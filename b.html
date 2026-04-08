@@ -1,0 +1,400 @@
+<!-- REL8TION /B PAGE - FULL DROP-IN HTML BLOCK -->
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div id="app" class="min-h-screen p-4 md:p-6"></div>
+
+<script>
+const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
+const SMS_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-lead-sms`;
+const REL8TION_LOGO = "https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png";
+const agentSlug = new URLSearchParams(location.search).get("agent");
+const uid = new URLSearchParams(location.search).get("uid");
+
+let detectedHouse = null;
+let agentData = null;
+
+function esc(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function safeUrl(url){
+  if(!url) return "";
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function formatPhone(p){
+  let c = String(p || "").replace(/\D/g,"");
+  return c.length === 10 ? "+1" + c : (c ? "+" + c : "");
+}
+
+function money(v){
+  const n = Number(v || 0);
+  return n ? "$" + n.toLocaleString() : "";
+}
+
+function setBackground(){
+  document.getElementById("app").style.background = `
+    radial-gradient(circle at top left, rgba(96,165,250,0.32), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(59,130,246,0.20), transparent 35%),
+    linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%)
+  `;
+}
+
+function showLoading(msg = "Loading your Rel8tion experience ✨"){
+  document.getElementById("app").innerHTML = `
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center">
+        <div class="mb-8">
+          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+        </div>
+        <div class="py-10">
+          <div class="w-20 h-20 border-8 border-slate-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
+          <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">Working Our Magic ✨</h2>
+          <p class="text-slate-500 text-lg font-bold animate-pulse">${esc(msg)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+  setBackground();
+}
+
+function showError(title, message){
+  document.getElementById("app").innerHTML = `
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center">
+        <div class="mb-8">
+          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+        </div>
+        <h1 class="font-['Poppins'] text-[30px] md:text-[40px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
+          ${esc(title)}
+        </h1>
+        <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">
+          ${esc(message)}
+        </p>
+      </div>
+    </div>
+  `;
+  setBackground();
+}
+
+function socialBtn(label, url, extra = ""){
+  if(!url) return "";
+  return `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="px-4 py-3 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-sm shadow-sm ${extra}">${label}</a>`;
+}
+
+function setPre(v){
+  document.getElementById("pre").value = v;
+  document.getElementById("yesBtn").classList.remove("active-pre");
+  document.getElementById("noBtn").classList.remove("active-pre");
+  if(v === "yes") document.getElementById("yesBtn").classList.add("active-pre");
+  if(v === "no") document.getElementById("noBtn").classList.add("active-pre");
+}
+
+function saveContact(name, phone, email){
+  const contact = `BEGIN:VCARD
+VERSION:3.0
+FN:${name}
+TEL:${phone || ""}
+EMAIL:${email || ""}
+END:VCARD`;
+
+  const blob = new Blob([contact], { type: "text/vcard" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${String(name || "agent").replace(/\s+/g, "-").toLowerCase()}.vcf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function fetchJson(url, options = {}){
+  const res = await fetch(url, options);
+  const raw = await res.text().catch(() => "");
+  if(!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
+  try{
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){
+    throw new Error("Invalid JSON response: " + raw);
+  }
+}
+
+async function init(){
+  showLoading();
+
+  try{
+    if(!agentSlug){
+      showError("Missing Agent", "This page is missing the agent slug in the URL.");
+      return;
+    }
+
+    const agents = await fetchJson(`${SUPABASE_URL}/rest/v1/agents?slug=eq.${encodeURIComponent(agentSlug)}&select=*`, {
+      headers: {
+        "apikey": KEY,
+        "Authorization": "Bearer " + KEY
+      }
+    });
+
+    agentData = Array.isArray(agents) ? agents[0] : null;
+
+    if(!agentData){
+      showError("Agent Not Found", "We couldn't find the agent tied to this page.");
+      return;
+    }
+
+    try{
+      await new Promise((resolve) => {
+        if(!navigator.geolocation) return resolve();
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          try{
+            const houses = await fetchJson(`${SUPABASE_URL}/rest/v1/rpc/find_nearest_open_house`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": KEY,
+                "Authorization": "Bearer " + KEY
+              },
+              body: JSON.stringify({
+                user_lat: pos.coords.latitude,
+                user_lng: pos.coords.longitude
+              })
+            });
+            if(Array.isArray(houses) && houses.length) detectedHouse = houses[0];
+          } catch(e){
+            console.log("Open house lookup skipped", e);
+          }
+          resolve();
+        }, () => resolve(), { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+      });
+    } catch(e){}
+
+    renderBuyer();
+
+  }catch(e){
+    console.log(e);
+    showError("Something Went Wrong", "Please try again.");
+  }
+}
+
+function renderBuyer(){
+  const houseImage = detectedHouse?.image || "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80";
+
+  document.getElementById("app").innerHTML = `
+    <div class="max-w-3xl mx-auto">
+      <div class="w-full rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)]">
+        
+        <div class="text-center mb-8">
+          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm mb-4" alt="Rel8tion">
+          <h1 class="font-['Poppins'] text-[34px] md:text-[48px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-3">
+            Your Rel8tionship<br>Starts Here
+          </h1>
+          <p class="text-slate-500 text-[17px] md:text-[19px] leading-relaxed font-medium max-w-xl mx-auto">
+            Save the contact, follow on social, and register below so you don’t miss the right home.
+          </p>
+        </div>
+
+        <div class="rounded-[34px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6 mb-7 text-center">
+          <img src="${agentData.image_url || "https://via.placeholder.com/200?text=Agent"}" class="w-32 h-32 rounded-full object-cover mx-auto shadow-[0_18px_40px_rgba(31,42,90,0.16)] mb-4" alt="${esc(agentData.name)}">
+          <div class="text-slate-900 text-[28px] md:text-[34px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
+            ${esc(agentData.name || "")}
+          </div>
+          <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium mb-5">
+            ${esc(agentData.brokerage || "")}
+          </p>
+
+          <button onclick="saveContact('${esc(agentData.name || "")}','${esc(agentData.phone || "")}','${esc(agentData.email || "")}')" class="w-full py-5 rounded-full font-black text-[17px] md:text-[18px] uppercase tracking-[-0.02em] text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all mb-5" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+            📲 Save Contact Info
+          </button>
+
+          <div class="flex flex-wrap gap-2 justify-center">
+            ${socialBtn("Facebook", agentData.facebook)}
+            ${socialBtn("Instagram", agentData.instagram)}
+            ${socialBtn("Website", agentData.website)}
+          </div>
+        </div>
+
+        <div class="rounded-[34px] overflow-hidden shadow-[0_20px_60px_rgba(31,42,90,0.08)] mb-7 border border-slate-100 bg-white">
+          <img src="${houseImage}" class="h-64 w-full object-cover" alt="Property">
+          <div class="p-6 md:p-8">
+            <h3 class="text-2xl md:text-3xl font-black text-[#1F2A5A] leading-tight mb-3">
+              ${detectedHouse ? "Our First House Date? Let’s Find the Perfect One." : "Let’s Find the Perfect One."}
+            </h3>
+            <p class="text-slate-500 text-[16px] leading-relaxed font-medium">
+              ${
+                detectedHouse
+                ? `You are at <strong>${esc(detectedHouse.address || "")}</strong>${detectedHouse.price ? ` listed at <strong>${money(detectedHouse.price)}</strong>` : ""}. If this isn’t the one, register below and we’ll help match you with better options today.`
+                : `Register below and tell us what you want. We’ll help match you with homes that make sense for your goals, budget, and timing.`
+              }
+            </p>
+          </div>
+        </div>
+
+        <div class="rounded-[34px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6">
+          <div class="text-center mb-5">
+            <div class="text-slate-900 text-[28px] md:text-[34px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
+              Register Below to Unlock the Best Match
+            </div>
+            <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium">
+              Follow on Instagram for exclusive listings, but also register below so we can actually help you secure the right home.
+            </p>
+          </div>
+
+          <div class="space-y-4">
+            <input id="name" placeholder="Your Name" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <input id="phone" placeholder="Phone Number" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <input id="email" placeholder="Email Address" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+
+            <select id="areas" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+              <option value="">Preferred Area</option>
+              <option>Queens</option>
+              <option>Nassau</option>
+              <option>Suffolk</option>
+              <option>Brooklyn</option>
+              <option>NYC</option>
+              <option>Staten Island</option>
+              <option>Upstate</option>
+              <option>Anywhere</option>
+            </select>
+
+            <select id="price" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+              <option value="">Price Range</option>
+              <option>500 and under</option>
+              <option>500-750</option>
+              <option>750-850</option>
+              <option>850-950</option>
+              <option>1M+</option>
+            </select>
+
+            <textarea id="notes" placeholder="What are you looking for? Tell us what matters most." class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y"></textarea>
+
+            <div class="text-slate-900 text-[17px] font-black tracking-[-0.02em]">
+              Are you pre-approved?
+            </div>
+
+            <div class="flex gap-3">
+              <button id="yesBtn" onclick="setPre('yes')" class="flex-1 py-4 rounded-[18px] bg-slate-100 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
+                Yes
+              </button>
+              <button id="noBtn" onclick="setPre('no')" class="flex-1 py-4 rounded-[18px] bg-slate-100 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
+                No
+              </button>
+            </div>
+
+            <input type="hidden" id="pre">
+
+            <label class="flex items-start gap-3 text-left text-slate-500 text-[13px] leading-relaxed font-medium">
+              <input type="checkbox" id="consent" class="mt-1">
+              <span>
+                I agree to be contacted about this property, similar homes, open houses, and financing options. If I’m not pre-approved, I consent to speaking with a specialist.
+              </span>
+            </label>
+
+            <button id="submitBtn" onclick="submitLead()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+              🔥 Show Me the Best Match
+            </button>
+
+            <p id="status" class="text-center text-slate-500 font-bold"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setBackground();
+}
+
+async function submitLead(){
+  const btn = document.getElementById("submitBtn");
+  const status = document.getElementById("status");
+
+  const form = {
+    name: document.getElementById("name").value.trim(),
+    phone: formatPhone(document.getElementById("phone").value),
+    email: document.getElementById("email").value.trim(),
+    areas: document.getElementById("areas").value,
+    price: document.getElementById("price").value,
+    notes: document.getElementById("notes").value.trim(),
+    preapproved: document.getElementById("pre").value,
+    consent: document.getElementById("consent").checked,
+    agent_slug: agentSlug,
+    chip_uid: uid || null,
+    property_address: detectedHouse?.address || "",
+    property_price: detectedHouse?.price || null
+  };
+
+  if(!form.name || !form.phone){
+    status.innerText = "Please enter your name and phone number.";
+    return;
+  }
+
+  if(!form.preapproved){
+    status.innerText = "Please select whether you are pre-approved.";
+    return;
+  }
+
+  if(!form.consent){
+    status.innerText = "Please check the consent box to continue.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "Sending...";
+  status.innerText = "";
+
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": KEY,
+        "Authorization": "Bearer " + KEY
+      },
+      body: JSON.stringify(form)
+    });
+
+    await fetch(SMS_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": KEY,
+        "Authorization": "Bearer " + KEY
+      },
+      body: JSON.stringify({
+        agent_phone: agentData?.phone || "",
+        buyer_phone: form.phone,
+        buyer_name: form.name,
+        areas: form.areas,
+        price: form.price,
+        preapproved: form.preapproved
+      })
+    });
+
+    btn.innerText = "Submitted ✓";
+    status.innerText = "Perfect. You're in. We'll be in touch shortly with next steps and matching homes.";
+  } catch(e){
+    console.log(e);
+    btn.disabled = false;
+    btn.innerText = "🔥 Show Me the Best Match";
+    status.innerText = "Something went wrong. Please try again.";
+  }
+}
+
+init();
+</script>
+
+<style>
+.active-pre{
+  background:linear-gradient(90deg,#38bdf8,#2563eb)!important;
+  color:#fff!important;
+  box-shadow:0 18px 40px rgba(59,130,246,0.28);
+}
+</style>

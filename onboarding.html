@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion | You're Live!</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    html, body{
+      margin:0;
+      padding:0;
+      overflow-x:hidden;
+    }
+
+    body{
+      font-family:'Inter',sans-serif;
+      color:#1F2A5A;
+      background:
+        radial-gradient(circle at top left, rgba(96,165,250,0.32), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(59,130,246,0.20), transparent 35%),
+        linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%);
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:url('https://rel8tion.info/wp-content/uploads/2026/04/logostogether.png') no-repeat center center;
+      background-size:55%;
+      opacity:0.03;
+      filter:grayscale(100%);
+      z-index:-1;
+      pointer-events:none;
+    }
+
+    .glass-card{
+      background:rgba(255,255,255,0.97);
+      backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.95);
+      box-shadow:0 40px 100px rgba(31,42,90,0.10);
+    }
+
+    .btn-rel8{
+      background:linear-gradient(135deg, #40c8ff, #6d5eff);
+      box-shadow:0 18px 38px rgba(109,94,255,0.30);
+    }
+
+    @keyframes bobFloat{
+      0%{ transform:translateY(0px); }
+      50%{ transform:translateY(-8px); }
+      100%{ transform:translateY(0px); }
+    }
+
+    .floating-chip{
+      animation:bobFloat 3.2s ease-in-out infinite;
+      will-change:transform;
+    }
+
+    @media (min-width:1024px){
+      .main-grid{
+        display:grid;
+        grid-template-columns:1.05fr 0.95fr;
+        gap:32px;
+        align-items:center;
+      }
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div class="min-h-screen flex items-center justify-center p-4 md:p-8">
+    <div class="glass-card max-w-6xl w-full rounded-[28px] md:rounded-[56px] p-4 sm:p-5 md:p-12">
+
+      <div class="main-grid">
+
+        <!-- LEFT SIDE -->
+        <div>
+          <img
+            src="https://rel8tion.info/wp-content/uploads/2026/04/logostogether.png"
+            alt="Rel8tion"
+            class="h-12 md:h-16 w-auto mb-6 mx-auto lg:mx-0 object-contain"
+          >
+
+          <div class="inline-flex items-center justify-center lg:justify-start mb-5 w-full lg:w-auto">
+            <div class="px-4 py-2 rounded-full bg-slate-50 border border-slate-200 shadow-sm text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+              You're Live
+            </div>
+          </div>
+
+          <h1 class="font-['Poppins'] text-[30px] sm:text-[36px] md:text-[64px] font-black leading-[0.9] tracking-[-0.05em] mb-4 text-center lg:text-left uppercase bg-gradient-to-br from-[#2057FF] to-[#1AB5F2] bg-clip-text text-transparent break-words">
+            Start Turning<br>Conversations<br>Into Closings
+          </h1>
+
+          <p class="text-[15px] sm:text-[16px] md:text-[21px] text-slate-500 leading-relaxed font-medium mb-8 text-center lg:text-left max-w-2xl">
+            Your Rel8tionChip is active. Use it in open houses, showings, and everyday conversations to capture contacts instantly and stay top-of-mind.
+          </p>
+
+          <!-- QUICK INSTRUCTIONS -->
+          <div class="rounded-[28px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.06)] p-5 md:p-6 mb-5">
+            <div class="text-slate-900 text-[22px] md:text-[24px] font-black tracking-[-0.03em] mb-4 text-left">
+              What To Do
+            </div>
+
+            <div class="space-y-4">
+              <div class="flex items-start gap-3">
+                <div class="min-w-[42px] h-[42px] rounded-[14px] bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-sm shadow-inner">
+                  01
+                </div>
+                <div class="text-left">
+                  <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Keep it on you</div>
+                  <div class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                    Attach it to your keys, bag, or wherever it is always ready.
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                <div class="min-w-[42px] h-[42px] rounded-[14px] bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-sm shadow-inner">
+                  02
+                </div>
+                <div class="text-left">
+                  <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Use it instead of a business card</div>
+                  <div class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                    Ask people to tap when the conversation is going well.
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                <div class="min-w-[42px] h-[42px] rounded-[14px] bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-sm shadow-inner">
+                  03
+                </div>
+                <div class="text-left">
+                  <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Let Rel8tion do the rest</div>
+                  <div class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                    Every tap opens your profile, saves your contact, and starts the relationship.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-slate-700 text-[13px] md:text-[13px] font-bold uppercase tracking-[0.14em] mt-4 text-center lg:text-left">
+            "Faster follow-up. Better first impressions. More opportunities kept alive."
+          </p>
+        </div>
+
+        <!-- RIGHT SIDE -->
+        <div class="mt-5 lg:mt-0 space-y-5">
+
+          <!-- BENEFITS -->
+          <div class="rounded-[30px] md:rounded-[40px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6">
+            <div class="text-[11px] font-black uppercase tracking-[0.22em] text-indigo-500 mb-3">
+              Key Benefits
+            </div>
+
+            <div class="space-y-4 text-left">
+              <div>
+                <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Instant contact capture</div>
+                <p class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                  No paper cards. No clunky sign-in sheet energy. Just a smooth tap experience.
+                </p>
+              </div>
+
+              <div>
+                <div class="font-black text-slate-900 text-[16px] md:text-[17px]">24/7 Pre-Approvals</div>
+                <p class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                  Non-pre-approved buyers can also get fast pre-approval support through our sponsored lending partners.
+                </p>
+              </div>
+
+              <div>
+                <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Better follow-up position</div>
+                <p class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                  You stay in front of the people you meet instead of being forgotten by dinner.
+                </p>
+              </div>
+
+              <div>
+                <div class="font-black text-slate-900 text-[16px] md:text-[17px]">Open-house-ready</div>
+                <p class="text-slate-500 text-[14px] md:text-[15px] leading-relaxed">
+                  Designed to help you capture more real opportunities from traffic you are already getting.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CTA -->
+          <a
+            id="goLive"
+            href="#"
+            class="btn-rel8 block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline"
+          >
+            See It In Action
+          </a>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const agent = urlParams.get('agent') || 'ron';
+    document.getElementById('goLive').href = `/b?agent=${agent}`;
+  </script>
+
+</body>
+</html>
