@@ -20,7 +20,7 @@
   }
 
   .rel8tion-wrapper {
-    background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+    background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 58%, #f0f7ff 100%);
     min-height: 100vh;
     position: relative;
   }
@@ -44,12 +44,26 @@
     to { transform: translateX(-50%); }
   }
 
+  .fade-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.07) 22%, rgba(240,247,255,0.93) 100%);
+  }
+
   .glass-card {
     background: rgba(255, 255, 255, 0.18);
     backdrop-filter: blur(8px) saturate(160%);
     -webkit-backdrop-filter: blur(8px) saturate(160%);
-    border: 1px solid rgba(255,255,255,0.6);
-    box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,255,255,0.65);
+    box-shadow: 0 25px 50px rgba(31, 42, 90, 0.11), inset 0 1px 1px rgba(255,255,255,0.35);
+  }
+
+  .glass-surface {
+    background: rgba(255,255,255,0.38);
+    border: 1px solid rgba(255,255,255,0.58);
+    box-shadow: 0 10px 22px rgba(31,42,90,0.08);
   }
 
   .brand-button {
@@ -58,6 +72,10 @@
     transition: all .3s ease;
     box-shadow: 0 10px 20px rgba(31,42,90,0.2);
     border: none;
+    text-decoration: none;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .brand-button:hover {
@@ -72,12 +90,17 @@
     transform: none;
   }
 
-  .fade-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-    background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.05) 25%, rgba(240,247,255,0.92) 100%);
+  .secondary-button {
+    background: rgba(255,255,255,0.45);
+    color: #1f2a5a;
+    border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 8px 20px rgba(31,42,90,0.08);
+    text-decoration: none;
+  }
+
+  .secondary-button:hover {
+    background: rgba(255,255,255,0.62);
+    transform: translateY(-2px);
   }
 </style>
 </head>
@@ -88,16 +111,80 @@
 
   <header class="w-full relative z-30 px-4 py-4 md:px-8 md:py-6 flex justify-between items-center">
     <a href="https://rel8tion.info"><img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-7 md:h-10 w-auto"></a>
-    <a href="https://rel8tion.info/how-it-works" class="brand-button px-5 py-2 md:px-7 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider no-underline inline-flex">How It Works</a>
+    <nav class="hidden sm:flex gap-6 font-bold text-[11px] md:text-sm text-[#1f2a5a] uppercase tracking-widest">
+      <a href="https://rel8tion.info/how-it-works" class="hover:text-blue-600 transition">How It Works</a>
+      <a href="https://rel8tion.info/features" class="hover:text-blue-600 transition">Features</a>
+      <a href="https://rel8tion.info/pricing" class="hover:text-blue-600 transition">Pricing</a>
+      <a href="https://rel8tion.info/contact" class="hover:text-blue-600 transition">Contact</a>
+    </nav>
+    <a href="https://rel8tion.info/contact" class="brand-button px-5 py-2 md:px-7 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider">Talk to Us</a>
   </header>
 
   <main class="relative z-20 px-4 md:px-8 pb-14">
-    <div class="max-w-4xl mx-auto pt-6 md:pt-12">
-      <section class="glass-card rounded-[40px] p-8 md:p-14">
+    <div class="max-w-6xl mx-auto pt-6 md:pt-12 space-y-6 md:space-y-10">
+      <section class="glass-card rounded-[42px] p-8 md:p-16 text-center">
+        <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/45 border border-white/60 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">Live Workflow Demo</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-[38px] md:text-[64px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-5">See Rel8tion in Action</h1>
+        <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-8">See how Rel8tion helps agents protect relationships, activate open houses instantly, simplify compliance, automate follow-up, and keep more deals moving toward closing.</p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="#demo-request" class="brand-button w-full sm:w-auto px-10 py-4 rounded-full font-bold uppercase tracking-wide">Request Your Demo</a>
+          <a href="https://rel8tion.info/contact" class="secondary-button w-full sm:w-auto px-10 py-4 rounded-full font-bold uppercase tracking-wide inline-flex justify-center">Talk to Us</a>
+        </div>
+      </section>
+
+      <section class="glass-card rounded-[42px] p-8 md:p-14">
+        <div class="text-center mb-8 md:mb-10">
+          <h2 class="font-['Plus_Jakarta_Sans'] text-[30px] md:text-[44px] leading-tight font-extrabold tracking-tight text-slate-900 mb-4">What Rel8tion Helps You Do</h2>
+          <p class="text-slate-700 text-base md:text-lg font-medium max-w-3xl mx-auto">Rel8tion is built for high-stakes, real-world transaction flow — where relationships, compliance, and conversion all have to work together.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Activate open houses instantly</h3><p class="text-slate-700 font-medium">Tap and launch your open-house workflow without setup friction.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Prove representation</h3><p class="text-slate-700 font-medium">Create cleaner relationship proof for represented buyers and their agents.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Simplify compliance</h3><p class="text-slate-700 font-medium">Capture structured records that support compliance-friendly operations.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Automate follow-up</h3><p class="text-slate-700 font-medium">Keep relationships alive after first interaction with less manual effort.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Support cleaner cooperation</h3><p class="text-slate-700 font-medium">Route buyers and agents through clearer paths with fewer handoff gaps.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Keep deals moving</h3><p class="text-slate-700 font-medium">From pre-approvals to deal-saver support, protect momentum through closing.</p></article>
+        </div>
+      </section>
+
+      <section class="glass-card rounded-[42px] p-8 md:p-14">
+        <div class="text-center mb-8 md:mb-10">
+          <h2 class="font-['Plus_Jakarta_Sans'] text-[30px] md:text-[44px] leading-tight font-extrabold tracking-tight text-slate-900 mb-4">What You’ll See in the Demo</h2>
+          <p class="text-slate-700 text-base md:text-lg font-medium max-w-3xl mx-auto">We walk through the actual workflow, not just feature screens, so you can see how Rel8tion fits your team day-to-day.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Smart Sign setup</h3><p class="text-slate-700 font-medium">See tap-to-activate setup in a real open-house context.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Buyer check-in flow</h3><p class="text-slate-700 font-medium">Follow the buyer journey from entry through key qualification moments.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Buyer-agent protection workflow</h3><p class="text-slate-700 font-medium">See how representation gets documented with clearer proof.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Compliance workflow</h3><p class="text-slate-700 font-medium">Review structured record flow that supports cleaner oversight.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Follow-up automation</h3><p class="text-slate-700 font-medium">Understand how Rel8tion helps agents stay consistently in front of buyers.</p></article>
+          <article class="glass-surface rounded-[28px] p-6"><h3 class="text-xl font-extrabold text-slate-900 mb-2">Pre-approval / deal support flow</h3><p class="text-slate-700 font-medium">Explore financing and deal-saver pathways that keep opportunities alive.</p></article>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <article class="glass-card rounded-[38px] p-8 md:p-10 md:col-span-2">
+          <h2 class="font-['Plus_Jakarta_Sans'] text-[28px] md:text-[36px] font-extrabold text-slate-900 mb-5">Who It’s For</h2>
+          <ul class="space-y-3 text-slate-700 font-semibold text-lg">
+            <li>• Listing agents</li>
+            <li>• Buyer’s agents</li>
+            <li>• Teams</li>
+            <li>• Brokerages</li>
+            <li>• Agents who want better systems and less friction</li>
+          </ul>
+        </article>
+        <article class="glass-card rounded-[38px] p-8 md:p-10 md:col-span-3 flex items-center">
+          <div>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-[28px] md:text-[36px] font-extrabold text-slate-900 mb-4">Why Rel8tion Is Different</h2>
+            <p class="text-slate-700 text-lg md:text-xl font-medium">Rel8tion is built around the real moments where deals are won, protected, delayed, or saved — not just lead capture.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="demo-request" class="glass-card rounded-[42px] p-8 md:p-14">
         <div class="text-center mb-8">
-          <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/45 border border-white/60 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">Request a Demo</div>
-          <h1 class="font-['Plus_Jakarta_Sans'] text-[34px] md:text-[56px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-5">Let's Build Your Open House System</h1>
-          <p class="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">Tell us about your team and we will show you how Rel8tion fits your workflow.</p>
+          <h2 class="font-['Plus_Jakarta_Sans'] text-[30px] md:text-[44px] font-extrabold text-slate-900 mb-3">Request Your Rel8tion Demo</h2>
+          <p class="text-slate-700 text-base md:text-lg font-medium max-w-3xl mx-auto">See how Rel8tion can fit your business, your workflow, and the way you actually work in the field.</p>
         </div>
 
         <form id="demo-request-form" class="space-y-5" novalidate>
@@ -141,6 +228,26 @@
       </section>
     </div>
   </main>
+
+  <footer class="w-full relative z-30 bg-white/35 backdrop-blur-md border-t border-white/40 mt-12 px-6 py-14">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-10 text-center md:text-left">
+      <div class="max-w-md">
+        <img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-9 mb-6 mx-auto md:mx-0 opacity-90">
+        <p class="text-slate-600 text-sm font-medium">Rel8tion is the relationship, compliance, cooperation, and conversion system built to help agents protect more opportunities from first tap to closing.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-8 text-sm font-bold text-slate-700">
+        <a href="https://rel8tion.info/how-it-works" class="hover:text-slate-900">How It Works</a>
+        <a href="https://rel8tion.info/features" class="hover:text-slate-900">Features</a>
+        <a href="https://rel8tion.info/pricing" class="hover:text-slate-900">Pricing</a>
+        <a href="https://rel8tion.info/agents" class="hover:text-slate-900">Agents</a>
+        <a href="https://rel8tion.info/demo" class="hover:text-slate-900">Demo</a>
+        <a href="https://rel8tion.info/contact" class="hover:text-slate-900">Contact</a>
+        <a href="https://rel8tion.info/privacy-policy" class="hover:text-slate-900">Privacy Policy</a>
+        <a href="https://rel8tion.info/terms-of-service" class="hover:text-slate-900">Terms of Service</a>
+      </div>
+    </div>
+    <div class="text-center mt-12 pt-8 border-t border-white/40 text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">&copy; 2026 REL8TION. ALL RIGHTS RESERVED.</div>
+  </footer>
 </div>
 
 <script>
