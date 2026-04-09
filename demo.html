@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rel8tion Demo | See Rel8tion in Action</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand-navy: #1f2a5a;
+      --brand-sky: #38bdf8;
+      --brand-bg: #f0f7ff;
+      --card-border: rgba(255, 255, 255, 0.55);
+      --card-bg: rgba(255, 255, 255, 0.18);
+      --text-muted: #475569;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      color: var(--brand-navy);
+      background: linear-gradient(180deg, #38bdf8 0%, #d9ecff 28%, #f0f7ff 72%, #f0f7ff 100%);
+      background-attachment: fixed;
+    }
+
+    .page-wrap {
+      position: relative;
+      min-height: 100vh;
+      overflow: hidden;
+      padding: 1.25rem;
+    }
+
+    .cloud-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.5;
+      background-image: radial-gradient(circle at 12% 22%, rgba(255,255,255,0.62) 0, rgba(255,255,255,0) 16%),
+                        radial-gradient(circle at 84% 14%, rgba(255,255,255,0.56) 0, rgba(255,255,255,0) 18%),
+                        radial-gradient(circle at 68% 42%, rgba(255,255,255,0.42) 0, rgba(255,255,255,0) 20%);
+      z-index: 0;
+    }
+
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .top-nav,
+    .glass-card {
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      backdrop-filter: blur(8px) saturate(160%);
+      -webkit-backdrop-filter: blur(8px) saturate(160%);
+      box-shadow: 0 24px 54px rgba(31, 42, 90, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .top-nav {
+      border-radius: 22px;
+      padding: 0.9rem 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .logo {
+      height: 34px;
+      width: auto;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.05rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .nav-links a {
+      color: var(--brand-navy);
+      text-decoration: none;
+      opacity: 0.9;
+    }
+
+    .btn {
+      border-radius: 999px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      padding: 0.86rem 1.5rem;
+      font-weight: 700;
+      font-size: 0.87rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.22s ease;
+    }
+
+    .btn-primary {
+      color: #fff;
+      background: var(--brand-navy);
+      box-shadow: 0 12px 28px rgba(31, 42, 90, 0.25);
+    }
+
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    .btn-secondary {
+      color: var(--brand-navy);
+      border-color: rgba(255,255,255,0.72);
+      background: rgba(255,255,255,0.33);
+    }
+
+    .hero {
+      border-radius: 34px;
+      padding: 2.1rem;
+      text-align: center;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      font-size: 0.69rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-weight: 800;
+      margin-bottom: 0.9rem;
+      padding: 0.4rem 0.72rem;
+      border: 1px solid rgba(255,255,255,0.65);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.38);
+    }
+
+    h1, h2, h3 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      color: #0f1d4e;
+    }
+
+    h1 { font-size: clamp(2rem, 5vw, 4rem); margin-bottom: 0.95rem; }
+    h2 { font-size: clamp(1.45rem, 3vw, 2.65rem); margin-bottom: 0.65rem; }
+    h3 { font-size: clamp(1.15rem, 2.2vw, 1.48rem); margin-bottom: 0.5rem; }
+
+    .lead {
+      max-width: 930px;
+      margin: 0 auto;
+      font-size: clamp(1rem, 2vw, 1.33rem);
+      line-height: 1.5;
+      color: #1e2e66;
+      font-weight: 500;
+    }
+
+    .actions {
+      margin-top: 1.4rem;
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .content-section { margin-top: 1rem; }
+
+    .grid {
+      display: grid;
+      gap: 0.86rem;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .card {
+      border-radius: 26px;
+      padding: 1.3rem;
+      min-height: 100%;
+    }
+
+    .card p { margin: 0; color: var(--text-muted); line-height: 1.52; font-weight: 500; }
+
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-12 { grid-column: span 12; }
+
+    .list {
+      margin: 0;
+      padding: 0 0 0 1.1rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-weight: 500;
+    }
+
+    .list li + li { margin-top: 0.45rem; }
+
+    .section-head {
+      margin-bottom: 0.8rem;
+      text-align: center;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      margin-bottom: 0.35rem;
+      display: block;
+      color: #25346a;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(31,42,90,0.2);
+      background: rgba(255,255,255,0.62);
+      border-radius: 12px;
+      padding: 0.74rem 0.82rem;
+      font: inherit;
+      color: #1d2a58;
+    }
+
+    textarea { min-height: 120px; resize: vertical; }
+
+    .full { grid-column: span 2; }
+
+    footer {
+      margin-top: 1rem;
+      border-radius: 24px;
+      padding: 1.1rem;
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: 1.3fr 2fr;
+      align-items: center;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 0.8rem 1rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      font-size: 0.87rem;
+    }
+
+    .footer-links a { color: var(--brand-navy); text-decoration: none; font-weight: 600; }
+
+    @media (max-width: 960px) {
+      .span-4, .span-6 { grid-column: span 12; }
+      .top-nav { flex-direction: column; align-items: stretch; }
+      .nav-links { justify-content: flex-start; }
+    }
+
+    @media (max-width: 680px) {
+      .page-wrap { padding: 0.75rem; }
+      .hero, .card, footer { padding: 1rem; border-radius: 19px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .full { grid-column: span 1; }
+      footer { grid-template-columns: 1fr; }
+      .footer-links { justify-content: flex-start; }
+      .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="cloud-layer" aria-hidden="true"></div>
+    <div class="shell">
+      <header class="top-nav">
+        <a href="https://rel8tion.info" aria-label="Rel8tion home">
+          <img class="logo" src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" />
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="https://rel8tion.info/how-it-works">How It Works</a>
+          <a href="https://rel8tion.info/features">Features</a>
+          <a href="https://rel8tion.info/pricing">Pricing</a>
+          <a href="https://rel8tion.info/agents">Agents</a>
+          <a href="https://rel8tion.info/contact">Contact</a>
+        </nav>
+        <a class="btn btn-primary" href="#request-demo">Request Your Demo</a>
+      </header>
+
+      <main>
+        <section class="glass-card hero">
+          <span class="eyebrow">Live Workflow Demo</span>
+          <h1>See Rel8tion in Action</h1>
+          <p class="lead">See how Rel8tion helps agents protect relationships, activate open houses instantly, simplify compliance, automate follow-up, and keep more deals moving toward closing.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#request-demo">Request Your Demo</a>
+            <a class="btn btn-secondary" href="https://rel8tion.info/contact">Talk to Us</a>
+          </div>
+        </section>
+
+        <section class="content-section glass-card card span-12">
+          <div class="section-head">
+            <h2>What Rel8tion Helps You Do</h2>
+          </div>
+          <div class="grid">
+            <article class="glass-card card span-4"><h3>Activate open houses instantly</h3><p>Smart sign auto-setup launches the right event flow without manual setup overhead.</p></article>
+            <article class="glass-card card span-4"><h3>Prove representation</h3><p>Represented-buyer protection helps create cleaner evidence of buyer-agent relationships.</p></article>
+            <article class="glass-card card span-4"><h3>Simplify compliance</h3><p>Compliance-friendly records support buyer, buyer-agent, and listing-agent workflows in one place.</p></article>
+            <article class="glass-card card span-4"><h3>Automate follow-up</h3><p>Automated nurturing keeps communication active so opportunities don’t stall after first contact.</p></article>
+            <article class="glass-card card span-4"><h3>Support cleaner cooperation</h3><p>Structured workflows reduce friction between all sides and support broker oversight expectations.</p></article>
+            <article class="glass-card card span-4"><h3>Keep deals moving</h3><p>Instant pre-approvals and deal-saver support help protect momentum when transactions get complex.</p></article>
+          </div>
+        </section>
+
+        <section class="content-section glass-card card">
+          <div class="section-head">
+            <h2>What You’ll See in the Demo</h2>
+          </div>
+          <div class="grid">
+            <article class="glass-card card span-6"><h3>Smart Sign setup</h3><p>How activation starts on-site in seconds.</p></article>
+            <article class="glass-card card span-6"><h3>Buyer check-in flow</h3><p>How visitors move into the right journey without confusion.</p></article>
+            <article class="glass-card card span-6"><h3>Buyer-agent protection workflow</h3><p>How representation is documented with fewer gaps.</p></article>
+            <article class="glass-card card span-6"><h3>Compliance workflow</h3><p>How records stay organized for operational and brokerage needs.</p></article>
+            <article class="glass-card card span-6"><h3>Follow-up automation</h3><p>How nurturing stays active without adding admin burden.</p></article>
+            <article class="glass-card card span-6"><h3>Pre-approval / deal support flow</h3><p>How financing and deal-saver paths help sustain progress toward closing.</p></article>
+          </div>
+        </section>
+
+        <section class="content-section glass-card card">
+          <div class="section-head">
+            <h2>Who It’s For</h2>
+          </div>
+          <div class="grid">
+            <article class="glass-card card span-6">
+              <ul class="list">
+                <li>Listing agents</li>
+                <li>Buyer’s agents</li>
+                <li>Teams</li>
+                <li>Brokerages</li>
+                <li>Agents who want better systems and less friction</li>
+              </ul>
+            </article>
+            <article class="glass-card card span-6">
+              <h3>Why Rel8tion Is Different</h3>
+              <p>Rel8tion is built around the real moments where deals are won, protected, delayed, or saved — not just lead capture.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="request-demo" class="content-section glass-card card">
+          <div class="section-head">
+            <h2>Request Your Rel8tion Demo</h2>
+            <p class="lead" style="font-size:1.06rem;max-width:760px;">See how Rel8tion can fit your business, your workflow, and the way you actually work in the field.</p>
+          </div>
+
+          <form action="https://rel8tion.info/thank-you" method="get" class="glass-card card" aria-label="Demo request form">
+            <!-- TODO: Replace with live CRM/form handler endpoint when integration is available. -->
+            <div class="form-grid">
+              <div>
+                <label for="name">Name</label>
+                <input id="name" name="name" type="text" required />
+              </div>
+              <div>
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" required />
+              </div>
+              <div>
+                <label for="phone">Phone</label>
+                <input id="phone" name="phone" type="tel" />
+              </div>
+              <div>
+                <label for="brokerage">Brokerage</label>
+                <input id="brokerage" name="brokerage" type="text" />
+              </div>
+              <div class="full">
+                <label for="role">Role</label>
+                <select id="role" name="role">
+                  <option value="">Select role</option>
+                  <option>Listing Agent</option>
+                  <option>Buyer’s Agent</option>
+                  <option>Team Leader</option>
+                  <option>Broker / Brokerage Ops</option>
+                </select>
+              </div>
+              <div class="full">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" placeholder="Tell us your goals, process gaps, or what you want covered in your demo."></textarea>
+              </div>
+              <div class="full">
+                <button class="btn btn-primary" type="submit">Request Your Demo</button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <footer class="glass-card">
+        <p style="margin:0;color:#31406f;font-weight:500;">Rel8tion helps agents protect relationships, simplify compliance, automate nurturing, and support cleaner cooperation from open house through closing.</p>
+        <nav class="footer-links" aria-label="Footer links">
+          <a href="https://rel8tion.info/how-it-works">How It Works</a>
+          <a href="https://rel8tion.info/features">Features</a>
+          <a href="https://rel8tion.info/pricing">Pricing</a>
+          <a href="https://rel8tion.info/agents">Agents</a>
+          <a href="https://rel8tion.info/demo">Demo</a>
+          <a href="https://rel8tion.info/contact">Contact</a>
+          <a href="https://rel8tion.info/privacy-policy">Privacy Policy</a>
+          <a href="https://rel8tion.info/terms-of-service">Terms of Service</a>
+        </nav>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>
