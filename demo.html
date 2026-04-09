@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Rel8tion | Request a Demo</title>
+<style>
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+    background-color: #f0f7ff;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    color: #1f2a5a;
+  }
+
+  .rel8tion-wrapper {
+    background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+    min-height: 100vh;
+    position: relative;
+  }
+
+  .moving-clouds {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 500px;
+    z-index: 1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+    background-repeat: repeat-x;
+    background-size: 800px auto;
+    animation: driftClouds 120s linear infinite;
+  }
+
+  @keyframes driftClouds {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px) saturate(160%);
+    -webkit-backdrop-filter: blur(8px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255,255,255,0.35);
+  }
+
+  .brand-button {
+    background-color: #1f2a5a;
+    color: #fff;
+    transition: all .3s ease;
+    box-shadow: 0 10px 20px rgba(31,42,90,0.2);
+    border: none;
+  }
+
+  .brand-button:hover {
+    background-color: #161e40;
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(31,42,90,0.3);
+  }
+
+  .brand-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .fade-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.05) 25%, rgba(240,247,255,0.92) 100%);
+  }
+</style>
+</head>
+<body>
+<div class="rel8tion-wrapper">
+  <div class="moving-clouds"></div>
+  <div class="fade-overlay"></div>
+
+  <header class="w-full relative z-30 px-4 py-4 md:px-8 md:py-6 flex justify-between items-center">
+    <a href="https://rel8tion.info/"><img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-7 md:h-10 w-auto"></a>
+    <a href="https://rel8tion.info/howitworks" class="brand-button px-5 py-2 md:px-7 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider no-underline inline-flex">How It Works</a>
+  </header>
+
+  <main class="relative z-20 px-4 md:px-8 pb-14">
+    <div class="max-w-4xl mx-auto pt-6 md:pt-12">
+      <section class="glass-card rounded-[40px] p-8 md:p-14">
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/45 border border-white/60 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">Request a Demo</div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-[34px] md:text-[56px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-5">Let's Build Your Open House System</h1>
+          <p class="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">Tell us about your team and we will show you how Rel8tion fits your workflow.</p>
+        </div>
+
+        <form id="demo-request-form" class="space-y-5" novalidate>
+          <div>
+            <label for="name" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Name</label>
+            <input id="name" name="name" type="text" required class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300" autocomplete="name">
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label for="email" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Email</label>
+              <input id="email" name="email" type="email" required class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300" autocomplete="email">
+            </div>
+            <div>
+              <label for="phone" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Phone</label>
+              <input id="phone" name="phone" type="tel" required class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300" autocomplete="tel">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label for="brokerage" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Brokerage</label>
+              <input id="brokerage" name="brokerage" type="text" class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300">
+            </div>
+            <div>
+              <label for="role" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Role</label>
+              <input id="role" name="role" type="text" class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="Agent, Broker, Team Lead...">
+            </div>
+          </div>
+
+          <div>
+            <label for="message" class="block text-sm font-bold uppercase tracking-widest text-slate-700 mb-2">Message</label>
+            <textarea id="message" name="message" rows="5" class="w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-300" placeholder="Tell us about your goals and timeline."></textarea>
+          </div>
+
+          <div>
+            <button id="demo-submit-button" type="submit" class="brand-button w-full py-4 rounded-full font-bold uppercase tracking-wider text-sm md:text-base">Submit Demo Request</button>
+            <p id="demo-form-error" class="mt-3 text-sm font-medium text-red-700" role="alert" aria-live="polite" hidden></p>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ============================
+  // Supabase configuration
+  // ============================
+  // TODO: Paste your Supabase project URL below (example: https://xyzcompany.supabase.co)
+  const SUPABASE_URL = "https://YOUR-PROJECT-ID.supabase.co";
+
+  // TODO: Paste your Supabase anon key below
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+  // Thank-you redirect URL after successful insert
+  const THANK_YOU_URL = "https://rel8tion.info/thank-you";
+
+  (function () {
+    const form = document.getElementById("demo-request-form");
+    const submitButton = document.getElementById("demo-submit-button");
+    const errorMessage = document.getElementById("demo-form-error");
+
+    if (!form || !submitButton || !errorMessage) {
+      return;
+    }
+
+    function setSubmitting(isSubmitting) {
+      submitButton.disabled = isSubmitting;
+      submitButton.setAttribute("aria-busy", isSubmitting ? "true" : "false");
+      submitButton.textContent = isSubmitting ? "Submitting..." : "Submit Demo Request";
+    }
+
+    function setError(message) {
+      if (!message) {
+        errorMessage.hidden = true;
+        errorMessage.textContent = "";
+        return;
+      }
+      errorMessage.textContent = message;
+      errorMessage.hidden = false;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      setError("");
+
+      const formData = new FormData(form);
+      const payload = {
+        name: String(formData.get("name") || "").trim(),
+        email: String(formData.get("email") || "").trim(),
+        phone: String(formData.get("phone") || "").trim(),
+        brokerage: String(formData.get("brokerage") || "").trim(),
+        role: String(formData.get("role") || "").trim(),
+        message: String(formData.get("message") || "").trim()
+      };
+
+      if (!payload.name || !payload.email || !payload.phone) {
+        setError("Please complete name, email, and phone before submitting.");
+        return;
+      }
+
+      setSubmitting(true);
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/demo_requests`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to submit your request right now. Please try again.");
+        }
+
+        window.location.href = THANK_YOU_URL;
+      } catch (error) {
+        setError(error && error.message ? error.message : "Something went wrong. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
+    });
+  })();
+</script>
+</body>
+</html>
