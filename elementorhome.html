@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
 <title>Rel8tion | Show Up, Tap Once, Everything Goes Live.</title>
-
 <style>
     html, body {
         margin: 0 !important;
@@ -16,18 +14,16 @@
         background-color: #f0f7ff;
     }
 
-    /* 1. DEEP BLUE SKY WRAPPER */
     .rel8tion-wrapper {
         font-family: 'Inter', sans-serif;
         color: #1f2a5a;
         background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
-        background-attachment: fixed; 
+        background-attachment: fixed;
         width: 100%;
         min-height: 100vh;
         position: relative;
     }
 
-    /* 2. THE MOVING CLOUDS */
     .moving-clouds {
         position: fixed;
         top: 0;
@@ -41,19 +37,19 @@
         background-size: 800px auto;
         animation: driftClouds 120s linear infinite;
     }
-    @keyframes driftClouds { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-    /* ========================================================= */
-    /* THE BULLETPROOF STAGE (House + Agents locked together)    */
-    /* ========================================================= */
-    
+    @keyframes driftClouds {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+
     .scene-stage {
         position: fixed;
-        top: 60%; /* Pushes the house slightly down on Desktop */
+        top: 60%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 1400px; /* Base Desktop Size */
-        aspect-ratio: 16 / 9; /* Locks the shape */
+        width: 1400px;
+        aspect-ratio: 16 / 9;
         z-index: 2;
         pointer-events: none;
     }
@@ -65,32 +61,25 @@
         filter: saturate(1.1);
     }
 
-    /* THE FULL-SCREEN FADE (Blends the house edges seamlessly) */
     .fade-overlay {
         position: fixed;
         inset: 0;
         width: 100vw;
         height: 100vh;
-        z-index: 5; /* Sits OVER the house, UNDER the text cards */
+        z-index: 5;
         pointer-events: none;
         background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
     }
 
-    /* THE AGENTS (Now locked to the House Image) */
     .agent-cutout {
-        position: absolute; /* Absolute to the Stage, not the screen! */
-        width: 3.5%; 
+        position: absolute;
+        width: 3.5%;
         height: auto;
         z-index: 10;
         opacity: 0;
-        animation-fill-mode: both !important; /* Stops the top-left ghosting */
+        animation-fill-mode: both !important;
     }
 
-    /* HOW TO MOVE THEM: 
-       Change `top: XX%`. A higher number moves them down into the grass. 
-       A lower number moves them up toward the roof.
-       You only have to change it HERE. It will auto-scale to Mobile! 
-    */
     @keyframes walk1 { 0% { left: 50%; top: 70%; opacity: 0; } 10% { opacity: 1; } 100% { left:25%; top: 56%; opacity: 0; } }
     @keyframes walk2 { 0% { left: 47%; top: 52%; opacity: 0; } 10% { opacity: 1; } 100% { left: 15%; top: 79%; opacity: 0; } }
     @keyframes walk3 { 0% { left: 77%; top: 57%; opacity: 0; } 10% { opacity: 1; } 100% { left: 50%; top: 75%; opacity: 0; } }
@@ -103,25 +92,20 @@
     .agent-4 { animation: walk4 30s infinite linear; animation-delay: 6s; }
     .agent-5 { animation: walk5 50s infinite linear; animation-delay: 3s; }
 
-    /* ========================================================= */
-    /* RESPONSIVE SCALING (House scales, agents follow perfectly) */
-    /* ========================================================= */
-
     @media (max-width: 1024px) {
         .scene-stage {
-            width: 180vw; /* Scales the house up for Tablet/Fold */
-            top: 70%;     /* Lowers the house to make room for header */
+            width: 180vw;
+            top: 70%;
         }
     }
 
     @media (max-width: 768px) {
         .scene-stage {
-            width: 280vw; /* Scales the house massively for tall iPhones */
-            top: 45%;     /* Lifts the house up behind the text */
+            width: 280vw;
+            top: 45%;
         }
     }
 
-    /* LAYER 3: PREMIUM GLASS UI */
     .glass-card {
         background: rgba(255, 255, 255, 0.15) !important;
         backdrop-filter: blur(5px) saturate(160%);
@@ -143,174 +127,202 @@
         align-items: center;
         justify-content: center;
     }
+
     .brand-button:hover {
         background-color: #161e40 !important;
         transform: translateY(-2px);
         box-shadow: 0 15px 30px rgba(31, 42, 90, 0.3) !important;
     }
+
+    .secondary-button {
+        background: rgba(255,255,255,0.38);
+        color: #1f2a5a !important;
+        border: 1px solid rgba(255,255,255,0.7);
+        box-shadow: 0 8px 20px rgba(31, 42, 90, 0.08);
+    }
+
+    .secondary-button:hover {
+        background: rgba(255,255,255,0.62);
+    }
 </style>
 </head>
-
 <body>
-
 <div class="rel8tion-wrapper">
     <div class="moving-clouds"></div>
-    
+
     <div class="scene-stage">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png" class="house-img" alt="House Background">
-        
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
-
     </div>
 
     <div class="fade-overlay"></div>
 
     <header class="w-full absolute top-0 left-0 z-50 px-4 pt-0 flex justify-between items-center bg-transparent md:px-8 md:py-6">
         <img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-4 w-auto md:h-10">
-        
+
         <nav class="hidden sm:flex gap-8 font-bold text-[11px] md:text-sm text-[#1f2a5a] uppercase tracking-widest">
-            <a href="#" class="hover:text-blue-600 transition">How it Works</a>
-            <a href="#" class="hover:text-blue-600 transition">Features</a>
-            <a href="#access" class="hover:text-blue-600 transition">Contact</a>
+            <a href="https://rel8tion.info/how-it-works" class="hover:text-blue-600 transition">How It Works</a>
+            <a href="https://rel8tion.info/features" class="hover:text-blue-600 transition">Features</a>
+            <a href="https://rel8tion.info/agents" class="hover:text-blue-600 transition">Agents</a>
+            <a href="https://rel8tion.info/contact" class="hover:text-blue-600 transition">Contact</a>
         </nav>
-        
-        <a href="#access" id="ctaBtnTop" class="brand-button px-5 py-2 md:px-8 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider">
-            Login
+
+        <a href="https://rel8tion.info/demo" class="brand-button px-5 py-2 md:px-8 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider">
+            Request a Demo
         </a>
     </header>
 
-   <div class="relative z-20 w-full px-4 md:px-6 pt-36 pb-10 md:pt-40">
+    <main class="relative z-20 w-full px-4 md:px-6 pt-36 pb-10 md:pt-40">
         <div class="max-w-6xl mx-auto space-y-16 md:space-y-24">
-
-          <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+            <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
                 <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
-                    The Automation Revolution for Real Estate
+                    Built for Modern Real Estate Professionals
                 </div>
-                
+
                 <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
-                    Show Up, Tap Once,<br>Everything Goes Live
+                    Show Up. Tap Once. Everything Goes Live.
                 </h1>
-                
-                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto mb-10 leading-normal">
-                    Rel8tion is a self-programming open house system that lets agents show up, tap once, capture every relationship, verify representation, and automate follow-up without manual setup.
+
+                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-10 leading-normal">
+                    Rel8tion helps agents activate open houses instantly, prove representation, simplify compliance, automate follow-up, and keep more deals alive from first tap to closing.
                 </p>
-                <div class="flex justify-center">
-                    <a href="#access" id="ctaBtn" class="brand-button inline-flex items-center justify-center gap-3 w-full md:w-auto px-12 py-6 rounded-full font-bold text-xl uppercase tracking-wide">
-                        🚀 Activate Your System
+
+                <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+                    <a href="https://rel8tion.info/how-it-works" class="brand-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        See It In Action
                     </a>
-                </div>
-                <div class="mt-10 flex flex-wrap items-center justify-center gap-3 text-[12px] md:text-[13px] font-black uppercase tracking-[0.16em] text-slate-600">
-                    <span>⚡ Self-Programming Sign </span> • <span>📍 Verified Representation </span> • <span>💬 Automated Workflow </span>
+                    <a href="https://rel8tion.info/demo" class="secondary-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide inline-flex justify-center">
+                        Request a Demo
+                    </a>
                 </div>
             </section>
 
             <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="glass-card rounded-[38px] p-10 text-left">
+                <article class="glass-card rounded-[38px] p-10 text-left">
                     <div class="text-5xl mb-8">📱</div>
-                    <h3 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Smart Sign & Rel8tion Chip</h3>
-                    <div class="space-y-3 text-slate-700 text-lg leading-relaxed font-medium">
-                        <p>A self-programming sign that can be tapped on-site to verify the listing and launch the correct buyer flow without manual programming.</p>
-                        <p>Paired with the Rel8tion Chip: It connects the tap to the right profile, brand, and automation workflow.</p>
-                    </div>
-                </div>
-                <div class="glass-card rounded-[38px] p-10 text-left">
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Smart Sign Auto-Setup</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">Arrive at the open house, tap the sign, and Rel8tion sets everything up automatically — no extra steps, no manual programming, no wasted time.</p>
+                </article>
+                <article class="glass-card rounded-[38px] p-10 text-left">
                     <div class="text-5xl mb-8">🛡️</div>
-                    <h3 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Verified Representation</h3>
-                    <div class="space-y-3 text-slate-700 text-lg leading-relaxed font-medium">
-                        <p>A buyer-agent linking system that shows when a buyer is already tied to an agent, protecting relationships and avoiding arguments later.</p>
-                        <p>Creates immediate, time-stamped proof that the buyer was represented at the event.</p>
-                    </div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Buyer Relationship Protection</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">Give buyer’s agents proof of relationship before or at the open house, helping protect represented buyers and reduce the risk of clients being steered away.</p>
+                </article>
+            </section>
+
+            <section class="glass-card rounded-[44px] p-10 md:p-16">
+                <div class="text-center mb-10">
+                    <h2 class="text-[32px] md:text-[48px] font-extrabold text-slate-900">How Rel8tion Works</h2>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 1</div>
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Tap to Activate</h3>
+                        <p class="text-slate-700 font-medium">Arrive on-site and tap your smart sign or Rel8tion device.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 2</div>
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Launch the Right Flow</h3>
+                        <p class="text-slate-700 font-medium">Rel8tion loads the property, event, and buyer journey automatically.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 3</div>
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Capture and Protect Relationships</h3>
+                        <p class="text-slate-700 font-medium">Buyers, buyer’s agents, and listing agents move through the correct workflow with cleaner records and better protection.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 4</div>
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Keep the Deal Moving</h3>
+                        <p class="text-slate-700 font-medium">Automated follow-up, compliance support, pre-approvals, and deal-saver tools help keep the process alive through closing.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="glass-card rounded-[44px] p-10 md:p-16">
+                <div class="text-center mb-10">
+                    <h2 class="text-[32px] md:text-[48px] font-extrabold text-slate-900">Built for the Moments That Matter Most</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">The Open House Setup That Handles Itself</h3>
+                        <p class="text-slate-700 font-medium">Rel8tion’s smart sign activates on-site and launches the right event flow automatically, so agents can focus on people instead of setup.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Cleaner Cooperation. Better Negotiation.</h3>
+                        <p class="text-slate-700 font-medium">Rel8tion creates a structured workflow between buyers, buyer’s agents, and listing agents so communication is cleaner, cooperation is easier, and deals move with less friction.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Protect the Buyer-Agent Relationship</h3>
+                        <p class="text-slate-700 font-medium">Create proof of relationship before or at the open house so agents can document representation and reduce the risk of clients being steered away.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Paperless Compliance, Signed Digitally</h3>
+                        <p class="text-slate-700 font-medium">Handle compliance forms digitally so nothing gets lost, delayed, or held up by paper-based workflows.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Stay Front and Center for the Full Home Search</h3>
+                        <p class="text-slate-700 font-medium">Rel8tion keeps agents in front of buyers with automated nurturing that stays active throughout the full home search, not just the first interaction.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Built for Broker Oversight</h3>
+                        <p class="text-slate-700 font-medium">Give brokerages cleaner records, better visibility, and more control over compliance-sensitive interactions.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Instant Pre-Approvals That Keep Deals Moving</h3>
+                        <p class="text-slate-700 font-medium">Get buyers financing-ready faster so agents can stay focused on the properties, conversations, and closings that matter.</p>
+                    </article>
+                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Save the Deals That Are Hard to Close</h3>
+                        <p class="text-slate-700 font-medium">When deals get messy, Rel8tion gives agents access to support designed to help resolve issues and keep transactions alive.</p>
+                    </article>
                 </div>
             </section>
 
             <section class="glass-card rounded-[44px] p-12 md:p-20 text-center">
-                <div class="inline-flex items-center justify-center mb-6">
-                    <div class="px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
-                        Why It Matters
-                    </div>
-                </div>
-                <h2 class="text-[34px] md:text-[56px] font-extrabold text-slate-900 mb-8">Less friction means more use.</h2>
-                <p class="text-slate-700 text-xl md:text-2xl font-medium max-w-4xl mx-auto leading-relaxed">
-                    Agents adopt tools that save time. Every buyer is captured through a structured check-in flow, not a paper sheet or half-broken QR experience.
+                <h2 class="text-[34px] md:text-[56px] font-extrabold text-slate-900 mb-8">Real Estate Moves Fast. Relationships Break Faster.</h2>
+                <p class="text-slate-700 text-xl md:text-2xl font-medium max-w-5xl mx-auto leading-relaxed">
+                    Rel8tion was built for the moments where real estate deals are won, lost, protected, or saved — from open houses and buyer representation to compliance, financing readiness, and long-term follow-up.
                 </p>
             </section>
 
-            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="glass-card rounded-[38px] p-10 text-left">
-                    <div class="text-[#1f2a5a] font-black uppercase tracking-widest text-xs mb-4">Workflow</div>
-                    <h3 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Automated Workflow</h3>
-                    <p class="text-slate-700 text-lg leading-relaxed">Buyer check-in, messaging, routing, and follow-up happen from one connected system instead of disconnected tools.</p>
-                </div>
-                <div class="glass-card rounded-[38px] p-10 text-left">
-                    <div class="text-[#1f2a5a] font-black uppercase tracking-widest text-xs mb-4">Defensibility</div>
-                    <h3 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Live Event Records</h3>
-                    <p class="text-slate-700 text-lg leading-relaxed font-medium">Rel8tion creates a record of check-in, representation, and next-steps—providing operational value and defensibility for the brokerage.</p>
+            <section class="glass-card rounded-[44px] px-6 py-12 md:p-24 text-center">
+                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">Protect More Relationships. Save More Deals. Close More Business.</h2>
+                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-10">
+                    From instant open-house setup to compliance, nurturing, pre-approvals, and deal rescue, Rel8tion helps agents stay organized, protected, and positioned to close more business.
+                </p>
+                <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+                    <a href="https://rel8tion.info/how-it-works" class="brand-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        See It In Action
+                    </a>
+                    <a href="https://rel8tion.info/demo" class="secondary-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        Request a Demo
+                    </a>
                 </div>
             </section>
-
-            <section id="access" class="glass-card rounded-[44px] p-10 md:p-20">
-                <div class="text-center mb-16">
-                    <h2 class="text-[38px] md:text-[56px] font-extrabold text-slate-900 tracking-tight mb-4">Designed to Scale with You</h2>
-                    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto">Physical and visible. A sign, a tap, and a live flow are easier to trust than another dashboard.</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-                    <div class="bg-white/30 p-10 rounded-[40px] border border-white/40">
-                        <div class="font-bold text-slate-900 text-2xl mb-4">Early Adopter's
-                        <p class="text-slate-700 text-sm leading-relaxed">✔ Branded profile, basic check-in, and foundational routing. Low upfront barrier.</p>
-                    </div>
-                    <div class="bg-white/60 p-10 rounded-[40px] border border-white ring-2 ring-[#1f2a5a]/10 shadow-2xl">
-                        <div class="font-black text-slate-900 text-2xl mb-1">Pro Agent</div>
-                        <div class="text-3xl font-black text-[#1f2a5a] mb-6">$49/month</div>
-                        <p class="text-slate-700 text-sm leading-relaxed">✔ Chip + smart sign workflow, self-programming event setup, automated follow-up, and analytics.</p>
-                    </div>
-                    <div class="bg-white/30 p-10 rounded-[40px] border border-white/40">
-                        <div class="font-bold text-slate-900 text-2xl mb-1">Verified Rep</div>
-                        <div class="text-3xl font-black text-[#1f2a5a] mb-6">$29/month</div>
-                        <p class="text-slate-700 text-sm leading-relaxed">✔ Buyer-agent linking, verification records, and cooperation request workflow protection.</p>
-                    </div>
-                </div>
-        
-
-        <section class="glass-card rounded-[44px] px-6 py-12 md:p-24 text-center">
-                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">Capture Every Buyer.<br>Protect Your Relationships.</h2>
-                <a href="#access" class="brand-button inline-flex justify-center items-center w-full max-w-lg py-5 md:py-6 rounded-full font-bold text-lg md:text-2xl uppercase tracking-widest">
-                    See It In Action
-                </a>
-                <p class="mt-8 text-slate-500 text-xs md:text-sm font-bold uppercase tracking-widest">It creates immediate value on day one.</p>
-            </section><section class="glass-card rounded-[44px] px-6 py-12 md:p-24 text-center">
-                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">Capture Every Buyer.<br>Protect Your Relationships.</h2>
-                <a href="#access" class="brand-button inline-flex justify-center items-center w-full max-w-lg py-5 md:py-6 rounded-full font-bold text-lg md:text-2xl uppercase tracking-widest">
-                    See It In Action
-                </a>
-                <p class="mt-8 text-slate-500 text-xs md:text-sm font-bold uppercase tracking-widest">It creates immediate value on day one.</p>
-            </section>ection class="glass-card rounded-[44px] px-6 py-12 md:p-24 text-center">
-                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">Capture Every Buyer.<br>Protect Your Relationships.</h2>
-                <a href="#access" class="brand-button inline-flex justify-center items-center w-full max-w-lg py-5 md:py-6 rounded-full font-bold text-lg md:text-2xl uppercase tracking-widest">
-                    See It In Action
-                </a>
-                <p class="mt-8 text-slate-500 text-xs md:text-sm font-bold uppercase tracking-widest">It creates immediate value on day one.</p>
-            </section>
-
         </div>
-    </div>
+    </main>
 
     <footer class="w-full relative z-30 bg-white/40 backdrop-blur-md border-t border-white/40 mt-12 px-6 py-16">
         <div class="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center md:items-start gap-12">
             <div class="max-w-sm text-center md:text-left">
                 <img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-9 mb-8 mx-auto md:mx-0 opacity-90">
-                <p class="text-slate-600 text-sm font-medium">The self-programming open house system. Capture every buyer, protect your relationships, and automate your workflow with a single tap.</p>
+                <p class="text-slate-600 text-sm font-medium">Rel8tion helps agents, teams, and brokerages protect relationships, automate follow-up, simplify compliance, support cooperation, and move more deals toward closing.</p>
             </div>
             <div class="flex gap-16 md:gap-24 text-center md:text-left">
                 <div>
                     <div class="font-black text-slate-900 mb-6 uppercase text-[10px] tracking-widest">Platform</div>
                     <ul class="text-sm font-bold text-slate-700 space-y-4">
-                        <li><a href="#" class="hover:text-slate-900 transition">Works</a></li>
-                        <li><a href="#" class="hover:text-slate-900 transition">Pricing</a></li>
-                        <li><a href="#" class="hover:text-slate-900 transition">Features</a></li>
+                        <li><a href="https://rel8tion.info/how-it-works" class="hover:text-slate-900 transition">How It Works</a></li>
+                        <li><a href="https://rel8tion.info/features" class="hover:text-slate-900 transition">Features</a></li>
+                        <li><a href="https://rel8tion.info/pricing" class="hover:text-slate-900 transition">Pricing</a></li>
+                        <li><a href="https://rel8tion.info/contact" class="hover:text-slate-900 transition">Contact</a></li>
+                        <li><a href="https://rel8tion.info/agents" class="hover:text-slate-900 transition">Agents</a></li>
+                        <li><a href="https://rel8tion.info/privacy-policy" class="hover:text-slate-900 transition">Privacy Policy</a></li>
+                        <li><a href="https://rel8tion.info/terms-of-service" class="hover:text-slate-900 transition">Terms of Service</a></li>
                     </ul>
                 </div>
             </div>
@@ -319,20 +331,11 @@
             &copy; 2026 REL8TION. ALL RIGHTS RESERVED.
         </div>
     </footer>
-
 </div>
 
 <script>
-  const urlParams = new URLSearchParams(window.location.search);
-  const agentSlug = urlParams.get("agent");
-  if (agentSlug) {
-    const ids = ["ctaBtn", "ctaBtnTop"];
-    ids.forEach(id => {
-      const btn = document.getElementById(id);
-      if (btn) btn.href = `/login?agent=${agentSlug}`;
-    });
-  }
+  const thankYouUrl = "https://rel8tion.info/thank-you";
+  window.rel8tionThankYouRedirect = thankYouUrl;
 </script>
-
 </body>
 </html>
