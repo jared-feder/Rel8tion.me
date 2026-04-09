@@ -1,20 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <title>Rel8tion | Show Up, Tap Once, Everything Goes Live.</title>
 <style>
-    html, body {
+    #rel8tion-home {
         margin: 0 !important;
         padding: 0 !important;
-        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        position: relative;
+        isolation: isolate;
+        box-sizing: border-box;
         background-color: #f0f7ff;
     }
 
-    .rel8tion-wrapper {
+    #rel8tion-home *,
+    #rel8tion-home *::before,
+    #rel8tion-home *::after {
+        box-sizing: border-box;
+    }
+
+    #rel8tion-home a,
+    #rel8tion-home button {
+        pointer-events: auto;
+    }
+
+    #rel8tion-home .rel8tion-wrapper {
         font-family: 'Inter', sans-serif;
         color: #1f2a5a;
         background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
@@ -24,7 +37,7 @@
         position: relative;
     }
 
-    .moving-clouds {
+    #rel8tion-home .moving-clouds {
         position: fixed;
         top: 0;
         left: 0;
@@ -35,15 +48,15 @@
         background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
         background-repeat: repeat-x;
         background-size: 800px auto;
-        animation: driftClouds 120s linear infinite;
+        animation: rel8tionDriftClouds 120s linear infinite;
     }
 
-    @keyframes driftClouds {
+    @keyframes rel8tionDriftClouds {
         from { transform: translateX(0); }
         to { transform: translateX(-50%); }
     }
 
-    .scene-stage {
+    #rel8tion-home .scene-stage {
         position: fixed;
         top: 60%;
         left: 50%;
@@ -54,14 +67,14 @@
         pointer-events: none;
     }
 
-    .house-img {
+    #rel8tion-home .house-img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         filter: saturate(1.1);
     }
 
-    .fade-overlay {
+    #rel8tion-home .fade-overlay {
         position: fixed;
         inset: 0;
         width: 100vw;
@@ -71,7 +84,7 @@
         background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
     }
 
-    .agent-cutout {
+    #rel8tion-home .agent-cutout {
         position: absolute;
         width: 3.5%;
         height: auto;
@@ -80,33 +93,33 @@
         animation-fill-mode: both !important;
     }
 
-    @keyframes walk1 { 0% { left: 50%; top: 70%; opacity: 0; } 10% { opacity: 1; } 100% { left:25%; top: 56%; opacity: 0; } }
-    @keyframes walk2 { 0% { left: 47%; top: 52%; opacity: 0; } 10% { opacity: 1; } 100% { left: 15%; top: 79%; opacity: 0; } }
-    @keyframes walk3 { 0% { left: 77%; top: 57%; opacity: 0; } 10% { opacity: 1; } 100% { left: 50%; top: 75%; opacity: 0; } }
-    @keyframes walk4 { 0% { left: 25%; top: 55%; opacity: 0; } 10% { opacity: 1; } 100% { left: 75%; top: 88%; opacity: 0; } }
-    @keyframes walk5 { 0% { left: 33%; top: 44%; opacity: 0; } 10% { opacity: 1; } 100% { left: 78%; top: 89%; opacity: 0; } }
+    @keyframes rel8tionWalk1 { 0% { left: 50%; top: 70%; opacity: 0; } 10% { opacity: 1; } 100% { left:25%; top: 56%; opacity: 0; } }
+    @keyframes rel8tionWalk2 { 0% { left: 47%; top: 52%; opacity: 0; } 10% { opacity: 1; } 100% { left: 15%; top: 79%; opacity: 0; } }
+    @keyframes rel8tionWalk3 { 0% { left: 77%; top: 57%; opacity: 0; } 10% { opacity: 1; } 100% { left: 50%; top: 75%; opacity: 0; } }
+    @keyframes rel8tionWalk4 { 0% { left: 25%; top: 55%; opacity: 0; } 10% { opacity: 1; } 100% { left: 75%; top: 88%; opacity: 0; } }
+    @keyframes rel8tionWalk5 { 0% { left: 33%; top: 44%; opacity: 0; } 10% { opacity: 1; } 100% { left: 78%; top: 89%; opacity: 0; } }
 
-    .agent-1 { animation: walk1 37s infinite linear; }
-    .agent-2 { animation: walk2 33s infinite linear; animation-delay: 5s; }
-    .agent-3 { animation: walk3 24s infinite linear; animation-delay: 2s; }
-    .agent-4 { animation: walk4 30s infinite linear; animation-delay: 6s; }
-    .agent-5 { animation: walk5 50s infinite linear; animation-delay: 3s; }
+    #rel8tion-home .agent-1 { animation: rel8tionWalk1 37s infinite linear; }
+    #rel8tion-home .agent-2 { animation: rel8tionWalk2 33s infinite linear; animation-delay: 5s; }
+    #rel8tion-home .agent-3 { animation: rel8tionWalk3 24s infinite linear; animation-delay: 2s; }
+    #rel8tion-home .agent-4 { animation: rel8tionWalk4 30s infinite linear; animation-delay: 6s; }
+    #rel8tion-home .agent-5 { animation: rel8tionWalk5 50s infinite linear; animation-delay: 3s; }
 
     @media (max-width: 1024px) {
-        .scene-stage {
+        #rel8tion-home .scene-stage {
             width: 180vw;
             top: 70%;
         }
     }
 
     @media (max-width: 768px) {
-        .scene-stage {
+        #rel8tion-home .scene-stage {
             width: 280vw;
             top: 45%;
         }
     }
 
-    .glass-card {
+    #rel8tion-home .glass-card {
         background: rgba(255, 255, 255, 0.15) !important;
         backdrop-filter: blur(5px) saturate(160%);
         -webkit-backdrop-filter: blur(5px) saturate(160%);
@@ -114,7 +127,7 @@
         box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
     }
 
-    .brand-button {
+    #rel8tion-home .brand-button {
         background-color: #1f2a5a !important;
         color: #ffffff !important;
         transition: all 0.3s ease;
@@ -128,25 +141,24 @@
         justify-content: center;
     }
 
-    .brand-button:hover {
+    #rel8tion-home .brand-button:hover {
         background-color: #161e40 !important;
         transform: translateY(-2px);
         box-shadow: 0 15px 30px rgba(31, 42, 90, 0.3) !important;
     }
 
-    .secondary-button {
+    #rel8tion-home .secondary-button {
         background: rgba(255,255,255,0.38);
         color: #1f2a5a !important;
         border: 1px solid rgba(255,255,255,0.7);
         box-shadow: 0 8px 20px rgba(31, 42, 90, 0.08);
     }
 
-    .secondary-button:hover {
+    #rel8tion-home .secondary-button:hover {
         background: rgba(255,255,255,0.62);
     }
 </style>
-</head>
-<body>
+<div id="rel8tion-home">
 <div class="rel8tion-wrapper">
     <div class="moving-clouds"></div>
 
@@ -332,10 +344,9 @@
         </div>
     </footer>
 </div>
+</div>
 
 <script>
   const thankYouUrl = "https://rel8tion.info/thank-you";
   window.rel8tionThankYouRedirect = thankYouUrl;
 </script>
-</body>
-</html>
