@@ -3,8 +3,8 @@ export const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 
 // TODO: replace these with the final Supabase Storage public URLs
 export const ASSETS = {
-  rel8tionLogo: 'https://darkblue-oryx-581419.hostingersite.com/wp-content/uploads/2026/04/logo150x100trans.png',
-  floatingChip: 'https://rel8tion.info/wp-content/uploads/2026/04/3d_rel8tion.png'
+  rel8tionLogo: 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/images/handlogoblue150x150.png',
+  floatingChip: 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/images/signchip.png'
 };
 
 export const PROFILE_BUCKET = 'agent-images';
