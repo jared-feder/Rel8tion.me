@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Claim Test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="app" class="min-h-screen flex items-center justify-center p-4 md:p-6 transition-all duration-700"></div>
+
+  <script type="module">
+    import { initClaimPage } from '/src/modules/claim/bootstrap.js';
+    initClaimPage();
+  </script>
+
+  <style>
+    @keyframes progressMove{
+      from{transform:translateX(-15%);width:35%;}
+      to{transform:translateX(90%);width:45%;}
+    }
+    @keyframes bobFloat {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+      100% { transform: translateY(0px); }
+    }
+    .floating-chip {
+      animation: bobFloat 3.2s ease-in-out infinite;
+      will-change: transform;
+    }
+  </style>
+</body>
+</html>
