@@ -1,12 +1,26 @@
-<!-- REL8TION /A PAGE - FULL DROP-IN HTML BLOCK -->
+<!-- REL8TION /A PAGE - PREMIUM REDIRECT VERSION - FULL DROP-IN HTML BLOCK -->
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 
-<div id="app" class="min-h-screen flex items-center justify-center p-4 md:p-6 transition-all duration-700"></div>
+<div id="aShell" class="rel8tion-wrapper">
+  <div class="moving-clouds"></div>
+
+  <div class="agent-stage">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
+  </div>
+
+  <div class="fade-overlay"></div>
+
+  <div id="app" class="redirect-app-layer"></div>
+</div>
 
 <script>
-const REL8TION_LOGO = "https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png";
+const REL8TION_LOGO = "https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png";
 const params = new URLSearchParams(location.search);
 const agent = params.get("agent");
 const uid = params.get("uid");
@@ -20,21 +34,22 @@ function esc(str){
     .replace(/'/g, "&#039;");
 }
 
+function setBackground(){
+  const app = document.getElementById("app");
+  app.className = "redirect-app-layer";
+}
+
 function render(content){
   const app = document.getElementById("app");
   app.innerHTML = `
-    <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center transition-all duration-500">
+    <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
       <div class="mb-8">
         <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
       </div>
       ${content}
     </div>
   `;
-  app.style.background = `
-    radial-gradient(circle at top left, rgba(96,165,250,0.32), transparent 35%),
-    radial-gradient(circle at bottom right, rgba(59,130,246,0.20), transparent 35%),
-    linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%)
-  `;
+  setBackground();
 }
 
 function go(){
@@ -58,11 +73,134 @@ function go(){
 
 render(`
   <div class="py-10 md:py-14">
-    <div class="w-20 h-20 border-8 border-slate-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
-    <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">Opening Your Rel8tion Page ✨</h2>
-    <p class="text-slate-500 text-lg font-bold animate-pulse">Sending you to the right place...</p>
+    <div class="inline-flex items-center justify-center mb-6">
+      <div class="px-4 py-2 rounded-full bg-white/55 border border-white/80 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
+        Opening Verified Experience
+      </div>
+    </div>
+
+    <div class="w-20 h-20 border-8 border-slate-100/80 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
+
+    <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">
+      Opening Your Rel8tion Page ✨
+    </h2>
+
+    <p class="text-slate-500 text-lg font-bold animate-pulse">
+      Sending you to the right place...
+    </p>
+
+    <div class="mt-8 w-full h-3 rounded-full bg-slate-100/80 overflow-hidden">
+      <div class="h-full rounded-full animate-[progressMove_1.3s_ease-in-out_infinite_alternate]" style="width:42%;background:linear-gradient(90deg,#38bdf8,#2563eb);"></div>
+    </div>
+
+    <p class="mt-4 text-xs text-slate-400 font-bold uppercase tracking-[0.22em]">
+      This only takes a second
+    </p>
   </div>
 `);
 
 setTimeout(go, 700);
 </script>
+
+<style>
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  background-color: #f0f7ff;
+}
+
+.rel8tion-wrapper {
+  font-family: 'Inter', sans-serif;
+  color: #1f2a5a;
+  background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+  background-attachment: fixed;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.redirect-app-layer {
+  position: relative;
+  z-index: 20;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.moving-clouds {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 500px;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+  background-repeat: repeat-x;
+  background-size: 800px auto;
+  animation: driftClouds 120s linear infinite;
+}
+
+.agent-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
+}
+
+.agent-cutout {
+  position: absolute;
+  width: 70px;
+  height: auto;
+  z-index: 10;
+  opacity: 0;
+  filter: drop-shadow(0 14px 24px rgba(31,42,90,0.12));
+  animation-fill-mode: both !important;
+}
+
+@keyframes driftClouds {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes walk1 { 0% { left: 68%; top: 78%; opacity: 0; } 10% { opacity: .18; } 100% { left: 18%; top: 72%; opacity: 0; } }
+@keyframes walk2 { 0% { left: 82%; top: 26%; opacity: 0; } 10% { opacity: .14; } 100% { left: 10%; top: 32%; opacity: 0; } }
+@keyframes walk3 { 0% { left: 12%; top: 62%; opacity: 0; } 10% { opacity: .16; } 100% { left: 78%; top: 70%; opacity: 0; } }
+@keyframes walk4 { 0% { left: 20%; top: 18%; opacity: 0; } 10% { opacity: .12; } 100% { left: 72%; top: 22%; opacity: 0; } }
+@keyframes walk5 { 0% { left: 50%; top: 84%; opacity: 0; } 10% { opacity: .16; } 100% { left: 84%; top: 58%; opacity: 0; } }
+
+.agent-1 { animation: walk1 36s infinite linear; }
+.agent-2 { animation: walk2 30s infinite linear; animation-delay: 4s; }
+.agent-3 { animation: walk3 28s infinite linear; animation-delay: 2s; }
+.agent-4 { animation: walk4 40s infinite linear; animation-delay: 6s; }
+.agent-5 { animation: walk5 34s infinite linear; animation-delay: 3s; }
+
+@keyframes progressMove {
+  from { transform: translateX(-15%); width:35%; }
+  to { transform: translateX(90%); width:45%; }
+}
+
+@media (max-width: 768px) {
+  .agent-cutout {
+    width: 52px;
+  }
+
+  .redirect-app-layer {
+    padding: 14px;
+  }
+}
+</style>

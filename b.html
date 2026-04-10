@@ -1,20 +1,37 @@
-<!-- REL8TION /B PAGE - FULL DROP-IN HTML BLOCK -->
+<!-- REL8TION /B PAGE - PREMIUM GLASS VERSION / COLLAPSIBLE FORM - FULL DROP-IN HTML BLOCK -->
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 
-<div id="app" class="min-h-screen p-4 md:p-6"></div>
+<div id="bShell" class="rel8tion-wrapper">
+  <div class="moving-clouds"></div>
+
+  <div class="agent-stage">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
+  </div>
+
+  <div class="fade-overlay"></div>
+
+  <div id="app" class="buyer-app-layer"></div>
+</div>
 
 <script>
 const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
 const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
 const SMS_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-lead-sms`;
-const REL8TION_LOGO = "https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png";
+const REL8TION_LOGO = "https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png";
+const DEFAULT_AGENT_IMAGE = "https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png";
+
 const agentSlug = new URLSearchParams(location.search).get("agent");
 const uid = new URLSearchParams(location.search).get("uid");
 
 let detectedHouse = null;
 let agentData = null;
+let formOpen = false;
 
 function esc(str){
   return String(str || "")
@@ -35,59 +52,33 @@ function formatPhone(p){
   return c.length === 10 ? "+1" + c : (c ? "+" + c : "");
 }
 
+function displayPhone(p){
+  let c = String(p || "").replace(/\D/g,"");
+  if(c.length === 11 && c.startsWith("1")) c = c.slice(1);
+  if(c.length === 10){
+    return `(${c.slice(0,3)}) ${c.slice(3,6)}-${c.slice(6)}`;
+  }
+  return p || "";
+}
+
 function money(v){
   const n = Number(v || 0);
   return n ? "$" + n.toLocaleString() : "";
 }
 
 function setBackground(){
-  document.getElementById("app").style.background = `
-    radial-gradient(circle at top left, rgba(96,165,250,0.32), transparent 35%),
-    radial-gradient(circle at bottom right, rgba(59,130,246,0.20), transparent 35%),
-    linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%)
-  `;
+  const app = document.getElementById("app");
+  app.className = "buyer-app-layer";
 }
 
-function showLoading(msg = "Loading your Rel8tion experience ✨"){
-  document.getElementById("app").innerHTML = `
-    <div class="min-h-screen flex items-center justify-center">
-      <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center">
-        <div class="mb-8">
-          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
-        </div>
-        <div class="py-10">
-          <div class="w-20 h-20 border-8 border-slate-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
-          <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">Working Our Magic ✨</h2>
-          <p class="text-slate-500 text-lg font-bold animate-pulse">${esc(msg)}</p>
-        </div>
-      </div>
-    </div>
-  `;
-  setBackground();
-}
-
-function showError(title, message){
-  document.getElementById("app").innerHTML = `
-    <div class="min-h-screen flex items-center justify-center">
-      <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center">
-        <div class="mb-8">
-          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
-        </div>
-        <h1 class="font-['Poppins'] text-[30px] md:text-[40px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
-          ${esc(title)}
-        </h1>
-        <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">
-          ${esc(message)}
-        </p>
-      </div>
-    </div>
-  `;
-  setBackground();
-}
-
-function socialBtn(label, url, extra = ""){
+function socialBtn(label, url){
   if(!url) return "";
-  return `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="px-4 py-3 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-sm shadow-sm ${extra}">${label}</a>`;
+  return `
+    <a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer"
+       class="px-4 py-3 rounded-full bg-white/85 border border-white/80 text-slate-700 font-black text-sm shadow-sm hover:-translate-y-[1px] transition-all">
+      ${label}
+    </a>
+  `;
 }
 
 function setPre(v){
@@ -117,6 +108,31 @@ END:VCARD`;
   URL.revokeObjectURL(url);
 }
 
+function toggleLeadForm(force){
+  if(typeof force === "boolean"){
+    formOpen = force;
+  } else {
+    formOpen = !formOpen;
+  }
+
+  const wrap = document.getElementById("leadFormWrap");
+  const btn = document.getElementById("openFormBtn");
+  const btnText = document.getElementById("openFormBtnText");
+
+  if(wrap){
+    if(formOpen){
+      wrap.classList.remove("hidden");
+      wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      wrap.classList.add("hidden");
+    }
+  }
+
+  if(btn && btnText){
+    btnText.textContent = formOpen ? "Hide Matching Form" : "Unlock Matching Form";
+  }
+}
+
 async function fetchJson(url, options = {}){
   const res = await fetch(url, options);
   const raw = await res.text().catch(() => "");
@@ -126,6 +142,47 @@ async function fetchJson(url, options = {}){
   }catch(e){
     throw new Error("Invalid JSON response: " + raw);
   }
+}
+
+function glassShell(inner){
+  return `
+    <div class="max-w-4xl mx-auto">
+      <div class="w-full rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-5 md:p-8 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
+        ${inner}
+      </div>
+    </div>
+  `;
+}
+
+function showLoading(msg = "Loading your Rel8tion experience ✨"){
+  document.getElementById("app").innerHTML = glassShell(`
+    <div class="text-center py-8 md:py-12">
+      <div class="mb-8">
+        <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+      </div>
+      <div class="w-20 h-20 border-8 border-slate-100/80 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
+      <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">Working Our Magic ✨</h2>
+      <p class="text-slate-500 text-lg font-bold animate-pulse">${esc(msg)}</p>
+    </div>
+  `);
+  setBackground();
+}
+
+function showError(title, message){
+  document.getElementById("app").innerHTML = glassShell(`
+    <div class="text-center py-6">
+      <div class="mb-8">
+        <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+      </div>
+      <h1 class="font-['Poppins'] text-[30px] md:text-[40px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
+        ${esc(title)}
+      </h1>
+      <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto">
+        ${esc(message)}
+      </p>
+    </div>
+  `);
+  setBackground();
 }
 
 async function init(){
@@ -154,6 +211,7 @@ async function init(){
     try{
       await new Promise((resolve) => {
         if(!navigator.geolocation) return resolve();
+
         navigator.geolocation.getCurrentPosition(async (pos) => {
           try{
             const houses = await fetchJson(`${SUPABASE_URL}/rest/v1/rpc/find_nearest_open_house`, {
@@ -168,12 +226,19 @@ async function init(){
                 user_lng: pos.coords.longitude
               })
             });
-            if(Array.isArray(houses) && houses.length) detectedHouse = houses[0];
+
+            if(Array.isArray(houses) && houses.length){
+              detectedHouse = houses[0];
+            }
           } catch(e){
             console.log("Open house lookup skipped", e);
           }
           resolve();
-        }, () => resolve(), { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+        }, () => resolve(), {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 0
+        });
       });
     } catch(e){}
 
@@ -186,74 +251,124 @@ async function init(){
 }
 
 function renderBuyer(){
-  const houseImage = detectedHouse?.image || "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80";
+  const houseImage = detectedHouse?.image || "https://rel8tion.me/wp-content/uploads/2026/04/trythisbackround.png";
+  const agentImage = agentData?.image_url || DEFAULT_AGENT_IMAGE;
+  const propertyHeadline = detectedHouse
+    ? "You’re In The Right Place"
+    : "Start The Search The Right Way";
 
-  document.getElementById("app").innerHTML = `
-    <div class="max-w-3xl mx-auto">
-      <div class="w-full rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)]">
-        
-        <div class="text-center mb-8">
-          <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm mb-4" alt="Rel8tion">
-          <h1 class="font-['Poppins'] text-[34px] md:text-[48px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-3">
-            Your Rel8tionship<br>Starts Here
-          </h1>
-          <p class="text-slate-500 text-[17px] md:text-[19px] leading-relaxed font-medium max-w-xl mx-auto">
-            Save the contact, follow on social, and register below so you don’t miss the right home.
-          </p>
+  const propertyText = detectedHouse
+    ? `You are at <strong>${esc(detectedHouse.address || "")}</strong>${detectedHouse.price ? ` listed at <strong>${money(detectedHouse.price)}</strong>` : ""}. If this one is not the perfect fit, unlock the form below and we will help match you with better options.`
+    : `Unlock the form below and tell us what matters most. We’ll help match you with homes that make sense for your goals, timing, and budget.`;
+
+  document.getElementById("app").innerHTML = glassShell(`
+    <div class="space-y-6 md:space-y-7">
+
+      <section class="text-center">
+        <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm mb-5" alt="Rel8tion">
+        <div class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/55 border border-white/80 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5 shadow-sm">
+          Verified Buyer Experience
         </div>
+        <h1 class="font-['Poppins'] text-[34px] md:text-[52px] leading-[0.94] font-black tracking-[-0.04em] text-slate-900 mb-4">
+          Your Rel8tionship<br>Starts Here
+        </h1>
+        <p class="text-slate-500 text-[17px] md:text-[20px] leading-relaxed font-medium max-w-2xl mx-auto">
+          Save the contact, connect with the agent, and unlock a smarter match experience built for serious buyers.
+        </p>
+      </section>
 
-        <div class="rounded-[34px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6 mb-7 text-center">
-          <img src="${agentData.image_url || "https://via.placeholder.com/200?text=Agent"}" class="w-32 h-32 rounded-full object-cover mx-auto shadow-[0_18px_40px_rgba(31,42,90,0.16)] mb-4" alt="${esc(agentData.name)}">
-          <div class="text-slate-900 text-[28px] md:text-[34px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
-            ${esc(agentData.name || "")}
-          </div>
-          <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium mb-5">
-            ${esc(agentData.brokerage || "")}
-          </p>
+      <section class="rounded-[34px] border border-white/70 bg-white/55 backdrop-blur-sm shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-7">
+        <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
+          <img
+            src="${agentImage}"
+            class="w-32 h-32 md:w-36 md:h-36 rounded-full object-cover shadow-[0_18px_40px_rgba(31,42,90,0.16)] shrink-0 bg-white"
+            alt="${esc(agentData.name)}"
+          >
 
-          <button onclick="saveContact('${esc(agentData.name || "")}','${esc(agentData.phone || "")}','${esc(agentData.email || "")}')" class="w-full py-5 rounded-full font-black text-[17px] md:text-[18px] uppercase tracking-[-0.02em] text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all mb-5" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
-            📲 Save Contact Info
-          </button>
-
-          <div class="flex flex-wrap gap-2 justify-center">
-            ${socialBtn("Facebook", agentData.facebook)}
-            ${socialBtn("Instagram", agentData.instagram)}
-            ${socialBtn("Website", agentData.website)}
-          </div>
-        </div>
-
-        <div class="rounded-[34px] overflow-hidden shadow-[0_20px_60px_rgba(31,42,90,0.08)] mb-7 border border-slate-100 bg-white">
-          <img src="${houseImage}" class="h-64 w-full object-cover" alt="Property">
-          <div class="p-6 md:p-8">
-            <h3 class="text-2xl md:text-3xl font-black text-[#1F2A5A] leading-tight mb-3">
-              ${detectedHouse ? "Our First House Date? Let’s Find the Perfect One." : "Let’s Find the Perfect One."}
-            </h3>
-            <p class="text-slate-500 text-[16px] leading-relaxed font-medium">
-              ${
-                detectedHouse
-                ? `You are at <strong>${esc(detectedHouse.address || "")}</strong>${detectedHouse.price ? ` listed at <strong>${money(detectedHouse.price)}</strong>` : ""}. If this isn’t the one, register below and we’ll help match you with better options today.`
-                : `Register below and tell us what you want. We’ll help match you with homes that make sense for your goals, budget, and timing.`
-              }
-            </p>
-          </div>
-        </div>
-
-        <div class="rounded-[34px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6">
-          <div class="text-center mb-5">
-            <div class="text-slate-900 text-[28px] md:text-[34px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
-              Register Below to Unlock the Best Match
+          <div class="flex-1 text-center md:text-left">
+            <div class="text-slate-900 text-[30px] md:text-[38px] leading-[0.98] font-black tracking-[-0.03em] mb-2">
+              ${esc(agentData.name || "")}
             </div>
-            <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium">
-              Follow on Instagram for exclusive listings, but also register below so we can actually help you secure the right home.
+
+            <p class="text-slate-500 text-[16px] md:text-[18px] font-medium mb-2">
+              ${esc(agentData.brokerage || "")}
             </p>
+
+            ${(agentData.phone || agentData.email) ? `
+              <div class="text-slate-500 text-sm md:text-base font-semibold mb-5">
+                ${agentData.phone ? `<div>${esc(displayPhone(agentData.phone))}</div>` : ""}
+                ${agentData.email ? `<div>${esc(agentData.email)}</div>` : ""}
+              </div>
+            ` : ""}
+
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+              <button
+                onclick="saveContact('${esc(agentData.name || "")}','${esc(agentData.phone || "")}','${esc(agentData.email || "")}')"
+                class="flex-1 py-4 rounded-full font-black text-[16px] md:text-[17px] uppercase tracking-[-0.02em] text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all"
+                style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+                📲 Save Contact
+              </button>
+
+              <button
+                id="openFormBtn"
+                onclick="toggleLeadForm()"
+                class="flex-1 py-4 rounded-full font-black text-[16px] md:text-[17px] uppercase tracking-[-0.02em] bg-white/85 border border-slate-200 text-slate-700 shadow-sm transition-all">
+                <span id="openFormBtnText">${formOpen ? "Hide Matching Form" : "Unlock Matching Form"}</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+              ${socialBtn("Facebook", agentData.facebook)}
+              ${socialBtn("Instagram", agentData.instagram)}
+              ${socialBtn("Website", agentData.website)}
+            </div>
           </div>
+        </div>
+      </section>
 
+      <section class="rounded-[34px] overflow-hidden shadow-[0_20px_60px_rgba(31,42,90,0.08)] border border-white/70 bg-white/55 backdrop-blur-sm">
+        <img src="${houseImage}" class="h-64 w-full object-cover" alt="Property">
+        <div class="p-6 md:p-8">
+          <div class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/70 border border-white text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-4 shadow-sm">
+            Smart Match Preview
+          </div>
+          <h3 class="text-2xl md:text-3xl font-black text-[#1F2A5A] leading-tight mb-3">
+            ${propertyHeadline}
+          </h3>
+          <p class="text-slate-500 text-[16px] leading-relaxed font-medium">
+            ${propertyText}
+          </p>
+        </div>
+      </section>
+
+      <section class="rounded-[34px] border border-white/70 bg-white/55 backdrop-blur-sm shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-7">
+        <div class="text-center mb-5">
+          <div class="text-slate-900 text-[28px] md:text-[36px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
+            Private Buyer Matching
+          </div>
+          <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium max-w-2xl mx-auto">
+            This form helps the agent respond with the right homes, the right strategy, and the right next step instead of wasting your time.
+          </p>
+        </div>
+
+        <div class="text-center mb-4">
+          <button
+            onclick="toggleLeadForm()"
+            class="inline-flex items-center justify-center px-6 py-4 rounded-full font-black text-[15px] md:text-[16px] uppercase tracking-[-0.02em] text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all"
+            style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+            ✨ ${formOpen ? "Form Is Open Below" : "Unlock Matching Form"}
+          </button>
+        </div>
+
+        <div id="leadFormWrap" class="${formOpen ? "" : "hidden"} mt-6">
           <div class="space-y-4">
-            <input id="name" placeholder="Your Name" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
-            <input id="phone" placeholder="Phone Number" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
-            <input id="email" placeholder="Email Address" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <input id="name" placeholder="Your Name" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-            <select id="areas" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <input id="phone" placeholder="Phone Number" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+
+            <input id="email" placeholder="Email Address" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+
+            <select id="areas" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
               <option value="">Preferred Area</option>
               <option>Queens</option>
               <option>Nassau</option>
@@ -265,7 +380,7 @@ function renderBuyer(){
               <option>Anywhere</option>
             </select>
 
-            <select id="price" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <select id="price" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
               <option value="">Price Range</option>
               <option>500 and under</option>
               <option>500-750</option>
@@ -274,17 +389,17 @@ function renderBuyer(){
               <option>1M+</option>
             </select>
 
-            <textarea id="notes" placeholder="What are you looking for? Tell us what matters most." class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y"></textarea>
+            <textarea id="notes" placeholder="What are you looking for? Tell us what matters most." class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y"></textarea>
 
             <div class="text-slate-900 text-[17px] font-black tracking-[-0.02em]">
               Are you pre-approved?
             </div>
 
             <div class="flex gap-3">
-              <button id="yesBtn" onclick="setPre('yes')" class="flex-1 py-4 rounded-[18px] bg-slate-100 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
+              <button id="yesBtn" onclick="setPre('yes')" type="button" class="flex-1 py-4 rounded-[18px] bg-white/85 border border-slate-200 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
                 Yes
               </button>
-              <button id="noBtn" onclick="setPre('no')" class="flex-1 py-4 rounded-[18px] bg-slate-100 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
+              <button id="noBtn" onclick="setPre('no')" type="button" class="flex-1 py-4 rounded-[18px] bg-white/85 border border-slate-200 text-slate-700 font-black text-[16px] uppercase tracking-[-0.02em] transition-all">
                 No
               </button>
             </div>
@@ -305,9 +420,10 @@ function renderBuyer(){
             <p id="status" class="text-center text-slate-500 font-bold"></p>
           </div>
         </div>
-      </div>
+      </section>
+
     </div>
-  `;
+  `);
 
   setBackground();
 }
@@ -351,7 +467,7 @@ async function submitLead(){
   status.innerText = "";
 
   try{
-    await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+    const leadRes = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -361,7 +477,12 @@ async function submitLead(){
       body: JSON.stringify(form)
     });
 
-    await fetch(SMS_FUNCTION_URL, {
+    if(!leadRes.ok){
+      const raw = await leadRes.text().catch(() => "");
+      throw new Error(raw || "Failed saving lead");
+    }
+
+    const smsRes = await fetch(SMS_FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -378,8 +499,13 @@ async function submitLead(){
       })
     });
 
+    if(!smsRes.ok){
+      const raw = await smsRes.text().catch(() => "");
+      console.log("SMS warning:", raw);
+    }
+
     btn.innerText = "Submitted ✓";
-    status.innerText = "Perfect. You're in. We'll be in touch shortly with next steps and matching homes.";
+    status.innerText = "Perfect. You're in. We’ll be in touch shortly with next steps and matching homes.";
   } catch(e){
     console.log(e);
     btn.disabled = false;
@@ -392,9 +518,106 @@ init();
 </script>
 
 <style>
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  background-color: #f0f7ff;
+}
+
+.rel8tion-wrapper {
+  font-family: 'Inter', sans-serif;
+  color: #1f2a5a;
+  background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+  background-attachment: fixed;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.buyer-app-layer {
+  position: relative;
+  z-index: 20;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.moving-clouds {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 500px;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+  background-repeat: repeat-x;
+  background-size: 800px auto;
+  animation: driftClouds 120s linear infinite;
+}
+
+.agent-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
+}
+
+.agent-cutout {
+  position: absolute;
+  width: 70px;
+  height: auto;
+  z-index: 10;
+  opacity: 0;
+  filter: drop-shadow(0 14px 24px rgba(31,42,90,0.12));
+  animation-fill-mode: both !important;
+}
+
+@keyframes driftClouds {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes walk1 { 0% { left: 68%; top: 78%; opacity: 0; } 10% { opacity: .18; } 100% { left: 18%; top: 72%; opacity: 0; } }
+@keyframes walk2 { 0% { left: 82%; top: 26%; opacity: 0; } 10% { opacity: .14; } 100% { left: 10%; top: 32%; opacity: 0; } }
+@keyframes walk3 { 0% { left: 12%; top: 62%; opacity: 0; } 10% { opacity: .16; } 100% { left: 78%; top: 70%; opacity: 0; } }
+@keyframes walk4 { 0% { left: 20%; top: 18%; opacity: 0; } 10% { opacity: .12; } 100% { left: 72%; top: 22%; opacity: 0; } }
+@keyframes walk5 { 0% { left: 50%; top: 84%; opacity: 0; } 10% { opacity: .16; } 100% { left: 84%; top: 58%; opacity: 0; } }
+
+.agent-1 { animation: walk1 36s infinite linear; }
+.agent-2 { animation: walk2 30s infinite linear; animation-delay: 4s; }
+.agent-3 { animation: walk3 28s infinite linear; animation-delay: 2s; }
+.agent-4 { animation: walk4 40s infinite linear; animation-delay: 6s; }
+.agent-5 { animation: walk5 34s infinite linear; animation-delay: 3s; }
+
 .active-pre{
   background:linear-gradient(90deg,#38bdf8,#2563eb)!important;
   color:#fff!important;
+  border-color:transparent!important;
   box-shadow:0 18px 40px rgba(59,130,246,0.28);
+}
+
+@media (max-width: 768px) {
+  .agent-cutout {
+    width: 52px;
+  }
+
+  .buyer-app-layer {
+    padding: 14px;
+  }
 }
 </style>
