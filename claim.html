@@ -348,7 +348,7 @@ function showVerifyAgent(){
 
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ""}
 
       <h1 class="font-['Poppins'] text-4xl font-black mb-4 leading-tight uppercase text-[#1f2a5a]">
         Wait — Is This You?
@@ -400,7 +400,7 @@ function showVerifyAgent(){
 function showAlreadyClaimed(agent){
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6"">` : ""}
 
       <h1 class="font-['Poppins'] text-[34px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">
         This Chip Is Already Active
@@ -491,7 +491,7 @@ function showFullProfileForm(prefillBrokerage = "", notice = ""){
 
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6"">` : ""}
 
       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
         Complete Your Profile
