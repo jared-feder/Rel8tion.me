@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rel8tion Smart Sign Activation Test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50">
+  <div
+    class="min-h-screen flex items-center justify-center p-4 md:p-8"
+    style="background:
+      radial-gradient(circle at top left, rgba(96,165,250,0.28), transparent 35%),
+      radial-gradient(circle at bottom right, rgba(59,130,246,0.18), transparent 35%),
+      linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%);"
+  >
+    <div class="w-full max-w-3xl rounded-[34px] md:rounded-[42px] border border-white/80 bg-white/85 backdrop-blur-sm p-6 md:p-10 shadow-[0_30px_80px_rgba(31,42,90,0.12)]">
+      <div class="text-center mb-8">
+        <img
+          src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/images/handlogoblue150x150.png"
+          class="h-16 md:h-20 mx-auto mb-4"
+          alt="Rel8tion"
+        />
+        <h1 class="font-['Poppins'] text-[30px] md:text-[42px] leading-[0.96] font-black tracking-[-0.04em] text-slate-900 mb-3">
+          Smart Sign Activation Test
+        </h1>
+        <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-2xl mx-auto">
+          Temporary protected route for pairing or reassigning a sign, detecting the nearest listing, and asking the agent to confirm before activation.
+        </p>
+      </div>
+
+      <div class="rounded-[24px] border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm font-semibold text-blue-800 mb-6">
+        Phase 1 behavior: the sign is <strong>not permanent</strong>. This flow can reassign a sign to another agent and activate it at the current open house only after listing confirmation.
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Agent Slug *</label>
+          <input
+            id="agentSlug"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="brian-hv7s"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Agent UUID (optional)</label>
+          <input
+            id="agentId"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="optional uuid"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Keychain UID *</label>
+          <input
+            id="keychainUid"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="first scan uid"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Sign UID *</label>
+          <input
+            id="signUid"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="second scan uid"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Latitude</label>
+          <input
+            id="lat"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="40.7128"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Longitude</label>
+          <input
+            id="lng"
+            class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400"
+            placeholder="-73.9352"
+          />
+        </div>
+      </div>
+
+      <div class="mt-6 flex flex-col md:flex-row gap-3">
+        <button
+          id="useGpsBtn"
+          class="flex-1 py-4 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[15px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all"
+        >
+          Use My GPS
+        </button>
+
+        <button
+          id="detectBtn"
+          class="flex-1 py-4 rounded-full text-white font-black text-[16px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all"
+          style="background:linear-gradient(90deg,#38bdf8,#2563eb);"
+        >
+          Detect Listing
+        </button>
+      </div>
+
+      <div id="statusCard" class="mt-6 hidden rounded-[24px] border border-slate-100 bg-slate-50 p-5 text-left"></div>
+      <div id="listingCard" class="mt-6 hidden rounded-[28px] overflow-hidden border border-slate-100 bg-white shadow-sm"></div>
+
+      <div id="confirmWrap" class="mt-4 hidden flex flex-col md:flex-row gap-3">
+        <button
+          id="confirmBtn"
+          class="flex-1 py-4 rounded-full text-white font-black text-[16px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)]"
+          style="background:linear-gradient(90deg,#38bdf8,#2563eb);"
+        >
+          Yes — Activate This Listing
+        </button>
+
+        <button
+          id="cancelBtn"
+          class="flex-1 py-4 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[15px] uppercase tracking-[-0.02em] shadow-sm"
+        >
+          No — Do Not Activate
+        </button>
+      </div>
+
+      <pre id="result" class="mt-4 hidden w-full overflow-auto rounded-[24px] border border-slate-200 bg-slate-950 text-slate-100 p-5 text-xs leading-relaxed"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      createOrResumeOpenHouseEvent,
+      getOrCreateSmartSignFromPair,
+      recordChipScan,
+      resolveNearestListingContext
+    } from '/src/modules/smartSign/lifecycle.js';
+
+    import { createScanEvent } from '/src/api/scanEvents.js';
+    import { updateSmartSign } from '/src/api/smartSigns.js';
+
+    const byId = (id) => document.getElementById(id);
+    const resultEl = byId('result');
+    const statusCard = byId('statusCard');
+    const listingCard = byId('listingCard');
+    const confirmWrap = byId('confirmWrap');
+
+    let pending = null;
+
+    function money(v) {
+      if (v == null || v === '') return '';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0
+      }).format(Number(v));
+    }
+
+    function setStatus(title, lines = []) {
+      statusCard.classList.remove('hidden');
+      statusCard.innerHTML = `
+        <div class="text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Smart Sign Setup Status</div>
+        <div class="text-slate-900 font-black text-2xl mb-2">${title}</div>
+        <div class="space-y-1 text-slate-600 font-medium">
+          ${lines.map(line => `<div>${line}</div>`).join('')}
+        </div>
+      `;
+    }
+
+    function setResult(obj) {
+      resultEl.classList.remove('hidden');
+      resultEl.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    function showListing(listing) {
+      if (!listing) {
+        listingCard.classList.add('hidden');
+        confirmWrap.classList.add('hidden');
+        return;
+      }
+
+      listingCard.classList.remove('hidden');
+      confirmWrap.classList.remove('hidden');
+
+      listingCard.innerHTML = `
+        ${listing.image ? `<img src="${listing.image}" class="w-full h-56 object-cover" alt="Listing">` : ''}
+        <div class="p-6">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 mb-2">Detected Listing</div>
+          <div class="text-slate-900 font-black text-3xl leading-tight mb-2">${listing.address || 'Nearby Open House'}</div>
+          <div class="text-blue-600 font-black text-xl mb-2">${listing.price ? money(listing.price) : ''}</div>
+          <div class="text-slate-500 font-bold uppercase tracking-[0.14em] text-xs mb-2">${listing.brokerage || ''}</div>
+          <div class="text-slate-600 font-medium text-sm">Status: ${listing.status || 'UNKNOWN'}</div>
+        </div>
+      `;
+    }
+
+    byId('useGpsBtn').onclick = () => {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported on this device.');
+        return;
+      }
+
+      setStatus('Getting Your GPS...', ['Trying to detect your current location.']);
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          byId('lat').value = String(pos.coords.latitude);
+          byId('lng').value = String(pos.coords.longitude);
+
+          setStatus('GPS Loaded', [
+            'Latitude: ' + pos.coords.latitude,
+            'Longitude: ' + pos.coords.longitude
+          ]);
+        },
+        (err) => {
+          setStatus('GPS Failed', [err.message || 'Location permission was denied.']);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        }
+      );
+    };
+
+    byId('detectBtn').onclick = async () => {
+      const agentSlug = byId('agentSlug').value.trim();
+      const agentId = byId('agentId').value.trim() || null;
+      const keychainUid = byId('keychainUid').value.trim();
+      const signUid = byId('signUid').value.trim();
+      const lat = byId('lat').value.trim();
+      const lng = byId('lng').value.trim();
+
+      if (!agentSlug || !keychainUid || !signUid) {
+        alert('Agent slug, keychain UID, and sign UID are required.');
+        return;
+      }
+
+      resultEl.classList.add('hidden');
+      showListing(null);
+
+      setStatus('Preparing Sign Activation...', [
+        'Recording the keychain scan.',
+        'Recording the sign scan.',
+        'Detecting the nearest listing for confirmation.'
+      ]);
+
+      try {
+        const numLat = lat ? Number(lat) : null;
+        const numLng = lng ? Number(lng) : null;
+
+        const keychainScan = await recordChipScan({
+          uid: keychainUid,
+          agentSlug,
+          agentId,
+          deviceType: 'keychain_chip',
+          scanContext: 'protected_setup_keychain',
+          metadata: {
+            phase: 'keychain_anchor',
+            lat: numLat,
+            lng: numLng
+          }
+        });
+
+        const signScan = await recordChipScan({
+          uid: signUid,
+          agentSlug,
+          agentId,
+          deviceType: 'smart_sign_tag',
+          scanContext: 'protected_setup_sign',
+          metadata: {
+            phase: 'sign_candidate',
+            lat: numLat,
+            lng: numLng
+          }
+        });
+
+        const smartSign = await getOrCreateSmartSignFromPair({
+          primaryUid: signUid,
+          secondaryUid: keychainUid,
+          ownerAgentSlug: agentSlug,
+          ownerAgentId: agentId,
+          primaryDeviceType: 'smart_sign_tag',
+          secondaryDeviceType: 'keychain_chip'
+        });
+
+        const listingContext = await resolveNearestListingContext({
+          lat: numLat,
+          lng: numLng
+        });
+
+        pending = {
+          agentSlug,
+          agentId,
+          keychainUid,
+          signUid,
+          smartSign,
+          keychainScan,
+          signScan,
+          listingContext
+        };
+
+        setStatus('Is This Your Listing?', [
+          'Review the detected open house below.',
+          'If it is correct, confirm and the sign will become live there.'
+        ]);
+
+        showListing(listingContext);
+        setResult(pending);
+      } catch (err) {
+        setStatus('Detection Failed', [err.message || String(err)]);
+        setResult({ error: err.message || String(err) });
+      }
+    };
+
+    byId('confirmBtn').onclick = async () => {
+      if (!pending) return;
+
+      setStatus('Activating Sign...', [
+        'Creating or resuming the event.',
+        'Assigning the sign to this open house.',
+        'Marking the sign live.'
+      ]);
+
+      try {
+        const eventRecord = await createOrResumeOpenHouseEvent({
+          smartSign: pending.smartSign,
+          hostAgentSlug: pending.agentSlug,
+          hostAgentId: pending.agentId,
+          listingContext: pending.listingContext,
+          primaryUid: pending.signUid,
+          secondaryUid: pending.keychainUid,
+          activationMethod: 'paired_scan_confirmed'
+        });
+
+        const updatedSign = await updateSmartSign(pending.smartSign.id, {
+          owner_agent_id: pending.agentId,
+          owner_agent_slug: pending.agentSlug,
+          status: 'active',
+          active_event_id: eventRecord.id,
+          activation_uid_primary: pending.signUid,
+          activation_uid_secondary: pending.keychainUid,
+          activation_method: 'paired_scan_confirmed',
+          setup_confirmed_at: new Date().toISOString(),
+          primary_device_type: 'smart_sign_tag',
+          secondary_device_type: 'keychain_chip'
+        });
+
+        const completionScan = await createScanEvent({
+          uid: pending.signUid,
+          agent_id: pending.agentId,
+          agent_slug: pending.agentSlug,
+          scan_type: 'setup_complete',
+          related_sign_id: pending.smartSign.id,
+          open_house_event_id: eventRecord.id,
+          device_type: 'smart_sign_tag',
+          scan_context: 'lifecycle_activation_confirmed',
+          metadata: {
+            keychain_uid: pending.keychainUid,
+            listing_id: pending.listingContext?.id || null,
+            listing_address: pending.listingContext?.address || null
+          }
+        });
+
+        const outcome = {
+          keychainScan: pending.keychainScan,
+          signScan: pending.signScan,
+          smartSign: updatedSign || pending.smartSign,
+          eventRecord,
+          completionScan,
+          listingContext: pending.listingContext
+        };
+
+        setStatus('Sign Activated Successfully', [
+          'Sign ID: ' + ((updatedSign || pending.smartSign)?.id || 'missing'),
+          'Event ID: ' + (eventRecord?.id || 'missing'),
+          'Listing: ' + (pending.listingContext?.address || 'none detected')
+        ]);
+
+        setResult(outcome);
+      } catch (err) {
+        setStatus('Activation Failed', [err.message || String(err)]);
+        setResult({ error: err.message || String(err), pending });
+      }
+    };
+
+    byId('cancelBtn').onclick = () => {
+      setStatus('Activation Cancelled', [
+        'The sign was not attached to the detected listing.'
+      ]);
+      confirmWrap.classList.add('hidden');
+      pending = null;
+    };
+  </script>
+</body>
+</html>
