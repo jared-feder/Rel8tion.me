@@ -12,7 +12,7 @@ export const APP_BASE_URL = 'https://app.rel8tion.me';
 export const PUBLIC_BASE_URL = 'https://rel8tion.me';
 
 export const ROUTES = {
-  onboarding: `${APP_BASE_URL}/onboarding`,
+  onboarding: `${PUBLIC_BASE_URL}/onboarding`,
   buyerProfile: `${APP_BASE_URL}/a`,
   claim: `${APP_BASE_URL}/claim`,
   agents: `${APP_BASE_URL}/agents`
