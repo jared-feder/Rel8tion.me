@@ -14,7 +14,7 @@ import { sendActivationSMS } from '../../api/notifications.js';
 import {
   linkKeyToAgent,
   loadAgentFromUID
-} from '../../api/services.js';
+} from '../../api/keys.js';
 
 import {
   showAlreadyClaimed,
