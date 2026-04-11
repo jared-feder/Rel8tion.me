@@ -1,17 +1,21 @@
 import { ROUTES } from '../../core/config.js';
 import { state, resetDetectionState, setDetectedHouse, setNearbyHouses, setLoaderInterval } from '../../core/state.js';
 import { debug, normalizePhoneForMatch, randSuffix, slugify } from '../../core/utils.js';
+
+import { applyBranding } from '../../api/brokerages.js';
+import { findNearestOpenHouses } from '../../api/openHouses.js';
 import {
-  applyBranding,
   findAgentByEmail,
   findAgentByPhoneNormalized,
-  findNearestOpenHouses,
-  linkKeyToAgent,
-  loadAgentFromUID,
-  sendActivationSMS,
   upsertAgent,
   uploadFullProfilePhoto
+} from '../../api/agents.js';
+import { sendActivationSMS } from '../../api/notifications.js';
+import {
+  linkKeyToAgent,
+  loadAgentFromUID
 } from '../../api/services.js';
+
 import {
   showAlreadyClaimed,
   showDetection,
@@ -23,20 +27,6 @@ import {
   showOtherListings,
   showVerifyAgent
 } from './renderer.js';
-
-export function bindPublicHandlers() {
-  window.startDetection = startDetection;
-  window.skipToForm = skipToForm;
-  window.confirmListing = confirmListing;
-  window.showOtherListings = showOtherListings;
-  window.autoActivate = autoActivate;
-  window.activate = activate;
-  window.saveFullProfile = saveFullProfile;
-  window.init = init;
-  window.selectHouse = selectHouse;
-  window.showForm = showForm;
-  window.showFullProfileForm = showFullProfileForm;
-}
 
 export function startLoaderTextCycle() {
   const steps = [
