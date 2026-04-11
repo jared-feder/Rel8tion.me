@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Smart Sign Pair Test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50">
+  <div class="min-h-screen flex items-center justify-center p-4 md:p-8" style="background:radial-gradient(circle at top left, rgba(96,165,250,0.28), transparent 35%), radial-gradient(circle at bottom right, rgba(59,130,246,0.18), transparent 35%), linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%);">
+    <div class="w-full max-w-2xl rounded-[34px] md:rounded-[42px] border border-white/80 bg-white/85 backdrop-blur-sm p-6 md:p-10 shadow-[0_30px_80px_rgba(31,42,90,0.12)]">
+      <div class="text-center mb-8">
+        <img src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/images/handlogoblue150x150.png" class="h-16 md:h-20 mx-auto mb-4" alt="Rel8tion">
+        <h1 class="font-['Poppins'] text-[30px] md:text-[42px] leading-[0.96] font-black tracking-[-0.04em] text-slate-900 mb-3">Smart Sign Pair Test</h1>
+        <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-xl mx-auto">Temporary protected setup route. This is for pairing or reassigning a sign to an agent and activating it at the current open house.</p>
+      </div>
+
+      <div class="rounded-[24px] border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm font-semibold text-blue-800 mb-6">
+        Phase 1 behavior: the sign is <strong>not permanent</strong>. Running this flow can reassign a sign to a different agent and attach it to the currently detected open house event.
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Agent Slug *</label>
+          <input id="agentSlug" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="brian-hv7s">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Agent UUID (optional)</label>
+          <input id="agentId" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="optional uuid">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Keychain UID *</label>
+          <input id="keychainUid" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="first scan uid">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Sign UID *</label>
+          <input id="signUid" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="second scan uid">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Latitude</label>
+          <input id="lat" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="40.7128">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Longitude</label>
+          <input id="lng" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" placeholder="-73.9352">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Keychain Device Type</label>
+          <input id="keychainDeviceType" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" value="keychain_chip">
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Sign Device Type</label>
+          <input id="signDeviceType" class="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-900 outline-none focus:border-blue-400" value="smart_sign_tag">
+        </div>
+      </div>
+
+      <div class="mt-6 flex flex-col md:flex-row gap-3">
+        <button id="useGpsBtn" class="flex-1 py-4 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[15px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Use My GPS</button>
+        <button id="pairBtn" class="flex-1 py-4 rounded-full text-white font-black text-[16px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Pair / Reassign Sign</button>
+      </div>
+
+      <div id="statusCard" class="mt-6 hidden rounded-[24px] border border-slate-100 bg-slate-50 p-5 text-left"></div>
+      <pre id="result" class="mt-4 hidden w-full overflow-auto rounded-[24px] border border-slate-200 bg-slate-950 text-slate-100 p-5 text-xs leading-relaxed"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { recordChipScan, activateSmartSignSession } from '/src/modules/smartSign/lifecycle.js';
+
+    const byId = (id) => document.getElementById(id);
+    const resultEl = byId('result');
+    const statusCard = byId('statusCard');
+
+    function setStatus(title, lines = []) {
+      statusCard.classList.remove('hidden');
+      statusCard.innerHTML = `
+        <div class="text-xs font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Smart Sign Setup Status</div>
+        <div class="text-slate-900 font-black text-2xl mb-2">${title}</div>
+        <div class="space-y-1 text-slate-600 font-medium">${lines.map(line => `<div>${line}</div>`).join('')}</div>
+      `;
+    }
+
+    function setResult(obj) {
+      resultEl.classList.remove('hidden');
+      resultEl.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    byId('useGpsBtn').onclick = () => {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported on this device.');
+        return;
+      }
+      setStatus('Getting Your GPS...', ['Trying to detect your current location.']);
+      navigator.geolocation.getCurrentPosition((pos) => {
+        byId('lat').value = String(pos.coords.latitude);
+        byId('lng').value = String(pos.coords.longitude);
+        setStatus('GPS Loaded', [
+          'Latitude: ' + pos.coords.latitude,
+          'Longitude: ' + pos.coords.longitude
+        ]);
+      }, (err) => {
+        setStatus('GPS Failed', [err.message || 'Location permission was denied.']);
+      }, {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
+      });
+    };
+
+    byId('pairBtn').onclick = async () => {
+      const agentSlug = byId('agentSlug').value.trim();
+      const agentId = byId('agentId').value.trim() || null;
+      const keychainUid = byId('keychainUid').value.trim();
+      const signUid = byId('signUid').value.trim();
+      const lat = byId('lat').value.trim();
+      const lng = byId('lng').value.trim();
+      const keychainDeviceType = byId('keychainDeviceType').value.trim() || 'keychain_chip';
+      const signDeviceType = byId('signDeviceType').value.trim() || 'smart_sign_tag';
+
+      if (!agentSlug || !keychainUid || !signUid) {
+        alert('Agent slug, keychain UID, and sign UID are required.');
+        return;
+      }
+
+      resultEl.classList.add('hidden');
+      setStatus('Opening Pairing Window...', [
+        'Recording the agent keychain scan first.',
+        'Then pairing or reassigning the sign UID.'
+      ]);
+
+      try {
+        await recordChipScan({
+          uid: keychainUid,
+          agentSlug,
+          agentId,
+          deviceType: keychainDeviceType,
+          scanContext: 'protected_setup_keychain',
+          metadata: {
+            phase: 'keychain_anchor',
+            lat: lat ? Number(lat) : null,
+            lng: lng ? Number(lng) : null
+          }
+        });
+
+        const outcome = await activateSmartSignSession({
+          uid: signUid,
+          agentSlug,
+          agentId,
+          lat: lat ? Number(lat) : null,
+          lng: lng ? Number(lng) : null,
+          deviceType: signDeviceType,
+          scanContext: 'protected_setup_sign'
+        });
+
+        setStatus('Sign Paired / Reassigned Successfully', [
+          'Owner agent: ' + (agentSlug || 'unknown'),
+          'Sign ID: ' + (outcome.smartSign?.id || 'missing'),
+          'Event ID: ' + (outcome.eventRecord?.id || 'missing'),
+          'Listing: ' + (outcome.listingContext?.address || 'none detected')
+        ]);
+        setResult(outcome);
+      } catch (err) {
+        setStatus('Setup Failed', [err.message || String(err)]);
+        setResult({ error: err.message || String(err) });
+      }
+    };
+  </script>
+</body>
+</html>
