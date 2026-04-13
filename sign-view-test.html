@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rel8tion Sign Resolve Test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{
+      margin:0;
+      font-family:Inter,sans-serif;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(120,100,255,.25), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(80,200,255,.25), transparent 40%),
+        linear-gradient(180deg,#f3f5ff,#eef2ff);
+      color:#1f2a5a;
+    }
+    #app{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      box-sizing:border-box;
+    }
+    .card{
+      width:100%;
+      max-width:720px;
+      background:rgba(255,255,255,.92);
+      border:1px solid rgba(255,255,255,.55);
+      backdrop-filter:blur(14px);
+      border-radius:32px;
+      box-shadow:0 30px 80px rgba(0,0,0,.10);
+      padding:28px;
+      text-align:center;
+    }
+    .logo{
+      max-width:180px;
+      width:100%;
+      height:auto;
+      margin:0 auto 10px;
+      display:block;
+    }
+    .pill{
+      display:inline-block;
+      padding:8px 14px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      background:#eef2ff;
+      color:#4f46e5;
+      margin-bottom:14px;
+    }
+    h1{
+      margin:0 0 10px;
+      font-family:Poppins,sans-serif;
+      font-size:clamp(30px,5vw,48px);
+      line-height:1;
+      letter-spacing:-0.03em;
+    }
+    p.sub{
+      color:#6b76a8;
+      font-size:16px;
+      line-height:1.5;
+      margin:0 0 22px;
+    }
+    .status{
+      width:52px;
+      height:52px;
+      border:5px solid rgba(109,94,255,.15);
+      border-top:5px solid #6d5eff;
+      border-radius:50%;
+      margin:0 auto 18px;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .property-card{
+      background:#fff;
+      border-radius:24px;
+      overflow:hidden;
+      box-shadow:0 16px 40px rgba(31,42,90,.08);
+      text-align:left;
+      margin-top:20px;
+    }
+    .property-card img{
+      width:100%;
+      height:240px;
+      object-fit:cover;
+      display:block;
+      background:#eef2ff;
+    }
+    .property-body{ padding:22px; }
+    .address{
+      font-family:Poppins,sans-serif;
+      font-size:28px;
+      line-height:1.08;
+      margin-bottom:8px;
+      color:#1f2a5a;
+    }
+    .meta{
+      color:#6b76a8;
+      font-size:15px;
+      line-height:1.6;
+    }
+    .price{
+      font-weight:800;
+      font-size:22px;
+      color:#2563eb;
+      margin-bottom:8px;
+    }
+    .btn{
+      display:block;
+      width:100%;
+      box-sizing:border-box;
+      padding:18px;
+      border:none;
+      border-radius:999px;
+      text-decoration:none;
+      text-align:center;
+      font-weight:800;
+      font-size:17px;
+      cursor:pointer;
+      margin-top:18px;
+      background:linear-gradient(135deg,#40c8ff,#6d5eff);
+      color:#fff;
+      box-shadow:0 18px 40px rgba(100,100,255,.25);
+    }
+    .ghost{
+      background:#fff;
+      color:#1f2a5a;
+      border:1px solid rgba(31,42,90,.10);
+      box-shadow:none;
+    }
+    .small{
+      font-size:13px;
+      color:#7c86b6;
+      margin-top:14px;
+      line-height:1.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
+    const REL8TION_LOGO = "https://rel8tion.info/wp-content/uploads/2026/03/rel8tionlogo.png";
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+
+    function esc(str){
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function money(v){
+      const n = Number(v || 0);
+      if(!n) return "";
+      return "$" + n.toLocaleString();
+    }
+
+    function render(html){
+      document.getElementById("app").innerHTML = html;
+    }
+
+    function renderLoading(msg = "Resolving sign..."){
+      render(`
+        <div class="card">
+          <img src="${REL8TION_LOGO}" class="logo" alt="Rel8tion">
+          <div class="pill">Smart Sign</div>
+          <div class="status"></div>
+          <h1>Loading Live Event</h1>
+          <p class="sub">${esc(msg)}</p>
+        </div>
+      `);
+    }
+
+    function renderError(title, message){
+      render(`
+        <div class="card">
+          <img src="${REL8TION_LOGO}" class="logo" alt="Rel8tion">
+          <div class="pill">Smart Sign</div>
+          <h1>${esc(title)}</h1>
+          <p class="sub">${esc(message)}</p>
+          <a href="/" class="btn ghost">Go Home</a>
+        </div>
+      `);
+    }
+
+    function renderInactive(sign){
+      render(`
+        <div class="card">
+          <img src="${REL8TION_LOGO}" class="logo" alt="Rel8tion">
+          <div class="pill">Smart Sign</div>
+          <h1>Sign Found</h1>
+          <p class="sub">This sign exists, but it is not attached to an active open house yet.</p>
+          <div class="small">
+            <strong>Public code:</strong> ${esc(sign.public_code)}<br>
+            <strong>Status:</strong> ${esc(sign.status || "inactive")}
+          </div>
+        </div>
+      `);
+    }
+
+    function renderActive(sign, eventRow, house){
+      const image = house?.image || "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80";
+      render(`
+        <div class="card">
+          <img src="${REL8TION_LOGO}" class="logo" alt="Rel8tion">
+          <div class="pill">Live Open House</div>
+          <h1>Welcome In</h1>
+          <p class="sub">This sign is currently attached to an active open house event.</p>
+          <div class="property-card">
+            <img src="${esc(image)}" alt="Property">
+            <div class="property-body">
+              <div class="address">${esc(house?.address || "Property details found")}</div>
+              ${house?.price ? `<div class="price">${money(house.price)}</div>` : ""}
+              <div class="meta">
+                ${house?.brokerage ? `<div><strong>Brokerage:</strong> ${esc(house.brokerage)}</div>` : ""}
+                ${house?.beds ? `<div><strong>Beds:</strong> ${esc(house.beds)}</div>` : ""}
+                ${house?.baths ? `<div><strong>Baths:</strong> ${esc(house.baths)}</div>` : ""}
+                ${eventRow?.id ? `<div><strong>Event ID:</strong> ${esc(eventRow.id)}</div>` : ""}
+                ${sign?.public_code ? `<div><strong>Sign Code:</strong> ${esc(sign.public_code)}</div>` : ""}
+              </div>
+              <a href="/event-shell-test.html?event=${encodeURIComponent(eventRow.id)}" class="btn">
+                Continue To Live Event Shell
+              </a>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    async function fetchJson(url, options = {}){
+      const res = await fetch(url, options);
+      const text = await res.text();
+      if(!res.ok) throw new Error(text || `Request failed: ${res.status}`);
+      return text ? JSON.parse(text) : null;
+    }
+
+    async function init(){
+      if(!code){
+        renderError("Missing Sign Code", "This route needs ?code=YOUR_PUBLIC_CODE");
+        return;
+      }
+
+      renderLoading("Looking up sign identity...");
+
+      try{
+        const signRows = await fetchJson(
+          `${SUPABASE_URL}/rest/v1/smart_signs?public_code=eq.${encodeURIComponent(code)}&select=*`,
+          {
+            headers:{ apikey: KEY, Authorization: "Bearer " + KEY }
+          }
+        );
+
+        if(!Array.isArray(signRows) || !signRows.length){
+          renderError("Invalid Sign", "No smart sign was found for that public code.");
+          return;
+        }
+
+        const sign = signRows[0];
+
+        if(!sign.active_event_id){
+          renderInactive(sign);
+          return;
+        }
+
+        renderLoading("Loading active event...");
+
+        const eventRows = await fetchJson(
+          `${SUPABASE_URL}/rest/v1/open_house_events?id=eq.${encodeURIComponent(sign.active_event_id)}&select=*`,
+          {
+            headers:{ apikey: KEY, Authorization: "Bearer " + KEY }
+          }
+        );
+
+        if(!Array.isArray(eventRows) || !eventRows.length){
+          renderError("Event Missing", "The sign points to an event that could not be found.");
+          return;
+        }
+
+        const eventRow = eventRows[0];
+        let house = null;
+
+        if(eventRow.open_house_source_id){
+          const houseRows = await fetchJson(
+            `${SUPABASE_URL}/rest/v1/open_houses?id=eq.${encodeURIComponent(eventRow.open_house_source_id)}&select=*`,
+            {
+              headers:{ apikey: KEY, Authorization: "Bearer " + KEY }
+            }
+          );
+
+          if(Array.isArray(houseRows) && houseRows.length){
+            house = houseRows[0];
+          }
+        }
+
+        renderActive(sign, eventRow, house);
+      }catch(err){
+        console.error(err);
+        renderError("Resolve Failed", err.message || "Something went wrong while loading this sign.");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
