@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rel8tion Smart Sign</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;font-family:Inter,sans-serif;background:radial-gradient(circle at 20% 0%, rgba(120,100,255,.25), transparent 40%),radial-gradient(circle at 80% 100%, rgba(80,200,255,.25), transparent 40%),linear-gradient(180deg,#f3f5ff,#eef2ff);color:#1f2a5a;}
+    #app{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+    .card{width:100%;max-width:720px;background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.55);backdrop-filter:blur(14px);border-radius:32px;box-shadow:0 30px 80px rgba(0,0,0,.10);padding:28px;text-align:center;}
+    .logo{max-width:180px;width:100%;height:auto;margin:0 auto 10px;display:block;}
+    .pill{display:inline-block;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:#eef2ff;color:#4f46e5;margin-bottom:14px;}
+    h1{margin:0 0 10px;font-family:Poppins,sans-serif;font-size:clamp(30px,5vw,48px);line-height:1;letter-spacing:-0.03em;}
+    p.sub{color:#6b76a8;font-size:16px;line-height:1.5;margin:0 0 22px;}
+    .status{width:52px;height:52px;border:5px solid rgba(109,94,255,.15);border-top:5px solid #6d5eff;border-radius:50%;margin:0 auto 18px;animation:spin 1s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .btn{display:block;width:100%;box-sizing:border-box;padding:18px;border:none;border-radius:999px;text-decoration:none;text-align:center;font-weight:800;font-size:17px;cursor:pointer;margin-top:18px;background:linear-gradient(135deg,#40c8ff,#6d5eff);color:#fff;box-shadow:0 18px 40px rgba(100,100,255,.25);}
+    .ghost{background:#fff;color:#1f2a5a;border:1px solid rgba(31,42,90,.10);box-shadow:none;}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+
+    function esc(str){
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function render(html){
+      document.getElementById("app").innerHTML = html;
+    }
+
+    if(!code){
+      render(`
+        <div class="card">
+          <div class="pill">Smart Sign</div>
+          <h1>Missing Sign Code</h1>
+          <p class="sub">This route needs ?code=YOUR_PUBLIC_CODE</p>
+          <a href="/" class="btn ghost">Go Home</a>
+        </div>
+      `);
+    } else {
+      render(`
+        <div class="card">
+          <img src="https://rel8tion.info/wp-content/uploads/2026/03/rel8tionlogo.png" class="logo" alt="Rel8tion">
+          <div class="pill">Smart Sign</div>
+          <div class="status"></div>
+          <h1>Opening Live Event</h1>
+          <p class="sub">Resolving sign code and loading the active event shell...</p>
+        </div>
+      `);
+      window.location.replace(`/sign-view-test.html?code=${encodeURIComponent(code)}`);
+    }
+  </script>
+</body>
+</html>
