@@ -1,14 +1,28 @@
-<!-- REL8TION CLAIM PAGE - DEBUG/FIXED DROP-IN HTML BLOCK -->
+<!-- REL8TION CLAIM PAGE - HOMEPAGE STYLE / NO HOUSE - FULL DROP-IN HTML BLOCK -->
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 
-<div id="app" class="min-h-screen flex items-center justify-center p-4 md:p-6 transition-all duration-700"></div>
+<div id="claimShell" class="rel8tion-wrapper">
+  <div class="moving-clouds"></div>
+
+  <div class="agent-stage">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
+  </div>
+
+  <div class="fade-overlay"></div>
+
+  <div id="app" class="claim-app-layer"></div>
+</div>
 
 <script>
 const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
 const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
-const REL8TION_LOGO = "https://darkblue-oryx-581419.hostingersite.com/wp-content/uploads/2026/04/logo150x100trans.png";
+const REL8TION_LOGO = "https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png";
 const PROFILE_BUCKET = "agent-images";
 
 const state = {
@@ -18,21 +32,20 @@ const state = {
   currentBrand: null,
   prefilledAgent: null,
   keyRecord: null,
-  loaderInterval: null
+  loaderInterval: null,
+  detectedAgentPhoto: null
 };
-
 
 function debug(msg, data = null){
   console.log("🐞 DEBUG:", msg, data || "");
 }
-
 
 function esc(str){
   return String(str || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -72,18 +85,6 @@ function money(v){
   return "$" + n.toLocaleString();
 }
 
-function money(v){
-  const n = Number(v || 0);
-  if(!n) return "";
-  return "$" + n.toLocaleString();
-}
-
-function money(v){
-  const n = Number(v || 0);
-  if(!n) return "";
-  return "$" + n.toLocaleString();
-}
-
 function getStatus(h){
   try{
     const now = new Date();
@@ -111,12 +112,7 @@ function getBrandColors(){
 
 function setAppBackground(){
   const app = document.getElementById("app");
-  app.className = "min-h-screen flex items-center justify-center p-4 md:p-6 transition-all duration-700";
-  app.style.background = `
-    radial-gradient(circle at top left, rgba(96,165,250,0.32), transparent 35%),
-    radial-gradient(circle at bottom right, rgba(59,130,246,0.20), transparent 35%),
-    linear-gradient(180deg, #eaf4ff 0%, #dceeff 45%, #eef6ff 100%)
-  `;
+  app.className = "claim-app-layer";
 }
 
 function primaryButtonStyle(){
@@ -127,7 +123,7 @@ function primaryButtonStyle(){
 function render(content){
   const app = document.getElementById("app");
   app.innerHTML = `
-    <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/90 bg-white p-6 md:p-10 shadow-[0_35px_90px_rgba(31,42,90,0.12)] text-center transition-all duration-500">
+    <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
       <div class="mb-8">
         <img src="${REL8TION_LOGO}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
       </div>
@@ -140,10 +136,10 @@ function render(content){
 function showLoading(msg = "Finding Your Listing ✨"){
   render(`
     <div class="py-10 md:py-14">
-      <div class="w-20 h-20 border-8 border-slate-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
+      <div class="w-20 h-20 border-8 border-slate-100/80 border-t-blue-600 rounded-full animate-spin mx-auto mb-8"></div>
       <h2 class="text-2xl md:text-3xl font-black mb-2 tracking-tight text-[#1f2a5a]">Finding Your Listing ✨</h2>
       <p id="loaderText" class="text-slate-500 text-lg font-bold animate-pulse">${esc(msg)}</p>
-      <div class="mt-8 w-full h-3 rounded-full bg-slate-100 overflow-hidden">
+      <div class="mt-8 w-full h-3 rounded-full bg-slate-100/80 overflow-hidden">
         <div class="h-full rounded-full animate-[progressMove_1.3s_ease-in-out_infinite_alternate]" style="width:42%;background:linear-gradient(90deg,#38bdf8,#2563eb);"></div>
       </div>
       <p class="mt-4 text-xs text-slate-400 font-bold uppercase tracking-[0.22em]">⚡ This only takes a second...</p>
@@ -187,7 +183,7 @@ function showError(title, message){
           Try Again
         </button>
 
-        <button onclick="showForm()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="showForm()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           Set Up Manually
         </button>
       </div>
@@ -199,7 +195,7 @@ function showIntro(){
   render(`
     <div class="text-center">
       <div class="inline-flex items-center justify-center mb-6">
-        <div class="px-4 py-2 rounded-full bg-slate-50 border border-slate-200 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
+        <div class="px-4 py-2 rounded-full bg-white/60 border border-white/80 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
           Agent Activation
         </div>
       </div>
@@ -212,32 +208,32 @@ function showIntro(){
         Every tap = a new lead. We handle the relationship until closing.
       </p>
 
-    <div class="rounded-[34px] border border-slate-100 bg-white shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6 mb-7 text-left">
-  <div class="flex items-center gap-4">
-    <div class="shrink-0">
-      <div class="relative w-[110px] h-[110px] md:w-[128px] md:h-[128px] floating-chip">
-        <div class="absolute inset-0 rounded-full blur-2xl opacity-40 bg-[radial-gradient(circle,#60a5fa_0%,#a855f7_45%,transparent_75%)]"></div>
-        <img 
-          src="https://rel8tion.info/wp-content/uploads/2026/04/3d_rel8tion.png"
-          class="relative w-full h-full object-contain drop-shadow-[0_22px_45px_rgba(64,200,255,0.28)]"
-          alt="Rel8tion Floating Chip"
-        >
+      <div class="rounded-[34px] border border-white/70 bg-white/55 shadow-[0_20px_60px_rgba(31,42,90,0.08)] p-5 md:p-6 mb-7 text-left backdrop-blur-sm">
+        <div class="flex items-center gap-4">
+          <div class="shrink-0">
+            <div class="relative w-[140px] h-[125px] md:w-[145px] md:h-[145px] floating-chip">
+              <div class="absolute inset-0 rounded-full blur-2xl opacity-40 bg-[radial-gradient(circle,#60a5fa_0%,#60a5fa_0%,transparent_75%)]"></div>
+              <img 
+                src="https://rel8tion.me/wp-content/uploads/2026/04/sign-colorfulmockup.png"
+                class="relative w-full h-full object-contain drop-shadow-[0_45px_45px_rgba(64,200,255,0.28)]"
+                alt="Rel8tion Floating Chip"
+              >
+            </div>
+          </div>
+
+          <div class="min-w-0">
+            <div class="text-slate-900 text-[24px] md:text-[26px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
+              Our Smart Sign<br>Programs Itself
+            </div>
+
+            <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium">
+              No set up needed.   Just tap it when you arrive at your open house and it does the rest. Automatically.
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="min-w-0">
-      <div class="text-slate-900 text-[24px] md:text-[26px] leading-[1.0] font-black tracking-[-0.03em] mb-2">
-        From Tap To<br>Closing Table
-      </div>
-
-      <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium">
-        We capture, follow up, and nurture the smart way.
-      </p>
-    </div>
-  </div>
-</div>
-
-      <div class="rounded-[28px] border border-blue-100 bg-slate-50 px-6 py-6 shadow-inner mb-7">
+      <div class="rounded-[28px] border border-blue-100 bg-white/55 backdrop-blur-sm px-6 py-6 shadow-inner mb-7">
         <div class="text-slate-900 text-[19px] md:text-[20px] font-black tracking-[-0.02em]">
           Put it on your keychain and use it everyday.
         </div>
@@ -248,7 +244,7 @@ function showIntro(){
           🟢 Yes — Detect My Listing
         </button>
 
-        <button onclick="skipToForm()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] md:text-[18px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="skipToForm()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] md:text-[18px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           🔵 No — Set Up Manually
         </button>
       </div>
@@ -270,7 +266,7 @@ function showDetection(){
         If this is the right listing, we can preload your setup and speed things up.
       </p>
 
-      <div class="rounded-[34px] overflow-hidden shadow-2xl mb-8 text-left border border-slate-100 bg-white">
+      <div class="rounded-[34px] overflow-hidden shadow-2xl mb-8 text-left border border-white/70 bg-white/80 backdrop-blur-sm">
         ${h.image ? `<img src="${esc(h.image)}" class="h-64 w-full object-cover">` : ""}
 
         <div class="p-6 md:p-8">
@@ -284,8 +280,6 @@ function showDetection(){
 
           ${h.price ? `<div class="text-xl font-black text-blue-600 mb-2">${money(h.price)}</div>` : ""}
           <p class="text-slate-500 text-sm font-black uppercase tracking-widest">${esc(h.brokerage || "")}</p>
-
-          
         </div>
       </div>
 
@@ -294,7 +288,7 @@ function showDetection(){
           💯 Yes — Activate This Listing
         </button>
 
-        <button onclick="showOtherListings()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="showOtherListings()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           Show Other Listings Nearby
         </button>
 
@@ -319,7 +313,7 @@ function showOtherListings(){
         ${unique.map(h => {
           const s = getStatus(h);
           return `
-            <div onclick="selectHouse('${esc(h.id)}')" class="flex items-start gap-4 p-4 rounded-[28px] border-2 border-slate-100 hover:border-blue-400 bg-white shadow-sm hover:shadow-xl transition-all cursor-pointer">
+            <div onclick="selectHouse('${esc(h.id)}')" class="flex items-start gap-4 p-4 rounded-[28px] border-2 border-white/70 hover:border-blue-400 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all cursor-pointer">
               ${h.image
                 ? `<img src="${esc(h.image)}" class="w-20 h-20 rounded-2xl object-cover bg-slate-100 shadow-inner">`
                 : `<div class="w-20 h-20 rounded-2xl bg-slate-100 shadow-inner flex items-center justify-center text-slate-400 text-xs font-bold">No Image</div>`
@@ -352,10 +346,11 @@ function showOtherListings(){
 function showVerifyAgent(){
   const h = state.detectedHouse;
   const hasAnyDetectedInfo = !!(h?.agent || h?.agent_phone || h?.agent_email);
+  const verifyPhoto = state.prefilledAgent?.image_url || state.detectedAgentPhoto || "";
 
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ""}
 
       <h1 class="font-['Poppins'] text-4xl font-black mb-4 leading-tight uppercase text-[#1f2a5a]">
         Wait — Is This You?
@@ -365,7 +360,19 @@ function showVerifyAgent(){
         We found profile details attached to this listing. Go live now or finish your profile first.
       </p>
 
-      <div class="bg-blue-50/50 p-8 md:p-10 rounded-[34px] border-2 border-blue-100 mb-6 shadow-inner">
+      <div class="bg-blue-50/70 backdrop-blur-sm p-8 md:p-10 rounded-[34px] border-2 border-blue-100 mb-6 shadow-inner">
+        ${verifyPhoto ? `
+          <img
+            src="${esc(verifyPhoto)}"
+            class="w-28 h-28 rounded-full object-cover mx-auto shadow-[0_18px_40px_rgba(31,42,90,0.16)] mb-5 bg-white"
+            alt="${esc(h.agent || 'Agent')}"
+          >
+        ` : `
+          <div class="w-28 h-28 rounded-full bg-white border border-blue-100 mx-auto mb-5 shadow-inner flex items-center justify-center text-slate-400 font-black">
+            AGENT
+          </div>
+        `}
+
         <h3 class="text-3xl md:text-4xl font-black text-blue-900 leading-tight mb-2">
           ${esc(h.agent || "Profile info found")}
         </h3>
@@ -379,7 +386,7 @@ function showVerifyAgent(){
       </div>
 
       ${hasAnyDetectedInfo ? `
-        <div class="rounded-[22px] border border-slate-100 bg-slate-50 px-5 py-4 text-left mb-6">
+        <div class="rounded-[22px] border border-white/70 bg-white/60 backdrop-blur-sm px-5 py-4 text-left mb-6">
           <div class="text-slate-900 font-black text-base mb-1">Would you like to complete your profile now?</div>
           <div class="text-slate-500 text-sm font-medium">
             Add photo, email, bio, social links, and website now, or do it later after onboarding.
@@ -392,11 +399,11 @@ function showVerifyAgent(){
           ✅ Activate Now
         </button>
 
-        <button onclick="showFullProfileForm()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="showFullProfileForm()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           ✍️ Complete Profile Now
         </button>
 
-        <button onclick="showForm(state.detectedHouse?.brokerage || '')" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="showForm(state.detectedHouse?.brokerage || '')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           No — Let Me Edit My Info
         </button>
       </div>
@@ -407,7 +414,7 @@ function showVerifyAgent(){
 function showAlreadyClaimed(agent){
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6"">` : ""}
 
       <h1 class="font-['Poppins'] text-[34px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">
         This Chip Is Already Active
@@ -417,7 +424,7 @@ function showAlreadyClaimed(agent){
         We found an existing agent connected to this Rel8tion chip.
       </p>
 
-      <div class="rounded-[30px] border border-slate-100 bg-slate-50/90 p-6 text-left mb-8">
+      <div class="rounded-[30px] border border-white/70 bg-white/60 backdrop-blur-sm p-6 text-left mb-8">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Connected Agent</div>
         <div class="text-slate-900 font-black text-2xl mb-1">${esc(agent.name || "")}</div>
         ${agent.brokerage ? `<div class="text-slate-500 font-bold uppercase tracking-[0.14em] text-xs mb-3">${esc(agent.brokerage)}</div>` : ""}
@@ -430,7 +437,7 @@ function showAlreadyClaimed(agent){
           Open Existing Setup
         </a>
 
-        <button onclick="showFullProfileForm('${esc(agent.brokerage || '')}', 'Update your full profile anytime below.')" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm transition-all">
+        <button onclick="showFullProfileForm('${esc(agent.brokerage || '')}', 'Update your full profile anytime below.')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm transition-all">
           Complete / Update Full Profile
         </button>
       </div>
@@ -441,9 +448,9 @@ function showAlreadyClaimed(agent){
 function showForm(prefillBrokerage = "", notice = ""){
   const p = state.prefilledAgent || {};
   const brokerage = prefillBrokerage || p.brokerage || state.detectedHouse?.brokerage || "";
- const loveLine = brokerage
-  ? `Get your ${brokerage} profile live in seconds.`
-  : `Fast setup. Big results.`;
+  const loveLine = brokerage
+    ? `Get your ${brokerage} profile live in seconds.`
+    : `Fast setup. Big results.`;
 
   render(`
     <div>
@@ -458,15 +465,15 @@ function showForm(prefillBrokerage = "", notice = ""){
       </p>
 
       ${notice ? `
-        <div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50 text-blue-700 px-5 py-4 text-sm font-semibold">
+        <div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">
           ${esc(notice)}
         </div>
       ` : ""}
 
       <div class="space-y-4 text-left">
-        <input id="name" value="${esc(p.name || "")}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="name" value="${esc(p.name || "")}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="phone" value="${esc(p.phone || "")}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="phone" value="${esc(p.phone || "")}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
       </div>
 
       <div class="mt-6 space-y-3">
@@ -474,7 +481,7 @@ function showForm(prefillBrokerage = "", notice = ""){
           Activate My Profile
         </button>
 
-        <button onclick="startDetection()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="startDetection()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           Try Detection Again
         </button>
       </div>
@@ -498,7 +505,7 @@ function showFullProfileForm(prefillBrokerage = "", notice = ""){
 
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
+      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6"">` : ""}
 
       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
         Complete Your Profile
@@ -509,21 +516,21 @@ function showFullProfileForm(prefillBrokerage = "", notice = ""){
       </p>
 
       ${notice ? `
-        <div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50 text-blue-700 px-5 py-4 text-sm font-semibold">
+        <div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">
           ${esc(notice)}
         </div>
       ` : ""}
 
       <div class="space-y-4 text-left">
-        <input id="full_name" value="${esc(name)}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_name" value="${esc(name)}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="full_phone" value="${esc(phone)}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_phone" value="${esc(phone)}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="full_email" value="${esc(email)}" placeholder="Email" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_email" value="${esc(email)}" placeholder="Email" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="full_brokerage" value="${esc(brokerage)}" placeholder="Brokerage" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_brokerage" value="${esc(brokerage)}" placeholder="Brokerage" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50 to-slate-50 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all">
+        <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all backdrop-blur-sm">
           <div class="text-slate-900 font-black text-lg mb-1">📸 Add Profile Photo</div>
           <div class="text-slate-500 text-sm font-semibold">Tap to upload</div>
           <input type="file" id="full_photo" accept="image/*" hidden>
@@ -531,13 +538,13 @@ function showFullProfileForm(prefillBrokerage = "", notice = ""){
 
         <img id="full_preview" src="${esc(image_url)}" class="${image_url ? 'block' : 'hidden'} w-full rounded-[24px] max-h-[280px] object-cover shadow-sm">
 
-        <input id="full_instagram" value="${esc(instagram)}" placeholder="Instagram" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_instagram" value="${esc(instagram)}" placeholder="Instagram" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="full_website" value="${esc(website)}" placeholder="Website" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_website" value="${esc(website)}" placeholder="Website" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <input id="full_facebook" value="${esc(facebook)}" placeholder="Facebook" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="full_facebook" value="${esc(facebook)}" placeholder="Facebook" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-        <textarea id="full_bio" placeholder="Bio" class="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
+        <textarea id="full_bio" placeholder="Bio" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
       </div>
 
       <div class="mt-6 space-y-3">
@@ -545,7 +552,7 @@ function showFullProfileForm(prefillBrokerage = "", notice = ""){
           Save Full Profile
         </button>
 
-        <button onclick="autoActivate()" class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="autoActivate()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
           Do This Later
         </button>
       </div>
@@ -582,6 +589,59 @@ async function fetchJson(url, options = {}){
     return raw ? JSON.parse(raw) : {};
   }catch(e){
     throw new Error("Invalid JSON response: " + raw);
+  }
+}
+
+async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" } = {}) {
+  try {
+    let normalizedPhone = String(phone || "").replace(/\D/g, "");
+    if (normalizedPhone.length === 11 && normalizedPhone.startsWith("1")) {
+      normalizedPhone = normalizedPhone.slice(1);
+    }
+
+    const tryQueries = [];
+
+    if (openHouseId && normalizedPhone) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&primary_photo_url=not.is.null&limit=1`
+      );
+    }
+
+    if (openHouseId && name) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&primary_photo_url=not.is.null&limit=1`
+      );
+    }
+
+    if (normalizedPhone) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&primary_photo_url=not.is.null&limit=1`
+      );
+    }
+
+    if (name) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&name=eq.${encodeURIComponent(name)}&primary_photo_url=not.is.null&limit=1`
+      );
+    }
+
+    for (const url of tryQueries) {
+      const rows = await fetchJson(url, {
+        headers: {
+          "apikey": KEY,
+          "Authorization": "Bearer " + KEY
+        }
+      });
+
+      if (Array.isArray(rows) && rows.length && rows[0].primary_photo_url) {
+        return rows[0].primary_photo_url;
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.log("listing_agents photo lookup skipped", e);
+    return null;
   }
 }
 
@@ -766,6 +826,12 @@ async function confirmListing(){
   }
 
   if(state.detectedHouse.agent || state.detectedHouse.agent_phone || state.detectedHouse.agent_email){
+    state.detectedAgentPhoto = await fetchListingAgentPhoto({
+      openHouseId: state.detectedHouse?.id || "",
+      name: state.detectedHouse?.agent || "",
+      phone: state.detectedHouse?.agent_phone || ""
+    });
+
     showVerifyAgent();
   } else {
     showForm(state.detectedHouse.brokerage || "");
@@ -1093,6 +1159,7 @@ async function autoActivate(){
     );
   }
 }
+
 async function activate(){
   const name = document.getElementById("name")?.value?.trim() || "";
   const phone = document.getElementById("phone")?.value?.trim() || "";
@@ -1184,7 +1251,6 @@ async function saveFullProfile(){
   const website = document.getElementById("full_website")?.value?.trim() || "";
   const facebook = document.getElementById("full_facebook")?.value?.trim() || "";
   const bio = document.getElementById("full_bio")?.value?.trim() || "";
-  
 
   debug("SAVE FULL PROFILE CLICKED", { uid: state.uid, name, phone, email, brokerage });
 
@@ -1281,24 +1347,115 @@ init();
 </script>
 
 <style>
-@keyframes progressMove{
-  from{transform:translateX(-15%);width:35%;}
-  to{transform:translateX(90%);width:45%;}
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  background-color: #f0f7ff;
 }
+
+.rel8tion-wrapper {
+  font-family: 'Inter', sans-serif;
+  color: #1f2a5a;
+  background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+  background-attachment: fixed;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.claim-app-layer {
+  position: relative;
+  z-index: 20;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.moving-clouds {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 500px;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+  background-repeat: repeat-x;
+  background-size: 800px auto;
+  animation: driftClouds 120s linear infinite;
+}
+
+.agent-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
+}
+
+.agent-cutout {
+  position: absolute;
+  width: 90px;
+  height: auto;
+  z-index: 10;
+  opacity: 0;
+  filter: drop-shadow(0 14px 24px rgba(31,42,90,0.12));
+  animation-fill-mode: both !important;
+}
+
+@keyframes driftClouds {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes walk1 { 0% { left: 68%; top: 78%; opacity: 0; } 10% { opacity: .18; } 100% { left: 18%; top: 72%; opacity: 0; } }
+@keyframes walk2 { 0% { left: 82%; top: 26%; opacity: 0; } 10% { opacity: .14; } 100% { left: 10%; top: 32%; opacity: 0; } }
+@keyframes walk3 { 0% { left: 12%; top: 62%; opacity: 0; } 10% { opacity: .16; } 100% { left: 78%; top: 70%; opacity: 0; } }
+@keyframes walk4 { 0% { left: 20%; top: 18%; opacity: 0; } 10% { opacity: .12; } 100% { left: 72%; top: 22%; opacity: 0; } }
+@keyframes walk5 { 0% { left: 50%; top: 84%; opacity: 0; } 10% { opacity: .16; } 100% { left: 84%; top: 58%; opacity: 0; } }
+
+.agent-1 { animation: walk1 36s infinite linear; }
+.agent-2 { animation: walk2 30s infinite linear; animation-delay: 4s; }
+.agent-3 { animation: walk3 28s infinite linear; animation-delay: 2s; }
+.agent-4 { animation: walk4 40s infinite linear; animation-delay: 6s; }
+.agent-5 { animation: walk5 34s infinite linear; animation-delay: 0s; }
+
+@keyframes progressMove {
+  from { transform: translateX(-15%); width:35%; }
+  to { transform: translateX(90%); width:45%; }
+}
+
 @keyframes bobFloat {
-  0% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-  100% {
-    transform: translateY(0px);
-  }
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
 .floating-chip {
   animation: bobFloat 3.2s ease-in-out infinite;
   will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .agent-cutout {
+    width: 52px;
+  }
+
+  .claim-app-layer {
+    padding: 14px;
+  }
 }
 </style>
