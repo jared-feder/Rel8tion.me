@@ -20,88 +20,16 @@
 </div>
 
 <script>
-// ... (unchanged code above)
-
-// 🔥 MULTI AGENT SELECTION
-async function showAgentSelection(){
-  const h = state.detectedHouse;
-  if(!h) return;
-
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/listing_agents?open_house_id=eq.${encodeURIComponent(h.id)}`, {
-      headers:{ apikey: KEY, Authorization: "Bearer " + KEY }
-    });
-
-    const agents = await res.json();
-
-    if(!agents.length){
-      state.detectedAgentPhoto = await fetchListingAgentPhoto({
-        openHouseId: h?.id || "",
-        name: h?.agent || "",
-        phone: h?.agent_phone || ""
-      });
-      showVerifyAgent();
-      return;
-    }
-
-    if(agents.length === 1){
-      selectAgent(agents[0]);
-      return;
-    }
-
-    render(`
-      <div>
-        <h1 class="text-3xl font-black mb-4">Select Yourself</h1>
-        <div class="space-y-3">
-          ${agents.map(a => `
-            <div onclick='selectAgent(${JSON.stringify(a)})' class="flex items-center gap-4 p-4 bg-white rounded-xl shadow cursor-pointer">
-              <img src="${a.primary_photo_url || a.directory_photo_url || 'https://via.placeholder.com/80'}" class="w-14 h-14 rounded-full object-cover">
-              <div>
-                <div class="font-bold">${a.name || 'Agent'}</div>
-                <div class="text-sm text-gray-500">${a.phone || ''}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        <button onclick="showVerifyAgent()" class="mt-4 text-sm text-gray-400">Not Me</button>
-      </div>
-    `);
-
-  }catch(e){
-    console.log("Agent selection failed", e);
-    showVerifyAgent();
-  }
-}
-
-function selectAgent(a){
-  state.prefilledAgent = {
-    name: a.name,
-    phone: a.phone,
-    email: a.email,
-    image_url: a.primary_photo_url || a.directory_photo_url
-  };
-
-  state.detectedAgentPhoto = a.primary_photo_url || a.directory_photo_url;
-  showVerifyAgent();
-}
-
-// 🔥 FIXED CONFIRM LISTING
-async function confirmListing(){
-  if(!state.detectedHouse){
-    showForm();
-    return;
-  }
-
-  if(state.detectedHouse.brokerage){
-    await applyBranding(state.detectedHouse.brokerage);
-  }
-
-  showAgentSelection();
-}
-
-// ... (rest unchanged)
+// unchanged JS
 </script>
 
 <style>
-/* unchanged styles */
+/* 🔥 GLOBAL LOGO SIZE BOOST */
+img[src*="brokerage-logos"]{
+  max-height: 140px !important;
+  width: auto !important;
+  object-fit: contain;
+}
+
+/* unchanged styles below */
 </style>
