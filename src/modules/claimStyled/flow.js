@@ -28,6 +28,26 @@ import {
   showVerifyAgent
 } from './renderer.js';
 
+function getSearchParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+function isSignDemoMode() {
+  return getSearchParams().get('mode') === 'sign-demo';
+}
+
+function redirectToSignDemo(agentSlug) {
+  if (!agentSlug) return;
+  const params = getSearchParams();
+  const next = new URLSearchParams();
+  if (state.uid) next.set('uid', state.uid);
+  next.set('agent', agentSlug);
+  next.set('mode', 'sign-demo');
+  if (params.get('code')) next.set('code', params.get('code'));
+  if (params.get('sign_id')) next.set('sign_id', params.get('sign_id'));
+  window.location.href = `/sign-demo-activate.html?${next.toString()}`;
+}
+
 export function bindPublicHandlers() {
   window.startDetection = startDetection;
   window.skipToForm = skipToForm;
@@ -235,6 +255,11 @@ export async function init() {
   try {
     await loadAgentFromUID();
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
+      const claimedSlug = state.prefilledAgent?.slug || state.keyRecord.agent_slug;
+      if (isSignDemoMode()) {
+        redirectToSignDemo(claimedSlug);
+        return;
+      }
       if (state.prefilledAgent) showAlreadyClaimed(state.prefilledAgent);
       else window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(state.keyRecord.agent_slug)}`;
     } else {
