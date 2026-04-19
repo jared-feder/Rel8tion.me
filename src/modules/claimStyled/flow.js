@@ -28,6 +28,8 @@ import {
   showVerifyAgent
 } from './renderer.js';
 
+const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
+
 function getSearchParams() {
   return new URLSearchParams(window.location.search);
 }
@@ -36,15 +38,27 @@ function isSignDemoMode() {
   return getSearchParams().get('mode') === 'sign-demo';
 }
 
+function readSignDemoSession() {
+  try {
+    const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function redirectToSignDemo(agentSlug) {
   if (!agentSlug) return;
   const params = getSearchParams();
   const next = new URLSearchParams();
+  const pending = readSignDemoSession();
   if (state.uid) next.set('uid', state.uid);
   next.set('agent', agentSlug);
   next.set('mode', 'sign-demo');
   if (params.get('code')) next.set('code', params.get('code'));
+  else if (pending?.publicCode) next.set('code', pending.publicCode);
   if (params.get('sign_id')) next.set('sign_id', params.get('sign_id'));
+  else if (pending?.signId) next.set('sign_id', pending.signId);
   window.location.href = `/sign-demo-activate.html?${next.toString()}`;
 }
 
