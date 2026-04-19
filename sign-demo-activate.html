@@ -89,6 +89,7 @@
   <script>
     const SUPABASE_URL = 'https://nicanqrfqlbnlmnoernb.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg';
+    const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const params = new URLSearchParams(window.location.search);
 
     const state = {
@@ -141,6 +142,35 @@
       }
     }
 
+    function readSession() {
+      try {
+        const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function writeSession(patch = {}) {
+      const next = { ...(readSession() || {}), ...patch, updatedAt: new Date().toISOString() };
+      window.localStorage.setItem(SIGN_DEMO_SESSION_KEY, JSON.stringify(next));
+      return next;
+    }
+
+    function clearSession() {
+      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+    }
+
+    function mergeStateFromSession() {
+      const pending = readSession();
+      if (!pending) return null;
+      if (!state.uid && pending.uid) state.uid = pending.uid;
+      if (!state.agentSlug && pending.agentSlug) state.agentSlug = pending.agentSlug;
+      if (!state.publicCode && pending.publicCode) state.publicCode = pending.publicCode;
+      if (!state.signId && pending.signId) state.signId = pending.signId;
+      return pending;
+    }
+
     async function request(path, options = {}) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         ...options,
@@ -188,17 +218,57 @@
       `);
     }
 
+    function renderTapSignStep() {
+      const pending = readSession();
+      render(`
+        <div class="center">
+          <div class="pill">Step 1 • tap keychain complete</div>
+          <h1>Now Tap The Sign</h1>
+          <p class="copy">Your claimed keychain is recognized. Next, tap or scan the sign so we can identify which sign to register for this demo.</p>
+          <div class="meta" style="max-width:760px;margin:18px auto 0;">
+            <div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid || pending?.uid || '—')}</div></div>
+            <div class="meta-box"><div class="label">Agent Slug</div><div class="value">${esc(state.agentSlug || pending?.agentSlug || '—')}</div></div>
+          </div>
+          <div class="notice warn" style="max-width:620px;margin:18px auto 0;">Leave this on the same phone/browser. After the sign tap is detected, tap the keychain again to complete the handshake.</div>
+          <div class="stack" style="max-width:620px;margin:18px auto 0;">
+            <button class="button secondary" onclick="window.enterSignCodeManually()">Enter Sign Code Manually</button>
+            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
+          </div>
+        </div>
+      `);
+    }
+
     function renderSignCodeStep() {
       render(`
         <div class="center">
-          <div class="pill">Step 1 • identify sign</div>
+          <div class="pill">Identify sign</div>
           <h1>Enter The Sign Code</h1>
-          <p class="copy">Use the printed QR code value or a known demo code so we can lock this sign to the detected open house.</p>
+          <p class="copy">Use the printed QR code value if you want to continue without tapping the sign.</p>
           <div style="max-width:520px;margin:20px auto 0;" class="stack">
             <input id="codeInput" class="field" placeholder="Example: testsign01" value="${esc(state.publicCode)}">
             <button class="button primary" onclick="window.resolveSignCode()">Continue</button>
+            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
           </div>
           ${state.error ? `<div class="notice error" style="max-width:520px;margin:16px auto 0;">${esc(state.error)}</div>` : ''}
+        </div>
+      `);
+    }
+
+    function renderHandshakeWait() {
+      const pending = readSession();
+      render(`
+        <div class="center">
+          <div class="pill">Step 2 • sign captured</div>
+          <h1>Now Tap The Keychain Again</h1>
+          <p class="copy">The sign is identified. Tap the same claimed keychain one more time to seal the demo handshake and continue to listing detection.</p>
+          <div class="meta" style="max-width:760px;margin:18px auto 0;">
+            <div class="meta-box"><div class="label">Pending Sign Code</div><div class="value">${esc(state.publicCode || pending?.publicCode || '—')}</div></div>
+            <div class="meta-box"><div class="label">Pending Agent</div><div class="value">${esc(state.agentSlug || pending?.agentSlug || '—')}</div></div>
+          </div>
+          <div class="notice success" style="max-width:620px;margin:18px auto 0;">After the second keychain tap, the claim flow will carry this sign code forward automatically.</div>
+          <div class="stack" style="max-width:620px;margin:18px auto 0;">
+            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
+          </div>
         </div>
       `);
     }
@@ -208,9 +278,9 @@
       render(`
         <div>
           <div class="center">
-            <div class="pill">Step 2 • detect listing</div>
+            <div class="pill">Step 3 • detect listing</div>
             <h1>Lock The Sign To This Open House</h1>
-            <p class="copy">We are using the already-claimed chip as the auth token. Pick the listing and we will attach the sign to the event.</p>
+            <p class="copy">The handshake is complete. Pick the listing and we will attach the sign to the live event.</p>
           </div>
           <div class="meta">
             <div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid || '—')}</div></div>
@@ -247,7 +317,7 @@
       render(`
         <div>
           <div class="center">
-            <div class="pill">Step 3 • confirm + activate</div>
+            <div class="pill">Step 4 • confirm + activate</div>
             <h1>Confirm This Listing</h1>
             <p class="copy">This will end any currently active event for this sign, create a fresh event if needed, and lock the sign live to this open house.</p>
           </div>
@@ -287,7 +357,7 @@
           <div class="stack" style="max-width:620px;margin:18px auto 0;">
             <a class="button primary" href="/s.html?code=${encodeURIComponent(state.publicCode)}">Open Live Sign Route</a>
             <a class="button secondary" href="/event-shell-test.html?event=${encodeURIComponent(state.event?.id || '')}">Open Event Shell</a>
-            <button class="button secondary" onclick="window.location.reload()">Start Another Demo</button>
+            <button class="button secondary" onclick="window.resetDemoSession()">Start Another Demo</button>
           </div>
         </div>
       `);
@@ -422,18 +492,47 @@
       });
 
       state.event = event;
+      clearSession();
       return event;
     }
+
+    async function proceedToListingDetection() {
+      await loadAgentFromClaimedChip();
+      await resolveSign();
+      writeSession({
+        uid: state.uid,
+        agentSlug: state.agentSlug,
+        publicCode: state.publicCode,
+        signId: state.signId,
+        stage: 'handshake_complete'
+      });
+      await detectListings();
+      state.info = 'Handshake complete. Choose the listing to lock this sign live.';
+      renderDetectedListings();
+    }
+
+    window.enterSignCodeManually = function enterSignCodeManually() {
+      state.error = '';
+      renderSignCodeStep();
+    };
 
     window.resolveSignCode = async function resolveSignCode() {
       try {
         state.error = '';
         state.publicCode = document.getElementById('codeInput')?.value?.trim() || state.publicCode;
         await resolveSign();
-        await loadAgentFromClaimedChip();
-        await detectListings();
-        state.info = 'Claimed chip recognized. Now choose the listing to lock this sign live.';
-        renderDetectedListings();
+        const pending = writeSession({
+          uid: state.uid || readSession()?.uid || '',
+          agentSlug: state.agentSlug || readSession()?.agentSlug || '',
+          publicCode: state.publicCode,
+          signId: state.signId,
+          stage: (state.uid && state.agentSlug) ? 'waiting_for_handshake' : 'waiting_for_handshake'
+        });
+        if (state.uid && state.agentSlug) {
+          renderHandshakeWait();
+          return;
+        }
+        renderHandshakeWait();
       } catch (err) {
         state.error = err.message || 'Could not resolve sign code.';
         renderSignCodeStep();
@@ -462,17 +561,57 @@
       }
     };
 
+    window.resetDemoSession = function resetDemoSession() {
+      clearSession();
+      const next = new URLSearchParams();
+      if (state.uid) next.set('uid', state.uid);
+      if (state.agentSlug) next.set('agent', state.agentSlug);
+      if (state.uid && state.agentSlug) {
+        window.location.href = `/sign-demo-activate.html?${next.toString()}`;
+        return;
+      }
+      window.location.href = '/sign-demo-activate.html';
+    };
+
     async function init() {
       renderLoading('Checking claimed chip and sign context...');
       try {
-        await loadAgentFromClaimedChip();
-        if (state.publicCode) {
-          await resolveSign();
-          await detectListings();
-          state.info = 'Claimed chip recognized. Choose the listing to lock this sign live.';
-          renderDetectedListings();
+        const pending = mergeStateFromSession();
+
+        if (state.uid && state.agentSlug && pending?.stage === 'waiting_for_handshake' && pending.publicCode) {
+          state.publicCode = pending.publicCode;
+          state.signId = pending.signId || state.signId;
+          await proceedToListingDetection();
           return;
         }
+
+        if (state.uid && state.agentSlug && !state.publicCode) {
+          writeSession({ uid: state.uid, agentSlug: state.agentSlug, stage: 'waiting_for_sign' });
+          renderTapSignStep();
+          return;
+        }
+
+        if (!state.uid && state.publicCode && pending?.uid && pending?.agentSlug) {
+          state.uid = pending.uid;
+          state.agentSlug = pending.agentSlug;
+          await resolveSign();
+          writeSession({ uid: state.uid, agentSlug: state.agentSlug, publicCode: state.publicCode, signId: state.signId, stage: 'waiting_for_handshake' });
+          renderHandshakeWait();
+          return;
+        }
+
+        if (state.uid && state.agentSlug && state.publicCode) {
+          await proceedToListingDetection();
+          return;
+        }
+
+        if (state.publicCode && !state.uid) {
+          await resolveSign();
+          writeSession({ publicCode: state.publicCode, signId: state.signId, stage: 'waiting_for_handshake' });
+          renderHandshakeWait();
+          return;
+        }
+
         renderSignCodeStep();
       } catch (err) {
         renderMessage('Sign Demo Not Ready', err.message || 'Missing sign-demo context.', 'error');
