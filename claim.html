@@ -374,16 +374,15 @@ function showVerifyAgent(){
         `}
 
         <h3 class="text-3xl md:text-4xl font-black text-blue-900 leading-tight mb-2">
-          ${esc(h.agent || "Profile info found")}
+          ${esc(state.prefilledAgent?.name || h.agent || "Profile info found")}
         </h3>
 
         <p class="text-blue-600 font-black text-sm uppercase tracking-[0.2em] mb-2">
           ${esc(h.brokerage || "")}
         </p>
 
-        ${h.agent_phone ? `<div class="text-slate-500 font-semibold">${esc(normalizePhone(h.agent_phone))}</div>` : ""}
-        ${h.agent_email ? `<div class="text-slate-500 font-semibold">${esc(h.agent_email)}</div>` : ""}
-      </div>
+       ${state.prefilledAgent?.phone ? `<div class="text-slate-500 font-semibold">${esc(normalizePhone(state.prefilledAgent.phone))}</div>` : ""}
+${state.prefilledAgent?.email ? `<div class="text-slate-500 font-semibold">${esc(state.prefilledAgent.email)}</div>` : ""}
 
       ${hasAnyDetectedInfo ? `
         <div class="rounded-[22px] border border-white/70 bg-white/60 backdrop-blur-sm px-5 py-4 text-left mb-6">
@@ -411,80 +410,62 @@ function showVerifyAgent(){
   `);
 }
 
-function showAlreadyClaimed(agent){
-  render(`
-    <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6"">` : ""}
-
-      <h1 class="font-['Poppins'] text-[34px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">
-        This Chip Is Already Active
-      </h1>
-
-      <p class="text-slate-500 text-[17px] md:text-[19px] leading-relaxed font-medium max-w-md mx-auto mb-8">
-        We found an existing agent connected to this Rel8tion chip.
-      </p>
-
-      <div class="rounded-[30px] border border-white/70 bg-white/60 backdrop-blur-sm p-6 text-left mb-8">
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Connected Agent</div>
-        <div class="text-slate-900 font-black text-2xl mb-1">${esc(agent.name || "")}</div>
-        ${agent.brokerage ? `<div class="text-slate-500 font-bold uppercase tracking-[0.14em] text-xs mb-3">${esc(agent.brokerage)}</div>` : ""}
-        ${agent.phone ? `<div class="text-slate-600 font-semibold">${esc(normalizePhone(agent.phone))}</div>` : ""}
-        ${agent.email ? `<div class="text-slate-600 font-semibold">${esc(agent.email)}</div>` : ""}
-      </div>
-
-      <div class="space-y-3">
-        <a href="/onboarding?agent=${encodeURIComponent(agent.slug || '')}" class="block w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all text-center" style="${primaryButtonStyle()}">
-          Open Existing Setup
-        </a>
-
-        <button onclick="showFullProfileForm('${esc(agent.brokerage || '')}', 'Update your full profile anytime below.')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm transition-all">
-          Complete / Update Full Profile
-        </button>
-      </div>
-    </div>
-  `);
-}
-
 function showForm(prefillBrokerage = "", notice = ""){
+
   const p = state.prefilledAgent || {};
   const brokerage = prefillBrokerage || p.brokerage || state.detectedHouse?.brokerage || "";
+
   const loveLine = brokerage
     ? `Get your ${brokerage} profile live in seconds.`
     : `Fast setup. Big results.`;
 
   render(`
     <div>
-      ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-16 max-w-[170px] object-contain mx-auto mb-6">` : ""}
 
-      <h1 class="font-['Poppins'] text-[30px] md:text-[40px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">
+      ${state.currentBrand?.logo_url ? `
+        <img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}"
+             class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">
+      ` : ""}
+
+      <h1 class="font-['Poppins'] text-[30px] md:text-[40px] font-black mb-3 uppercase text-slate-900">
         Activate Your REL8TIONCHIP
       </h1>
 
-      <p class="text-slate-500 text-[17px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">
+      <p class="text-slate-500 text-[17px] mb-6">
         ${esc(loveLine)}
       </p>
 
       ${notice ? `
-        <div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">
+        <div class="mb-6 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 px-5 py-4 text-sm font-semibold">
           ${esc(notice)}
         </div>
       ` : ""}
 
       <div class="space-y-4 text-left">
-        <input id="name" value="${esc(p.name || "")}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="name"
+          value="${esc(p.name || "")}"
+          placeholder="Full Name *"
+          class="w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-[16px] font-semibold text-slate-900">
 
-        <input id="phone" value="${esc(p.phone || "")}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+        <input id="phone"
+          value="${esc(p.phone || "")}"
+          placeholder="Phone Number *"
+          class="w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-[16px] font-semibold text-slate-900">
       </div>
 
       <div class="mt-6 space-y-3">
-        <button onclick="activate()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">
+        <button onclick="activate()"
+          class="w-full py-5 rounded-full font-black text-[18px] uppercase"
+          style="${primaryButtonStyle()}">
           Activate My Profile
         </button>
 
-        <button onclick="startDetection()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">
+        <button onclick="startDetection()"
+          class="w-full py-5 rounded-full bg-white border border-slate-200 text-slate-700 font-black text-[17px] uppercase">
           Try Detection Again
         </button>
       </div>
+
     </div>
   `);
 }
@@ -883,9 +864,9 @@ async function showAgentSelection(){
 
         </div>
 
-        <button onclick="showVerifyAgent()" class="mt-6 text-slate-400 text-sm font-bold uppercase tracking-widest">
-          Not Me
-        </button>
+       <button onclick="showForm()" class="mt-6 text-slate-400 text-sm font-bold uppercase tracking-widest">
+  Not Me
+</button>
 
       </div>
     `);
@@ -894,6 +875,20 @@ async function showAgentSelection(){
     console.log("Agent selection failed", e);
     showVerifyAgent();
   }
+}
+function selectAgent(a){
+
+  state.prefilledAgent = {
+    name: a.name,
+    phone: a.phone,
+    email: a.email,
+    image_url: a.primary_photo_url || a.directory_photo_url
+  };
+
+  state.detectedAgentPhoto =
+    a.primary_photo_url || a.directory_photo_url;
+
+  showVerifyAgent();
 }
 async function confirmListing(){
   if(!state.detectedHouse){
@@ -905,19 +900,9 @@ async function confirmListing(){
     await applyBranding(state.detectedHouse.brokerage);
   }
 
-  if(state.detectedHouse.agent || state.detectedHouse.agent_phone || state.detectedHouse.agent_email){
-    state.detectedAgentPhoto = await fetchListingAgentPhoto({
-      openHouseId: state.detectedHouse?.id || "",
-      name: state.detectedHouse?.agent || "",
-      phone: state.detectedHouse?.agent_phone || ""
-    });
-
-    showVerifyAgent();
-  } else {
-    showForm(state.detectedHouse.brokerage || "");
-  }
+  // 🔥 THIS IS THE FIX
+  showAgentSelection();
 }
-
 async function upsertAgent(agent){
   debug("UPSERT AGENT START", agent);
 
@@ -1537,5 +1522,15 @@ html, body {
   .claim-app-layer {
     padding: 14px;
   }
+  img[src*="brokerage-logos"]{
+  max-height: 140px !important;
+  width: auto !important;
+  object-fit: contain;
+}
+img[src*="brokerage-logos"]{
+  max-height: 140px !important;
+  width: auto !important;
+  object-fit: contain;
+}
 }
 </style>
