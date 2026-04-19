@@ -6,618 +6,67 @@
   <title>Rel8tion Sign Demo Activation</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg1:#38bdf8;
-      --bg2:#f0f7ff;
-      --text:#1f2a5a;
-      --muted:#64748b;
-      --card:rgba(255,255,255,.18);
-      --border:rgba(255,255,255,.58);
-      --shadow:0 24px 60px rgba(31,42,90,.10), inset 0 1px 1px rgba(255,255,255,.28);
-      --primary:#1f2a5a;
-      --primaryHover:#162046;
-      --secondaryBg:rgba(255,255,255,.42);
-      --secondaryBorder:rgba(255,255,255,.72);
-      --success:#16a34a;
-      --warning:#d97706;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:#f0f7ff;font-family:Inter,sans-serif;color:var(--text)}
-    body{min-height:100vh;background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 60%,var(--bg2) 100%);background-attachment:fixed;overflow-x:hidden}
+    :root{--bg1:#38bdf8;--bg2:#f0f7ff;--text:#1f2a5a;--muted:#64748b;--card:rgba(255,255,255,.18);--border:rgba(255,255,255,.58);--shadow:0 24px 60px rgba(31,42,90,.10), inset 0 1px 1px rgba(255,255,255,.28);--primary:#1f2a5a;--primaryHover:#162046;--secondaryBg:rgba(255,255,255,.42);--secondaryBorder:rgba(255,255,255,.72);--success:#16a34a;--warning:#d97706}
+    *{box-sizing:border-box} html,body{margin:0;padding:0;background:#f0f7ff;font-family:Inter,sans-serif;color:var(--text)} body{min-height:100vh;background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 60%,var(--bg2) 100%);background-attachment:fixed;overflow-x:hidden}
     .moving-clouds{position:fixed;top:0;left:0;width:200%;height:420px;z-index:1;pointer-events:none;background-image:url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");background-repeat:repeat-x;background-size:800px auto;animation:driftClouds 120s linear infinite}
-    @keyframes driftClouds{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-    .fade-overlay{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 10%, rgba(240,247,255,.92) 100%)}
-    .wrap{position:relative;z-index:3;max-width:980px;margin:0 auto;padding:24px 16px 48px}
-    .glass{background:var(--card);backdrop-filter:blur(10px) saturate(160%);-webkit-backdrop-filter:blur(10px) saturate(160%);border:1px solid var(--border);box-shadow:var(--shadow)}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-radius:28px;margin-bottom:18px}
-    .topbar .title{font-family:Poppins,sans-serif;font-weight:900;font-size:clamp(18px,2.2vw,32px);text-align:center;line-height:1.05;letter-spacing:-.03em}
-    .logo{height:34px;width:auto;object-fit:contain}
-    .card{border-radius:34px;padding:26px}
-    .center{text-align:center}
-    .pill{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.55);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
-    h1{font-family:Poppins,sans-serif;font-size:clamp(34px,4vw,56px);line-height:.97;letter-spacing:-.04em;margin:16px 0 10px;font-weight:900}
-    .copy{color:var(--muted);font-size:16px;line-height:1.6;font-weight:600}
-    .loader{width:72px;height:72px;border:7px solid rgba(255,255,255,.72);border-top:7px solid #2563eb;border-radius:50%;margin:0 auto 22px;animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .button{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:18px 22px;border-radius:999px;text-decoration:none;font-weight:900;letter-spacing:-.02em;font-size:17px;border:none;cursor:pointer;transition:.25s ease}
-    .button.primary{background:var(--primary);color:white;box-shadow:0 14px 28px rgba(31,42,90,.18)}
-    .button.primary:hover{background:var(--primaryHover);transform:translateY(-2px)}
-    .button.secondary{background:var(--secondaryBg);color:var(--text);border:1px solid var(--secondaryBorder)}
-    .button.secondary:hover{background:rgba(255,255,255,.62)}
-    .stack{display:grid;gap:14px}
-    .field{width:100%;padding:16px 18px;border-radius:18px;border:1px solid rgba(255,255,255,.74);background:rgba(255,255,255,.44);color:var(--text);font-size:16px;font-weight:700;outline:none}
-    .field::placeholder{color:#64748b}
-    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
-    .meta-box{padding:16px;border-radius:20px;background:rgba(255,255,255,.34);border:1px solid rgba(255,255,255,.58)}
-    .label{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:6px}
-    .value{font-size:16px;font-weight:800;color:var(--text);line-height:1.35;word-break:break-word}
-    .listings{display:grid;gap:14px;margin-top:18px}
-    .listing{display:grid;grid-template-columns:112px 1fr;gap:14px;padding:14px;border-radius:24px;background:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.56);cursor:pointer;transition:.2s ease}
-    .listing:hover{transform:translateY(-2px);box-shadow:0 14px 26px rgba(31,42,90,.12)}
-    .listing img,.listing .img-fallback{width:112px;height:96px;border-radius:18px;object-fit:cover;background:rgba(255,255,255,.55)}
-    .listing .img-fallback{display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:800;font-size:12px}
-    .listing .status{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:white}
-    .listing .address{font-size:20px;font-weight:900;line-height:1.08;margin:8px 0 6px}
-    .listing .sub{font-size:14px;color:var(--muted);font-weight:700}
-    .notice{margin-top:16px;padding:14px 16px;border-radius:18px;font-weight:800;font-size:14px}
-    .notice.success{background:rgba(22,163,74,.12);border:1px solid rgba(22,163,74,.24);color:#166534}
-    .notice.error{background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.24);color:#991b1b}
-    .notice.warn{background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.24);color:#92400e}
-    @media (max-width: 720px){
-      .meta{grid-template-columns:1fr}
-      .listing{grid-template-columns:1fr}
-      .listing img,.listing .img-fallback{width:100%;height:180px}
-      .wrap{padding:16px 12px 32px}
-      .logo{height:26px}
-    }
+    @keyframes driftClouds{from{transform:translateX(0)}to{transform:translateX(-50%)}} .fade-overlay{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 10%, rgba(240,247,255,.92) 100%)} .wrap{position:relative;z-index:3;max-width:980px;margin:0 auto;padding:24px 16px 48px}
+    .glass{background:var(--card);backdrop-filter:blur(10px) saturate(160%);-webkit-backdrop-filter:blur(10px) saturate(160%);border:1px solid var(--border);box-shadow:var(--shadow)} .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-radius:28px;margin-bottom:18px} .topbar .title{font-family:Poppins,sans-serif;font-weight:900;font-size:clamp(18px,2.2vw,32px);text-align:center;line-height:1.05;letter-spacing:-.03em}
+    .logo{height:34px;width:auto;object-fit:contain} .card{border-radius:34px;padding:26px} .center{text-align:center} .pill{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.55);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
+    h1{font-family:Poppins,sans-serif;font-size:clamp(34px,4vw,56px);line-height:.97;letter-spacing:-.04em;margin:16px 0 10px;font-weight:900} .copy{color:var(--muted);font-size:16px;line-height:1.6;font-weight:600} .loader{width:72px;height:72px;border:7px solid rgba(255,255,255,.72);border-top:7px solid #2563eb;border-radius:50%;margin:0 auto 22px;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}} .button{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:18px 22px;border-radius:999px;text-decoration:none;font-weight:900;letter-spacing:-.02em;font-size:17px;border:none;cursor:pointer;transition:.25s ease} .button.primary{background:var(--primary);color:white;box-shadow:0 14px 28px rgba(31,42,90,.18)} .button.primary:hover{background:var(--primaryHover);transform:translateY(-2px)} .button.secondary{background:var(--secondaryBg);color:var(--text);border:1px solid var(--secondaryBorder)} .button.secondary:hover{background:rgba(255,255,255,.62)}
+    .stack{display:grid;gap:14px} .field{width:100%;padding:16px 18px;border-radius:18px;border:1px solid rgba(255,255,255,.74);background:rgba(255,255,255,.44);color:var(--text);font-size:16px;font-weight:700;outline:none} .field::placeholder{color:#64748b} .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px} .meta-box{padding:16px;border-radius:20px;background:rgba(255,255,255,.34);border:1px solid rgba(255,255,255,.58)} .label{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:6px} .value{font-size:16px;font-weight:800;color:var(--text);line-height:1.35;word-break:break-word}
+    .listings{display:grid;gap:14px;margin-top:18px} .listing{display:grid;grid-template-columns:112px 1fr;gap:14px;padding:14px;border-radius:24px;background:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.56);cursor:pointer;transition:.2s ease} .listing:hover{transform:translateY(-2px);box-shadow:0 14px 26px rgba(31,42,90,.12)} .listing img,.listing .img-fallback{width:112px;height:96px;border-radius:18px;object-fit:cover;background:rgba(255,255,255,.55)} .listing .img-fallback{display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:800;font-size:12px} .listing .status{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:white} .listing .address{font-size:20px;font-weight:900;line-height:1.08;margin:8px 0 6px} .listing .sub{font-size:14px;color:var(--muted);font-weight:700}
+    .notice{margin-top:16px;padding:14px 16px;border-radius:18px;font-weight:800;font-size:14px} .notice.success{background:rgba(22,163,74,.12);border:1px solid rgba(22,163,74,.24);color:#166534} .notice.error{background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.24);color:#991b1b} .notice.warn{background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.24);color:#92400e}
+    @media (max-width:720px){.meta{grid-template-columns:1fr}.listing{grid-template-columns:1fr}.listing img,.listing .img-fallback{width:100%;height:180px}.wrap{padding:16px 12px 32px}.logo{height:26px}}
   </style>
 </head>
 <body>
-  <div class="moving-clouds"></div>
-  <div class="fade-overlay"></div>
-
+  <div class="moving-clouds"></div><div class="fade-overlay"></div>
   <div class="wrap">
-    <div class="glass topbar">
-      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="logo">
-      <div class="title">Sign Demo Activation</div>
-      <img src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png" alt="Nationwide" class="logo">
-    </div>
-
+    <div class="glass topbar"><img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="logo"><div class="title">Sign Demo Activation</div><img src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png" alt="Nationwide" class="logo"></div>
     <div id="app" class="glass card"></div>
   </div>
-
   <script>
-    const SUPABASE_URL = 'https://nicanqrfqlbnlmnoernb.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg';
-    const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
-    const params = new URLSearchParams(window.location.search);
-
-    const state = {
-      uid: params.get('uid') || '',
-      agentSlug: params.get('agent') || '',
-      publicCode: params.get('code') || '',
-      signId: params.get('sign_id') || '',
-      agent: null,
-      sign: null,
-      houses: [],
-      selectedHouse: null,
-      event: null,
-      error: '',
-      info: ''
-    };
-
-    function headers(extra = {}) {
-      return {
-        apikey: KEY,
-        Authorization: `Bearer ${KEY}`,
-        'Content-Type': 'application/json',
-        ...extra
-      };
-    }
-
-    function esc(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    function money(v) {
-      const n = Number(v || 0);
-      return n ? '$' + n.toLocaleString() : '';
-    }
-
-    function getStatus(h) {
-      try {
-        const now = new Date();
-        const start = h?.open_start ? new Date(h.open_start) : null;
-        const end = h?.open_end ? new Date(h.open_end) : null;
-        if (start && end && now >= start && now <= end) return { label: 'LIVE NOW', color: '#16a34a' };
-        if (start && now < start) return { label: 'UPCOMING', color: '#2563eb' };
-        return { label: 'ENDED', color: '#6b7280' };
-      } catch (_) {
-        return { label: 'OPEN HOUSE', color: '#2563eb' };
-      }
-    }
-
-    function readSession() {
-      try {
-        const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    function writeSession(patch = {}) {
-      const next = { ...(readSession() || {}), ...patch, updatedAt: new Date().toISOString() };
-      window.localStorage.setItem(SIGN_DEMO_SESSION_KEY, JSON.stringify(next));
-      return next;
-    }
-
-    function clearSession() {
-      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
-    }
-
-    function mergeStateFromSession() {
-      const pending = readSession();
-      if (!pending) return null;
-      if (!state.uid && pending.uid) state.uid = pending.uid;
-      if (!state.agentSlug && pending.agentSlug) state.agentSlug = pending.agentSlug;
-      if (!state.publicCode && pending.publicCode) state.publicCode = pending.publicCode;
-      if (!state.signId && pending.signId) state.signId = pending.signId;
-      return pending;
-    }
-
-    async function request(path, options = {}) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-        ...options,
-        headers: headers(options.headers)
-      });
-      const text = await res.text();
-      if (!res.ok) throw new Error(text || `Request failed (${res.status})`);
-      return text ? JSON.parse(text) : null;
-    }
-
-    async function rpc(name, body) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify(body)
-      });
-      const text = await res.text();
-      if (!res.ok) throw new Error(text || `RPC failed (${res.status})`);
-      return text ? JSON.parse(text) : null;
-    }
-
-    function render(html) {
-      document.getElementById('app').innerHTML = html;
-    }
-
-    function renderLoading(message = 'Preparing sign demo...') {
-      render(`
-        <div class="center">
-          <div class="pill">Claimed chip → sign demo</div>
-          <div class="loader"></div>
-          <h1>Loading</h1>
-          <p class="copy">${esc(message)}</p>
-        </div>
-      `);
-    }
-
-    function renderMessage(title, message, tone = 'warn') {
-      render(`
-        <div class="center">
-          <div class="pill">Claimed chip → sign demo</div>
-          <h1>${esc(title)}</h1>
-          <p class="copy">${esc(message)}</p>
-          <div class="notice ${tone}" style="max-width:620px;margin:18px auto 0;">${esc(message)}</div>
-        </div>
-      `);
-    }
-
-    function renderTapSignStep() {
-      const pending = readSession();
-      render(`
-        <div class="center">
-          <div class="pill">Step 1 • tap keychain complete</div>
-          <h1>Now Tap The Sign</h1>
-          <p class="copy">Your claimed keychain is recognized. Next, tap or scan the sign so we can identify which sign to register for this demo.</p>
-          <div class="meta" style="max-width:760px;margin:18px auto 0;">
-            <div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid || pending?.uid || '—')}</div></div>
-            <div class="meta-box"><div class="label">Agent Slug</div><div class="value">${esc(state.agentSlug || pending?.agentSlug || '—')}</div></div>
-          </div>
-          <div class="notice warn" style="max-width:620px;margin:18px auto 0;">Leave this on the same phone/browser. After the sign tap is detected, tap the keychain again to complete the handshake.</div>
-          <div class="stack" style="max-width:620px;margin:18px auto 0;">
-            <button class="button secondary" onclick="window.enterSignCodeManually()">Enter Sign Code Manually</button>
-            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
-          </div>
-        </div>
-      `);
-    }
-
-    function renderSignCodeStep() {
-      render(`
-        <div class="center">
-          <div class="pill">Identify sign</div>
-          <h1>Enter The Sign Code</h1>
-          <p class="copy">Use the printed QR code value if you want to continue without tapping the sign.</p>
-          <div style="max-width:520px;margin:20px auto 0;" class="stack">
-            <input id="codeInput" class="field" placeholder="Example: testsign01" value="${esc(state.publicCode)}">
-            <button class="button primary" onclick="window.resolveSignCode()">Continue</button>
-            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
-          </div>
-          ${state.error ? `<div class="notice error" style="max-width:520px;margin:16px auto 0;">${esc(state.error)}</div>` : ''}
-        </div>
-      `);
-    }
-
-    function renderHandshakeWait() {
-      const pending = readSession();
-      render(`
-        <div class="center">
-          <div class="pill">Step 2 • sign captured</div>
-          <h1>Now Tap The Keychain Again</h1>
-          <p class="copy">The sign is identified. Tap the same claimed keychain one more time to seal the demo handshake and continue to listing detection.</p>
-          <div class="meta" style="max-width:760px;margin:18px auto 0;">
-            <div class="meta-box"><div class="label">Pending Sign Code</div><div class="value">${esc(state.publicCode || pending?.publicCode || '—')}</div></div>
-            <div class="meta-box"><div class="label">Pending Agent</div><div class="value">${esc(state.agentSlug || pending?.agentSlug || '—')}</div></div>
-          </div>
-          <div class="notice success" style="max-width:620px;margin:18px auto 0;">After the second keychain tap, the claim flow will carry this sign code forward automatically.</div>
-          <div class="stack" style="max-width:620px;margin:18px auto 0;">
-            <button class="button secondary" onclick="window.resetDemoSession()">Start Over</button>
-          </div>
-        </div>
-      `);
-    }
-
-    function renderDetectedListings() {
-      const listings = (state.houses || []).slice(0, 10);
-      render(`
-        <div>
-          <div class="center">
-            <div class="pill">Step 3 • detect listing</div>
-            <h1>Lock The Sign To This Open House</h1>
-            <p class="copy">The handshake is complete. Pick the listing and we will attach the sign to the live event.</p>
-          </div>
-          <div class="meta">
-            <div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid || '—')}</div></div>
-            <div class="meta-box"><div class="label">Agent Slug</div><div class="value">${esc(state.agentSlug || '—')}</div></div>
-            <div class="meta-box"><div class="label">Sign Code</div><div class="value">${esc(state.publicCode || '—')}</div></div>
-            <div class="meta-box"><div class="label">Detected Listings</div><div class="value">${listings.length}</div></div>
-          </div>
-          ${state.info ? `<div class="notice success">${esc(state.info)}</div>` : ''}
-          ${state.error ? `<div class="notice error">${esc(state.error)}</div>` : ''}
-          <div class="listings">
-            ${listings.map((h) => {
-              const s = getStatus(h);
-              return `
-                <div class="listing" onclick="window.selectListing('${esc(h.id)}')">
-                  ${h.image ? `<img src="${esc(h.image)}" alt="${esc(h.address || 'Listing')}">` : `<div class="img-fallback">No Image</div>`}
-                  <div>
-                    <div class="status" style="background:${s.color}">${esc(s.label)}</div>
-                    <div class="address">${esc(h.address || 'Open House')}</div>
-                    ${h.price ? `<div style="font-size:19px;font-weight:900;color:#2563eb;">${money(h.price)}</div>` : ''}
-                    <div class="sub">${esc(h.brokerage || '')}</div>
-                    <div class="sub" style="margin-top:6px;">${esc(h.open_start || '')}</div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `);
-    }
-
-    function renderConfirmStep() {
-      const h = state.selectedHouse;
-      const s = getStatus(h);
-      render(`
-        <div>
-          <div class="center">
-            <div class="pill">Step 4 • confirm + activate</div>
-            <h1>Confirm This Listing</h1>
-            <p class="copy">This will end any currently active event for this sign, create a fresh event if needed, and lock the sign live to this open house.</p>
-          </div>
-          <div class="listing" style="cursor:default;margin-top:18px;">
-            ${h.image ? `<img src="${esc(h.image)}" alt="${esc(h.address || 'Listing')}">` : `<div class="img-fallback">No Image</div>`}
-            <div>
-              <div class="status" style="background:${s.color}">${esc(s.label)}</div>
-              <div class="address">${esc(h.address || 'Open House')}</div>
-              ${h.price ? `<div style="font-size:19px;font-weight:900;color:#2563eb;">${money(h.price)}</div>` : ''}
-              <div class="sub">${esc(h.brokerage || '')}</div>
-              <div class="sub" style="margin-top:6px;">Sign code: ${esc(state.publicCode)}</div>
-              <div class="sub">Agent slug: ${esc(state.agentSlug)}</div>
-            </div>
-          </div>
-          ${state.error ? `<div class="notice error">${esc(state.error)}</div>` : ''}
-          <div class="stack" style="margin-top:18px;">
-            <button class="button primary" onclick="window.activateSignDemo()">Activate This Listing</button>
-            <button class="button secondary" onclick="window.backToListings()">Choose Another Listing</button>
-          </div>
-        </div>
-      `);
-    }
-
-    function renderSuccess() {
-      const h = state.selectedHouse;
-      render(`
-        <div class="center">
-          <div class="pill">Demo locked live</div>
-          <h1>Sign Activated</h1>
-          <p class="copy">The sign is now attached to the selected event. You can open the public route or jump directly to the event shell.</p>
-          <div class="meta" style="max-width:760px;margin:18px auto 0;">
-            <div class="meta-box"><div class="label">Address</div><div class="value">${esc(h?.address || '—')}</div></div>
-            <div class="meta-box"><div class="label">Sign Code</div><div class="value">${esc(state.publicCode || '—')}</div></div>
-            <div class="meta-box"><div class="label">Event ID</div><div class="value">${esc(state.event?.id || '—')}</div></div>
-            <div class="meta-box"><div class="label">Agent</div><div class="value">${esc(state.agentSlug || '—')}</div></div>
-          </div>
-          <div class="stack" style="max-width:620px;margin:18px auto 0;">
-            <a class="button primary" href="/s.html?code=${encodeURIComponent(state.publicCode)}">Open Live Sign Route</a>
-            <a class="button secondary" href="/event-shell-test.html?event=${encodeURIComponent(state.event?.id || '')}">Open Event Shell</a>
-            <button class="button secondary" onclick="window.resetDemoSession()">Start Another Demo</button>
-          </div>
-        </div>
-      `);
-    }
-
-    async function loadAgentFromClaimedChip() {
-      if (!state.agentSlug && state.uid) {
-        const keyRows = await request(`keys?uid=eq.${encodeURIComponent(state.uid)}&select=*`);
-        const keyRow = keyRows?.[0] || null;
-        if (keyRow?.agent_slug) state.agentSlug = keyRow.agent_slug;
-      }
-      if (!state.agentSlug) throw new Error('Missing claimed agent context for sign demo.');
-      const agentRows = await request(`agents?slug=eq.${encodeURIComponent(state.agentSlug)}&select=*`);
-      state.agent = agentRows?.[0] || null;
-      return state.agent;
-    }
-
-    async function resolveSign() {
-      const code = state.publicCode || '';
-      if (!code) throw new Error('Missing sign code.');
-      const signRows = await request(`smart_signs?public_code=eq.${encodeURIComponent(code)}&select=*`);
-      const sign = signRows?.[0] || null;
-      if (!sign) throw new Error('No smart sign was found for that code.');
-      state.sign = sign;
-      state.signId = sign.id;
-      return sign;
-    }
-
-    async function detectListings() {
-      renderLoading('Finding nearby open houses for this claimed agent...');
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('Location detection is not supported on this device.'));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-          try {
-            const houses = await rpc('find_nearest_open_house', {
-              user_lat: pos.coords.latitude,
-              user_lng: pos.coords.longitude
-            });
-            if (!Array.isArray(houses) || !houses.length) throw new Error('No nearby open house was found.');
-            state.houses = houses;
-            resolve(houses);
-          } catch (err) {
-            reject(err);
-          }
-        }, () => reject(new Error('Location permission was denied.')), {
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 0
-        });
-      });
-    }
-
-    async function getActiveEventForSign(signId) {
-      const rows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(signId)}&status=eq.active&select=*&order=created_at.desc&limit=1`);
-      return rows?.[0] || null;
-    }
-
-    async function closeActiveEvent(eventId) {
-      await request(`open_house_events?id=eq.${encodeURIComponent(eventId)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'ended',
-          ended_at: new Date().toISOString(),
-          last_activity_at: new Date().toISOString()
-        })
-      });
-    }
-
-    async function createOrLockEvent() {
-      const now = new Date().toISOString();
-      const sign = state.sign;
-      const house = state.selectedHouse;
-      if (!sign?.id || !house?.id || !state.agentSlug) throw new Error('Missing sign, listing, or agent state.');
-
-      const activeEvent = await getActiveEventForSign(sign.id);
-      if (activeEvent && activeEvent.open_house_source_id !== house.id) {
-        await closeActiveEvent(activeEvent.id);
-      }
-
-      const eventPayload = {
-        open_house_source_id: house.id,
-        host_agent_slug: state.agentSlug,
-        smart_sign_id: sign.id,
-        status: 'active',
-        start_time: house.open_start || null,
-        end_time: house.open_end || null,
-        last_activity_at: now,
-        activation_uid_primary: state.uid || null,
-        activation_method: 'sign_demo_claimed_chip',
-        setup_confirmed_at: now,
-        setup_context: {
-          flow: 'sign-demo',
-          source: 'claimed-chip-bridge',
-          address: house.address || null,
-          detected_brokerage: house.brokerage || null
-        }
-      };
-
-      let event = null;
-      if (activeEvent && activeEvent.open_house_source_id === house.id) {
-        const updated = await request(`open_house_events?id=eq.${encodeURIComponent(activeEvent.id)}`, {
-          method: 'PATCH',
-          headers: { Prefer: 'return=representation' },
-          body: JSON.stringify(eventPayload)
-        });
-        event = Array.isArray(updated) ? updated[0] : null;
-      } else {
-        const inserted = await request('open_house_events', {
-          method: 'POST',
-          headers: { Prefer: 'return=representation' },
-          body: JSON.stringify(eventPayload)
-        });
-        event = Array.isArray(inserted) ? inserted[0] : null;
-      }
-
-      if (!event?.id) throw new Error('Failed to create or update the event.');
-
-      await request(`smart_signs?id=eq.${encodeURIComponent(sign.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          owner_agent_slug: state.agentSlug,
-          status: 'active',
-          active_event_id: event.id,
-          activation_uid_primary: state.uid || sign.activation_uid_primary || null,
-          activation_method: 'sign_demo_claimed_chip',
-          setup_confirmed_at: now,
-          deactivated_at: null
-        })
-      });
-
-      state.event = event;
-      clearSession();
-      return event;
-    }
-
-    async function proceedToListingDetection() {
-      await loadAgentFromClaimedChip();
-      await resolveSign();
-      writeSession({
-        uid: state.uid,
-        agentSlug: state.agentSlug,
-        publicCode: state.publicCode,
-        signId: state.signId,
-        stage: 'handshake_complete'
-      });
-      await detectListings();
-      state.info = 'Handshake complete. Choose the listing to lock this sign live.';
-      renderDetectedListings();
-    }
-
-    window.enterSignCodeManually = function enterSignCodeManually() {
-      state.error = '';
-      renderSignCodeStep();
-    };
-
-    window.resolveSignCode = async function resolveSignCode() {
-      try {
-        state.error = '';
-        state.publicCode = document.getElementById('codeInput')?.value?.trim() || state.publicCode;
-        await resolveSign();
-        const pending = writeSession({
-          uid: state.uid || readSession()?.uid || '',
-          agentSlug: state.agentSlug || readSession()?.agentSlug || '',
-          publicCode: state.publicCode,
-          signId: state.signId,
-          stage: (state.uid && state.agentSlug) ? 'waiting_for_handshake' : 'waiting_for_handshake'
-        });
-        if (state.uid && state.agentSlug) {
-          renderHandshakeWait();
-          return;
-        }
-        renderHandshakeWait();
-      } catch (err) {
-        state.error = err.message || 'Could not resolve sign code.';
-        renderSignCodeStep();
-      }
-    };
-
-    window.selectListing = function selectListing(id) {
-      state.error = '';
-      state.selectedHouse = (state.houses || []).find((h) => String(h.id) === String(id)) || null;
-      renderConfirmStep();
-    };
-
-    window.backToListings = function backToListings() {
-      state.error = '';
-      renderDetectedListings();
-    };
-
-    window.activateSignDemo = async function activateSignDemo() {
-      try {
-        renderLoading('Locking the sign to the selected open house...');
-        await createOrLockEvent();
-        renderSuccess();
-      } catch (err) {
-        state.error = err.message || 'Failed to activate sign demo.';
-        renderConfirmStep();
-      }
-    };
-
-    window.resetDemoSession = function resetDemoSession() {
-      clearSession();
-      const next = new URLSearchParams();
-      if (state.uid) next.set('uid', state.uid);
-      if (state.agentSlug) next.set('agent', state.agentSlug);
-      if (state.uid && state.agentSlug) {
-        window.location.href = `/sign-demo-activate.html?${next.toString()}`;
-        return;
-      }
-      window.location.href = '/sign-demo-activate.html';
-    };
-
-    async function init() {
-      renderLoading('Checking claimed chip and sign context...');
-      try {
-        const pending = mergeStateFromSession();
-
-        if (state.uid && state.agentSlug && pending?.stage === 'waiting_for_handshake' && pending.publicCode) {
-          state.publicCode = pending.publicCode;
-          state.signId = pending.signId || state.signId;
-          await proceedToListingDetection();
-          return;
-        }
-
-        if (state.uid && state.agentSlug && !state.publicCode) {
-          writeSession({ uid: state.uid, agentSlug: state.agentSlug, stage: 'waiting_for_sign' });
-          renderTapSignStep();
-          return;
-        }
-
-        if (!state.uid && state.publicCode && pending?.uid && pending?.agentSlug) {
-          state.uid = pending.uid;
-          state.agentSlug = pending.agentSlug;
-          await resolveSign();
-          writeSession({ uid: state.uid, agentSlug: state.agentSlug, publicCode: state.publicCode, signId: state.signId, stage: 'waiting_for_handshake' });
-          renderHandshakeWait();
-          return;
-        }
-
-        if (state.uid && state.agentSlug && state.publicCode) {
-          await proceedToListingDetection();
-          return;
-        }
-
-        if (state.publicCode && !state.uid) {
-          await resolveSign();
-          writeSession({ publicCode: state.publicCode, signId: state.signId, stage: 'waiting_for_handshake' });
-          renderHandshakeWait();
-          return;
-        }
-
-        renderSignCodeStep();
-      } catch (err) {
-        renderMessage('Sign Demo Not Ready', err.message || 'Missing sign-demo context.', 'error');
-      }
-    }
-
+    const SUPABASE_URL='https://nicanqrfqlbnlmnoernb.supabase.co';
+    const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg';
+    const SIGN_DEMO_SESSION_KEY='rel8tion_sign_demo_session';
+    const params=new URLSearchParams(window.location.search);
+    const state={uid:params.get('uid')||'',agentSlug:params.get('agent')||'',publicCode:params.get('code')||'',signId:params.get('sign_id')||'',signChipUid:params.get('sign_uid')||'',agent:null,sign:null,houses:[],selectedHouse:null,event:null,error:'',info:''};
+    const headers=(extra={})=>({apikey:KEY,Authorization:`Bearer ${KEY}`,'Content-Type':'application/json',...extra});
+    const esc=(str)=>String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#039;');
+    const money=(v)=>{const n=Number(v||0);return n?'$'+n.toLocaleString():''};
+    const getStatus=(h)=>{try{const now=new Date(),start=h?.open_start?new Date(h.open_start):null,end=h?.open_end?new Date(h.open_end):null;if(start&&end&&now>=start&&now<=end)return{label:'LIVE NOW',color:'#16a34a'};if(start&&now<start)return{label:'UPCOMING',color:'#2563eb'};return{label:'ENDED',color:'#6b7280'}}catch{return{label:'OPEN HOUSE',color:'#2563eb'}}};
+    const readSession=()=>{try{const raw=window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);return raw?JSON.parse(raw):null}catch{return null}};
+    const writeSession=(patch={})=>{const next={...(readSession()||{}),...patch,updatedAt:new Date().toISOString()};window.localStorage.setItem(SIGN_DEMO_SESSION_KEY,JSON.stringify(next));return next};
+    const clearSession=()=>window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+    const mergeStateFromSession=()=>{const p=readSession();if(!p)return null;if(!state.uid&&p.uid)state.uid=p.uid;if(!state.agentSlug&&p.agentSlug)state.agentSlug=p.agentSlug;if(!state.publicCode&&p.publicCode)state.publicCode=p.publicCode;if(!state.signId&&p.signId)state.signId=p.signId;if(!state.signChipUid&&p.primaryChipUid)state.signChipUid=p.primaryChipUid;return p};
+    async function request(path,options={}){const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{...options,headers:headers(options.headers)});const text=await res.text();if(!res.ok)throw new Error(text||`Request failed (${res.status})`);return text?JSON.parse(text):null}
+    async function rpc(name,body){const res=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`,{method:'POST',headers:headers(),body:JSON.stringify(body)});const text=await res.text();if(!res.ok)throw new Error(text||`RPC failed (${res.status})`);return text?JSON.parse(text):null}
+    const render=(html)=>document.getElementById('app').innerHTML=html;
+    const renderLoading=(m='Preparing sign demo...')=>render(`<div class="center"><div class="pill">Claimed chip → sign demo</div><div class="loader"></div><h1>Loading</h1><p class="copy">${esc(m)}</p></div>`);
+    const renderMessage=(t,m,tone='warn')=>render(`<div class="center"><div class="pill">Claimed chip → sign demo</div><h1>${esc(t)}</h1><p class="copy">${esc(m)}</p><div class="notice ${tone}" style="max-width:620px;margin:18px auto 0;">${esc(m)}</div></div>`);
+    const renderTapSign1=()=>{const p=readSession();render(`<div class="center"><div class="pill">Step 1 • keychain recognized</div><h1>Now Tap Sign Chip 1</h1><p class="copy">Your claimed keychain is recognized. Tap the first sign chip so we know which sign is being activated.</p><div class="meta" style="max-width:760px;margin:18px auto 0;"><div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid||p?.uid||'—')}</div></div><div class="meta-box"><div class="label">Agent Slug</div><div class="value">${esc(state.agentSlug||p?.agentSlug||'—')}</div></div></div><div class="notice warn" style="max-width:620px;margin:18px auto 0;">Leave this on the same phone/browser. After chip 1 is captured, we’ll ask for sign chip 2 the first time only.</div><div class="stack" style="max-width:620px;margin:18px auto 0;"><button class="button secondary" onclick="window.enterSignCodeManually()">Enter Sign Code Manually</button><button class="button secondary" onclick="window.resetDemoSession()">Start Over</button></div></div>`)};
+    const renderTapSign2=()=>{const p=readSession();render(`<div class="center"><div class="pill">Step 2 • register sign chip 2</div><h1>Now Tap Sign Chip 2</h1><p class="copy">We captured the first sign chip. Tap the second sign chip now so this sign is fully registered the real way.</p><div class="meta" style="max-width:760px;margin:18px auto 0;"><div class="meta-box"><div class="label">Sign Code</div><div class="value">${esc(state.publicCode||p?.publicCode||'—')}</div></div><div class="meta-box"><div class="label">Primary Sign Chip</div><div class="value">${esc(p?.primaryChipUid||state.signChipUid||'—')}</div></div></div><div class="notice success" style="max-width:620px;margin:18px auto 0;">This only has to be done the first time. After both sign chips are paired, future demos can skip this step.</div><div class="stack" style="max-width:620px;margin:18px auto 0;"><button class="button secondary" onclick="window.enterSecondSignChipManually()">Enter Sign Chip 2 UID Manually</button><button class="button secondary" onclick="window.resetDemoSession()">Start Over</button></div></div>`)};
+    const renderSecondChipManual=()=>render(`<div class="center"><div class="pill">Register sign chip 2</div><h1>Enter Chip 2 UID</h1><p class="copy">If you are not tapping the second sign chip directly, enter its UID here to complete the two-chip setup.</p><div style="max-width:520px;margin:20px auto 0;" class="stack"><input id="secondChipInput" class="field" placeholder="Example: sign-chip-002"><button class="button primary" onclick="window.saveSecondChipManual()">Save Chip 2</button><button class="button secondary" onclick="window.resetDemoSession()">Start Over</button></div>${state.error?`<div class="notice error" style="max-width:520px;margin:16px auto 0;">${esc(state.error)}</div>`:''}</div>`);
+    const renderSignCode=()=>render(`<div class="center"><div class="pill">Identify sign</div><h1>Enter The Sign Code</h1><p class="copy">Use the printed QR code value if you want to continue without tapping the sign chips.</p><div style="max-width:520px;margin:20px auto 0;" class="stack"><input id="codeInput" class="field" placeholder="Example: testsign01" value="${esc(state.publicCode)}"><button class="button primary" onclick="window.resolveSignCode()">Continue</button><button class="button secondary" onclick="window.resetDemoSession()">Start Over</button></div>${state.error?`<div class="notice error" style="max-width:520px;margin:16px auto 0;">${esc(state.error)}</div>`:''}</div>`);
+    const renderHandshakeWait=()=>{const p=readSession();render(`<div class="center"><div class="pill">Step 3 • sign chips registered</div><h1>Now Tap The Keychain Again</h1><p class="copy">Both sign chips are registered. Tap the same claimed keychain one more time to seal the handshake and continue to listing detection.</p><div class="meta" style="max-width:760px;margin:18px auto 0;"><div class="meta-box"><div class="label">Pending Sign Code</div><div class="value">${esc(state.publicCode||p?.publicCode||'—')}</div></div><div class="meta-box"><div class="label">Sign Chips</div><div class="value">${esc((p?.primaryChipUid||'—')+' / '+(p?.secondChipUid||'—'))}</div></div></div><div class="notice success" style="max-width:620px;margin:18px auto 0;">After the second keychain tap, the claim flow will carry the pending sign session forward automatically.</div><div class="stack" style="max-width:620px;margin:18px auto 0;"><button class="button secondary" onclick="window.resetDemoSession()">Start Over</button></div></div>`)};
+    const renderDetectedListings=()=>{const listings=(state.houses||[]).slice(0,10);render(`<div><div class="center"><div class="pill">Step 4 • detect listing</div><h1>Lock The Sign To This Open House</h1><p class="copy">The handshake is complete. Pick the listing and we will attach the sign to the live event.</p></div><div class="meta"><div class="meta-box"><div class="label">Chip UID</div><div class="value">${esc(state.uid||'—')}</div></div><div class="meta-box"><div class="label">Agent Slug</div><div class="value">${esc(state.agentSlug||'—')}</div></div><div class="meta-box"><div class="label">Sign Code</div><div class="value">${esc(state.publicCode||'—')}</div></div><div class="meta-box"><div class="label">Detected Listings</div><div class="value">${listings.length}</div></div></div>${state.info?`<div class="notice success">${esc(state.info)}</div>`:''}${state.error?`<div class="notice error">${esc(state.error)}</div>`:''}<div class="listings">${listings.map(h=>{const s=getStatus(h);return `<div class="listing" onclick="window.selectListing('${esc(h.id)}')">${h.image?`<img src="${esc(h.image)}" alt="${esc(h.address||'Listing')}">`:`<div class="img-fallback">No Image</div>`}<div><div class="status" style="background:${s.color}">${esc(s.label)}</div><div class="address">${esc(h.address||'Open House')}</div>${h.price?`<div style="font-size:19px;font-weight:900;color:#2563eb;">${money(h.price)}</div>`:''}<div class="sub">${esc(h.brokerage||'')}</div><div class="sub" style="margin-top:6px;">${esc(h.open_start||'')}</div></div></div>`}).join('')}</div></div>`)};
+    const renderConfirm=()=>{const h=state.selectedHouse,s=getStatus(h);render(`<div><div class="center"><div class="pill">Step 5 • confirm + activate</div><h1>Confirm This Listing</h1><p class="copy">This will end any currently active event for this sign, create a fresh event if needed, and lock the sign live to this open house.</p></div><div class="listing" style="cursor:default;margin-top:18px;">${h.image?`<img src="${esc(h.image)}" alt="${esc(h.address||'Listing')}">`:`<div class="img-fallback">No Image</div>`}<div><div class="status" style="background:${s.color}">${esc(s.label)}</div><div class="address">${esc(h.address||'Open House')}</div>${h.price?`<div style="font-size:19px;font-weight:900;color:#2563eb;">${money(h.price)}</div>`:''}<div class="sub">${esc(h.brokerage||'')}</div><div class="sub" style="margin-top:6px;">Sign code: ${esc(state.publicCode)}</div><div class="sub">Agent slug: ${esc(state.agentSlug)}</div></div></div>${state.error?`<div class="notice error">${esc(state.error)}</div>`:''}<div class="stack" style="margin-top:18px;"><button class="button primary" onclick="window.activateSignDemo()">Activate This Listing</button><button class="button secondary" onclick="window.backToListings()">Choose Another Listing</button></div></div>`)};
+    const renderSuccess=()=>{const h=state.selectedHouse;render(`<div class="center"><div class="pill">Demo locked live</div><h1>Sign Activated</h1><p class="copy">The sign is now attached to the selected event. You can open the public route or jump directly to the event shell.</p><div class="meta" style="max-width:760px;margin:18px auto 0;"><div class="meta-box"><div class="label">Address</div><div class="value">${esc(h?.address||'—')}</div></div><div class="meta-box"><div class="label">Sign Code</div><div class="value">${esc(state.publicCode||'—')}</div></div><div class="meta-box"><div class="label">Event ID</div><div class="value">${esc(state.event?.id||'—')}</div></div><div class="meta-box"><div class="label">Agent</div><div class="value">${esc(state.agentSlug||'—')}</div></div></div><div class="stack" style="max-width:620px;margin:18px auto 0;"><a class="button primary" href="/s.html?code=${encodeURIComponent(state.publicCode)}">Open Live Sign Route</a><a class="button secondary" href="/event-shell-test.html?event=${encodeURIComponent(state.event?.id||'')}">Open Event Shell</a><button class="button secondary" onclick="window.resetDemoSession()">Start Another Demo</button></div></div>`)};
+    async function loadAgentFromClaimedChip(){if(!state.agentSlug&&state.uid){const keyRows=await request(`keys?uid=eq.${encodeURIComponent(state.uid)}&select=*`);const keyRow=keyRows?.[0]||null;if(keyRow?.agent_slug)state.agentSlug=keyRow.agent_slug}if(!state.agentSlug)throw new Error('Missing claimed agent context for sign demo.');const agentRows=await request(`agents?slug=eq.${encodeURIComponent(state.agentSlug)}&select=*`);state.agent=agentRows?.[0]||null;return state.agent}
+    async function resolveSignByCode(code){const signRows=await request(`smart_signs?public_code=eq.${encodeURIComponent(code)}&select=*`);const sign=signRows?.[0]||null;if(!sign)throw new Error('No smart sign was found for that code.');state.sign=sign;state.signId=sign.id;state.publicCode=sign.public_code||code;return sign}
+    async function resolveSignByChipUid(uid){const r1=await request(`smart_signs?uid_primary=eq.${encodeURIComponent(uid)}&select=*`);if(r1?.[0]){state.sign=r1[0];state.signId=state.sign.id;state.publicCode=state.sign.public_code||state.publicCode;return {sign:state.sign,side:'primary'}}const r2=await request(`smart_signs?uid_secondary=eq.${encodeURIComponent(uid)}&select=*`);if(r2?.[0]){state.sign=r2[0];state.signId=state.sign.id;state.publicCode=state.sign.public_code||state.publicCode;return {sign:state.sign,side:'secondary'}}throw new Error('No smart sign was found for that sign chip UID.')}
+    async function registerSecondChip(secondChipUid){const p=readSession()||{};const signId=state.signId||p.signId;const primary=p.primaryChipUid||state.signChipUid;if(!signId)throw new Error('Missing sign record for second chip registration.');if(!secondChipUid)throw new Error('Missing second sign chip UID.');if(secondChipUid===primary)throw new Error('Second sign chip UID cannot match the first chip UID.');const rows=await request(`smart_signs?id=eq.${encodeURIComponent(signId)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({uid_secondary:secondChipUid,activation_uid_secondary:secondChipUid,secondary_device_type:'sign_chip'})});const updated=Array.isArray(rows)?rows[0]:null;if(!updated?.id)throw new Error('Failed to save the second sign chip.');state.sign=updated;state.signId=updated.id;state.publicCode=updated.public_code||state.publicCode;writeSession({signId:updated.id,publicCode:state.publicCode,secondChipUid,stage:'waiting_for_handshake'});renderHandshakeWait()}
+    async function detectListings(){renderLoading('Finding nearby open houses for this claimed agent...');return new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error('Location detection is not supported on this device.'));return}navigator.geolocation.getCurrentPosition(async(pos)=>{try{const houses=await rpc('find_nearest_open_house',{user_lat:pos.coords.latitude,user_lng:pos.coords.longitude});if(!Array.isArray(houses)||!houses.length)throw new Error('No nearby open house was found.');state.houses=houses;resolve(houses)}catch(err){reject(err)}},()=>reject(new Error('Location permission was denied.')),{enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+    async function getActiveEventForSign(signId){const rows=await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(signId)}&status=eq.active&select=*&order=created_at.desc&limit=1`);return rows?.[0]||null}
+    async function closeActiveEvent(eventId){await request(`open_house_events?id=eq.${encodeURIComponent(eventId)}`,{method:'PATCH',body:JSON.stringify({status:'ended',ended_at:new Date().toISOString(),last_activity_at:new Date().toISOString()})})}
+    async function createOrLockEvent(){const now=new Date().toISOString(),sign=state.sign,house=state.selectedHouse,p=readSession()||{};if(!sign?.id||!house?.id||!state.agentSlug)throw new Error('Missing sign, listing, or agent state.');const activeEvent=await getActiveEventForSign(sign.id);if(activeEvent&&activeEvent.open_house_source_id!==house.id)await closeActiveEvent(activeEvent.id);const eventPayload={open_house_source_id:house.id,host_agent_slug:state.agentSlug,smart_sign_id:sign.id,status:'active',start_time:house.open_start||null,end_time:house.open_end||null,last_activity_at:now,activation_uid_primary:state.uid||null,activation_uid_secondary:p.secondChipUid||sign.uid_secondary||null,activation_method:'sign_demo_claimed_chip',setup_confirmed_at:now,setup_context:{flow:'sign-demo',source:'claimed-chip-bridge',address:house.address||null,detected_brokerage:house.brokerage||null,sign_chip_primary:p.primaryChipUid||sign.uid_primary||null,sign_chip_secondary:p.secondChipUid||sign.uid_secondary||null}};let event=null;if(activeEvent&&activeEvent.open_house_source_id===house.id){const updated=await request(`open_house_events?id=eq.${encodeURIComponent(activeEvent.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(eventPayload)});event=Array.isArray(updated)?updated[0]:null}else{const inserted=await request('open_house_events',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(eventPayload)});event=Array.isArray(inserted)?inserted[0]:null}if(!event?.id)throw new Error('Failed to create or update the event.');await request(`smart_signs?id=eq.${encodeURIComponent(sign.id)}`,{method:'PATCH',body:JSON.stringify({owner_agent_slug:state.agentSlug,status:'active',active_event_id:event.id,activation_uid_primary:state.uid||sign.activation_uid_primary||null,activation_uid_secondary:p.secondChipUid||sign.uid_secondary||null,activation_method:'sign_demo_claimed_chip',primary_device_type:'sign_chip',secondary_device_type:(p.secondChipUid||sign.uid_secondary)?'sign_chip':sign.secondary_device_type,setup_confirmed_at:now,deactivated_at:null})});state.event=event;clearSession();return event}
+    async function proceedToListingDetection(){await loadAgentFromClaimedChip();const p=readSession()||{};if(!state.sign&&state.publicCode)await resolveSignByCode(state.publicCode);writeSession({uid:state.uid,agentSlug:state.agentSlug,publicCode:state.publicCode,signId:state.signId,stage:'handshake_complete'});await detectListings();state.info='Handshake complete. Choose the listing to lock this sign live.';renderDetectedListings()}
+    window.enterSignCodeManually=()=>{state.error='';renderSignCode()}; window.enterSecondSignChipManually=()=>{state.error='';renderSecondChipManual()}; window.saveSecondChipManual=async()=>{try{state.error='';const uid=document.getElementById('secondChipInput')?.value?.trim()||'';await registerSecondChip(uid)}catch(err){state.error=err.message||'Could not save the second sign chip.';renderSecondChipManual()}};
+    window.resolveSignCode=async()=>{try{state.error='';state.publicCode=document.getElementById('codeInput')?.value?.trim()||state.publicCode;const sign=await resolveSignByCode(state.publicCode);writeSession({uid:state.uid||readSession()?.uid||'',agentSlug:state.agentSlug||readSession()?.agentSlug||'',publicCode:state.publicCode,signId:sign.id,primaryChipUid:sign.uid_primary||'',stage:sign.uid_secondary?'waiting_for_handshake':'waiting_for_second_sign_chip'});if(sign.uid_secondary){renderHandshakeWait();return}renderTapSign2()}catch(err){state.error=err.message||'Could not resolve sign code.';renderSignCode()}};
+    window.selectListing=(id)=>{state.error='';state.selectedHouse=(state.houses||[]).find(h=>String(h.id)===String(id))||null;renderConfirm()}; window.backToListings=()=>{state.error='';renderDetectedListings()}; window.activateSignDemo=async()=>{try{renderLoading('Locking the sign to the selected open house...');await createOrLockEvent();renderSuccess()}catch(err){state.error=err.message||'Failed to activate sign demo.';renderConfirm()}};
+    window.resetDemoSession=()=>{clearSession();const next=new URLSearchParams();if(state.uid)next.set('uid',state.uid);if(state.agentSlug)next.set('agent',state.agentSlug);window.location.href=next.toString()?`/sign-demo-activate.html?${next.toString()}`:'/sign-demo-activate.html'};
+    async function init(){renderLoading('Checking claimed chip and sign context...');try{const p=mergeStateFromSession();if(state.uid&&state.agentSlug&&p?.stage==='waiting_for_handshake'&&p.publicCode){state.publicCode=p.publicCode;state.signId=p.signId||state.signId;await proceedToListingDetection();return}if(state.uid&&state.agentSlug&&!state.publicCode&&!state.signChipUid){writeSession({uid:state.uid,agentSlug:state.agentSlug,stage:'waiting_for_sign_chip_1'});renderTapSign1();return}if(!state.uid&&state.signChipUid&&p?.stage==='waiting_for_sign_chip_1'){const result=await resolveSignByChipUid(state.signChipUid);writeSession({signId:result.sign.id,publicCode:result.sign.public_code,primaryChipUid:state.signChipUid,stage:result.sign.uid_secondary?'waiting_for_handshake':'waiting_for_second_sign_chip'});if(result.sign.uid_secondary){renderHandshakeWait()}else{renderTapSign2()}return}if(!state.uid&&state.signChipUid&&p?.stage==='waiting_for_second_sign_chip'){await registerSecondChip(state.signChipUid);return}if(!state.uid&&state.publicCode&&p?.uid&&p?.agentSlug){state.uid=p.uid;state.agentSlug=p.agentSlug;const sign=await resolveSignByCode(state.publicCode);writeSession({uid:state.uid,agentSlug:state.agentSlug,publicCode:state.publicCode,signId:sign.id,primaryChipUid:sign.uid_primary||'',stage:sign.uid_secondary?'waiting_for_handshake':'waiting_for_second_sign_chip'});if(sign.uid_secondary){renderHandshakeWait()}else{renderTapSign2()}return}if(state.uid&&state.agentSlug&&state.publicCode){const sign=await resolveSignByCode(state.publicCode);if(!sign.uid_secondary){writeSession({uid:state.uid,agentSlug:state.agentSlug,publicCode:sign.public_code,signId:sign.id,primaryChipUid:sign.uid_primary||'',stage:'waiting_for_second_sign_chip'});renderTapSign2();return}await proceedToListingDetection();return}if(state.publicCode&&!state.uid){const sign=await resolveSignByCode(state.publicCode);writeSession({publicCode:state.publicCode,signId:sign.id,primaryChipUid:sign.uid_primary||'',stage:sign.uid_secondary?'waiting_for_handshake':'waiting_for_second_sign_chip'});if(sign.uid_secondary){renderHandshakeWait()}else{renderTapSign2()}return}renderSignCode()}catch(err){renderMessage('Sign Demo Not Ready',err.message||'Missing sign-demo context.','error')}}
     init();
   </script>
 </body>
