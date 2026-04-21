@@ -108,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             mockup_render_error: null,
             mockup_error: null,
             updated_at: new Date().toISOString()
-          })
+          } as any)
           .eq("id", row.id);
 
         if (updated.error) throw new Error(updated.error.message);
@@ -124,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             mockup_render_error: message,
             mockup_render_attempted_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          })
+          } as any)
           .eq("id", row.id);
 
         results.push({ id: row.id, ok: false, error: message });
