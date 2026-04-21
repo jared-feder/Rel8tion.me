@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/render-agent-mockup.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/cron-generate.ts": {
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/cron-render.ts": {
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/cron-send.ts": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    { "path": "/api/cron-generate", "schedule": "1,11,21,31,41,51 * * * *" },
+    { "path": "/api/cron-render", "schedule": "3,13,23,33,43,53 * * * *" },
+    { "path": "/api/cron-send", "schedule": "5,15,25,35,45,55 * * * *" }
+  ]
+}
