@@ -1,15 +1,18 @@
-function must(name: string): string {
+function read(name: string, fallback = ""): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing required env var: ${name}`);
-  return value;
+  return value ?? fallback;
 }
 
 export const env = {
-  supabaseUrl: must("SUPABASE_URL"),
-  supabaseServiceRoleKey: must("SUPABASE_SERVICE_ROLE_KEY"),
-  storageBucket: process.env.SUPABASE_STORAGE_BUCKET || "agent-mockups",
-  publicBaseUrl: process.env.REL8TION_PUBLIC_BASE_URL || "https://rel8tion.me",
-  generateFunctionUrl: must("GENERATE_FUNCTION_URL"),
-  twilioSendFunctionUrl: must("TWILIO_SEND_FUNCTION_URL"),
-  cronSharedSecret: must("CRON_SHARED_SECRET")
+  supabaseUrl: read("SUPABASE_URL"),
+  supabaseServiceRoleKey: read("SUPABASE_SERVICE_ROLE_KEY"),
+  storageBucket: read("SUPABASE_STORAGE_BUCKET", "agent-mockups"),
+  publicBaseUrl: read("REL8TION_PUBLIC_BASE_URL", "https://rel8tion.me"),
+  generateFunctionUrl: read("GENERATE_FUNCTION_URL"),
+  twilioSendFunctionUrl: read("TWILIO_SEND_FUNCTION_URL"),
+  cronSharedSecret: read("CRON_SHARED_SECRET")
 };
+
+export function getMissingEnvVars(names: string[]): string[] {
+  return names.filter((name) => !process.env[name]);
+}
