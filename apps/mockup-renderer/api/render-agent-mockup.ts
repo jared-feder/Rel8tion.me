@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { env, getMissingEnvVars } from "../lib/env";
 import { getSupabaseAdmin } from "../lib/supabase-admin";
-import { renderMockupJpg } from "../lib/mockup";
 
 type QueueRow = {
   id: string;
@@ -51,6 +50,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const supabaseAdmin = getSupabaseAdmin();
     const limit = Math.min(Number(req.body?.limit || 10), 25);
+
+    let renderMockupJpg: any;
+    try {
+      const renderer = await import("../lib/mockup");
+      renderMockupJpg = renderer.renderMockupJpg;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed importing renderer";
+      return res.status(500).json({ error: message, stage: "import_renderer" });
+    }
 
     const { data, error } = await supabaseAdmin
       .from("agent_outreach_queue")
