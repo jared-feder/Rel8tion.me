@@ -27,6 +27,24 @@ function buildStoragePath(id: string): string {
   return `agent-outreach/${yyyy}/${mm}/${id}.jpg`;
 }
 
+async function patchQueueRow(id: string, payload: Record<string, string | null>) {
+  const response = await fetch(`${env.supabaseUrl}/rest/v1/agent_outreach_queue?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": env.supabaseServiceRoleKey,
+      "Authorization": `Bearer ${env.supabaseServiceRoleKey}`,
+      "Prefer": "return=minimal"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const raw = await response.text().catch(() => "");
+    throw new Error(raw || `Failed updating queue row ${id}`);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -38,10 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ]);
 
     if (missing.length) {
-      return res.status(500).json({
-        error: "Missing required environment variables",
-        missing
-      });
+      return res.status(500).json({ error: "Missing required environment variables", missing });
     }
 
     if (req.headers["x-cron-secret"] !== env.cronSharedSecret) {
@@ -98,34 +113,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: publicData } = supabaseAdmin.storage.from(env.storageBucket).getPublicUrl(path);
         const mockupUrl = publicData.publicUrl;
 
-        const updated = await supabaseAdmin
-          .from("agent_outreach_queue")
-          .update({
-            mockup_image_url: mockupUrl,
-            mockup_status: "rendered",
-            mockup_rendered_at: new Date().toISOString(),
-            mockup_render_attempted_at: new Date().toISOString(),
-            mockup_render_error: null,
-            mockup_error: null,
-            updated_at: new Date().toISOString()
-          } as any)
-          .eq("id", row.id);
+        await patchQueueRow(row.id, {
+          mockup_image_url: mockupUrl,
+          mockup_status: "rendered",
+          mockup_rendered_at: new Date().toISOString(),
+          mockup_render_attempted_at: new Date().toISOString(),
+          mockup_render_error: null,
+          mockup_error: null,
+          updated_at: new Date().toISOString()
+        });
 
-        if (updated.error) throw new Error(updated.error.message);
         results.push({ id: row.id, ok: true, mockup_image_url: mockupUrl });
       } catch (e) {
         const message = e instanceof Error ? e.message : "Unknown render error";
 
-        await supabaseAdmin
-          .from("agent_outreach_queue")
-          .update({
+        try {
+          await patchQueueRow(row.id, {
             mockup_status: "failed",
             mockup_error: message,
             mockup_render_error: message,
             mockup_render_attempted_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          } as any)
-          .eq("id", row.id);
+          });
+        } catch {}
 
         results.push({ id: row.id, ok: false, error: message });
       }
