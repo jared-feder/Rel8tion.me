@@ -171,7 +171,7 @@ function computeFollowupSendAt(openStart: string | null, initialSendAt: string):
 
   const openStartDate = new Date(openStart);
   const initialDate = new Date(initialSendAt);
-  const followupDate = new Date(openStartDate.getTime() - 2 * 60 * 60 * 1000);
+  const followupDate = new Date(openStartDate.getTime() - 24 * 60 * 60 * 1000);
 
   if (Number.isNaN(openStartDate.getTime()) || Number.isNaN(followupDate.getTime())) {
     return null;
