@@ -2,13 +2,24 @@ import { getSupabaseAdmin } from "../lib/supabase-admin";
 
 export default async function handler(req: any, res: any) {
   try {
-    const receivedSecret = req?.headers?.["x-cron-secret"] || null;
+    const receivedSharedSecret = req?.headers?.["x-cron-secret"] || null;
+    const authHeader = req?.headers?.authorization || req?.headers?.Authorization || "";
 
     if (req?.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    if (!process.env.CRON_SHARED_SECRET || receivedSecret !== process.env.CRON_SHARED_SECRET) {
+    const sharedSecretOk = !!(
+      process.env.CRON_SHARED_SECRET &&
+      receivedSharedSecret === process.env.CRON_SHARED_SECRET
+    );
+
+    const bearerSecretOk = !!(
+      process.env.CRON_SECRET &&
+      authHeader === `Bearer ${process.env.CRON_SECRET}`
+    );
+
+    if (!sharedSecretOk && !bearerSecretOk) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
