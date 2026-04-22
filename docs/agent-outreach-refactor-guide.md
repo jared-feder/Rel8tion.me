@@ -2,6 +2,17 @@
 
 This document captures the current state of the outreach pipeline, what has already been changed in the Vercel renderer app, and the exact Supabase-side changes needed to finish the pipeline around the Sharp-based Vercel mockup generator.
 
+## Copy-Paste Files In This Repo
+
+To make the final rollout easier, this repo now also includes ready-to-paste files:
+
+- [`docs/supabase-functions/generate-agent-outreach.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/generate-agent-outreach.ts:1>)
+- [`docs/supabase-functions/trigger-agent-mockups.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/trigger-agent-mockups.ts:1>)
+- [`docs/supabase-functions/send-agent-outreach.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/send-agent-outreach.ts:1>)
+- [`docs/hot-list-elementor.html`](</c:/Dev/GitHub/Rel8tion.me/docs/hot-list-elementor.html:1>)
+
+Those files are meant to be copied into Supabase / Elementor with minimal editing.
+
 ## What Is Already Done
 
 The Vercel `mockup-renderer` project has already been updated and deployed to:

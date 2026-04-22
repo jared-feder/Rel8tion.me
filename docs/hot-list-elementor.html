@@ -1,0 +1,560 @@
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div id="app" class="min-h-screen"></div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXAiLCJyZWYiOiJuaWNhbnFyZnFsYm5sbW5vZXJuYiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzYxMTYxMDc3LCJleHAiOjIwNzY3MzcwNzd9.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+
+let rows = [];
+
+function esc(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtDate(dateStr){
+  if(!dateStr) return "No date";
+  const d = new Date(dateStr);
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function shortMoney(n){
+  if(!n) return "";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0
+  }).format(n);
+}
+
+function badgeClass(status){
+  switch(status){
+    case "sent":
+    case "rendered":
+    case "generated":
+      return "bg-emerald-50 text-emerald-700";
+    case "pending":
+      return "bg-amber-50 text-amber-700";
+    case "failed":
+      return "bg-rose-50 text-rose-700";
+    case "blocked_duplicate":
+      return "bg-violet-50 text-violet-700";
+    case "skipped_started":
+    case "skipped_expired":
+    case "not_scheduled":
+      return "bg-slate-100 text-slate-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
+function getPhone(id){
+  const row = rows.find(r => r.id === id);
+  return (row?.agent_phone || "").replace(/\D/g, "");
+}
+
+function getFirstSms(id){
+  const box = document.querySelector(`.firstSmsBox[data-id="${id}"]`);
+  return box ? box.value.trim() : "";
+}
+
+function getFollowupSms(id){
+  const box = document.querySelector(`.followupSmsBox[data-id="${id}"]`);
+  return box ? box.value.trim() : "";
+}
+
+function renderCardImage(row){
+  if (row.mockup_image_url) {
+    return `
+      <div class="relative w-full h-[320px] rounded-2xl overflow-hidden bg-slate-100">
+        <img
+          src="${esc(row.mockup_image_url)}"
+          class="absolute inset-0 w-full h-full object-cover"
+          alt="Mockup"
+        >
+      </div>
+    `;
+  }
+
+  return `
+    <div class="relative w-full h-[320px] rounded-2xl overflow-hidden bg-[radial-gradient(circle_at_top_left,_#f3f5ff,_#eef2ff_35%,_#ffffff_75%)] border border-slate-200">
+      <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+        <div class="text-sm font-semibold text-slate-900">Mockup Not Ready</div>
+        <div class="text-xs text-slate-500 mt-2">Mockup Status: ${esc(row.mockup_status || "pending")}</div>
+        <div class="text-xs text-slate-500 mt-1">Generation: ${esc(row.generation_status || "pending")}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentPhoto(row){
+  if (row.agent_photo_url) {
+    return `
+      <img
+        src="${esc(row.agent_photo_url)}"
+        alt="Agent photo"
+        class="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm bg-white"
+      >
+    `;
+  }
+
+  return `
+    <div class="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[11px] text-slate-400 font-semibold">
+      No Photo
+    </div>
+  `;
+}
+
+function renderReasonBox(title, value){
+  if(!value) return "";
+  return `
+    <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+      <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">${esc(title)}</div>
+      <div class="text-sm text-slate-700 break-words">${esc(value)}</div>
+    </div>
+  `;
+}
+
+function render(){
+  app.innerHTML = `
+    <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f3f5ff,_#eef2ff_35%,_#ffffff_75%)] text-slate-900 p-4 md:p-6 font-[Inter]">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <div class="text-sm font-semibold tracking-[0.2em] uppercase text-indigo-600">Rel8tion</div>
+            <h1 class="font-[Poppins] text-3xl md:text-4xl font-black leading-tight">Open House Outreach Hot List</h1>
+            <p class="text-slate-600 mt-1">Generate copy, render real mockups, approve messages, and track sends from one queue.</p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button id="refreshBtn" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold shadow-lg">Refresh</button>
+            <button id="generateBtn" class="px-4 py-3 rounded-2xl bg-indigo-600 text-white font-semibold shadow-lg">Generate + Render Pending</button>
+          </div>
+        </div>
+
+        <div class="grid gap-4">
+          ${
+            rows.length === 0
+            ? `
+              <div class="rounded-3xl bg-white/80 backdrop-blur border border-slate-200 p-8 shadow-xl text-center">
+                <div class="text-xl font-bold">No outreach rows found</div>
+                <div class="text-slate-500 mt-2">Queue some enriched open houses first.</div>
+              </div>
+            `
+            : rows.map((row) => {
+              const smsOptions = [row.sms_variant_1, row.sms_variant_2, row.sms_variant_3].filter(Boolean);
+              const chosen = row.selected_sms || row.sms_variant_1 || "";
+
+              return `
+                <div class="rounded-3xl bg-white/90 backdrop-blur border border-slate-200 shadow-xl overflow-hidden">
+                  <div class="grid md:grid-cols-[340px_1fr] gap-0">
+                    <div class="bg-slate-100 p-3">
+                      ${renderCardImage(row)}
+                    </div>
+
+                    <div class="p-4 md:p-5">
+                      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                        <div class="flex items-start gap-3 min-w-0">
+                          <div class="shrink-0">
+                            ${renderAgentPhoto(row)}
+                          </div>
+
+                          <div class="min-w-0">
+                            <div class="text-xs uppercase tracking-[0.2em] text-indigo-600 font-bold">${esc(row.brokerage || "No Brokerage")}</div>
+                            <h2 class="text-2xl font-[Poppins] font-black leading-tight">${esc(row.agent_name || "Unknown Agent")}</h2>
+                            <div class="text-slate-600 mt-1">${esc(row.address || "No Address")}</div>
+                            <div class="text-slate-500 text-sm mt-1">${fmtDate(row.open_start)}</div>
+
+                            <div class="flex flex-wrap gap-2 mt-3 text-sm">
+                              ${row.price ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${shortMoney(row.price)}</span>` : ""}
+                              ${row.beds ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${row.beds} bd</span>` : ""}
+                              ${row.baths ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${row.baths} ba</span>` : ""}
+                              ${row.agent_phone ? `<span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-semibold">${esc(row.agent_phone)}</span>` : ""}
+                            </div>
+
+                            <div class="flex flex-wrap gap-2 mt-3 text-sm">
+                              <span class="px-3 py-1 rounded-full ${row.approved_for_send ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'} font-semibold">
+                                ${row.approved_for_send ? 'Approved for Send' : 'Not Approved'}
+                              </span>
+                              <span class="px-3 py-1 rounded-full ${badgeClass(row.generation_status)} font-semibold">
+                                Copy: ${esc(row.generation_status || "pending")}
+                              </span>
+                              <span class="px-3 py-1 rounded-full ${badgeClass(row.mockup_status)} font-semibold">
+                                Mockup: ${esc(row.mockup_status || "pending")}
+                              </span>
+                              <span class="px-3 py-1 rounded-full ${badgeClass(row.initial_send_status)} font-semibold">
+                                Initial: ${esc(row.initial_send_status || "pending")}
+                              </span>
+                              <span class="px-3 py-1 rounded-full ${badgeClass(row.followup_send_status)} font-semibold">
+                                Follow-Up: ${esc(row.followup_send_status || "pending")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                          <span class="px-3 py-1 rounded-full ${badgeClass(row.review_status)} text-sm font-semibold">${esc(row.review_status || "pending")}</span>
+                          <span class="px-3 py-1 rounded-full ${badgeClass(row.send_mode)} text-sm font-semibold">${esc(row.send_mode || "manual")}</span>
+                          <span class="px-3 py-1 rounded-full ${badgeClass(row.send_status)} text-sm font-semibold">${esc(row.send_status || "not_sent")}</span>
+                        </div>
+                      </div>
+
+                      <div class="mt-4">
+                        <label class="block text-sm font-semibold mb-2">First Text Variant</label>
+                        <select data-id="${row.id}" class="variantSelect w-full rounded-2xl border border-slate-300 px-4 py-3 bg-white">
+                          ${smsOptions.map((v, idx) => `
+                            <option value="${esc(v)}" ${v === chosen ? "selected" : ""}>Variant ${idx + 1}</option>
+                          `).join("")}
+                        </select>
+                      </div>
+
+                      <div class="mt-3">
+                        <textarea data-id="${row.id}" class="firstSmsBox w-full rounded-2xl border border-slate-300 px-4 py-3 min-h-[145px] text-[15px] leading-6">${esc(chosen)}</textarea>
+                      </div>
+
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <button data-id="${row.id}" class="copyFirstBtn px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold">Copy First Text</button>
+                        <button data-id="${row.id}" class="openFirstBtn px-4 py-3 rounded-2xl bg-indigo-600 text-white font-semibold">Open First Text</button>
+                      </div>
+
+                      <div class="mt-5">
+                        <label class="block text-sm font-semibold mb-2">Follow-Up Text</label>
+                        <textarea data-id="${row.id}" class="followupSmsBox w-full rounded-2xl border border-slate-300 px-4 py-3 min-h-[110px] text-[15px] leading-6">${esc(row.followup_sms || "")}</textarea>
+                      </div>
+
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <button data-id="${row.id}" class="copyFollowupBtn px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold">Copy Follow-Up</button>
+                        <button data-id="${row.id}" class="openFollowupBtn px-4 py-3 rounded-2xl bg-indigo-600 text-white font-semibold">Open Follow-Up</button>
+                      </div>
+
+                      <div class="mt-5 flex flex-wrap gap-2">
+                        <button data-id="${row.id}" class="approveBtn px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold">Approve for Send</button>
+                        <button data-id="${row.id}" class="unapproveBtn px-4 py-3 rounded-2xl bg-amber-500 text-white font-semibold">Unapprove</button>
+                        <button data-id="${row.id}" class="saveBtn px-4 py-3 rounded-2xl bg-white border border-slate-300 text-slate-900 font-semibold">Save Edits</button>
+                        <button data-id="${row.id}" class="rerenderBtn px-4 py-3 rounded-2xl bg-fuchsia-600 text-white font-semibold">Rerender Mockup</button>
+                        <button data-id="${row.id}" class="sentBtn px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold">Mark Sent</button>
+                        <button data-id="${row.id}" class="skipBtn px-4 py-3 rounded-2xl bg-rose-50 text-rose-700 border border-rose-200 font-semibold">Skip</button>
+                      </div>
+
+                      <div class="mt-4 grid md:grid-cols-2 gap-3">
+                        <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                          <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Initial Send At</div>
+                          <div class="text-sm text-slate-700">${esc(fmtDate(row.initial_send_at))}</div>
+                          ${row.initial_sent_at ? `<div class="text-xs text-slate-500 mt-2">Sent: ${esc(fmtDate(row.initial_sent_at))}</div>` : ""}
+                          ${row.twilio_sid_initial ? `<div class="text-xs text-slate-500 mt-2 break-all">SID: ${esc(row.twilio_sid_initial)}</div>` : ""}
+                        </div>
+
+                        <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                          <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Follow-Up Send At</div>
+                          <div class="text-sm text-slate-700">${esc(fmtDate(row.followup_send_at))}</div>
+                          ${row.followup_sent_at ? `<div class="text-xs text-slate-500 mt-2">Sent: ${esc(fmtDate(row.followup_sent_at))}</div>` : ""}
+                          ${row.twilio_sid_followup ? `<div class="text-xs text-slate-500 mt-2 break-all">SID: ${esc(row.twilio_sid_followup)}</div>` : ""}
+                        </div>
+                      </div>
+
+                      <div class="mt-4 grid md:grid-cols-2 gap-3">
+                        ${renderReasonBox("Initial Block Reason", row.initial_block_reason)}
+                        ${renderReasonBox("Follow-Up Block Reason", row.followup_block_reason)}
+                      </div>
+
+                      ${
+                        row.last_error
+                        ? `<div class="mt-3 text-sm text-rose-600 font-medium">Error: ${esc(row.last_error)}</div>`
+                        : ""
+                      }
+
+                      ${
+                        row.mockup_error
+                        ? `<div class="mt-3 text-sm text-rose-600 font-medium">Mockup Error: ${esc(row.mockup_error)}</div>`
+                        : ""
+                      }
+
+                      ${
+                        row.send_error
+                        ? `<div class="mt-3 text-sm text-rose-600 font-medium">Send Error: ${esc(row.send_error)}</div>`
+                        : ""
+                      }
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join("")
+          }
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindEvents();
+}
+
+async function loadRows(){
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 1);
+
+  const end = new Date(now);
+  end.setDate(end.getDate() + 7);
+
+  const { data, error } = await supabase
+    .from("agent_outreach_queue")
+    .select("*")
+    .neq("send_status", "sent")
+    .gte("open_start", start.toISOString())
+    .lte("open_start", end.toISOString())
+    .order("open_start", { ascending: true })
+    .limit(100);
+
+  if(error){
+    console.error(error);
+    alert(error.message);
+    return;
+  }
+
+  rows = data || [];
+  render();
+}
+
+async function saveEdits(id){
+  const firstText = getFirstSms(id);
+  const followupText = getFollowupSms(id);
+  const phone = getPhone(id);
+
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      selected_sms: firstText,
+      followup_sms: followupText,
+      sms_link: `sms:${phone}?body=${encodeURIComponent(firstText)}`,
+      followup_sms_link: `sms:${phone}?body=${encodeURIComponent(followupText)}`
+    })
+    .eq("id", id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function setApproval(id, approved){
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      approved_for_send: approved,
+      review_status: approved ? "approved" : "pending"
+    })
+    .eq("id", id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function markSent(id){
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      send_status: "sent",
+      review_status: "approved",
+      sent_at: new Date().toISOString()
+    })
+    .eq("id", id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function skipRow(id){
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      review_status: "skipped",
+      send_status: "archived",
+      skipped_at: new Date().toISOString()
+    })
+    .eq("id", id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function triggerGenerate(limit = 200){
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-agent-outreach`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ limit })
+  });
+
+  const data = await res.json();
+
+  if(!res.ok){
+    throw new Error(data.error || "Failed to generate outreach.");
+  }
+
+  return data;
+}
+
+async function triggerRender(payload = { limit: 200 }){
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/trigger-agent-mockups`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if(!res.ok){
+    throw new Error(data.error || "Failed to render mockups.");
+  }
+
+  return data;
+}
+
+async function generatePending(){
+  try {
+    await triggerGenerate(200);
+    await triggerRender({ limit: 200 });
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function rerenderRow(id){
+  try {
+    await triggerRender({ ids: [id], force: true });
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function bindEvents(){
+  document.getElementById("refreshBtn")?.addEventListener("click", loadRows);
+  document.getElementById("generateBtn")?.addEventListener("click", generatePending);
+
+  document.querySelectorAll(".variantSelect").forEach(el => {
+    el.addEventListener("change", (e) => {
+      const id = e.target.dataset.id;
+      const value = e.target.value;
+      const box = document.querySelector(`.firstSmsBox[data-id="${id}"]`);
+      if(box) box.value = value;
+    });
+  });
+
+  document.querySelectorAll(".copyFirstBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      const text = getFirstSms(id);
+      await navigator.clipboard.writeText(text);
+      e.target.textContent = "Copied";
+      setTimeout(() => e.target.textContent = "Copy First Text", 1200);
+    });
+  });
+
+  document.querySelectorAll(".copyFollowupBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      const text = getFollowupSms(id);
+      await navigator.clipboard.writeText(text);
+      e.target.textContent = "Copied";
+      setTimeout(() => e.target.textContent = "Copy Follow-Up", 1200);
+    });
+  });
+
+  document.querySelectorAll(".openFirstBtn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = e.target.dataset.id;
+      const text = getFirstSms(id);
+      const phone = getPhone(id);
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(text)}`;
+    });
+  });
+
+  document.querySelectorAll(".openFollowupBtn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = e.target.dataset.id;
+      const text = getFollowupSms(id);
+      const phone = getPhone(id);
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(text)}`;
+    });
+  });
+
+  document.querySelectorAll(".saveBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      await saveEdits(e.target.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".approveBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      await setApproval(e.target.dataset.id, true);
+    });
+  });
+
+  document.querySelectorAll(".unapproveBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      await setApproval(e.target.dataset.id, false);
+    });
+  });
+
+  document.querySelectorAll(".sentBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      await saveEdits(id);
+      await markSent(id);
+    });
+  });
+
+  document.querySelectorAll(".skipBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      await skipRow(e.target.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".rerenderBtn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      await rerenderRow(e.target.dataset.id);
+    });
+  });
+}
+
+loadRows();
+</script>
