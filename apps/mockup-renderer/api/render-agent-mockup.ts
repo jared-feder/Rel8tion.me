@@ -1,3 +1,5 @@
+import { env, getMissingEnvVars } from "../lib/env.js";
+
 type QueueRow = {
   id: string;
   agent_name: string | null;
@@ -19,9 +21,38 @@ type QueueRow = {
 function restHeaders() {
   return {
     "Content-Type": "application/json",
-    apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-    Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ""}`
+    apikey: env.supabaseServiceRoleKey,
+    Authorization: `Bearer ${env.supabaseServiceRoleKey}`
   };
+}
+
+function readHeader(req: any, name: string): string {
+  return req?.headers?.[name] || req?.headers?.[name.toLowerCase()] || req?.headers?.[name.toUpperCase()] || "";
+}
+
+function isAuthorizedRequest(req: any): boolean {
+  const sharedSecret = readHeader(req, "x-cron-secret");
+  const authHeader = readHeader(req, "authorization");
+
+  if (env.cronSharedSecret && sharedSecret === env.cronSharedSecret) {
+    return true;
+  }
+
+  if (env.cronSecret && authHeader === `Bearer ${env.cronSecret}`) {
+    return true;
+  }
+
+  return false;
+}
+
+function parseLimit(value: unknown): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 3;
+  }
+
+  return Math.max(1, Math.min(Math.floor(parsed), 10));
 }
 
 function buildStoragePath(id: string): string {
@@ -32,12 +63,11 @@ function buildStoragePath(id: string): string {
 }
 
 function publicObjectUrl(bucket: string, path: string): string {
-  const base = process.env.SUPABASE_URL || "";
-  return `${base}/storage/v1/object/public/${bucket}/${path}`;
+  return `${env.supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
 }
 
 async function patchQueueRow(id: string, payload: Record<string, string | null>) {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/agent_outreach_queue?id=eq.${encodeURIComponent(id)}`;
+  const url = `${env.supabaseUrl}/rest/v1/agent_outreach_queue?id=eq.${encodeURIComponent(id)}`;
 
   const response = await fetch(url, {
     method: "PATCH",
@@ -55,14 +85,14 @@ async function patchQueueRow(id: string, payload: Record<string, string | null>)
 }
 
 async function uploadMockup(bucket: string, path: string, bytes: Uint8Array) {
-  const url = `${process.env.SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+  const url = `${env.supabaseUrl}/storage/v1/object/${bucket}/${path}`;
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "image/jpeg",
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ""}`,
+      apikey: env.supabaseServiceRoleKey,
+      Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       "x-upsert": "true"
     },
     body: bytes
@@ -80,18 +110,34 @@ export default async function handler(req: any, res: any) {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (!env.cronSharedSecret && !env.cronSecret) {
       return res.status(500).json({
         ok: false,
-        stage: "env_check",
-        hasSupabaseUrl: !!process.env.SUPABASE_URL,
-        hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        stage: "auth_config",
+        error: "Missing CRON_SHARED_SECRET or CRON_SECRET"
       });
     }
 
-    const bucket = process.env.SUPABASE_STORAGE_BUCKET || "agent-mockups";
-    const baseUrl = process.env.REL8TION_PUBLIC_BASE_URL || "https://rel8tion.me";
-    const limit = Math.min(Number(req?.body?.limit || 3), 10);
+    if (!isAuthorizedRequest(req)) {
+      return res.status(401).json({
+        ok: false,
+        stage: "auth_check",
+        error: "Unauthorized"
+      });
+    }
+
+    const missingEnvVars = getMissingEnvVars(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
+    if (missingEnvVars.length > 0) {
+      return res.status(500).json({
+        ok: false,
+        stage: "env_check",
+        missingEnvVars
+      });
+    }
+
+    const bucket = env.storageBucket;
+    const baseUrl = env.publicBaseUrl;
+    const limit = parseLimit(req?.body?.limit);
 
     const select = [
       "id",
@@ -112,7 +158,7 @@ export default async function handler(req: any, res: any) {
     ].join(",");
 
     const url =
-      `${process.env.SUPABASE_URL}/rest/v1/agent_outreach_queue` +
+      `${env.supabaseUrl}/rest/v1/agent_outreach_queue` +
       `?select=${encodeURIComponent(select)}` +
       `&status=in.(pending_approval,approved)` +
       `&mockup_image_url=is.null` +

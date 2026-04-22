@@ -10,6 +10,7 @@ export const env = {
   publicBaseUrl: read("REL8TION_PUBLIC_BASE_URL", "https://rel8tion.me"),
   generateFunctionUrl: read("GENERATE_FUNCTION_URL"),
   twilioSendFunctionUrl: read("TWILIO_SEND_FUNCTION_URL"),
+  cronSecret: read("CRON_SECRET"),
   cronSharedSecret: read("CRON_SHARED_SECRET")
 };
 
