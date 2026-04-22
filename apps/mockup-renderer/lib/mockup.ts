@@ -1,6 +1,9 @@
 import sharp from "sharp";
 import { formatOpenHouseRange } from "./time.js";
 
+const FOREGROUND_SIGN_URL =
+  "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/outreach-mockups/jared-sign-foreground.png";
+
 export type MockupRenderInput = {
   agentName: string | null;
   brokerage: string | null;
@@ -49,7 +52,7 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
   const dateLine = truncate(formatOpenHouseRange(input.openStart, input.openEnd), 80);
 
   const propertyBuffer = await fetchImageBuffer(input.propertyImageUrl);
-  const agentBuffer = await fetchImageBuffer(input.agentPhotoUrl);
+  const foregroundBuffer = await fetchImageBuffer(FOREGROUND_SIGN_URL);
 
   const base = sharp({
     create: {
@@ -82,6 +85,15 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
     layers.push({ input: fallbackHero, top: 0, left: 0 });
   }
 
+  if (foregroundBuffer) {
+    const foreground = await sharp(foregroundBuffer)
+      .resize(width, 620, { fit: "contain", position: "center" })
+      .png()
+      .toBuffer();
+
+    layers.push({ input: foreground, top: 0, left: 0 });
+  }
+
   const whiteCard = await sharp({
     create: {
       width: 1120,
@@ -92,21 +104,6 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
   }).png().toBuffer();
 
   layers.push({ input: whiteCard, left: 40, top: 660 });
-
-  if (agentBuffer) {
-    const avatar = await sharp(agentBuffer)
-      .resize(150, 150, { fit: "cover", position: "attention" })
-      .composite([
-        {
-          input: Buffer.from(`<svg width="150" height="150"><circle cx="75" cy="75" r="74" fill="white"/></svg>`),
-          blend: "dest-in"
-        }
-      ])
-      .png()
-      .toBuffer();
-
-    layers.push({ input: avatar, left: 70, top: 700 });
-  }
 
   const svg = Buffer.from(`
     <svg width="${width}" height="${height}">
@@ -119,7 +116,7 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
         .cta    { font: 800 32px Arial, sans-serif; fill: white; }
       </style>
 
-      <text x="240" y="755" class="kicker">REL8TION OPEN HOUSE CONNECT</text>
+      <text x="70" y="755" class="kicker">REL8TION OPEN HOUSE CONNECT</text>
       <text x="70" y="905" class="title">${escapeXml(address)}</text>
       <text x="70" y="965" class="meta">${escapeXml(dateLine)}</text>
       <text x="70" y="1025" class="body">${escapeXml(agentName)} • ${escapeXml(brokerage)}</text>
