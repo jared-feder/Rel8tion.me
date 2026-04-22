@@ -10,7 +10,10 @@ To make the final rollout easier, this repo now also includes ready-to-paste fil
 - [`docs/supabase-functions/trigger-agent-mockups.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/trigger-agent-mockups.ts:1>)
 - [`docs/supabase-functions/send-agent-outreach.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/send-agent-outreach.ts:1>)
 - [`docs/supabase-functions/sync-openhouses.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/sync-openhouses.ts:1>)
+- [`docs/supabase-functions/twilio-inbound-reply.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/twilio-inbound-reply.ts:1>)
+- [`docs/supabase-functions/twilio-inbound-router.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/twilio-inbound-router.ts:1>)
 - [`docs/sql/queue_recent_outreach_candidates.sql`](</c:/Dev/GitHub/Rel8tion.me/docs/sql/queue_recent_outreach_candidates.sql:1>)
+- [`docs/sql/create_agent_outreach_replies.sql`](</c:/Dev/GitHub/Rel8tion.me/docs/sql/create_agent_outreach_replies.sql:1>)
 - [`docs/hot-list-elementor.html`](</c:/Dev/GitHub/Rel8tion.me/docs/hot-list-elementor.html:1>)
 
 Those files are meant to be copied into Supabase / Elementor with minimal editing.
@@ -67,6 +70,12 @@ It writes:
 6. `rel8tion.me/hot-list` shows the real stored mockup, not a fake browser preview.
 7. Jared edits and approves the copy on the hot-list page.
 8. The send function delivers the initial and follow-up SMS on schedule.
+
+Important:
+
+- if you want the mockup image to go out with the text, the Twilio send step must send MMS with `MediaUrl = mockup_image_url`
+- a row being `mockup_status = "rendered"` is not enough by itself if the send function only posts `Body`
+- the current desired flow is: initial send goes automatically once copy + mockup are ready, while follow-up/replies live in the hot-list workflow
 
 ## Architecture Decision
 

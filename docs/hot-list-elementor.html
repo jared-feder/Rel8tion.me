@@ -13,6 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById("app");
 
 let rows = [];
+let repliesByQueueId = {};
 
 function esc(str){
   return String(str || "")
@@ -55,6 +56,11 @@ function badgeClass(status){
       return "bg-rose-50 text-rose-700";
     case "blocked_duplicate":
       return "bg-violet-50 text-violet-700";
+    case "replied":
+      return "bg-sky-50 text-sky-700";
+    case "opted_out":
+    case "blocked_opt_out":
+      return "bg-rose-50 text-rose-700";
     case "skipped_started":
     case "skipped_expired":
     case "not_scheduled":
@@ -131,6 +137,39 @@ function renderReasonBox(title, value){
   `;
 }
 
+function renderReplies(row){
+  const replies = repliesByQueueId[row.id] || [];
+
+  if(!replies.length){
+    return `
+      <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+        <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Replies</div>
+        <div class="text-sm text-slate-500">No replies yet.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="rounded-2xl bg-sky-50/70 border border-sky-200 p-3">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="text-xs uppercase tracking-[0.18em] text-sky-700 font-bold">Replies</div>
+        <div class="text-xs text-sky-700 font-semibold">${replies.length} message${replies.length === 1 ? "" : "s"}</div>
+      </div>
+      <div class="grid gap-2">
+        ${replies.map((reply) => `
+          <div class="rounded-xl bg-white/80 border border-sky-100 p-3">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="text-xs font-semibold ${reply.opt_out ? "text-rose-600" : "text-slate-700"}">${reply.opt_out ? "Opt-Out Reply" : "Inbound Reply"}</div>
+              <div class="text-xs text-slate-500">${esc(fmtDate(reply.received_at))}</div>
+            </div>
+            <div class="text-sm text-slate-700 break-words">${esc(reply.body || "(empty message)")}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function render(){
   app.innerHTML = `
     <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f3f5ff,_#eef2ff_35%,_#ffffff_75%)] text-slate-900 p-4 md:p-6 font-[Inter]">
@@ -191,7 +230,7 @@ function render(){
 
                             <div class="flex flex-wrap gap-2 mt-3 text-sm">
                               <span class="px-3 py-1 rounded-full ${row.approved_for_send ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'} font-semibold">
-                                ${row.approved_for_send ? 'Approved for Send' : 'Not Approved'}
+                                ${row.approved_for_send ? 'Follow-Up Approved' : 'Follow-Up Needs Review'}
                               </span>
                               <span class="px-3 py-1 rounded-full ${badgeClass(row.generation_status)} font-semibold">
                                 Copy: ${esc(row.generation_status || "pending")}
@@ -245,8 +284,8 @@ function render(){
                       </div>
 
                       <div class="mt-5 flex flex-wrap gap-2">
-                        <button data-id="${row.id}" class="approveBtn px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold">Approve for Send</button>
-                        <button data-id="${row.id}" class="unapproveBtn px-4 py-3 rounded-2xl bg-amber-500 text-white font-semibold">Unapprove</button>
+                        <button data-id="${row.id}" class="approveBtn px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold">Approve Follow-Up</button>
+                        <button data-id="${row.id}" class="unapproveBtn px-4 py-3 rounded-2xl bg-amber-500 text-white font-semibold">Hold Follow-Up</button>
                         <button data-id="${row.id}" class="saveBtn px-4 py-3 rounded-2xl bg-white border border-slate-300 text-slate-900 font-semibold">Save Edits</button>
                         <button data-id="${row.id}" class="rerenderBtn px-4 py-3 rounded-2xl bg-fuchsia-600 text-white font-semibold">Rerender Mockup</button>
                         <button data-id="${row.id}" class="sentBtn px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold">Mark Sent</button>
@@ -272,6 +311,10 @@ function render(){
                       <div class="mt-4 grid md:grid-cols-2 gap-3">
                         ${renderReasonBox("Initial Block Reason", row.initial_block_reason)}
                         ${renderReasonBox("Follow-Up Block Reason", row.followup_block_reason)}
+                      </div>
+
+                      <div class="mt-4">
+                        ${renderReplies(row)}
                       </div>
 
                       ${
@@ -324,6 +367,32 @@ async function loadRows(){
   }
 
   rows = data || [];
+  repliesByQueueId = {};
+
+  const ids = rows.map((row) => row.id).filter(Boolean);
+
+  if(ids.length){
+    const { data: replies, error: repliesError } = await supabase
+      .from("agent_outreach_replies")
+      .select("id, queue_row_id, body, opt_out, received_at")
+      .in("queue_row_id", ids)
+      .order("received_at", { ascending: false })
+      .limit(250);
+
+    if(repliesError){
+      console.error(repliesError);
+    }else{
+      for(const reply of replies || []){
+        const key = reply.queue_row_id;
+        if(!key) continue;
+        if(!repliesByQueueId[key]) repliesByQueueId[key] = [];
+        if(repliesByQueueId[key].length < 3){
+          repliesByQueueId[key].push(reply);
+        }
+      }
+    }
+  }
+
   render();
 }
 
