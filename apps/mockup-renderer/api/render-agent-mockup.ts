@@ -12,7 +12,9 @@ type QueueRow = {
   open_end: string | null;
   listing_photo_url: string | null;
   agent_photo_url: string | null;
-  status: string | null;
+  generation_status: string | null;
+  review_status: string | null;
+  send_status: string | null;
   mockup_status: string | null;
   mockup_image_url: string | null;
   created_at: string | null;
@@ -53,6 +55,16 @@ function parseLimit(value: unknown): number {
   }
 
   return Math.max(1, Math.min(Math.floor(parsed), 10));
+}
+
+function parseIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
 }
 
 function buildStoragePath(id: string): string {
@@ -138,6 +150,8 @@ export default async function handler(req: any, res: any) {
     const bucket = env.storageBucket;
     const baseUrl = env.publicBaseUrl;
     const limit = parseLimit(req?.body?.limit);
+    const force = Boolean(req?.body?.force);
+    const ids = parseIds(req?.body?.ids);
 
     const select = [
       "id",
@@ -151,19 +165,29 @@ export default async function handler(req: any, res: any) {
       "open_end",
       "listing_photo_url",
       "agent_photo_url",
-      "status",
+      "generation_status",
+      "review_status",
+      "send_status",
       "mockup_status",
       "mockup_image_url",
       "created_at"
     ].join(",");
 
-    const url =
+    let url =
       `${env.supabaseUrl}/rest/v1/agent_outreach_queue` +
       `?select=${encodeURIComponent(select)}` +
-      `&status=in.(pending_approval,approved)` +
-      `&mockup_image_url=is.null` +
+      `&generation_status=eq.generated` +
+      `&send_status=eq.not_sent` +
       `&order=created_at.asc` +
       `&limit=${limit}`;
+
+    if (!force) {
+      url += `&mockup_image_url=is.null`;
+    }
+
+    if (ids.length > 0) {
+      url += `&id=in.(${ids.join(",")})`;
+    }
 
     const queueResponse = await fetch(url, {
       method: "GET",
