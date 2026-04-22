@@ -28,7 +28,7 @@ function buildStoragePath(id: string): string {
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `agent-outreach/${yyyy}/${mm}/${id}.svg`;
+  return `agent-outreach/${yyyy}/${mm}/${id}.jpg`;
 }
 
 function publicObjectUrl(bucket: string, path: string): string {
@@ -60,7 +60,7 @@ async function uploadMockup(bucket: string, path: string, bytes: Uint8Array) {
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "image/svg+xml",
+      "Content-Type": "image/jpeg",
       apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ""}`,
       "x-upsert": "true"
@@ -155,20 +155,20 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    let renderMockupSvg: any;
+    let renderMockupJpg: any;
     try {
       const renderer = await import("../lib/mockup");
-      if (typeof renderer.renderMockupSvg !== "function") {
-        console.error("[render-agent-mockup] Renderer module loaded without renderMockupSvg export", {
+      if (typeof renderer.renderMockupJpg !== "function") {
+        console.error("[render-agent-mockup] Renderer module loaded without renderMockupJpg export", {
           exportedKeys: Object.keys(renderer || {})
         });
         return res.status(500).json({
           ok: false,
           stage: "import_renderer",
-          error: "Renderer module missing renderMockupSvg export"
+          error: "Renderer module missing renderMockupJpg export"
         });
       }
-      renderMockupSvg = renderer.renderMockupSvg;
+      renderMockupJpg = renderer.renderMockupJpg;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed importing renderer";
       console.error("[render-agent-mockup] Failed importing renderer", {
@@ -187,7 +187,7 @@ export default async function handler(req: any, res: any) {
 
     for (const row of rows) {
       try {
-        const svg: Buffer = await renderMockupSvg({
+        const jpg: Buffer = await renderMockupJpg({
           agentName: row.agent_name,
           brokerage: row.brokerage,
           address: row.address,
@@ -200,7 +200,7 @@ export default async function handler(req: any, res: any) {
         });
 
         const path = buildStoragePath(row.id);
-        await uploadMockup(bucket, path, svg);
+        await uploadMockup(bucket, path, jpg);
 
         const publicUrl = publicObjectUrl(bucket, path);
 
