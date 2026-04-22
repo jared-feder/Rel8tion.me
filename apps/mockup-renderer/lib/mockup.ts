@@ -27,11 +27,30 @@ async function fetchImageBuffer(url: string | null): Promise<Buffer | null> {
   }
 }
 
+async function fetchRequiredImageBuffer(url: string | null, label: string): Promise<Buffer> {
+  if (!url) {
+    throw new Error(`Missing ${label} URL`);
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`${label} fetch failed with ${res.status} for ${url}`);
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${label} fetch failed for ${url}: ${message}`);
+  }
+}
+
 export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer> {
   const width = 1200;
   const height = 1200;
 
-  const propertyBuffer = await fetchImageBuffer(input.propertyImageUrl);
+  const propertyBuffer = await fetchRequiredImageBuffer(input.propertyImageUrl, "property image");
   const foregroundBuffer = await fetchImageBuffer(FOREGROUND_SIGN_URL);
 
   const base = sharp({
@@ -45,25 +64,12 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
 
   const layers: sharp.OverlayOptions[] = [];
 
-  if (propertyBuffer) {
-    const property = await sharp(propertyBuffer)
-      .resize(width, height, { fit: "cover", position: "center" })
-      .jpeg({ quality: 88 })
-      .toBuffer();
+  const property = await sharp(propertyBuffer)
+    .resize(width, height, { fit: "cover", position: "center" })
+    .jpeg({ quality: 88 })
+    .toBuffer();
 
-    layers.push({ input: property, top: 0, left: 0 });
-  } else {
-    const fallbackHero = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 132, b: 180, alpha: 1 }
-      }
-    }).png().toBuffer();
-
-    layers.push({ input: fallbackHero, top: 0, left: 0 });
-  }
+  layers.push({ input: property, top: 0, left: 0 });
 
   if (foregroundBuffer) {
     const foreground = await sharp(foregroundBuffer)
