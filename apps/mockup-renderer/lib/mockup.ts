@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { formatOpenHouseRange } from "./time";
+import { formatOpenHouseRange } from "./time.js";
 
 export type MockupRenderInput = {
   agentName: string | null;

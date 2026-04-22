@@ -157,7 +157,7 @@ export default async function handler(req: any, res: any) {
 
     let renderMockupJpg: any;
     try {
-      const renderer = await import("../lib/mockup");
+      const renderer = await import("../lib/mockup.js");
       if (typeof renderer.renderMockupJpg !== "function") {
         console.error("[render-agent-mockup] Renderer module loaded without renderMockupJpg export", {
           exportedKeys: Object.keys(renderer || {})
