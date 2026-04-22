@@ -145,6 +145,7 @@ function render(){
           <div class="flex flex-wrap gap-2">
             <button id="refreshBtn" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold shadow-lg">Refresh</button>
             <button id="generateBtn" class="px-4 py-3 rounded-2xl bg-indigo-600 text-white font-semibold shadow-lg">Generate + Render Pending</button>
+            <button id="rerenderAllBtn" class="px-4 py-3 rounded-2xl bg-fuchsia-600 text-white font-semibold shadow-lg">Rerender Loaded</button>
           </div>
         </div>
 
@@ -438,6 +439,28 @@ async function triggerRender(payload = { limit: 200 }){
   return data;
 }
 
+async function rerenderLoadedRows(){
+  const ids = rows.map((row) => row.id).filter(Boolean);
+
+  if (!ids.length) {
+    alert("No rows loaded.");
+    return;
+  }
+
+  const chunkSize = 50;
+
+  try {
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      await triggerRender({ ids: chunk, force: true, limit: chunk.length });
+    }
+
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function generatePending(){
   try {
     await triggerGenerate(200);
@@ -460,6 +483,7 @@ async function rerenderRow(id){
 function bindEvents(){
   document.getElementById("refreshBtn")?.addEventListener("click", loadRows);
   document.getElementById("generateBtn")?.addEventListener("click", generatePending);
+  document.getElementById("rerenderAllBtn")?.addEventListener("click", rerenderLoadedRows);
 
   document.querySelectorAll(".variantSelect").forEach(el => {
     el.addEventListener("change", (e) => {

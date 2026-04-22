@@ -80,7 +80,7 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
 
     layers.push({
       input: foreground,
-      left: Math.round((width - overlayWidth) / 2),
+      left: Math.min(width - overlayWidth, Math.round((width - overlayWidth) / 2) + 28),
       top: Math.max(0, height - overlayHeight)
     });
   }
