@@ -2,22 +2,18 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/render-agent-mockup.ts": {
-      "runtime": "nodejs20.x",
       "memory": 1024,
       "maxDuration": 60
     },
     "api/cron-generate.ts": {
-      "runtime": "nodejs20.x",
       "memory": 256,
       "maxDuration": 30
     },
     "api/cron-render.ts": {
-      "runtime": "nodejs20.x",
       "memory": 256,
       "maxDuration": 30
     },
     "api/cron-send.ts": {
-      "runtime": "nodejs20.x",
       "memory": 256,
       "maxDuration": 30
     }
