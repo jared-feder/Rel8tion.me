@@ -20,7 +20,8 @@ export default async function handler(req: any, res: any) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-cron-secret": process.env.CRON_SHARED_SECRET
+        "x-cron-secret": process.env.CRON_SHARED_SECRET,
+        "Authorization": `Bearer ${process.env.CRON_SECRET}`
       },
       body: JSON.stringify({ limit: 10 })
     });
