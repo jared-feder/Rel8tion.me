@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Smart Sign</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#f0f7ff]">
+  <main class="min-h-screen flex items-center justify-center px-4" style="background:linear-gradient(180deg,#38bdf8 0%,#f0f7ff 60%,#f0f7ff 100%);">
+    <div id="app" class="w-full flex items-center justify-center"></div>
+  </main>
+
+  <script type="module">
+    import { initSignResolverPage } from './src/modules/signResolver/bootstrap.js';
+    initSignResolverPage();
+  </script>
+</body>
+</html>

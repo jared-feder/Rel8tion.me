@@ -1,0 +1,495 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    #rel8tion-pro {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        position: relative;
+        isolation: isolate;
+        box-sizing: border-box;
+        background-color: #f0f7ff;
+    }
+
+    #rel8tion-pro *,
+    #rel8tion-pro *::before,
+    #rel8tion-pro *::after {
+        box-sizing: border-box;
+    }
+
+    #rel8tion-pro a,
+    #rel8tion-pro button {
+        pointer-events: auto;
+    }
+
+    #rel8tion-pro .rel8tion-wrapper {
+        font-family: 'Inter', sans-serif;
+        color: #1f2a5a;
+        background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+        background-attachment: fixed;
+        width: 100%;
+        min-height: 100vh;
+        position: relative;
+    }
+
+    #rel8tion-pro .moving-clouds {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 200%;
+        height: 500px;
+        z-index: 1;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+        background-repeat: repeat-x;
+        background-size: 800px auto;
+        animation: rel8tionDriftClouds 120s linear infinite;
+    }
+
+    @keyframes rel8tionDriftClouds {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+
+    #rel8tion-pro .scene-stage {
+        position: fixed;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 1400px;
+        aspect-ratio: 16 / 9;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    #rel8tion-pro .house-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(1.1);
+    }
+
+    #rel8tion-pro .fade-overlay {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 5;
+        pointer-events: none;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 100%, rgba(240,247,255,0.95) 100%);
+    }
+
+    #rel8tion-pro .agent-cutout {
+        position: absolute;
+        width: 5.5%;
+        height: auto;
+        z-index: 10;
+        opacity: 0;
+        animation-fill-mode: both !important;
+    }
+
+    @keyframes rel8tionWalk1 { 0% { left: 60%; top: 38%; opacity: 0; } 10% { opacity: 1; } 100% { left:31%; top: 44%; opacity: 0; } }
+    @keyframes rel8tionWalk2 { 0% { left: 58%; top: 41%; opacity: 0; } 10% { opacity: 1; } 100% { left: 50%; top: 42%; opacity: 0; } }
+    @keyframes rel8tionWalk3 { 0% { left: 62%; top: 38%; opacity: 0; } 10% { opacity: 1; } 100% { left:15%; top: 45%; opacity: 0; } }
+    @keyframes rel8tionWalk4 { 0% { left: 70%; top: 40%; opacity: 0; } 10% { opacity: 1; } 100% { left: 69%; top: 88%; opacity: 1; } }
+    @keyframes rel8tionWalk5 { 0% { left: 24%; top: 42%; opacity: 0; } 10% { opacity: 1; } 100% { left: 20%; top: 49%; opacity: 0; } }
+    @keyframes rel8tionWalk6 { 0% { left: 77%; top: 60%; opacity: 0; } 10% { opacity: 1; } 100% { left: 47%; top: 88%; opacity: 0; } }
+
+    #rel8tion-pro .agent-1 { animation: rel8tionWalk1 30s infinite linear; }
+    #rel8tion-pro .agent-2 { animation: rel8tionWalk2 28s infinite linear; animation-delay: 3s; }
+    #rel8tion-pro .agent-3 { animation: rel8tionWalk3 24s infinite linear; animation-delay: 1s; }
+    #rel8tion-pro .agent-4 { animation: rel8tionWalk4 30s infinite linear; animation-delay: 1s; }
+    #rel8tion-pro .agent-5 { animation: rel8tionWalk5 45s infinite linear; animation-delay: 3s; }
+    #rel8tion-pro .agent-6 { animation: rel8tionWalk6 30s infinite linear; animation-delay: 0s; }
+
+    @media (max-width: 1280px) {
+        #rel8tion-pro .scene-stage {
+            width: 140vw;
+            top: 70%;
+        }
+    }
+
+    @media (max-width: 768px) {
+        #rel8tion-pro .scene-stage {
+            width: 150vw;
+            top: 55%;
+        }
+    }
+
+    #rel8tion-pro .glass-card {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(0px) saturate(160%);
+        -webkit-backdrop-filter: blur(0px) saturate(160%);
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+    }
+
+    #rel8tion-pro .brand-button {
+        background-color: #1f2a5a !important;
+        color: #ffffff !important;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 20px rgba(31, 42, 90, 0.2) !important;
+        cursor: pointer;
+        border: none;
+        text-decoration: none;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #rel8tion-pro .brand-button:hover {
+        background-color: #161e40 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 15px 30px rgba(31, 42, 90, 0.3) !important;
+    }
+
+    #rel8tion-pro .secondary-button {
+        background: rgba(255,255,255,0.38);
+        color: #1f2a5a !important;
+        border: 1px solid rgba(255,255,255,0.7);
+        box-shadow: 0 8px 20px rgba(31, 42, 90, 0.08);
+    }
+
+    #rel8tion-pro .secondary-button:hover {
+        background: rgba(255,255,255,0.62);
+    }
+
+    #rel8tion-pro .field {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.65);
+        background: rgba(255,255,255,.42);
+        color: #1f2a5a;
+        padding: 16px 18px;
+        font-size: 16px;
+        font-weight: 600;
+        outline: none;
+    }
+
+    #rel8tion-pro .field::placeholder,
+    #rel8tion-pro textarea::placeholder {
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    #rel8tion-pro .field-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #1f2a5a;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+</style>
+
+<div id="rel8tion-pro">
+<div class="rel8tion-wrapper">
+    <div class="moving-clouds"></div>
+
+    <div class="scene-stage">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/maybe-2.png" class="house-img" alt="House Background">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb1.png" class="agent-cutout agent-1" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb2.png" class="agent-cutout agent-2" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb3.png" class="agent-cutout agent-3" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb4.png" class="agent-cutout agent-4" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb5.png" class="agent-cutout agent-5" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/nmb6.png" class="agent-cutout agent-6" alt="Agent">
+    </div>
+
+    <div class="fade-overlay"></div>
+
+    <header class="w-full absolute top-0 left-0 z-50 px-4 pt-3 md:px-8 md:pt-6">
+      <div class="max-w-6xl mx-auto">
+        <div class="glass-card rounded-[28px] px-4 py-3 md:px-6 md:py-4">
+          <div class="grid grid-cols-3 items-center gap-3">
+            <div class="flex items-center justify-start">
+              <img
+                src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png"
+                alt="Rel8tion Logo"
+                class="h-5 md:h-10 w-auto"
+              >
+            </div>
+
+            <div class="flex items-center justify-center text-center">
+              <div class="font-['Plus_Jakarta_Sans'] text-[15px] leading-tight md:text-[28px] font-extrabold tracking-tight text-slate-900">
+                Welcome NMB Loan Officers
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end">
+              <img
+                src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png"
+                alt="Nationwide Mortgage Bankers"
+                class="h-6 md:h-10 w-auto object-contain"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="relative z-20 w-full px-4 md:px-6 pt-36 pb-10 md:pt-40">
+        <div id="activateMount" class="max-w-3xl mx-auto">
+            <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+                <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
+                    REL8TION Verified NMB Loan Officers & Assistants
+                </div>
+
+                <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+                    Loading Your Rel8tionchip
+                </h1>
+
+                <p id="bootStatus" class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto leading-normal">
+                    Checking your verified page...
+                </p>
+            </section>
+        </div>
+    </main>
+</div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const DEFAULT_LOGO_URL = "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png";
+
+const params = new URLSearchParams(window.location.search);
+const uid = params.get("uid");
+
+function esc(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getFileExt(file){
+  const name = file?.name || "";
+  const parts = name.split(".");
+  return parts.length > 1 ? parts.pop().toLowerCase() : "jpg";
+}
+
+async function uploadHeadshot(file, uid){
+  if (!file) return "";
+  const ext = getFileExt(file);
+  const cleanExt = ["jpg","jpeg","png","webp"].includes(ext) ? ext : "jpg";
+  const path = `headshots/${uid}-${Date.now()}.${cleanExt}`;
+
+  const { error } = await supabaseClient.storage
+    .from("verified-assets")
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+      contentType: file.type || "image/jpeg"
+    });
+
+  if (error) throw error;
+
+  const { data } = supabaseClient.storage
+    .from("verified-assets")
+    .getPublicUrl(path);
+
+  return data?.publicUrl || "";
+}
+
+function renderForm(existing = {}) {
+  document.getElementById("activateMount").innerHTML = `
+    <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
+        Rel8tion Verified Loan Officers & Industry Professionals
+      </div>
+
+      <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+        Activate Your Rel8tionchip
+      </h1>
+
+      <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto mb-10 leading-normal">
+        Complete your verified page in one shot and go live instantly.
+      </p>
+
+      <form id="activateForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+        <input type="hidden" name="industry" value="${esc(existing.industry || 'loan')}">
+        <input type="hidden" name="logo_url" value="${esc(existing.logo_url || DEFAULT_LOGO_URL)}">
+
+        <div class="md:col-span-2">
+          <label class="field-label">Full Name</label>
+          <input class="field" name="full_name" required placeholder="Jared Smith" value="${esc(existing.full_name || '')}">
+        </div>
+
+        <div>
+          <label class="field-label">Title</label>
+          <input class="field" name="title" placeholder="Mortgage Loan Officer" value="${esc(existing.title || 'Mortgage Loan Officer')}">
+        </div>
+
+        <div>
+          <label class="field-label">Company</label>
+          <input class="field" name="company_name" placeholder="Nationwide Mortgage Bankers" value="${esc(existing.company_name || 'Nationwide Mortgage Bankers')}">
+        </div>
+
+        <div>
+          <label class="field-label">Phone</label>
+          <input class="field" name="phone" required placeholder="3477758059" value="${esc(existing.phone || '')}">
+        </div>
+
+        <div>
+          <label class="field-label">Email</label>
+          <input class="field" name="email" type="email" required placeholder="you@email.com" value="${esc(existing.email || '')}">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="field-label">Headshot Upload</label>
+          <input id="headshot_file" class="field" name="headshot_file" type="file" accept="image/png,image/jpeg,image/webp">
+        </div>
+
+        <div>
+          <label class="field-label">Pre-Approval Link</label>
+          <input class="field" name="cta_url" placeholder="https://..." value="${esc(existing.cta_url || '')}">
+        </div>
+
+        <div>
+          <label class="field-label">Calendar Link</label>
+          <input class="field" name="calendar_url" placeholder="https://..." value="${esc(existing.calendar_url || '')}">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="field-label">Short Bio</label>
+          <textarea class="field min-h-[120px]" name="bio" placeholder="Helping buyers get approved, move fast, and close with confidence.">${esc(existing.bio || '')}</textarea>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="field-label">Areas Served</label>
+          <input class="field" name="areas" placeholder="Long Island, Queens, Brooklyn" value="${esc(Array.isArray(existing.areas) ? existing.areas.join(', ') : '')}">
+        </div>
+
+        <div class="md:col-span-2 pt-2">
+          <button id="submitBtn" type="submit" class="brand-button w-full px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+            Activate Verified Page
+          </button>
+        </div>
+
+        <div class="md:col-span-2">
+          <div id="status" class="text-center text-sm md:text-base text-slate-700 font-bold min-h-[24px]"></div>
+        </div>
+      </form>
+    </section>
+  `;
+
+  document.getElementById("activateForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const form = e.target;
+    const status = document.getElementById("status");
+    const btn = document.getElementById("submitBtn");
+
+    btn.disabled = true;
+    btn.textContent = "Building Verified Page...";
+    status.textContent = "";
+
+    const formData = new FormData(form);
+    const areas = String(formData.get("areas") || "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    try {
+      let uploadedPhotoUrl = existing.photo_url || "";
+      const headshotFile = document.getElementById("headshot_file")?.files?.[0] || null;
+
+      if (headshotFile) {
+        status.textContent = "Uploading headshot...";
+        uploadedPhotoUrl = await uploadHeadshot(headshotFile, uid);
+      }
+
+      status.textContent = "Activating verified page...";
+
+      const payload = {
+        p_uid: uid,
+        p_industry: String(formData.get("industry") || "loan").trim(),
+        p_full_name: String(formData.get("full_name") || "").trim(),
+        p_title: String(formData.get("title") || "").trim(),
+        p_company_name: String(formData.get("company_name") || "").trim(),
+        p_phone: String(formData.get("phone") || "").trim(),
+        p_email: String(formData.get("email") || "").trim(),
+        p_photo_url: uploadedPhotoUrl,
+        p_logo_url: String(formData.get("logo_url") || "").trim(),
+        p_cta_url: String(formData.get("cta_url") || "").trim(),
+        p_calendar_url: String(formData.get("calendar_url") || "").trim(),
+        p_bio: String(formData.get("bio") || "").trim(),
+        p_areas: areas
+      };
+
+      const { data, error } = await supabaseClient.rpc("verified_profiles_activate_or_create", payload);
+
+      if (error) throw error;
+      if (!data || !data.length || !data[0].slug) {
+        throw new Error("Activation succeeded but no slug was returned.");
+      }
+
+      status.textContent = "Verified page activated. Redirecting...";
+      window.location.href = "/nmb-verified?slug=" + encodeURIComponent(data[0].slug);
+    } catch (err) {
+      console.error(err);
+      status.textContent = err.message || "Activation failed.";
+      btn.disabled = false;
+      btn.textContent = "Activate Verified Page";
+    }
+  });
+}
+
+async function boot() {
+  if (!uid) {
+    document.getElementById("activateMount").innerHTML = `
+      <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+        <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+          Missing chip link
+        </h1>
+        <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto leading-normal">
+          This activation link is incomplete.
+        </p>
+      </section>
+    `;
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc("verified_profiles_lookup", { p_uid: uid });
+    if (error) throw error;
+
+    const row = Array.isArray(data) && data.length ? data[0] : null;
+
+    if (row && row.is_active && row.slug) {
+      window.location.href = "/nmb-verified?slug=" + encodeURIComponent(row.slug);
+      return;
+    }
+
+    if (row) {
+      const { data: fullRow } = await supabaseClient
+        .from("verified_profiles")
+        .select("*")
+        .eq("uid", uid)
+        .maybeSingle();
+
+      renderForm(fullRow || row);
+      return;
+    }
+
+    renderForm({});
+  } catch (err) {
+    console.error(err);
+    renderForm({});
+  }
+}
+
+boot();
+</script>

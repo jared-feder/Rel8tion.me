@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Key Router</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#f0f7ff]">
+  <div class="min-h-screen flex items-center justify-center px-4" style="background:linear-gradient(180deg,#38bdf8 0%,#f0f7ff 60%,#f0f7ff 100%);">
+    <div class="w-full max-w-xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-8 text-center shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-10 mx-auto mb-6">
+      <h1 id="status" class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold tracking-tight text-slate-900 mb-3">Connecting...</h1>
+      <p id="substatus" class="text-slate-600 text-lg font-medium">Checking your Rel8tion chip.</p>
+    </div>
+  </div>
+  <script type="module">
+    import { SUPABASE_URL, KEY } from './src/core/config.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('uid');
+    const statusEl = document.getElementById('status');
+    const substatusEl = document.getElementById('substatus');
+
+    function setStatus(title, subtitle = '') {
+      statusEl.textContent = title;
+      substatusEl.textContent = subtitle;
+    }
+
+    function goToClaim() {
+      window.location.href = `./claim?uid=${encodeURIComponent(uid)}`;
+    }
+
+    async function init() {
+      if (!uid) {
+        window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
+        return;
+      }
+
+      setStatus('Checking Key...', 'Looking up your Rel8tion chip.');
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/keys?uid=eq.${encodeURIComponent(uid)}&select=*`, {
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const raw = await response.text().catch(() => '');
+      if (!response.ok) {
+        setStatus('Connection Error', 'Unable to read your chip right now.');
+        return;
+      }
+
+      const rows = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setStatus('First Time Setup...', 'Sending you to activation.');
+        goToClaim();
+        return;
+      }
+
+      const record = rows[0];
+      if (record.claimed === true && record.agent_slug) {
+        setStatus('Already Active', 'Opening the connected profile.');
+        window.location.href = `https://rel8tion.me/onboarding?agent=${encodeURIComponent(record.agent_slug)}`;
+        return;
+      }
+
+      setStatus('Setup Incomplete...', 'Finishing your activation.');
+      goToClaim();
+    }
+
+    init().catch(() => {
+      setStatus('Connection Error', 'Something interrupted the chip lookup.');
+    });
+  </script>
+</body>
+</html>

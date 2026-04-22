@@ -1,0 +1,388 @@
+import { ROUTES } from '../../core/config.js';
+import {
+  resetDetectionState,
+  setDetectedAgentPhoto,
+  setDetectedHouse,
+  setLoaderInterval,
+  setNearbyHouses,
+  setPrefilledAgent,
+  setSelectedBrokerage,
+  state
+} from '../../core/state.js';
+import { debug, normalizePhoneForMatch, randSuffix, slugify } from '../../core/utils.js';
+import { applyBranding } from '../../api/brokerages.js';
+import { findNearestOpenHouses } from '../../api/openHouses.js';
+import {
+  findAgentByEmail,
+  findAgentByPhoneNormalized,
+  findListingAgentPhoto,
+  findListingAgentsByOpenHouse,
+  upsertAgent,
+  uploadFullProfilePhoto
+} from '../../api/agents.js';
+import { sendActivationSMS } from '../../api/notifications.js';
+import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
+import {
+  showAlreadyClaimed,
+  showBrokerageStep,
+  showDetection,
+  showError,
+  showForm,
+  showFullProfileForm,
+  showIntro,
+  showLoading,
+  showOtherListings,
+  showVerifyAgent
+} from './renderer.js';
+
+export function bindPublicHandlers() {
+  window.startFieldFlow = startFieldFlow;
+  window.startOfficeFlow = startOfficeFlow;
+  window.startDetection = startDetection;
+  window.skipToForm = startOfficeFlow;
+  window.routeUnknownAgentFlow = routeUnknownAgentFlow;
+  window.continueFromBrokerageStep = continueFromBrokerageStep;
+  window.confirmListing = confirmListing;
+  window.showOtherListings = showOtherListings;
+  window.autoActivate = autoActivate;
+  window.saveFullProfile = saveFullProfile;
+  window.init = init;
+  window.selectHouse = selectHouse;
+  window.selectAgentByEncoded = selectAgentByEncoded;
+  window.showForm = showForm;
+  window.showBrokerageStep = showBrokerageStep;
+  window.showFullProfileForm = showFullProfileForm;
+}
+
+function startLoaderTextCycle() {
+  const steps = [
+    'Checking your setup...',
+    'Matching branding...',
+    'Preparing your profile...'
+  ];
+  let i = 0;
+  clearInterval(state.loaderInterval);
+  const id = setInterval(() => {
+    i += 1;
+    const el = document.getElementById('loaderText');
+    if (!el) return;
+    if (i < steps.length) el.textContent = steps[i];
+    else clearInterval(id);
+  }, 1100);
+  setLoaderInterval(id);
+}
+
+export function startFieldFlow() {
+  return startDetection();
+}
+
+export function startOfficeFlow() {
+  resetDetectionState();
+  setSelectedBrokerage('');
+  showBrokerageStep('Choose your brokerage to continue.');
+}
+
+export function routeUnknownAgentFlow(brokerage = '', notice = '') {
+  const cleanBrokerage = String(brokerage || '').trim();
+  if (cleanBrokerage) {
+    setSelectedBrokerage(cleanBrokerage);
+    applyBranding(cleanBrokerage).then(() => {
+      showFullProfileForm(cleanBrokerage, notice || 'Complete your profile to activate your Rel8tionchip.');
+    });
+    return;
+  }
+
+  setSelectedBrokerage('');
+  showBrokerageStep(notice || 'Select your brokerage to continue.');
+}
+
+export async function continueFromBrokerageStep() {
+  const select = document.getElementById('brokerage_step_select');
+  const custom = document.getElementById('brokerage_step_custom');
+  const selected = select?.value || '';
+  const customValue = custom?.value?.trim() || '';
+  const brokerage = selected === '__other__' ? customValue : selected;
+
+  if (!brokerage) {
+    alert('Select your brokerage to continue.');
+    return;
+  }
+
+  setSelectedBrokerage(brokerage);
+  await applyBranding(brokerage);
+  showFullProfileForm(brokerage, 'Complete your profile to activate your Rel8tionchip.');
+}
+
+export async function startDetection() {
+  showLoading('Preparing your setup');
+  startLoaderTextCycle();
+
+  if (!navigator.geolocation) {
+    routeUnknownAgentFlow('', 'Location is not supported on this device. Continue manually.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const houses = await findNearestOpenHouses(pos.coords.latitude, pos.coords.longitude);
+      if (!Array.isArray(houses) || !houses.length) {
+        routeUnknownAgentFlow('', 'No nearby listing found. Continue manually.');
+        return;
+      }
+
+      setNearbyHouses(houses);
+      setDetectedHouse(houses.find((h) => h.agent || h.agent_phone || h.agent_email) || houses[0]);
+      if (state.detectedHouse?.brokerage) {
+        setSelectedBrokerage(state.detectedHouse.brokerage);
+        await applyBranding(state.detectedHouse.brokerage);
+      }
+      showDetection();
+    } catch (e) {
+      debug('DETECTION FAILED', { message: e?.message || String(e) });
+      routeUnknownAgentFlow('', 'Detection failed. Continue manually.');
+    }
+  }, () => {
+    routeUnknownAgentFlow('', 'Location permission was denied. Continue manually.');
+  }, {
+    enableHighAccuracy: true,
+    timeout: 20000,
+    maximumAge: 0
+  });
+}
+
+export function selectHouse(id) {
+  setDetectedHouse(state.nearbyHouses.find((h) => String(h.id) === String(id)) || null);
+  if (state.detectedHouse?.brokerage) {
+    setSelectedBrokerage(state.detectedHouse.brokerage);
+    applyBranding(state.detectedHouse.brokerage).then(() => showDetection());
+  } else {
+    showDetection();
+  }
+}
+
+async function showAgentSelection() {
+  const h = state.detectedHouse;
+  if (!h) return;
+
+  try {
+    const agents = await findListingAgentsByOpenHouse(h.id);
+
+    if (!agents.length) {
+      setDetectedAgentPhoto(await findListingAgentPhoto({
+        openHouseId: h?.id || '',
+        name: h?.agent || '',
+        phone: h?.agent_phone || ''
+      }));
+
+      if (h?.agent || h?.agent_phone || h?.agent_email) {
+        showVerifyAgent();
+      } else {
+        routeUnknownAgentFlow(h?.brokerage || '', 'We did not find an agent record. Complete your profile below.');
+      }
+      return;
+    }
+
+    if (agents.length === 1) {
+      selectAgent(agents[0]);
+      return;
+    }
+
+    const fallbackBrokerage = h?.brokerage || '';
+    const cards = agents.map((a) => {
+      const photo = a.primary_photo_url || a.directory_photo_url || '';
+      return `
+        <div onclick="selectAgentByEncoded(this.dataset.agent)" data-agent="${encodeURIComponent(JSON.stringify(a))}" class="flex items-center gap-4 p-4 rounded-[24px] bg-white/80 border border-white/70 shadow hover:shadow-xl cursor-pointer">
+          ${photo ? `<img src="${photo}" class="w-16 h-16 rounded-full object-cover bg-white">` : `<div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-black">AG</div>`}
+          <div class="text-left">
+            <div class="font-black text-lg text-[#1f2a5a]">${a.name || 'Agent'}</div>
+            <div class="text-sm text-slate-500">${a.phone || ''}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('app').innerHTML = `
+      <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
+        <div class="mb-8">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+        </div>
+        <div>
+          <h1 class="font-['Poppins'] text-3xl md:text-4xl font-black mb-4 uppercase text-[#1f2a5a]">Select Yourself</h1>
+          <p class="text-slate-500 text-lg mb-6">We found multiple agents on this listing.</p>
+          <div class="space-y-3">${cards}</div>
+          <button onclick="routeUnknownAgentFlow('${fallbackBrokerage.replace(/'/g, "\\'")}', 'Complete your profile manually below.')" class="mt-6 text-slate-400 text-sm font-bold uppercase tracking-widest">Not Me</button>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    debug('AGENT SELECTION FAILED', { message: e?.message || String(e) });
+    if (h?.agent || h?.agent_phone || h?.agent_email) {
+      showVerifyAgent();
+    } else {
+      routeUnknownAgentFlow(h?.brokerage || '', 'Agent lookup failed. Continue manually.');
+    }
+  }
+}
+
+export async function confirmListing() {
+  if (!state.detectedHouse) {
+    routeUnknownAgentFlow('', 'No listing selected. Continue manually.');
+    return;
+  }
+
+  if (state.detectedHouse.brokerage) {
+    setSelectedBrokerage(state.detectedHouse.brokerage);
+    await applyBranding(state.detectedHouse.brokerage);
+  }
+
+  showLoading('Checking listing agents...');
+  try {
+    await showAgentSelection();
+  } catch (e) {
+    debug('CONFIRM LISTING FAILED', { message: e?.message || String(e) });
+    routeUnknownAgentFlow(state.detectedHouse?.brokerage || '', "We didn't find an exact match. Complete your profile below.");
+  }
+}
+
+export function selectAgentByEncoded(encoded) {
+  try {
+    const agent = JSON.parse(decodeURIComponent(encoded));
+    selectAgent(agent);
+  } catch (e) {
+    debug('SELECT AGENT DECODE FAILED', { message: e?.message || String(e) });
+  }
+}
+
+function selectAgent(agent) {
+  setPrefilledAgent({
+    ...(state.prefilledAgent || {}),
+    name: agent.name || state.prefilledAgent?.name || '',
+    phone: agent.phone || state.prefilledAgent?.phone || '',
+    email: agent.email || state.prefilledAgent?.email || '',
+    brokerage: agent.brokerage || state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '',
+    image_url: agent.primary_photo_url || agent.directory_photo_url || state.prefilledAgent?.image_url || ''
+  });
+
+  setDetectedAgentPhoto(agent.primary_photo_url || agent.directory_photo_url || '');
+  showVerifyAgent();
+}
+
+function getFullProfileBrokerage() {
+  const brokerageSelect = document.getElementById('full_brokerage_select')?.value || '';
+  const brokerageCustom = document.getElementById('full_brokerage_custom')?.value?.trim() || '';
+  return brokerageSelect === '__other__' ? brokerageCustom : brokerageSelect;
+}
+
+export async function autoActivate() {
+  const h = state.detectedHouse;
+  if (!(h?.agent || h?.agent_phone || h?.agent_email || state.prefilledAgent?.name || state.prefilledAgent?.phone)) {
+    routeUnknownAgentFlow(h?.brokerage || '', 'Complete your profile below.');
+    return;
+  }
+
+  showLoading('Activating your profile...');
+
+  try {
+    const sourceName = state.prefilledAgent?.name || h?.agent || 'Agent';
+    const sourcePhone = state.prefilledAgent?.phone || h?.agent_phone || null;
+    const sourceEmail = state.prefilledAgent?.email || h?.agent_email || null;
+    const phoneNormalized = normalizePhoneForMatch(sourcePhone);
+
+    let existingAgent = state.prefilledAgent?.slug ? state.prefilledAgent : null;
+    if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
+    if (!existingAgent && sourceEmail) existingAgent = await findAgentByEmail(sourceEmail);
+
+    const baseSlug = slugify(sourceName || sourceEmail || sourcePhone || 'agent') || 'agent';
+    const slug = existingAgent?.slug || state.prefilledAgent?.slug || `${baseSlug}-${randSuffix()}`;
+    const agent = {
+      name: existingAgent?.name || sourceName,
+      phone: existingAgent?.phone || sourcePhone,
+      phone_normalized: existingAgent?.phone_normalized || phoneNormalized || null,
+      email: existingAgent?.email || sourceEmail || null,
+      brokerage: existingAgent?.brokerage || state.selectedBrokerage || h?.brokerage || null,
+      slug,
+      image_url: existingAgent?.image_url || state.prefilledAgent?.image_url || state.detectedAgentPhoto || null,
+      bio: existingAgent?.bio || state.prefilledAgent?.bio || null
+    };
+
+    await upsertAgent(agent);
+    await linkKeyToAgent(slug);
+    await sendActivationSMS(agent.phone, slug, agent.name);
+    window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(slug)}`;
+  } catch (e) {
+    debug('AUTO ACTIVATE FAILED', { message: e?.message || String(e) });
+    routeUnknownAgentFlow(h?.brokerage || '', 'Auto activation failed. Complete your profile below.');
+  }
+}
+
+export async function saveFullProfile() {
+  const name = document.getElementById('full_name')?.value?.trim() || '';
+  const phone = document.getElementById('full_phone')?.value?.trim() || '';
+  const phoneNormalized = normalizePhoneForMatch(phone);
+  const email = document.getElementById('full_email')?.value?.trim() || '';
+  const brokerage = getFullProfileBrokerage();
+  const bio = document.getElementById('full_bio')?.value?.trim() || '';
+
+  if (!name || !phone) {
+    alert('Name and phone are required.');
+    return;
+  }
+  if (!brokerage) {
+    alert('Brokerage is required.');
+    return;
+  }
+
+  showLoading('Saving your profile...');
+
+  try {
+    let existingAgent = state.prefilledAgent?.slug ? state.prefilledAgent : null;
+    if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
+    if (!existingAgent && email) existingAgent = await findAgentByEmail(email);
+
+    const slug = existingAgent?.slug || state.prefilledAgent?.slug || `${slugify(name) || 'agent'}-${randSuffix()}`;
+    const imageUrl = await uploadFullProfilePhoto(slug);
+    const agent = {
+      name,
+      phone,
+      phone_normalized: phoneNormalized,
+      email: email || null,
+      brokerage: brokerage || null,
+      slug,
+      image_url: imageUrl || state.detectedAgentPhoto || null,
+      bio: bio || null
+    };
+
+    await upsertAgent(agent);
+    setSelectedBrokerage(brokerage);
+    await applyBranding(brokerage);
+    await linkKeyToAgent(slug);
+    await sendActivationSMS(phone, slug, name);
+    window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(slug)}`;
+  } catch (e) {
+    debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
+    showFullProfileForm(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
+  }
+}
+
+export async function init() {
+  showLoading('Checking your setup...');
+  startLoaderTextCycle();
+
+  if (!state.uid) {
+    showError('Invalid Key', 'This claim page is missing a chip uid in the URL.');
+    return;
+  }
+
+  try {
+    await loadAgentFromUID();
+    if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
+      if (state.prefilledAgent) showAlreadyClaimed(state.prefilledAgent);
+      else window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(state.keyRecord.agent_slug)}`;
+      return;
+    }
+    showIntro();
+  } catch (e) {
+    debug('INIT FAILED', { message: e?.message || String(e) });
+    showIntro();
+  }
+}

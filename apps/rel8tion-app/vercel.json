@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/claim", "destination": "/claim.html" },
+    { "source": "/k", "destination": "/k.html" },
+    { "source": "/s", "destination": "/sign.html" },
+    { "source": "/sign", "destination": "/sign.html" },
+    { "source": "/event", "destination": "/event.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/nmb-activate", "destination": "/nmb-activate.html" },
+    { "source": "/nmb-verified", "destination": "/nmb-verified.html" },
+    { "source": "/services/nmb/activate", "destination": "/nmb-activate.html" },
+    { "source": "/services/nmb/verified", "destination": "/nmb-verified.html" }
+  ]
+}
