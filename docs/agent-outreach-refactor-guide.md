@@ -166,6 +166,13 @@ function computeInitialSendAt(): string {
   return new Date().toISOString();
 }
 
+function isPast(dateString: string | null): boolean {
+  if (!dateString) return false;
+  const dt = new Date(dateString);
+  if (Number.isNaN(dt.getTime())) return false;
+  return dt <= new Date();
+}
+
 function computeFollowupSendAt(openStart: string | null, initialSendAt: string): string | null {
   if (!openStart) return null;
 
@@ -255,6 +262,24 @@ serve(async (req) => {
 
     for (const row of rows as QueueRow[]) {
       try {
+        if (isPast(row.open_end || row.open_start)) {
+          const { error } = await supabase
+            .from("agent_outreach_queue")
+            .update({
+              generation_status: "failed",
+              last_error: "Open house is already in the past",
+              initial_send_status: "skipped_expired",
+              followup_send_status: "not_scheduled",
+              followup_block_reason: "open_house_in_past",
+            })
+            .eq("id", row.id);
+
+          if (error) throw error;
+
+          results.push({ id: row.id, ok: false, error: "Open house is already in the past" });
+          continue;
+        }
+
         if (!row.agent_phone) {
           const { error } = await supabase
             .from("agent_outreach_queue")
