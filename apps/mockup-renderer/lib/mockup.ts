@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { formatOpenHouseRange } from "./time.js";
 
 const FOREGROUND_SIGN_URL =
   "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/outreach-mockups/jared-sign-foreground.png";
@@ -28,28 +27,9 @@ async function fetchImageBuffer(url: string | null): Promise<Buffer | null> {
   }
 }
 
-function truncate(input: string, max: number): string {
-  if (input.length <= max) return input;
-  return input.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
-}
-
-function escapeXml(input: string): string {
-  return input
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
 export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer> {
   const width = 1200;
   const height = 1200;
-
-  const address = truncate(input.address || "Open House", 70);
-  const brokerage = truncate(input.brokerage || "REL8TION", 60);
-  const agentName = truncate(input.agentName || "Local Listing Agent", 45);
-  const dateLine = truncate(formatOpenHouseRange(input.openStart, input.openEnd), 80);
 
   const propertyBuffer = await fetchImageBuffer(input.propertyImageUrl);
   const foregroundBuffer = await fetchImageBuffer(FOREGROUND_SIGN_URL);
@@ -67,7 +47,7 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
 
   if (propertyBuffer) {
     const property = await sharp(propertyBuffer)
-      .resize(width, 620, { fit: "cover", position: "center" })
+      .resize(width, height, { fit: "cover", position: "center" })
       .jpeg({ quality: 88 })
       .toBuffer();
 
@@ -76,7 +56,7 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
     const fallbackHero = await sharp({
       create: {
         width,
-        height: 620,
+        height,
         channels: 4,
         background: { r: 0, g: 132, b: 180, alpha: 1 }
       }
@@ -87,49 +67,26 @@ export async function renderMockupJpg(input: MockupRenderInput): Promise<Buffer>
 
   if (foregroundBuffer) {
     const foreground = await sharp(foregroundBuffer)
-      .resize(width, 620, { fit: "contain", position: "center" })
+      .resize(Math.round(width * 0.92), Math.round(height * 0.94), {
+        fit: "contain",
+        position: "center"
+      })
       .png()
       .toBuffer();
 
-    layers.push({ input: foreground, top: 0, left: 0 });
+    const metadata = await sharp(foreground).metadata();
+    const overlayWidth = metadata.width ?? width;
+    const overlayHeight = metadata.height ?? height;
+
+    layers.push({
+      input: foreground,
+      left: Math.round((width - overlayWidth) / 2),
+      top: Math.max(0, height - overlayHeight)
+    });
   }
 
-  const whiteCard = await sharp({
-    create: {
-      width: 1120,
-      height: 500,
-      channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 0.98 }
-    }
-  }).png().toBuffer();
-
-  layers.push({ input: whiteCard, left: 40, top: 660 });
-
-  const svg = Buffer.from(`
-    <svg width="${width}" height="${height}">
-      <style>
-        .kicker { font: 700 34px Arial, sans-serif; fill: #0084B4; }
-        .title  { font: 800 56px Arial, sans-serif; fill: #0E1420; }
-        .meta   { font: 600 34px Arial, sans-serif; fill: #48556A; }
-        .body   { font: 700 30px Arial, sans-serif; fill: #0E1420; }
-        .small  { font: 600 26px Arial, sans-serif; fill: #64748B; }
-        .cta    { font: 800 32px Arial, sans-serif; fill: white; }
-      </style>
-
-      <text x="70" y="755" class="kicker">REL8TION OPEN HOUSE CONNECT</text>
-      <text x="70" y="905" class="title">${escapeXml(address)}</text>
-      <text x="70" y="965" class="meta">${escapeXml(dateLine)}</text>
-      <text x="70" y="1025" class="body">${escapeXml(agentName)} • ${escapeXml(brokerage)}</text>
-      <text x="70" y="1080" class="small">Tap in. Capture leads. Follow up instantly.</text>
-
-      <rect x="760" y="1030" rx="18" ry="18" width="360" height="90" fill="#0084B4"/>
-      <text x="820" y="1088" class="cta">View Demo</text>
-      <text x="70" y="1160" class="small">${escapeXml(input.rel8tionUrl)}</text>
-    </svg>
-  `);
-
   return base
-    .composite([...layers, { input: svg, top: 0, left: 0 }])
+    .composite(layers)
     .jpeg({ quality: 90, mozjpeg: true })
     .toBuffer();
 }
