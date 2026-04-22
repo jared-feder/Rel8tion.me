@@ -311,6 +311,7 @@ async function loadRows(){
   const { data, error } = await supabase
     .from("agent_outreach_queue")
     .select("*")
+    .eq("enrichment_status", "ready")
     .neq("send_status", "sent")
     .or(`open_end.gte.${nowIso},and(open_end.is.null,open_start.gte.${nowIso})`)
     .order("open_start", { ascending: true })
