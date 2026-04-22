@@ -9,6 +9,8 @@ To make the final rollout easier, this repo now also includes ready-to-paste fil
 - [`docs/supabase-functions/generate-agent-outreach.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/generate-agent-outreach.ts:1>)
 - [`docs/supabase-functions/trigger-agent-mockups.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/trigger-agent-mockups.ts:1>)
 - [`docs/supabase-functions/send-agent-outreach.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/send-agent-outreach.ts:1>)
+- [`docs/supabase-functions/sync-openhouses.ts`](</c:/Dev/GitHub/Rel8tion.me/docs/supabase-functions/sync-openhouses.ts:1>)
+- [`docs/sql/queue_recent_outreach_candidates.sql`](</c:/Dev/GitHub/Rel8tion.me/docs/sql/queue_recent_outreach_candidates.sql:1>)
 - [`docs/hot-list-elementor.html`](</c:/Dev/GitHub/Rel8tion.me/docs/hot-list-elementor.html:1>)
 
 Those files are meant to be copied into Supabase / Elementor with minimal editing.
