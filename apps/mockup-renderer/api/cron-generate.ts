@@ -14,9 +14,17 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: "Missing GENERATE_FUNCTION_URL" });
     }
 
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY" });
+    }
+
     const r = await fetch(process.env.GENERATE_FUNCTION_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY
+      },
       body: JSON.stringify({ limit: 25 })
     });
 
