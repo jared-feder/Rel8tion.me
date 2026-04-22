@@ -2,37 +2,8 @@ import { getSupabaseAdmin } from "../lib/supabase-admin";
 
 export default async function handler(req: any, res: any) {
   try {
-    const receivedSharedSecret = req?.headers?.["x-cron-secret"] || null;
-    const authHeader = req?.headers?.authorization || req?.headers?.Authorization || "";
-
     if (req?.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    const sharedSecretConfigured = !!process.env.CRON_SHARED_SECRET;
-    const cronSecretConfigured = !!process.env.CRON_SECRET;
-
-    const sharedSecretOk = !!(
-      process.env.CRON_SHARED_SECRET &&
-      receivedSharedSecret === process.env.CRON_SHARED_SECRET
-    );
-
-    const bearerSecretOk = !!(
-      process.env.CRON_SECRET &&
-      authHeader === `Bearer ${process.env.CRON_SECRET}`
-    );
-
-    if (!sharedSecretOk && !bearerSecretOk) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        stage: "auth_check",
-        sawXCronSecretHeader: !!receivedSharedSecret,
-        sawAuthorizationHeader: !!authHeader,
-        sharedSecretConfigured,
-        cronSecretConfigured,
-        sharedSecretOk,
-        bearerSecretOk
-      });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
