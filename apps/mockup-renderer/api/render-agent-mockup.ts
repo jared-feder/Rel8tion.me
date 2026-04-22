@@ -158,9 +158,24 @@ export default async function handler(req: any, res: any) {
     let renderMockupSvg: any;
     try {
       const renderer = await import("../lib/mockup");
+      if (typeof renderer.renderMockupSvg !== "function") {
+        console.error("[render-agent-mockup] Renderer module loaded without renderMockupSvg export", {
+          exportedKeys: Object.keys(renderer || {})
+        });
+        return res.status(500).json({
+          ok: false,
+          stage: "import_renderer",
+          error: "Renderer module missing renderMockupSvg export"
+        });
+      }
       renderMockupSvg = renderer.renderMockupSvg;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed importing renderer";
+      console.error("[render-agent-mockup] Failed importing renderer", {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: message,
+        errorStack: error instanceof Error ? error.stack : undefined
+      });
       return res.status(500).json({
         ok: false,
         stage: "import_renderer",
@@ -206,6 +221,12 @@ export default async function handler(req: any, res: any) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown render error";
+        console.error("[render-agent-mockup] Failed rendering queue row", {
+          rowId: row.id,
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: message,
+          errorStack: error instanceof Error ? error.stack : undefined
+        });
 
         try {
           await patchQueueRow(row.id, {
@@ -233,6 +254,11 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown diagnostic error";
+    console.error("[render-agent-mockup] Unhandled diagnostic error", {
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: message,
+      errorStack: error instanceof Error ? error.stack : undefined
+    });
     return res.status(500).json({
       ok: false,
       error: message,

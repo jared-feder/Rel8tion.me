@@ -3,7 +3,8 @@
   "functions": {
     "api/render-agent-mockup.ts": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "node_modules/{sharp,@img}/**/*"
     },
     "api/cron-generate.ts": {
       "memory": 256,
