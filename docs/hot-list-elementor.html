@@ -305,21 +305,12 @@ function render(){
 }
 
 async function loadRows(){
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 1);
-
-  const end = new Date(now);
-  end.setDate(end.getDate() + 7);
-
   const { data, error } = await supabase
     .from("agent_outreach_queue")
     .select("*")
     .neq("send_status", "sent")
-    .gte("open_start", start.toISOString())
-    .lte("open_start", end.toISOString())
     .order("open_start", { ascending: true })
-    .limit(100);
+    .limit(500);
 
   if(error){
     console.error(error);

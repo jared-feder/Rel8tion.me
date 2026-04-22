@@ -51,10 +51,10 @@ function parseLimit(value: unknown): number {
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) {
-    return 3;
+    return 10;
   }
 
-  return Math.max(1, Math.min(Math.floor(parsed), 10));
+  return Math.max(1, Math.min(Math.floor(parsed), 50));
 }
 
 function parseIds(value: unknown): string[] {
