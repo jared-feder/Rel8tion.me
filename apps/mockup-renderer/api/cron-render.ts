@@ -14,7 +14,7 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: "Missing CRON_SHARED_SECRET" });
     }
 
-    const base = `${req.headers?.["x-forwarded-proto"] || "https"}://${req.headers?.host}`;
+    const base = process.env.RENDERER_BASE_URL || "https://mockup-renderer-psi.vercel.app";
 
     const r = await fetch(`${base}/api/render-agent-mockup`, {
       method: "POST",
