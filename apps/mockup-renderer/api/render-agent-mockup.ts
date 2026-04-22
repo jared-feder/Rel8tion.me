@@ -9,6 +9,9 @@ export default async function handler(req: any, res: any) {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
+    const sharedSecretConfigured = !!process.env.CRON_SHARED_SECRET;
+    const cronSecretConfigured = !!process.env.CRON_SECRET;
+
     const sharedSecretOk = !!(
       process.env.CRON_SHARED_SECRET &&
       receivedSharedSecret === process.env.CRON_SHARED_SECRET
@@ -20,7 +23,16 @@ export default async function handler(req: any, res: any) {
     );
 
     if (!sharedSecretOk && !bearerSecretOk) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({
+        error: "Unauthorized",
+        stage: "auth_check",
+        sawXCronSecretHeader: !!receivedSharedSecret,
+        sawAuthorizationHeader: !!authHeader,
+        sharedSecretConfigured,
+        cronSecretConfigured,
+        sharedSecretOk,
+        bearerSecretOk
+      });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
