@@ -148,7 +148,7 @@ export function showError(title, message) {
   `);
 }
 
-export function showIntro() {
+export function showIntro(notice = '') {
   render(`
     <div class="text-center">
       <div class="inline-flex items-center justify-center mb-6">
@@ -156,6 +156,7 @@ export function showIntro() {
       </div>
       <h1 class="font-['Poppins'] text-[34px] md:text-[48px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">Activate Your<br>REL8TIONCHIP</h1>
       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-xl mx-auto mb-8">Choose how you want to set up your profile.</p>
+      ${notice ? `<div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
       <div class="space-y-3">
         <button onclick="startFieldFlow()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">At a Listing or Open House</button>
         <button onclick="startOfficeFlow()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] md:text-[18px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">At Home or In the Office</button>
@@ -288,6 +289,10 @@ export function showAlreadyClaimed(agent) {
       </div>
     </div>
   `);
+}
+
+export function showMissingChipNotice() {
+  showIntro('This preview was opened without a chip uid. You can review the flow here, but live activation requires a real Rel8tionChip link.');
 }
 
 export function showForm(prefillBrokerage = '', notice = '') {

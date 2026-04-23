@@ -30,6 +30,7 @@ import {
   showForm,
   showFullProfileForm,
   showIntro,
+  showMissingChipNotice,
   showLoading,
   showOtherListings,
   showVerifyAgent
@@ -275,6 +276,10 @@ function getFullProfileBrokerage() {
 
 export async function autoActivate() {
   const h = state.detectedHouse;
+  if (!state.uid) {
+    showError('Chip Required', 'This preview can show the activation flow, but saving a live claim requires a real chip uid.');
+    return;
+  }
   if (!(h?.agent || h?.agent_phone || h?.agent_email || state.prefilledAgent?.name || state.prefilledAgent?.phone)) {
     routeUnknownAgentFlow(h?.brokerage || '', 'Complete your profile below.');
     return;
@@ -316,6 +321,11 @@ export async function autoActivate() {
 }
 
 export async function saveFullProfile() {
+  if (!state.uid) {
+    showError('Chip Required', 'This preview can show the form, but saving a live activation requires a real chip uid.');
+    return;
+  }
+
   const name = document.getElementById('full_name')?.value?.trim() || '';
   const phone = document.getElementById('full_phone')?.value?.trim() || '';
   const phoneNormalized = normalizePhoneForMatch(phone);
@@ -369,7 +379,7 @@ export async function init() {
   startLoaderTextCycle();
 
   if (!state.uid) {
-    showError('Invalid Key', 'This claim page is missing a chip uid in the URL.');
+    showMissingChipNotice();
     return;
   }
 
