@@ -9,7 +9,7 @@ export const ASSETS = {
 export const PROFILE_BUCKET = 'agent-images';
 
 export const ROUTES = {
-  onboarding: 'https://rel8tion.me/onboarding',
+  onboarding: '/onboarding',
   buyerProfile: '/a',
   claim: '/claim',
   agents: '/agents',

@@ -63,7 +63,7 @@
       const record = rows[0];
       if (record.claimed === true && record.agent_slug) {
         setStatus('Already Active', 'Opening the connected profile.');
-        window.location.href = `https://rel8tion.me/onboarding?agent=${encodeURIComponent(record.agent_slug)}`;
+        window.location.href = `/onboarding?agent=${encodeURIComponent(record.agent_slug)}`;
         return;
       }
 

@@ -5,6 +5,8 @@
     { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim.html", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim-test-styled.html", "destination": "/apps/rel8tion-app/claim.html" },
+    { "source": "/onboarding", "destination": "/apps/rel8tion-app/onboarding.html" },
+    { "source": "/onboarding.html", "destination": "/apps/rel8tion-app/onboarding.html" },
     { "source": "/k", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k.html", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k-test.html", "destination": "/apps/rel8tion-app/k.html" },
