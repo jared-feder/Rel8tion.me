@@ -32,6 +32,14 @@
       window.location.href = `./claim?uid=${encodeURIComponent(uid)}`;
     }
 
+    function goToLiveProfile(agentSlug) {
+      if (!agentSlug) return;
+      const target = uid
+        ? `${window.location.origin}/a?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
+        : `${window.location.origin}/a?agent=${encodeURIComponent(agentSlug)}`;
+      window.location.href = target;
+    }
+
     async function init() {
       if (!uid) {
         window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
@@ -62,8 +70,8 @@
 
       const record = rows[0];
       if (record.claimed === true && record.agent_slug) {
-        setStatus('Already Active', 'Opening the connected profile.');
-        window.location.href = `/onboarding?agent=${encodeURIComponent(record.agent_slug)}`;
+        setStatus('Already Active', 'Opening the live profile.');
+        goToLiveProfile(record.agent_slug);
         return;
       }
 
