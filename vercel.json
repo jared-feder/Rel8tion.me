@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },
+    { "source": "/k", "destination": "/apps/rel8tion-app/k.html" },
+    { "source": "/s", "destination": "/apps/rel8tion-app/sign.html" },
+    { "source": "/sign", "destination": "/apps/rel8tion-app/sign.html" },
+    { "source": "/event", "destination": "/apps/rel8tion-app/event.html" },
+    { "source": "/admin", "destination": "/apps/rel8tion-app/admin.html" },
+    { "source": "/nmb-activate", "destination": "/apps/rel8tion-app/nmb-activate.html" },
+    { "source": "/nmb-verified", "destination": "/apps/rel8tion-app/nmb-verified.html" },
+    { "source": "/services/nmb/activate", "destination": "/apps/rel8tion-app/nmb-activate.html" },
+    { "source": "/services/nmb/verified", "destination": "/apps/rel8tion-app/nmb-verified.html" }
+  ]
+}
