@@ -2,7 +2,13 @@ import { ASSETS, ROUTES } from '../../core/config.js';
 import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js';
 import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js';
 import { getHostSession, hostSessionLabel } from '../../core/hostSession.js';
-import { getActiveSmartSignEvent, getSmartSignByPublicCode, updateSmartSign } from '../../api/smartSigns.js';
+import {
+  assignSmartSignToAgent,
+  getActiveSmartSignEvent,
+  getSmartSignByPublicCode,
+  getSmartSignsByAssignedAgent,
+  updateSmartSign
+} from '../../api/smartSigns.js';
 import { esc, money } from '../../core/utils.js';
 
 const pageState = {
@@ -52,6 +58,22 @@ function errorView(title, message) {
 }
 
 function activationCard(sign) {
+  const signReady = Boolean(sign?.activation_uid_primary && sign?.activation_uid_secondary);
+  const hostOwnsSign = Boolean(pageState.hostSession?.agentSlug && sign?.assigned_agent_slug && sign.assigned_agent_slug === pageState.hostSession.agentSlug);
+  const signAssignedToOtherHost = Boolean(pageState.hostSession?.agentSlug && sign?.assigned_agent_slug && sign.assigned_agent_slug !== pageState.hostSession.agentSlug);
+
+  if (!signReady) {
+    return `
+      <div class="rounded-[28px] border border-amber-200 bg-amber-50/90 p-6 text-left max-w-xl mx-auto mt-6">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700 mb-3">Sign Setup Incomplete</div>
+        <div class="text-slate-900 font-black text-xl mb-3">Both Smart Sign chips must be registered first</div>
+        <p class="text-slate-700 font-semibold leading-relaxed">
+          This Smart Sign is missing one of its two embedded chip assignments. Register both sign chips to this sign before trying to activate it into a live event.
+        </p>
+      </div>
+    `;
+  }
+
   if (!pageState.hostSession) {
     return `
       <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mt-6">
@@ -59,6 +81,19 @@ function activationCard(sign) {
         <div class="text-slate-900 font-black text-xl mb-3">Host session not detected</div>
         <p class="text-slate-600 font-semibold leading-relaxed">
           This sign is ready, but no recent host chip scan was found on this device. Scan the claimed Rel8tionChip first, then scan this sign to bind it to the open house.
+        </p>
+      </div>
+    `;
+  }
+
+  if (signAssignedToOtherHost) {
+    return `
+      <div class="rounded-[28px] border border-rose-200 bg-rose-50/90 p-6 text-left max-w-xl mx-auto mt-6">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-rose-700 mb-3">Assigned To Another Host</div>
+        <div class="text-slate-900 font-black text-xl mb-3">This sign already belongs to another agent</div>
+        <p class="text-slate-700 font-semibold leading-relaxed">
+          Recent host detected: <span class="text-slate-900">${esc(hostSessionLabel(pageState.hostSession) || pageState.hostSession.agentSlug)}</span>.
+          This sign is currently assigned to <span class="text-slate-900">${esc(sign.assigned_agent_slug)}</span>, so it cannot be activated from this host session.
         </p>
       </div>
     `;
@@ -84,12 +119,19 @@ function activationCard(sign) {
       <div class="text-slate-900 font-black text-2xl md:text-3xl mb-2">Activate This Smart Sign</div>
       <p class="text-slate-600 font-medium leading-relaxed mb-5">
         Recent host recognized: <span class="text-slate-900 font-black">${esc(hostSessionLabel(pageState.hostSession) || pageState.hostSession.agentSlug)}</span>.
-        Use this device to detect the nearest listing and bind the sign to a live event.
+        ${hostOwnsSign
+          ? 'Use this device to detect the nearest listing and bind the sign to a live event.'
+          : 'This sign is unassigned, so the next activation will also claim it into the first open sign slot for this host.'}
       </p>
 
       <div class="rounded-[20px] bg-white/80 border border-white/80 p-4 mb-4">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Smart Sign</div>
         <div class="text-slate-900 font-black">${esc(sign.public_code || '')}</div>
+        <div class="text-slate-500 font-semibold text-sm mt-1">
+          ${sign.assigned_agent_slug
+            ? `Assigned to ${esc(sign.assigned_agent_slug)}${sign.assigned_slot ? ` • Slot ${esc(sign.assigned_slot)}` : ''}`
+            : 'Currently unassigned'}
+        </div>
       </div>
 
       <div class="flex flex-col md:flex-row gap-3">
@@ -218,13 +260,38 @@ async function activateSignToHouse(sign, house) {
   inactiveView(sign);
 
   try {
+    let effectiveSign = sign;
+
+    if (!effectiveSign.activation_uid_primary || !effectiveSign.activation_uid_secondary) {
+      throw new Error('This Smart Sign is missing one of its two registered sign chips.');
+    }
+
+    if (effectiveSign.assigned_agent_slug && effectiveSign.assigned_agent_slug !== pageState.hostSession.agentSlug) {
+      throw new Error('This Smart Sign is assigned to another agent and cannot be activated from this host session.');
+    }
+
+    if (!effectiveSign.assigned_agent_slug) {
+      const assignedSigns = await getSmartSignsByAssignedAgent(pageState.hostSession.agentSlug);
+      const usedSlots = new Set(
+        assignedSigns
+          .map((item) => Number(item.assigned_slot))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      );
+      const availableSlot = [1, 2].find((slot) => !usedSlots.has(slot));
+      if (!availableSlot) {
+        throw new Error('This host already has both Smart Sign slots assigned.');
+      }
+
+      effectiveSign = await assignSmartSignToAgent(sign.id, pageState.hostSession.agentSlug, availableSlot);
+    }
+
     const request = {
-      smart_sign_id: sign.id,
+      smart_sign_id: effectiveSign.id,
       agent_slug: pageState.hostSession.agentSlug,
       open_house_source_id: house.id
     };
 
-    const activeEvent = await getActiveSmartSignEvent(sign.id);
+    const activeEvent = await getActiveSmartSignEvent(effectiveSign.id);
     const lifecycle = resolveEventLifecycle({ activeEvent, request });
 
     let eventRow = null;
@@ -239,7 +306,7 @@ async function activateSignToHouse(sign, house) {
         eventRow = activeEvent;
       } else {
         eventRow = await createOpenHouseEvent({
-          smart_sign_id: sign.id,
+          smart_sign_id: effectiveSign.id,
           open_house_source_id: house.id,
           agent_slug: pageState.hostSession.agentSlug,
           status: 'live',
@@ -255,14 +322,14 @@ async function activateSignToHouse(sign, house) {
       throw new Error('The event activation did not return a live event id.');
     }
 
-    await updateSmartSign(sign.id, {
+    await updateSmartSign(effectiveSign.id, {
       active_event_id: eventRow.id,
       status: 'active',
       setup_confirmed_at: new Date().toISOString()
     });
 
     const freshHouse = await getOpenHouseById(eventRow.open_house_source_id || house.id);
-    activeView({ ...sign, active_event_id: eventRow.id, status: 'active' }, eventRow, freshHouse || house);
+    activeView({ ...effectiveSign, active_event_id: eventRow.id, status: 'active' }, eventRow, freshHouse || house);
   } catch (error) {
     console.error(error);
     pageState.activating = false;

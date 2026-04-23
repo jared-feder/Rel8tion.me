@@ -20,6 +20,15 @@ export async function getActiveSmartSignEvent(signId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
+export async function getSmartSignsByAssignedAgent(agentSlug) {
+  if (!agentSlug) return [];
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_signs?assigned_agent_slug=eq.${encodeURIComponent(agentSlug)}&select=*&order=assigned_slot.asc.nullslast,created_at.desc`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
 export async function updateSmartSign(signId, payload) {
   if (!signId) throw new Error('Missing sign id');
   const res = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?id=eq.${encodeURIComponent(signId)}`, {
@@ -34,4 +43,16 @@ export async function updateSmartSign(signId, payload) {
   let updated = null;
   try { updated = raw ? JSON.parse(raw) : null; } catch {}
   return Array.isArray(updated) && updated.length ? updated[0] : null;
+}
+
+export async function assignSmartSignToAgent(signId, agentSlug, assignedSlot) {
+  if (!signId) throw new Error('Missing sign id');
+  if (!agentSlug) throw new Error('Missing agent slug');
+  if (!assignedSlot) throw new Error('Missing assigned sign slot');
+
+  return updateSmartSign(signId, {
+    assigned_agent_slug: agentSlug,
+    assigned_slot: assignedSlot,
+    assigned_at: new Date().toISOString()
+  });
 }
