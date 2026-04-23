@@ -1,5 +1,5 @@
 import { KEY, SUPABASE_URL } from '../core/config.js';
-import { authHeaders } from '../core/utils.js';
+import { authHeaders, jsonHeaders } from '../core/utils.js';
 import { fetchJson } from './http.js';
 
 export async function getSmartSignByPublicCode(publicCode) {
@@ -18,4 +18,20 @@ export async function getActiveSmartSignEvent(signId) {
     { headers: authHeaders(KEY) }
   );
   return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+export async function updateSmartSign(signId, payload) {
+  if (!signId) throw new Error('Missing sign id');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?id=eq.${encodeURIComponent(signId)}`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
+    body: JSON.stringify(payload)
+  });
+
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) throw new Error('Failed to update smart sign: ' + raw);
+
+  let updated = null;
+  try { updated = raw ? JSON.parse(raw) : null; } catch {}
+  return Array.isArray(updated) && updated.length ? updated[0] : null;
 }

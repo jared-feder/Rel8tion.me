@@ -36,6 +36,15 @@ import {
   showVerifyAgent
 } from './renderer.js';
 
+function onboardingRoute(slug) {
+  const url = new URL(ROUTES.onboarding, window.location.origin);
+  url.searchParams.set('agent', slug);
+  if (state.uid) {
+    url.searchParams.set('uid', state.uid);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 export function bindPublicHandlers() {
   window.startFieldFlow = startFieldFlow;
   window.startOfficeFlow = startOfficeFlow;
@@ -313,7 +322,7 @@ export async function autoActivate() {
     await upsertAgent(agent);
     await linkKeyToAgent(slug);
     await sendActivationSMS(agent.phone, slug, agent.name);
-    window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(slug)}`;
+    window.location.href = onboardingRoute(slug);
   } catch (e) {
     debug('AUTO ACTIVATE FAILED', { message: e?.message || String(e) });
     routeUnknownAgentFlow(h?.brokerage || '', 'Auto activation failed. Complete your profile below.');
@@ -367,7 +376,7 @@ export async function saveFullProfile() {
     await applyBranding(brokerage);
     await linkKeyToAgent(slug);
     await sendActivationSMS(phone, slug, name);
-    window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(slug)}`;
+    window.location.href = onboardingRoute(slug);
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
     showFullProfileForm(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
@@ -387,7 +396,7 @@ export async function init() {
     await loadAgentFromUID();
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
       if (state.prefilledAgent) showAlreadyClaimed(state.prefilledAgent);
-      else window.location.href = `${ROUTES.onboarding}?agent=${encodeURIComponent(state.keyRecord.agent_slug)}`;
+      else window.location.href = onboardingRoute(state.keyRecord.agent_slug);
       return;
     }
     showIntro();

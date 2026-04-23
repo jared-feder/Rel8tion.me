@@ -1,8 +1,18 @@
 import { ASSETS, ROUTES } from '../../core/config.js';
-import { getEventById } from '../../api/events.js';
-import { getOpenHouseById } from '../../api/openHouses.js';
-import { getActiveSmartSignEvent, getSmartSignByPublicCode } from '../../api/smartSigns.js';
+import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js';
+import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js';
+import { getHostSession, hostSessionLabel } from '../../core/hostSession.js';
+import { getActiveSmartSignEvent, getSmartSignByPublicCode, updateSmartSign } from '../../api/smartSigns.js';
 import { esc, money } from '../../core/utils.js';
+
+const pageState = {
+  sign: null,
+  hostSession: null,
+  nearbyHouses: [],
+  activating: false,
+  activationError: '',
+  statusMessage: ''
+};
 
 function getCodeFromUrl() {
   return new URLSearchParams(window.location.search).get('code') || '';
@@ -41,6 +51,63 @@ function errorView(title, message) {
   `);
 }
 
+function activationCard(sign) {
+  if (!pageState.hostSession) {
+    return `
+      <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mt-6">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Host Activation</div>
+        <div class="text-slate-900 font-black text-xl mb-3">Host session not detected</div>
+        <p class="text-slate-600 font-semibold leading-relaxed">
+          This sign is ready, but no recent host chip scan was found on this device. Scan the claimed Rel8tionChip first, then scan this sign to bind it to the open house.
+        </p>
+      </div>
+    `;
+  }
+
+  const housesMarkup = pageState.nearbyHouses.length
+    ? `
+      <div class="space-y-3 mt-5">
+        ${pageState.nearbyHouses.slice(0, 5).map((house) => `
+          <button type="button" class="activate-house-button w-full rounded-[24px] border border-white/80 bg-white/85 p-4 text-left shadow-sm hover:shadow-md transition-all" data-house-id="${esc(house.id)}">
+            <div class="text-slate-900 font-black text-lg leading-tight mb-1">${esc(house.address || 'Open House')}</div>
+            <div class="text-sky-600 font-black text-base mb-1">${house.price ? money(house.price) : ''}</div>
+            <div class="text-slate-500 font-semibold text-sm">${esc(house.brokerage || '')}</div>
+          </button>
+        `).join('')}
+      </div>
+    `
+    : '';
+
+  return `
+    <div class="rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50/95 to-white p-6 text-left max-w-2xl mx-auto mt-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
+      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-3">Host Activation</div>
+      <div class="text-slate-900 font-black text-2xl md:text-3xl mb-2">Activate This Smart Sign</div>
+      <p class="text-slate-600 font-medium leading-relaxed mb-5">
+        Recent host recognized: <span class="text-slate-900 font-black">${esc(hostSessionLabel(pageState.hostSession) || pageState.hostSession.agentSlug)}</span>.
+        Use this device to detect the nearest listing and bind the sign to a live event.
+      </p>
+
+      <div class="rounded-[20px] bg-white/80 border border-white/80 p-4 mb-4">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Smart Sign</div>
+        <div class="text-slate-900 font-black">${esc(sign.public_code || '')}</div>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-3">
+        <button type="button" id="detect-nearest-house-button" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] disabled:opacity-70" style="background:linear-gradient(90deg,#38bdf8,#2563eb);" ${pageState.activating ? 'disabled' : ''}>
+          ${pageState.activating ? 'Working...' : 'Use Nearby Listing'}
+        </button>
+        <a href="/claim" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">
+          Claim Another Chip
+        </a>
+      </div>
+
+      ${pageState.statusMessage ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-4 text-sky-700 font-semibold mt-4">${esc(pageState.statusMessage)}</div>` : ''}
+      ${pageState.activationError ? `<div class="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-4 text-rose-700 font-semibold mt-4">${esc(pageState.activationError)}</div>` : ''}
+      ${housesMarkup}
+    </div>
+  `;
+}
+
 function inactiveView(sign) {
   shell(`
     <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Smart Sign</div>
@@ -51,7 +118,10 @@ function inactiveView(sign) {
       <div class="text-slate-900 font-black text-xl mb-2">${esc(sign.public_code || '')}</div>
       <div class="text-slate-600 font-semibold">Status: ${esc(sign.status || 'inactive')}</div>
     </div>
+    ${activationCard(sign)}
   `);
+
+  attachInactiveHandlers(sign);
 }
 
 function activeView(sign, eventRow, house) {
@@ -81,6 +151,127 @@ function activeView(sign, eventRow, house) {
   }, 1200);
 }
 
+function attachInactiveHandlers(sign) {
+  const detectButton = document.getElementById('detect-nearest-house-button');
+  detectButton?.addEventListener('click', async () => {
+    pageState.activating = true;
+    pageState.activationError = '';
+    pageState.statusMessage = 'Checking nearby listings...';
+    pageState.nearbyHouses = [];
+    inactiveView(sign);
+
+    if (!navigator.geolocation) {
+      pageState.activating = false;
+      pageState.activationError = 'Location is not supported on this device, so nearby listing detection cannot run here.';
+      pageState.statusMessage = '';
+      inactiveView(sign);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const houses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude);
+        pageState.nearbyHouses = Array.isArray(houses) ? houses : [];
+        pageState.statusMessage = pageState.nearbyHouses.length
+          ? 'Select the listing you want to bind to this sign.'
+          : 'No nearby open house was found for this location.';
+      } catch (error) {
+        console.error(error);
+        pageState.activationError = error.message || 'Unable to load nearby listings.';
+        pageState.statusMessage = '';
+      } finally {
+        pageState.activating = false;
+        inactiveView(sign);
+      }
+    }, () => {
+      pageState.activating = false;
+      pageState.activationError = 'Location permission was denied, so this sign could not be matched to a nearby listing.';
+      pageState.statusMessage = '';
+      inactiveView(sign);
+    }, {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0
+    });
+  });
+
+  document.querySelectorAll('.activate-house-button').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const houseId = button.getAttribute('data-house-id');
+      const house = pageState.nearbyHouses.find((item) => String(item.id) === String(houseId));
+      if (!house) return;
+      await activateSignToHouse(sign, house);
+    });
+  });
+}
+
+async function activateSignToHouse(sign, house) {
+  if (!pageState.hostSession?.agentSlug) {
+    pageState.activationError = 'A recent host chip session is required before activating this sign.';
+    inactiveView(sign);
+    return;
+  }
+
+  pageState.activating = true;
+  pageState.activationError = '';
+  pageState.statusMessage = 'Binding this sign to a live event...';
+  inactiveView(sign);
+
+  try {
+    const request = {
+      smart_sign_id: sign.id,
+      agent_slug: pageState.hostSession.agentSlug,
+      open_house_source_id: house.id
+    };
+
+    const activeEvent = await getActiveSmartSignEvent(sign.id);
+    const lifecycle = resolveEventLifecycle({ activeEvent, request });
+
+    let eventRow = null;
+    if (lifecycle.action === 'resume') {
+      eventRow = activeEvent;
+    } else {
+      if (activeEvent && lifecycle.action === 'close_and_create_new') {
+        await closeEvent(activeEvent.id);
+      }
+
+      if (activeEvent && lifecycle.action === 'prompt_resume_or_new') {
+        eventRow = activeEvent;
+      } else {
+        eventRow = await createOpenHouseEvent({
+          smart_sign_id: sign.id,
+          open_house_source_id: house.id,
+          agent_slug: pageState.hostSession.agentSlug,
+          status: 'live',
+          activation_uid_primary: pageState.hostSession.uid || null,
+          activation_method: 'host_chip_session_sign_activation',
+          setup_confirmed_at: new Date().toISOString(),
+          last_activity_at: new Date().toISOString()
+        });
+      }
+    }
+
+    if (!eventRow?.id) {
+      throw new Error('The event activation did not return a live event id.');
+    }
+
+    await updateSmartSign(sign.id, {
+      active_event_id: eventRow.id,
+      status: 'active',
+      setup_confirmed_at: new Date().toISOString()
+    });
+
+    const freshHouse = await getOpenHouseById(eventRow.open_house_source_id || house.id);
+    activeView({ ...sign, active_event_id: eventRow.id, status: 'active' }, eventRow, freshHouse || house);
+  } catch (error) {
+    console.error(error);
+    pageState.activating = false;
+    pageState.statusMessage = '';
+    pageState.activationError = error.message || 'Unable to activate this sign right now.';
+    inactiveView(sign);
+  }
+}
+
 export async function initSignResolverPage() {
   const code = getCodeFromUrl();
   if (!code) {
@@ -91,11 +282,13 @@ export async function initSignResolverPage() {
   loading('Looking up sign identity...');
 
   try {
+    pageState.hostSession = getHostSession();
     const sign = await getSmartSignByPublicCode(code);
     if (!sign) {
       errorView('Invalid Sign', 'No smart sign was found for that public code.');
       return;
     }
+    pageState.sign = sign;
 
     let eventRow = null;
     if (sign.active_event_id) {

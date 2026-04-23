@@ -17,6 +17,7 @@
   </div>
   <script type="module">
     import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js';
+    import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js';
 
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
@@ -34,6 +35,7 @@
 
     function goToLiveProfile(agentSlug) {
       if (!agentSlug) return;
+      saveHostSession({ agentSlug, uid, source: 'claimed-chip-router' });
       const target = uid
         ? `${window.location.origin}/a?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
         : `${window.location.origin}/a?agent=${encodeURIComponent(agentSlug)}`;

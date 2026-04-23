@@ -42,7 +42,7 @@
             <div>
               <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/45 border border-white/60 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">You're Live</div>
               <h1 class="font-['Plus_Jakarta_Sans'] text-[34px] sm:text-[44px] lg:text-[62px] leading-[0.95] font-extrabold tracking-tight text-slate-900 mb-5">Start Turning Conversations Into Closings</h1>
-              <p class="text-slate-700 text-[17px] md:text-[21px] font-medium leading-relaxed mb-7 max-w-2xl">Your Rel8tionChip is active. Use it in open houses, showings, and everyday conversations to capture contacts instantly and stay top-of-mind.</p>
+              <p class="text-slate-700 text-[17px] md:text-[21px] font-medium leading-relaxed mb-7 max-w-2xl">Your Rel8tionChip is active and your live profile is ready. Use it in open houses, showings, and everyday conversations to turn real-world taps into real opportunities.</p>
 
               <div class="glass-card rounded-[28px] p-5 md:p-6 mb-4">
                 <div class="text-slate-900 text-[22px] md:text-[24px] font-black tracking-tight mb-4">What To Do</div>
@@ -97,7 +97,7 @@
                 </div>
               </div>
 
-              <a id="goLive" href="#" class="cta-button block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">Open My Profile</a>
+              <a id="goLive" href="#" class="cta-button block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">See It Live</a>
             </div>
           </div>
         </section>
@@ -105,9 +105,17 @@
     </main>
   </div>
 
-  <script>
+  <script type="module">
+    import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js';
+
     const urlParams = new URLSearchParams(window.location.search);
     const agent = urlParams.get('agent') || '';
+    const uid = urlParams.get('uid') || '';
+
+    if (agent) {
+      saveHostSession({ agentSlug: agent, uid, source: 'onboarding' });
+    }
+
     document.getElementById('goLive').href = agent ? `/a?agent=${encodeURIComponent(agent)}` : '/claim';
   </script>
 </body>
