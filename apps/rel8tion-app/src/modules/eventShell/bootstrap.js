@@ -70,13 +70,15 @@ function loading(message) {
   `);
 }
 
-function errorView(title, message) {
+function errorView(title, message, actions = '') {
   shell(`
     <div class="text-center">
       <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Live Event</div>
       <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">${esc(title)}</h1>
       <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-8">${esc(message)}</p>
-      <a href="/" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Go Home</a>
+      <div class="flex flex-col md:flex-row items-center justify-center gap-3">
+        ${actions || '<a href="/" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Go Home</a>'}
+      </div>
     </div>
   `);
 }
@@ -475,7 +477,14 @@ function renderEventShell() {
 export async function initEventShellPage() {
   const eventId = getEventIdFromUrl();
   if (!eventId) {
-    errorView('Missing Event ID', 'This route needs ?event=YOUR_EVENT_ID');
+    errorView(
+      'Missing Event ID',
+      'This event page is meant to open from a Smart Sign or a live event link. Open a sign flow first, or use a real event id in the URL.',
+      `
+        <a href="/sign" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Open Smart Sign Flow</a>
+        <a href="/claim" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Open Claim Flow</a>
+      `
+    );
     return;
   }
 
