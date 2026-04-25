@@ -18,3 +18,29 @@ export async function getOpenHouseById(openHouseId) {
   );
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
+
+export async function searchOpenHouses(term) {
+  const query = String(term || '').trim();
+  if (!query) return [];
+
+  const clean = query.replace(/[%*(),]/g, ' ').replace(/\s+/g, ' ').trim();
+  const headers = { headers: authHeaders(KEY) };
+
+  if (clean) {
+    const rows = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/open_houses?address=ilike.${encodeURIComponent(`*${clean}*`)}&select=*&order=open_start.desc&limit=10`,
+      headers
+    );
+    if (Array.isArray(rows) && rows.length) return rows;
+  }
+
+  if (/^[A-Za-z0-9_.:-]+$/.test(query)) {
+    const rows = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/open_houses?id=eq.${encodeURIComponent(query)}&select=*&limit=10`,
+      headers
+    );
+    if (Array.isArray(rows)) return rows;
+  }
+
+  return [];
+}

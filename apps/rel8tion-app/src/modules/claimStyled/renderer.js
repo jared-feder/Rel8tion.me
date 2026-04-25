@@ -213,7 +213,26 @@ export function showDetection() {
       <div class="space-y-3">
         <button onclick="confirmListing()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Yes - Continue</button>
         <button onclick="showOtherListings()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Show Other Listings</button>
+        <button onclick="showListingSearch()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Search By Address Or MLS</button>
         <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Set Up Manually</button>
+      </div>
+    </div>
+  `);
+}
+
+export function showListingSearch(notice = '') {
+  render(`
+    <div>
+      <h1 class="font-['Poppins'] text-2xl md:text-3xl font-black mb-4 uppercase text-[#1f2a5a]">Find Your Listing</h1>
+      <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Search by address or MLS/source ID if location detection did not show the right property.</p>
+      ${notice ? `<div class="mb-5 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+      <div class="space-y-4 text-left">
+        <input id="listing_search_input" placeholder="Address or MLS ID" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+      </div>
+      <div class="mt-6 space-y-3">
+        <button onclick="searchListingByQuery()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Search Listings</button>
+        <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Set Up Manually</button>
+        <button onclick="showOtherListings()" class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Back To Listings</button>
       </div>
     </div>
   `);
@@ -225,7 +244,7 @@ export function showOtherListings() {
     <div>
       <h1 class="font-['Poppins'] text-2xl md:text-3xl font-black mb-6 uppercase text-[#1f2a5a]">Select Your Listing</h1>
       <div class="space-y-4 mb-8 max-h-[480px] overflow-y-auto pr-2">
-        ${unique.map((h) => {
+        ${unique.length ? unique.map((h) => {
           const s = getStatus(h);
           return `
             <div onclick="selectHouse('${esc(h.id)}')" class="flex items-start gap-4 p-4 rounded-[28px] border-2 border-white/70 hover:border-blue-400 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all cursor-pointer">
@@ -237,9 +256,12 @@ export function showOtherListings() {
                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${esc(h.brokerage || '')}</div>
               </div>
             </div>`;
-        }).join('')}
+        }).join('') : `<div class="rounded-[28px] border border-white/70 bg-white/70 px-5 py-6 text-slate-500 font-bold">No listings are loaded yet. Search by address or MLS/source ID.</div>`}
       </div>
-      <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="text-slate-400 text-sm font-bold uppercase tracking-widest">None of These</button>
+      <div class="space-y-3">
+        <button onclick="showListingSearch()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Search By Address Or MLS</button>
+        <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="text-slate-400 text-sm font-bold uppercase tracking-widest">None of These</button>
+      </div>
     </div>
   `);
 }

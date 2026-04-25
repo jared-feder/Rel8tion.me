@@ -11,7 +11,7 @@ import {
 } from '../../core/state.js';
 import { debug, normalizePhoneForMatch, randSuffix, slugify } from '../../core/utils.js';
 import { applyBranding } from '../../api/brokerages.js';
-import { findNearestOpenHouses } from '../../api/openHouses.js';
+import { findNearestOpenHouses, searchOpenHouses } from '../../api/openHouses.js';
 import {
   findAgentByEmail,
   findAgentByPhoneNormalized,
@@ -32,6 +32,7 @@ import {
   showIntro,
   showMissingChipNotice,
   showLoading,
+  showListingSearch,
   showOtherListings,
   showVerifyAgent
 } from './renderer.js';
@@ -54,6 +55,8 @@ export function bindPublicHandlers() {
   window.continueFromBrokerageStep = continueFromBrokerageStep;
   window.confirmListing = confirmListing;
   window.showOtherListings = showOtherListings;
+  window.showListingSearch = showListingSearch;
+  window.searchListingByQuery = searchListingByQuery;
   window.autoActivate = autoActivate;
   window.saveFullProfile = saveFullProfile;
   window.init = init;
@@ -167,6 +170,37 @@ export function selectHouse(id) {
     applyBranding(state.detectedHouse.brokerage).then(() => showDetection());
   } else {
     showDetection();
+  }
+}
+
+export async function searchListingByQuery() {
+  const input = document.getElementById('listing_search_input');
+  const query = input?.value?.trim() || '';
+
+  if (!query) {
+    showListingSearch('Enter an address or MLS/source ID first.');
+    return;
+  }
+
+  showLoading('Searching listings...');
+
+  try {
+    const houses = await searchOpenHouses(query);
+    if (!Array.isArray(houses) || !houses.length) {
+      showListingSearch('No matching listing found. Try another address, MLS/source ID, or continue manually.');
+      return;
+    }
+
+    setNearbyHouses(houses);
+    setDetectedHouse(houses.find((h) => h.agent || h.agent_phone || h.agent_email) || houses[0]);
+    if (state.detectedHouse?.brokerage) {
+      setSelectedBrokerage(state.detectedHouse.brokerage);
+      await applyBranding(state.detectedHouse.brokerage);
+    }
+    showOtherListings();
+  } catch (e) {
+    debug('LISTING SEARCH FAILED', { message: e?.message || String(e) });
+    showListingSearch('Search failed. Try another address, MLS/source ID, or continue manually.');
   }
 }
 
