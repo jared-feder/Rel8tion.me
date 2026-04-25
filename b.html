@@ -155,25 +155,25 @@ async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" 
 
     if (openHouseId && normalizedPhone) {
       tryQueries.push(
-        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&primary_photo_url=not.is.null&limit=1`
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`
       );
     }
 
     if (openHouseId && name) {
       tryQueries.push(
-        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&primary_photo_url=not.is.null&limit=1`
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&limit=1`
       );
     }
 
     if (normalizedPhone) {
       tryQueries.push(
-        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&primary_photo_url=not.is.null&limit=1`
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`
       );
     }
 
     if (name) {
       tryQueries.push(
-        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url&name=eq.${encodeURIComponent(name)}&primary_photo_url=not.is.null&limit=1`
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=eq.${encodeURIComponent(name)}&limit=1`
       );
     }
 
@@ -185,8 +185,8 @@ async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" 
         }
       });
 
-      if (Array.isArray(rows) && rows.length && rows[0].primary_photo_url) {
-        return rows[0].primary_photo_url;
+      if (Array.isArray(rows) && rows.length && (rows[0].primary_photo_url || rows[0].directory_photo_url)) {
+        return rows[0].primary_photo_url || rows[0].directory_photo_url;
       }
     }
 
@@ -195,6 +195,14 @@ async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" 
     console.log("listing_agents photo lookup skipped", e);
     return null;
   }
+}
+
+function firstPresent(...values){
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "") || "";
+}
+
+function agentImageUrl(agent){
+  return firstPresent(agent?.image_url, agent?.primary_photo_url, agent?.directory_photo_url, agent?.photo_url);
 }
 
 function glassShell(inner){
@@ -295,7 +303,7 @@ async function init(){
       });
     } catch(e){}
 
-    if(agentData && !agentData.image_url){
+    if(agentData && !agentImageUrl(agentData)){
       const fallbackPhoto = await fetchListingAgentPhoto({
         openHouseId: detectedHouse?.id || "",
         name: agentData.name || "",
@@ -317,7 +325,7 @@ async function init(){
 
 function renderBuyer(){
   const houseImage = detectedHouse?.image || "https://rel8tion.me/wp-content/uploads/2026/04/trythisbackround.png";
-  const agentImage = agentData?.image_url || DEFAULT_AGENT_IMAGE;
+  const agentImage = agentImageUrl(agentData) || DEFAULT_AGENT_IMAGE;
   const propertyHeadline = detectedHouse
     ? "You’re In The Right Place"
     : "Start The Search The Right Way";

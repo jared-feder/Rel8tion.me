@@ -1,5 +1,5 @@
 import { ASSETS } from '../../core/config.js';
-import { getAgentBySlug } from '../../api/agents.js';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js';
 import { createCheckin, getEventById, touchEvent } from '../../api/events.js';
 import { sendFinancingLeadAlert } from '../../api/notifications.js';
 import { getOpenHouseById } from '../../api/openHouses.js';
@@ -150,6 +150,41 @@ function mailtoHref(email, subject = '') {
 
 function textOrDash(value) {
   return value ? esc(value) : '&mdash;';
+}
+
+function firstPresent(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || '';
+}
+
+function agentPhotoUrl(agent) {
+  return firstPresent(
+    agent?.image_url,
+    agent?.primary_photo_url,
+    agent?.directory_photo_url,
+    agent?.photo_url
+  );
+}
+
+function hostAgentSlug(eventRow) {
+  return firstPresent(
+    eventRow?.host_agent_slug,
+    eventRow?.agent_slug,
+    eventRow?.setup_context?.agent_slug
+  );
+}
+
+function formatNumber(value) {
+  const n = Number(value || 0);
+  return n ? n.toLocaleString() : '';
+}
+
+function propertyFacts(house) {
+  return [
+    { label: 'Beds', value: firstPresent(house?.beds, house?.bedrooms) },
+    { label: 'Baths', value: firstPresent(house?.baths, house?.bathrooms) },
+    { label: 'Sq Ft', value: formatNumber(firstPresent(house?.sqft, house?.square_feet, house?.living_area)) },
+    { label: 'Taxes', value: house?.taxes ? money(house.taxes) : '' }
+  ];
 }
 
 function buttonClasses(selected) {
@@ -481,7 +516,7 @@ function nextStepCards() {
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-4">Host Contact</h2>
         <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-5 mb-4">
-          <div class="text-slate-900 font-black text-xl mb-1">${esc(agent?.name || 'Listing Representative')}</div>
+          <div class="text-slate-900 font-black text-xl mb-1">${esc(agent?.name || hostAgentSlug(pageState.eventRow) || 'Host Agent')}</div>
           <div class="text-slate-600 font-semibold mb-3">${textOrDash(agent?.brokerage || house?.brokerage)}</div>
           <div class="space-y-1 text-slate-700 font-medium">
             <div>${textOrDash(agent?.phone)}</div>
@@ -566,7 +601,9 @@ function renderEventShell() {
   const { eventRow, house, agent, selectedPath } = pageState;
   const image = house?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
   const status = houseStatus(house);
-  const agentName = agent?.name || eventRow?.agent_slug || 'Listing Representative';
+  const agentName = agent?.name || hostAgentSlug(eventRow) || 'Host Agent';
+  const agentImage = agentPhotoUrl(agent);
+  const facts = propertyFacts(house);
 
   const lastCheckinNeedsFinancing = pageState.lastCheckin?.metadata?.financing_requested === true;
 
@@ -585,10 +622,13 @@ function renderEventShell() {
         ${house?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-3">${money(house.price)}</div>` : ''}
         <div class="text-slate-600 text-base md:text-lg font-semibold">${esc(house?.brokerage || 'Brokerage info available on event record')}</div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-[1.25fr_.9fr_.9fr] gap-4 mt-6">
+          <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4 flex items-center gap-4">
+            ${agentImage ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="w-16 h-16 rounded-full object-cover bg-white border border-white shadow-sm">` : ''}
+            <div>
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Hosted By</div>
             <div class="text-slate-900 font-black text-lg">${esc(agentName)}</div>
+            </div>
           </div>
           <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Open Window</div>
@@ -598,6 +638,15 @@ function renderEventShell() {
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Event ID</div>
             <div class="text-slate-900 font-bold break-all">${esc(eventRow?.id || '')}</div>
           </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          ${facts.map((fact) => `
+            <div class="rounded-[18px] bg-white/80 border border-slate-100 p-4">
+              <div class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">${esc(fact.label)}</div>
+              <div class="text-slate-900 font-black text-lg">${fact.value ? esc(fact.value) : '&mdash;'}</div>
+            </div>
+          `).join('')}
         </div>
       </div>
     </section>
@@ -674,12 +723,16 @@ function renderEventShell() {
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Live Event Details</h2>
         <div class="grid grid-cols-1 gap-3 text-sm">
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Hosted By</div>
+            <div class="text-slate-900 font-bold">${esc(agentName)}</div>
+          </div>
+          <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Open House Source</div>
             <div class="text-slate-900 font-bold break-all">${esc(eventRow?.open_house_source_id || '')}</div>
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Agent Slug</div>
-            <div class="text-slate-900 font-bold break-all">${esc(eventRow?.agent_slug || '')}</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Host Agent Slug</div>
+            <div class="text-slate-900 font-bold break-all">${esc(hostAgentSlug(eventRow))}</div>
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Event Status</div>
@@ -760,9 +813,18 @@ export async function initEventShellPage() {
       : null;
 
     pageState.agent = null;
-    if (eventRow.agent_slug) {
+    const agentSlug = hostAgentSlug(eventRow);
+    if (agentSlug) {
       try {
-        pageState.agent = await getAgentBySlug(eventRow.agent_slug);
+        pageState.agent = await getAgentBySlug(agentSlug);
+        if (pageState.agent && !agentPhotoUrl(pageState.agent)) {
+          const photo = await findListingAgentPhoto({
+            openHouseId: eventRow.open_house_source_id || '',
+            name: pageState.agent.name || '',
+            phone: pageState.agent.phone || ''
+          });
+          if (photo) pageState.agent.image_url = photo;
+        }
       } catch (error) {
         console.log('getAgentBySlug skipped', error);
       }
