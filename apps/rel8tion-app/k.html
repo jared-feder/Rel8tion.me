@@ -19,6 +19,7 @@
     import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js';
     import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js';
 
+    const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
     const statusEl = document.getElementById('status');
@@ -31,6 +32,23 @@
 
     function goToClaim() {
       window.location.href = `./claim?uid=${encodeURIComponent(uid)}`;
+    }
+
+    function readSignActivationSession() {
+      try {
+        const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function continueSignActivation(query = {}) {
+      const next = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value) next.set(key, value);
+      }
+      window.location.href = `/sign-demo-activate.html?${next.toString()}`;
     }
 
     function goToLiveProfile(agentSlug) {
@@ -65,6 +83,13 @@
 
       const rows = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(rows) || rows.length === 0) {
+        const pendingSignActivation = readSignActivationSession();
+        if (pendingSignActivation?.stage === 'waiting_for_sign_chip_1' || pendingSignActivation?.stage === 'waiting_for_second_sign_chip') {
+          setStatus('Smart Sign Chip', 'Continuing sign activation.');
+          continueSignActivation({ sign_uid: uid });
+          return;
+        }
+
         setStatus('First Time Setup...', 'Sending you to activation.');
         goToClaim();
         return;
@@ -72,6 +97,13 @@
 
       const record = rows[0];
       if (record.claimed === true && record.agent_slug) {
+        const pendingSignActivation = readSignActivationSession();
+        if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.agentSlug === record.agent_slug) {
+          setStatus('Handshake Confirmed', 'Opening sign activation.');
+          continueSignActivation({ uid, agent: record.agent_slug });
+          return;
+        }
+
         setStatus('Already Active', 'Opening the live profile.');
         goToLiveProfile(record.agent_slug);
         return;
@@ -82,6 +114,13 @@
     }
 
     init().catch(() => {
+      const pendingSignActivation = readSignActivationSession();
+      if (pendingSignActivation?.stage === 'waiting_for_sign_chip_1' || pendingSignActivation?.stage === 'waiting_for_second_sign_chip') {
+        setStatus('Smart Sign Chip', 'Continuing sign activation.');
+        continueSignActivation({ sign_uid: uid });
+        return;
+      }
+
       setStatus('Connection Error', 'Something interrupted the chip lookup.');
     });
   </script>

@@ -3,6 +3,8 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/claim", "destination": "/claim.html" },
+    { "source": "/onboarding", "destination": "/onboarding.html" },
+    { "source": "/sign-demo-activate", "destination": "/sign-demo-activate.html" },
     { "source": "/k", "destination": "/k.html" },
     { "source": "/s", "destination": "/sign.html" },
     { "source": "/sign", "destination": "/sign.html" },

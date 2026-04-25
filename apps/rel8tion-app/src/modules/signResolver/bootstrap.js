@@ -20,8 +20,35 @@ const pageState = {
   statusMessage: ''
 };
 
+const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
+
 function getCodeFromUrl() {
   return new URLSearchParams(window.location.search).get('code') || '';
+}
+
+function readSignActivationSession() {
+  try {
+    const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function continueSignActivationFromQr(code) {
+  const pending = readSignActivationSession();
+  if (!pending?.uid || !pending?.agentSlug) return false;
+  if (!['waiting_for_sign_code', 'waiting_for_sign_chip_1', 'waiting_for_second_sign_chip', 'waiting_for_handshake'].includes(pending.stage)) {
+    return false;
+  }
+
+  const next = new URLSearchParams();
+  next.set('code', code);
+  next.set('uid', pending.uid);
+  next.set('agent', pending.agentSlug);
+  if (pending.signId) next.set('sign_id', pending.signId);
+  window.location.replace(`/sign-demo-activate.html?${next.toString()}`);
+  return true;
 }
 
 function render(html) {
@@ -343,6 +370,10 @@ export async function initSignResolverPage() {
   const code = getCodeFromUrl();
   if (!code) {
     errorView('Missing Sign Code', 'This route needs ?code=YOUR_PUBLIC_CODE');
+    return;
+  }
+
+  if (continueSignActivationFromQr(code)) {
     return;
   }
 

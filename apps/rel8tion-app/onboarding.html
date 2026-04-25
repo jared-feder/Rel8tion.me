@@ -97,7 +97,10 @@
                 </div>
               </div>
 
-              <a id="goLive" href="#" class="cta-button block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">See It Live</a>
+              <div class="space-y-3">
+                <a id="activateSign" href="#" class="cta-button block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">Activate Smart Sign</a>
+                <a id="goLive" href="#" class="block w-full py-4 px-6 rounded-full bg-white/80 border border-white/80 text-slate-700 font-black text-[16px] md:text-[17px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">See It Live</a>
+              </div>
             </div>
           </div>
         </section>
@@ -117,6 +120,10 @@
     }
 
     document.getElementById('goLive').href = agent ? `/a?agent=${encodeURIComponent(agent)}` : '/claim';
+    const activateUrl = new URL('/sign-demo-activate.html', window.location.origin);
+    if (agent) activateUrl.searchParams.set('agent', agent);
+    if (uid) activateUrl.searchParams.set('uid', uid);
+    document.getElementById('activateSign').href = agent ? `${activateUrl.pathname}${activateUrl.search}` : '/claim';
   </script>
 </body>
 </html>
