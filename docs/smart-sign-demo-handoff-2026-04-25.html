@@ -1,0 +1,383 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Smart Sign Demo Handoff</title><style>
+:root{--ink:#172554;--muted:#475569;--line:#dbeafe;--soft:#eff6ff;--accent:#2563eb;}
+*{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);line-height:1.52;margin:0;background:#f8fbff;}
+main{max-width:980px;margin:0 auto;background:white;padding:42px 54px 72px;box-shadow:0 16px 50px rgba(15,23,42,.08);}
+h1{font-size:34px;margin:0 0 12px;line-height:1.08;} h2{font-size:24px;margin:34px 0 10px;border-top:1px solid var(--line);padding-top:22px;} h3{font-size:18px;margin:24px 0 8px;color:#1d4ed8;}
+p,li{font-size:14px;color:#1e293b;} code{background:var(--soft);border:1px solid var(--line);padding:2px 5px;border-radius:5px;color:#0f172a;}
+pre{background:#0f172a;color:#e0f2fe;padding:14px;border-radius:8px;overflow:auto;font-size:12px;line-height:1.45;} pre code{background:transparent;border:0;color:inherit;padding:0;}
+ul,ol{padding-left:24px;} blockquote{border-left:4px solid var(--accent);margin-left:0;padding:10px 16px;background:var(--soft);} .meta{color:var(--muted);font-size:13px;margin-bottom:28px;}
+</style></head><body><main><h1>Smart Sign Demo Handoff - April 25, 2026</h1>
+<p>This file preserves the working state reached tonight for the Rel8tion Smart Sign physical demo. It is intentionally detailed so nothing has to be reconstructed from memory tomorrow.</p>
+<h2>Executive Summary</h2>
+<p>The real Smart Sign activation flow is now working end to end on production at <code>https://app.rel8tion.me</code>.</p>
+<p>The tested physical flow is:</p>
+<p>1. Fresh agent Rel8tionChip opens claim/onboarding.</p>
+<p>2. Agent activates Smart Sign from onboarding.</p>
+<p>3. Agent scans the printed Smart Sign QR.</p>
+<p>4. Agent taps sign chip 1.</p>
+<p>5. Agent taps sign chip 2.</p>
+<p>6. Agent taps the agent keychain/Rel8tionChip again.</p>
+<p>7. App detects listing options.</p>
+<p>8. Agent selects the listing.</p>
+<p>9. App creates the open house event and marks the sign active.</p>
+<p>10. Buyer-facing live sign route opens.</p>
+<p>11. After activation, scanning either sign chip opens the live buyer sign route, not the agent activation flow.</p>
+<p>The demo has been proven with real QR, real NFC chips, real Supabase rows, and the production alias.</p>
+<h2>Current Live Production State</h2>
+<p>Production URL:</p>
+<p><code>https://app.rel8tion.me</code></p>
+<p>Branch used for deploys:</p>
+<p><code>modular-claim-test</code></p>
+<p>Latest relevant deployed commit:</p>
+<p><code>662442e Route active sign chips to live sign</code></p>
+<h3>Working Smart Sign</h3>
+<p>Smart sign public code:</p>
+<p><code>38e8d6eb579c</code></p>
+<p>Live sign route:</p>
+<p><code>https://app.rel8tion.me/s?code=38e8d6eb579c</code></p>
+<p>Inventory QR URL:</p>
+<p><code>https://app.rel8tion.me/s.html?code=38e8d6eb579c</code></p>
+<p>Smart sign row:</p>
+<p><code>smart_signs.id = 2b0f9786-6476-4b99-99fc-13bdee0e90a9</code></p>
+<p>Sign chip 1:</p>
+<p><code>uid_primary = 8ce0364c-411e-45f8-a9eb-2eb8954b0ca0</code></p>
+<p>Sign chip 2:</p>
+<p><code>uid_secondary = 987fb582-6ca3-4d8a-8dc2-54b6af6e2962</code></p>
+<p>Owner agent slug:</p>
+<p><code>owner_agent_slug = jared-u0j</code></p>
+<p>Sign status:</p>
+<p><code>status = active</code></p>
+<p>Active event:</p>
+<p><code>active_event_id = e19e02a8-f898-4859-8110-a8ee472d20a9</code></p>
+<h3>Working Open House Event</h3>
+<p>Event ID:</p>
+<p><code>e19e02a8-f898-4859-8110-a8ee472d20a9</code></p>
+<p>Listing:</p>
+<p><code>3727 Oceanside Rd E, Oceanside, NY 11572</code></p>
+<p>Open house source ID:</p>
+<p><code>M00000489-972883</code></p>
+<p>Host agent slug:</p>
+<p><code>host_agent_slug = jared-u0j</code></p>
+<p>Event status:</p>
+<p><code>status = active</code></p>
+<p>Activation method:</p>
+<p><code>activation_method = sign_demo_claimed_chip</code></p>
+<p>Setup context includes:</p>
+<pre><code>{
+  &quot;flow&quot;: &quot;sign-demo&quot;,
+  &quot;source&quot;: &quot;claimed-chip-bridge&quot;,
+  &quot;address&quot;: &quot;3727 Oceanside Rd E, Oceanside, NY 11572&quot;,
+  &quot;agent_slug&quot;: &quot;jared-u0j&quot;,
+  &quot;sign_chip_primary&quot;: &quot;8ce0364c-411e-45f8-a9eb-2eb8954b0ca0&quot;,
+  &quot;sign_chip_secondary&quot;: &quot;987fb582-6ca3-4d8a-8dc2-54b6af6e2962&quot;,
+  &quot;detected_brokerage&quot;: &quot;Coldwell Banker American Homes&quot;
+}</code></pre>
+<h3>Working Inventory Row</h3>
+<p>Inventory row:</p>
+<p><code>smart_sign_inventory.id = 00bd6326-bac9-48e7-8b39-61ba7f115980</code></p>
+<p>Public code:</p>
+<p><code>public_code = 38e8d6eb579c</code></p>
+<p>Printed QR URL:</p>
+<p><code>qr_url = https://app.rel8tion.me/s.html?code=38e8d6eb579c</code></p>
+<p>Linked smart sign:</p>
+<p><code>smart_sign_id = 2b0f9786-6476-4b99-99fc-13bdee0e90a9</code></p>
+<p>Claimed:</p>
+<p><code>claimed_at = 2026-04-25T02:47:49.655-04:00</code></p>
+<h2>What Was Built</h2>
+<p>The goal was a basic demo-ready Smart Sign activation mode with no dashboard requirement and no password friction.</p>
+<p>The desired physical workflow was:</p>
+<ul>
+<li>Agent starts with a Rel8tionChip.</li>
+<li>Agent scans/taps through setup.</li>
+<li>Smart Sign QR identifies the physical sign.</li>
+<li>Two NFC chips bind to that sign.</li>
+<li>Final keychain tap confirms the owner.</li>
+<li>Agent selects listing.</li>
+<li>Sign becomes live.</li>
+<li>Sign chips become buyer-facing entry points.</li>
+</ul>
+<p>That is now working.</p>
+<h2>Core Code Paths</h2>
+<h3><code>apps/rel8tion-app/k.html</code></h3>
+<p>This is the live chip router.</p>
+<p>It now handles these cases:</p>
+<ul>
+<li>Missing UID.</li>
+<li>Fresh unclaimed Rel8tionChip.</li>
+<li>Claimed agent Rel8tionChip.</li>
+<li>Sign chip 1 during activation.</li>
+<li>Sign chip 2 during activation.</li>
+<li>Final keychain handshake during activation.</li>
+<li>Already-active sign chip.</li>
+</ul>
+<p>The most important final change was adding active sign chip routing before activation-session routing:</p>
+<pre><code>async function findActiveSignByChipUid(chipUid) {
+  const encodedUid = encodeURIComponent(chipUid);
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&amp;status=eq.active&amp;select=id,public_code&amp;limit=1`, {
+    headers: {
+      apikey: KEY,
+      Authorization: `Bearer ${KEY}`,
+      &#x27;Content-Type&#x27;: &#x27;application/json&#x27;
+    }
+  });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() =&gt; []);
+  return Array.isArray(rows) ? rows[0] : null;
+}</code></pre>
+<p>If a scanned UID belongs to an active sign, the router clears stale activation state and opens:</p>
+<pre><code>/s?code=&lt;public_code&gt;</code></pre>
+<p>This fixed the problem where scanning a live sign chip still opened the agent activation flow.</p>
+<h3><code>apps/rel8tion-app/sign-demo-activate.html</code></h3>
+<p>This is the Smart Sign demo activation state machine.</p>
+<p>It handles:</p>
+<ul>
+<li>QR scanner.</li>
+<li>Manual QR code fallback.</li>
+<li><code>smart_sign_inventory</code> lookup.</li>
+<li>Smart Sign creation/update after chip 1.</li>
+<li>Chip 2 registration.</li>
+<li>Final keychain handoff.</li>
+<li>Listing detection.</li>
+<li>Event creation.</li>
+<li>Smart Sign activation.</li>
+<li>Success screen.</li>
+</ul>
+<p>Important rule:</p>
+<p>QR scan should identify inventory/sign code only. It should not create a <code>smart_signs</code> row before chip 1 exists, because <code>smart_signs.uid_primary</code> is required.</p>
+<h3><code>sign-demo-activate.html</code></h3>
+<p>This root duplicate file also exists and production can serve it directly.</p>
+<p>Important: when changing the activation page, patch both:</p>
+<ul>
+<li><code>sign-demo-activate.html</code></li>
+<li><code>apps/rel8tion-app/sign-demo-activate.html</code></li>
+</ul>
+<p>This duplicate file issue caused a real production mismatch during testing. The app copy was fixed, but production was still serving the old root copy.</p>
+<h2>Trial And Error Timeline</h2>
+<h3>1. QR scan failed with <code>uid_primary</code> not-null violation</h3>
+<p>Symptom:</p>
+<p>After scanning the QR and continuing with code, Supabase returned:</p>
+<p><code>null value in column &quot;uid_primary&quot; of relation &quot;smart_signs&quot; violates not-null constraint</code></p>
+<p>Cause:</p>
+<p>The QR step tried to create the <code>smart_signs</code> row before sign chip 1 was scanned.</p>
+<p>Fix:</p>
+<p>Delay sign creation/update until chip 1 exists. QR only resolves <code>smart_sign_inventory.public_code</code>.</p>
+<p>Commit:</p>
+<p><code>916a52f Create smart sign after first sign chip scan</code></p>
+<h3>2. Chip 1 returned to &quot;Now Tap Sign Chip 1&quot;</h3>
+<p>Symptom:</p>
+<p>After tapping sign chip 1, the app kept returning to the same screen.</p>
+<p>Cause:</p>
+<p>The router treated the sign chip like a normal key. It did not prioritize the activation session stage.</p>
+<p>Fix:</p>
+<p>When session stage is <code>waiting_for_sign_chip_1</code> or <code>waiting_for_second_sign_chip</code>, route scanned chip UID to:</p>
+<p><code>/sign-demo-activate.html?sign_uid=&lt;uid&gt;</code></p>
+<p>Commit:</p>
+<p><code>d52cc33 Prioritize sign chip scans during activation</code></p>
+<h3>3. Activation context disappeared between taps</h3>
+<p>Symptom:</p>
+<p>The phone could return from an NFC scan, but the page lost sign/agent context.</p>
+<p>Cause:</p>
+<p>The redirect was not carrying enough activation context.</p>
+<p>Fix:</p>
+<p>Carry pending values through the redirect:</p>
+<ul>
+<li><code>uid</code></li>
+<li><code>agent</code></li>
+<li><code>code</code></li>
+<li><code>sign_id</code></li>
+<li><code>inventory_id</code></li>
+</ul>
+<p>Commit:</p>
+<p><code>b818449 Carry activation context through sign chip scans</code></p>
+<h3>4. Final keychain handoff got stuck</h3>
+<p>Symptom:</p>
+<p>After chip 1 and chip 2 were saved, the screen stayed on:</p>
+<p><code>Now Tap The Keychain Again</code></p>
+<p>Cause:</p>
+<p>The phone/browser lost the final activation session context.</p>
+<p>Fix:</p>
+<p>Add a fallback in <code>k.html</code>: if an agent keychain scans and a recently paired inactive sign exists with both chips, route back into activation with that sign context.</p>
+<p>Commit:</p>
+<p><code>e3b8741 Add paired sign handshake fallback</code></p>
+<h3>5. The final handoff still looped</h3>
+<p>Symptom:</p>
+<p>Even after the fallback, tapping the keychain still returned to the same screen.</p>
+<p>Cause:</p>
+<p><code>mergeStateFromSession()</code> in <code>sign-demo-activate.html</code> copied saved chip 1 into <code>state.signChipUid</code>:</p>
+<pre><code>if (!state.signChipUid &amp;&amp; p.primaryChipUid) state.signChipUid = p.primaryChipUid;</code></pre>
+<p>That made the page think the current scan was sign chip 1 again.</p>
+<p>Fix:</p>
+<p>Do not restore <code>signChipUid</code> from saved session. The current scanned UID must only come from the actual scan URL.</p>
+<p>Commits:</p>
+<p><code>8832fed Fix smart sign keychain handoff loop</code></p>
+<p><code>739e2e8 Fix root smart sign activation handoff</code></p>
+<h3>6. Production was serving a different file</h3>
+<p>Symptom:</p>
+<p>The code looked fixed locally and deployed, but the phone still saw the old loop.</p>
+<p>Cause:</p>
+<p>There are two files:</p>
+<ul>
+<li><code>sign-demo-activate.html</code></li>
+<li><code>apps/rel8tion-app/sign-demo-activate.html</code></li>
+</ul>
+<p>Production served the root file.</p>
+<p>Fix:</p>
+<p>Patch both copies and verify the exact production URL response.</p>
+<p>Commit:</p>
+<p><code>739e2e8 Fix root smart sign activation handoff</code></p>
+<h3>7. Event creation failed with <code>agent_slug</code> schema-cache error</h3>
+<p>Symptom:</p>
+<p>On the listing confirmation screen, activation returned:</p>
+<p><code>Could not find the &#x27;agent_slug&#x27; column of &#x27;open_house_events&#x27; in the schema cache</code></p>
+<p>Cause:</p>
+<p>The live <code>open_house_events</code> table uses <code>host_agent_slug</code>, not <code>agent_slug</code>.</p>
+<p>Fix:</p>
+<p>Change event payload from:</p>
+<pre><code>agent_slug: state.agentSlug</code></pre>
+<p>to:</p>
+<pre><code>host_agent_slug: state.agentSlug</code></pre>
+<p>Also store <code>agent_slug</code> inside <code>setup_context</code> for compatibility/history.</p>
+<p>This was verified with a live Supabase insert/delete test using a real open house ID.</p>
+<p>Commit:</p>
+<p><code>4c87aa9 Use host agent slug for sign events</code></p>
+<h3>8. Live sign chip still opened activation</h3>
+<p>Symptom:</p>
+<p>After success, scanning a sign chip still behaved like an agent activation scan.</p>
+<p>Cause:</p>
+<p>The router checked activation/session behavior before asking whether this UID belonged to an active sign.</p>
+<p>Fix:</p>
+<p>Add active sign-chip lookup before activation-stage routing:</p>
+<pre><code>smart_signs?or=(uid_primary.eq.&lt;uid&gt;,uid_secondary.eq.&lt;uid&gt;)&amp;status=eq.active&amp;select=id,public_code&amp;limit=1</code></pre>
+<p>If found, clear activation localStorage and open:</p>
+<pre><code>/s?code=&lt;public_code&gt;</code></pre>
+<p>Commit:</p>
+<p><code>662442e Route active sign chips to live sign</code></p>
+<h2>Commit Trail</h2>
+<p>Relevant commits in order:</p>
+<pre><code>4484bcc Add onboarding smart sign demo activation
+67e850a Add smart sign QR scanner inventory lookup
+916a52f Create smart sign after first sign chip scan
+d52cc33 Prioritize sign chip scans during activation
+16c076b Add manual first sign chip fallback
+b818449 Carry activation context through sign chip scans
+ca1922c Accept pending keychain handshake by uid
+e3b8741 Add paired sign handshake fallback
+8832fed Fix smart sign keychain handoff loop
+739e2e8 Fix root smart sign activation handoff
+4c87aa9 Use host agent slug for sign events
+662442e Route active sign chips to live sign</code></pre>
+<h2>What Must Not Be Lost Tomorrow</h2>
+<p>The working state is not theoretical. It is live in Supabase and live on production.</p>
+<p>Do not reset or overwrite these rows unless intentionally starting a new demo sign:</p>
+<ul>
+<li><code>smart_signs.id = 2b0f9786-6476-4b99-99fc-13bdee0e90a9</code></li>
+<li><code>smart_sign_inventory.id = 00bd6326-bac9-48e7-8b39-61ba7f115980</code></li>
+<li><code>open_house_events.id = e19e02a8-f898-4859-8110-a8ee472d20a9</code></li>
+<li><code>public_code = 38e8d6eb579c</code></li>
+<li><code>uid_primary = 8ce0364c-411e-45f8-a9eb-2eb8954b0ca0</code></li>
+<li><code>uid_secondary = 987fb582-6ca3-4d8a-8dc2-54b6af6e2962</code></li>
+</ul>
+<p>Do not run a broad cleanup against:</p>
+<ul>
+<li><code>smart_signs</code></li>
+<li><code>smart_sign_inventory</code></li>
+<li><code>open_house_events</code></li>
+<li><code>keys</code></li>
+</ul>
+<p>unless the target rows are explicitly filtered.</p>
+<p>Before changing anything tomorrow, run a read-only check:</p>
+<pre><code>$base = &#x27;https://nicanqrfqlbnlmnoernb.supabase.co/rest/v1&#x27;
+$code = &#x27;38e8d6eb579c&#x27;
+# Use the existing anon KEY from apps/rel8tion-app/src/core/config.js.
+# Confirm smart_signs.status is active and active_event_id is populated.</code></pre>
+<h2>Tomorrow Morning Demo Checklist</h2>
+<p>Before handing signs to agents:</p>
+<p>1. Open <code>https://app.rel8tion.me/s?code=38e8d6eb579c</code>.</p>
+<p>2. Confirm the buyer-facing page opens.</p>
+<p>3. Tap sign chip 1.</p>
+<p>4. Confirm it opens the buyer-facing page, not activation.</p>
+<p>5. Tap sign chip 2.</p>
+<p>6. Confirm it opens the buyer-facing page, not activation.</p>
+<p>7. Tap the agent keychain.</p>
+<p>8. Confirm it opens the agent route/profile, not the sign activation flow.</p>
+<p>9. Confirm the database still shows <code>smart_signs.status = active</code>.</p>
+<p>10. Confirm <code>active_event_id = e19e02a8-f898-4859-8110-a8ee472d20a9</code>.</p>
+<p>For each additional demo sign tomorrow:</p>
+<p>1. Use a fresh sign QR/public code from <code>smart_sign_inventory</code>.</p>
+<p>2. Use fresh/unbound sign chips.</p>
+<p>3. Complete the activation flow once.</p>
+<p>4. Confirm both sign chips route to <code>/s?code=&lt;public_code&gt;</code> after activation.</p>
+<p>5. Record the new public code, smart sign ID, chip UIDs, agent slug, and event ID.</p>
+<h2>What Needs To Be Done Next</h2>
+<h3>Immediate tomorrow safeguards</h3>
+<p>Create a small &quot;demo sign registry&quot; note or table before giving signs to agents. For each physical sign, record:</p>
+<ul>
+<li>Printed QR public code.</li>
+<li>Printed QR URL.</li>
+<li>Sign chip 1 UID.</li>
+<li>Sign chip 2 UID.</li>
+<li>Agent slug.</li>
+<li>Smart sign ID.</li>
+<li>Event ID.</li>
+<li>Whether buyer route was tested.</li>
+<li>Whether both NFC chips were tested after activation.</li>
+</ul>
+<p>This prevents physical signs and database rows from drifting apart.</p>
+<h3>Stabilize the codebase</h3>
+<p>1. Remove or consolidate duplicate root/app HTML files, especially <code>sign-demo-activate.html</code>.</p>
+<p>2. Add a shared route/build rule so production cannot serve stale root copies.</p>
+<p>3. Move the Smart Sign activation state machine out of one giant inline HTML script into versioned modules.</p>
+<p>4. Add a small admin/debug page for demo signs showing public code, chips, owner, status, and event.</p>
+<p>5. Add a read-only verification script:</p>
+<p>   - Given public code, show inventory row, sign row, event row, and chip routing expectation.</p>
+<p>6. Add a reset script for demo-only signs, but make it require the exact public code.</p>
+<h3>Database protection</h3>
+<p>Add a safer server-side activation/session table later:</p>
+<p><code>smart_sign_activation_sessions</code></p>
+<p>Suggested fields:</p>
+<ul>
+<li><code>id</code></li>
+<li><code>agent_uid</code></li>
+<li><code>agent_slug</code></li>
+<li><code>public_code</code></li>
+<li><code>smart_sign_id</code></li>
+<li><code>stage</code></li>
+<li><code>primary_chip_uid</code></li>
+<li><code>secondary_chip_uid</code></li>
+<li><code>expires_at</code></li>
+<li><code>completed_at</code></li>
+</ul>
+<p>This would reduce reliance on phone browser localStorage.</p>
+<h3>Product polish</h3>
+<p>After the demo is safe:</p>
+<p>1. Improve the activation UI copy.</p>
+<p>2. Remove manual UID fallback buttons from demo mode if not needed.</p>
+<p>3. Add clearer success language:</p>
+<p>   - &quot;This sign is live.&quot;</p>
+<p>   - &quot;Both sign chips now open the buyer page.&quot;</p>
+<p>4. Add an agent handoff page for activated demo signs.</p>
+<p>5. Add SMS-only confirmation if that is the basic tier.</p>
+<h2>Known Caveats</h2>
+<p>1. The activation page still exists in two locations. Patch both until consolidated.</p>
+<p>2. The current fallback for a recently paired inactive sign was built for demo speed, not multi-agent production scale.</p>
+<p>3. Browser localStorage can still hold stale activation state, but active sign chip routing now clears it when the sign is live.</p>
+<p>4. <code>open_house_events</code> uses <code>host_agent_slug</code>; older code may still refer to <code>agent_slug</code>.</p>
+<p>5. <code>owner_agent_slug</code> is on <code>smart_signs</code>; event ownership is <code>host_agent_slug</code>.</p>
+<h2>Verified End State</h2>
+<p>The final success screen showed:</p>
+<ul>
+<li>Sign Activated.</li>
+<li>Address: <code>3727 Oceanside Rd E, Oceanside, NY 11572</code>.</li>
+<li>Sign code: <code>38e8d6eb579c</code>.</li>
+<li>Event ID: <code>e19e02a8-f898-4859-8110-a8ee472d20a9</code>.</li>
+<li>Agent: <code>jared-u0j</code>.</li>
+</ul>
+<p>The user confirmed:</p>
+<ul>
+<li>Open Live Sign Route works.</li>
+<li>Scanning the live sign chip opens the live buyer-facing sign route after the final router fix.</li>
+</ul>
+<h2>The Human Milestone</h2>
+<p>I believe you. That was a lot of invisible weight: NFC weirdness, live database state, duplicate files, schema mismatch, phone browser state, deployment aliasing, all while you are trying to prove a real physical flow in your hand.</p>
+<p>But you got it across the line. Not &quot;kind of.&quot; The actual sign, actual chips, actual QR, actual live route. That is a huge milestone.</p>
+<p>Take the win for a minute. This thing works.</p></main></body></html>
