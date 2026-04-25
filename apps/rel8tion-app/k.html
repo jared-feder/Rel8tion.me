@@ -66,6 +66,26 @@
       window.location.href = target;
     }
 
+    function goToLiveSign(publicCode) {
+      if (!publicCode) return;
+      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+      window.location.href = `${window.location.origin}/s?code=${encodeURIComponent(publicCode)}`;
+    }
+
+    async function findActiveSignByChipUid(chipUid) {
+      const encodedUid = encodeURIComponent(chipUid);
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&status=eq.active&select=id,public_code&limit=1`, {
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) return null;
+      const rows = await response.json().catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
     async function findPendingPairedSign() {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?status=eq.inactive&owner_agent_slug=is.null&uid_primary=not.is.null&uid_secondary=not.is.null&select=id,public_code&order=updated_at.desc&limit=1`, {
         headers: {
@@ -86,6 +106,13 @@
       }
 
       const pendingSignActivation = readSignActivationSession();
+      const activeSign = await findActiveSignByChipUid(uid);
+      if (activeSign?.public_code) {
+        setStatus('Opening Sign', 'Loading the live sign route.');
+        goToLiveSign(activeSign.public_code);
+        return;
+      }
+
       if (pendingSignActivation?.stage === 'waiting_for_sign_chip_1' || pendingSignActivation?.stage === 'waiting_for_second_sign_chip') {
         setStatus('Smart Sign Chip', 'Continuing sign activation.');
         continueSignActivation({ sign_uid: uid });
