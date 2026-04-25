@@ -45,6 +45,12 @@
 
     function continueSignActivation(query = {}) {
       const next = new URLSearchParams();
+      const pending = readSignActivationSession();
+      if (pending?.uid) next.set('uid', pending.uid);
+      if (pending?.agentSlug) next.set('agent', pending.agentSlug);
+      if (pending?.publicCode) next.set('code', pending.publicCode);
+      if (pending?.signId) next.set('sign_id', pending.signId);
+      if (pending?.inventoryId) next.set('inventory_id', pending.inventoryId);
       for (const [key, value] of Object.entries(query)) {
         if (value) next.set(key, value);
       }
