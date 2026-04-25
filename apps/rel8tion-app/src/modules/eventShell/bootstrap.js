@@ -573,9 +573,9 @@ function attachEventHandlers() {
         buyerPhone: payload.visitor_phone || '',
         buyerName: payload.visitor_name || '',
         agentName: pageState.agent?.name || hostAgentSlug(pageState.eventRow) || '',
-        agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || '',
+            agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || pageState.eventRow?.setup_context?.detected_brokerage || '',
         agentPhone: pageState.agent?.phone || '',
-        propertyAddress: pageState.house?.address || ''
+        propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || ''
       });
 
       if (financingRequested) {
@@ -583,7 +583,7 @@ function attachEventHandlers() {
           agentPhone: pageState.agent?.phone || payload.buyer_agent_phone || '',
           buyerPhone: payload.visitor_phone || '',
           buyerName: payload.visitor_name || 'Buyer',
-          address: pageState.house?.address || 'Open House Visitor',
+          address: pageState.house?.address || pageState.eventRow?.setup_context?.address || 'Open House Visitor',
           price: pageState.house?.price ? money(pageState.house.price) : '',
           preapproved: payload.pre_approved === true ? 'yes' : 'no'
         });
@@ -608,11 +608,21 @@ function attachEventHandlers() {
 
 function renderEventShell() {
   const { eventRow, house, agent, selectedPath } = pageState;
-  const image = house?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
-  const status = houseStatus(house);
+  const contextHouse = house || {
+    address: eventRow?.setup_context?.address || '',
+    brokerage: eventRow?.setup_context?.detected_brokerage || '',
+    price: eventRow?.setup_context?.price || null,
+    beds: eventRow?.setup_context?.beds || null,
+    baths: eventRow?.setup_context?.baths || null,
+    sqft: eventRow?.setup_context?.sqft || null,
+    open_start: eventRow?.start_time || null,
+    open_end: eventRow?.end_time || null
+  };
+  const image = contextHouse?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
+  const status = houseStatus(contextHouse);
   const agentName = agent?.name || hostAgentSlug(eventRow) || 'Host Agent';
   const agentImage = agentPhotoUrl(agent);
-  const facts = propertyFacts(house);
+  const facts = propertyFacts(contextHouse);
 
   const lastCheckinNeedsFinancing = pageState.lastCheckin?.metadata?.financing_requested === true;
 
@@ -627,9 +637,9 @@ function renderEventShell() {
       <img src="${esc(image)}" alt="Property" class="w-full h-64 md:h-80 object-cover bg-slate-100">
       <div class="p-6 md:p-8">
         <div class="inline-flex items-center px-4 py-2 rounded-full text-xs font-black uppercase tracking-[0.18em] text-white mb-4" style="background:${status.color}">${esc(status.label)}</div>
-        <div class="font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(house?.address || 'Open House Event')}</div>
-        ${house?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-3">${money(house.price)}</div>` : ''}
-        <div class="text-slate-600 text-base md:text-lg font-semibold">${esc(house?.brokerage || 'Brokerage info available on event record')}</div>
+        <div class="font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(contextHouse?.address || 'Open House Event')}</div>
+        ${contextHouse?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-3">${money(contextHouse.price)}</div>` : ''}
+        <div class="text-slate-600 text-base md:text-lg font-semibold">${esc(contextHouse?.brokerage || 'Brokerage info available on event record')}</div>
 
         <div class="grid grid-cols-1 md:grid-cols-[1.25fr_.9fr_.9fr] gap-4 mt-6">
           <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4 flex items-center gap-4">
