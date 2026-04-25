@@ -38,6 +38,8 @@ function readSignActivationSession() {
 function continueSignActivationFromQr(code) {
   const pending = readSignActivationSession();
   if (!pending?.uid || !pending?.agentSlug) return false;
+  if (pending.publicCode && pending.publicCode !== code) return false;
+  if (!pending.publicCode && !pending.qrArmedAt) return false;
   if (!['waiting_for_sign_code', 'waiting_for_sign_chip_1', 'waiting_for_second_sign_chip', 'waiting_for_handshake'].includes(pending.stage)) {
     return false;
   }
@@ -383,7 +385,7 @@ export async function initSignResolverPage() {
     pageState.hostSession = getHostSession();
     const sign = await getSmartSignByPublicCode(code);
     if (!sign) {
-      errorView('Invalid Sign', 'No smart sign was found for that public code.');
+      window.location.replace(`/sign-demo-activate.html?code=${encodeURIComponent(code)}&fresh_qr=1`);
       return;
     }
     pageState.sign = sign;

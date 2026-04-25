@@ -137,6 +137,21 @@
       const record = rows[0];
       if (record.claimed === true && record.agent_slug) {
         const pendingSignActivation = readSignActivationSession();
+        if (pendingSignActivation?.stage === 'waiting_for_agent_keychain' && pendingSignActivation.publicCode) {
+          if (pendingSignActivation.ownerAgentSlug && pendingSignActivation.ownerAgentSlug !== record.agent_slug) {
+            setStatus('Wrong Keychain', `This sign is assigned to ${pendingSignActivation.ownerAgentSlug}.`);
+            return;
+          }
+          setStatus('Keychain Confirmed', 'Opening sign activation.');
+          continueSignActivation({
+            uid,
+            agent: record.agent_slug,
+            code: pendingSignActivation.publicCode,
+            sign_id: pendingSignActivation.signId
+          });
+          return;
+        }
+
         if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.agentSlug === record.agent_slug) {
           setStatus('Handshake Confirmed', 'Opening sign activation.');
           continueSignActivation({ uid, agent: record.agent_slug });
