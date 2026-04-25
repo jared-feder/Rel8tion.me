@@ -66,6 +66,19 @@
       window.location.href = target;
     }
 
+    async function findPendingPairedSign() {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?status=eq.inactive&owner_agent_slug=is.null&uid_primary=not.is.null&uid_secondary=not.is.null&select=id,public_code&order=updated_at.desc&limit=1`, {
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) return null;
+      const rows = await response.json().catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
     async function init() {
       if (!uid) {
         window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
@@ -113,6 +126,18 @@
         if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.agentSlug === record.agent_slug) {
           setStatus('Handshake Confirmed', 'Opening sign activation.');
           continueSignActivation({ uid, agent: record.agent_slug });
+          return;
+        }
+
+        const pendingPairedSign = await findPendingPairedSign();
+        if (pendingPairedSign?.public_code) {
+          setStatus('Handshake Confirmed', 'Opening sign activation.');
+          continueSignActivation({
+            uid,
+            agent: record.agent_slug,
+            code: pendingPairedSign.public_code,
+            sign_id: pendingPairedSign.id
+          });
           return;
         }
 
