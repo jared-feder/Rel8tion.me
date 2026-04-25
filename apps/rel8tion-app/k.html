@@ -79,6 +79,12 @@
         return;
       }
 
+      if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.uid === uid) {
+        setStatus('Handshake Confirmed', 'Opening sign activation.');
+        continueSignActivation({ uid, agent: pendingSignActivation.agentSlug });
+        return;
+      }
+
       setStatus('Checking Key...', 'Looking up your Rel8tion chip.');
       const response = await fetch(`${SUPABASE_URL}/rest/v1/keys?uid=eq.${encodeURIComponent(uid)}&select=*`, {
         headers: {
