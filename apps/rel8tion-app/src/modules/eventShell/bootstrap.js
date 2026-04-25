@@ -1,7 +1,7 @@
 import { ASSETS } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js';
 import { createCheckin, getEventById, touchEvent } from '../../api/events.js';
-import { sendFinancingLeadAlert } from '../../api/notifications.js';
+import { sendBuyerConfirmationSMS, sendFinancingLeadAlert } from '../../api/notifications.js';
 import { getOpenHouseById } from '../../api/openHouses.js';
 import { esc, money } from '../../core/utils.js';
 
@@ -569,6 +569,15 @@ function attachEventHandlers() {
       }
 
       const financingRequested = payload.metadata?.financing_requested === true;
+      await sendBuyerConfirmationSMS({
+        buyerPhone: payload.visitor_phone || '',
+        buyerName: payload.visitor_name || '',
+        agentName: pageState.agent?.name || hostAgentSlug(pageState.eventRow) || '',
+        agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || '',
+        agentPhone: pageState.agent?.phone || '',
+        propertyAddress: pageState.house?.address || ''
+      });
+
       if (financingRequested) {
         await sendFinancingLeadAlert({
           agentPhone: pageState.agent?.phone || payload.buyer_agent_phone || '',

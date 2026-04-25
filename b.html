@@ -61,6 +61,17 @@ function displayPhone(p){
   return p || "";
 }
 
+function buildBuyerConfirmationMessage(form){
+  return [
+    `Thanks${form.name ? ` ${form.name}` : ""}, your open house request was received.`,
+    detectedHouse?.address ? `Property: ${detectedHouse.address}` : "",
+    agentData?.name ? `Hosted by: ${agentData.name}` : "",
+    agentData?.brokerage ? `Brokerage: ${agentData.brokerage}` : "",
+    agentData?.phone ? `Agent phone: ${displayPhone(agentData.phone)}` : "",
+    "Reply or call the agent directly for next steps."
+  ].filter(Boolean).join("\\n");
+}
+
 function money(v){
   const n = Number(v || 0);
   return n ? "$" + n.toLocaleString() : "";
@@ -576,6 +587,26 @@ async function submitLead(){
     if(!smsRes.ok){
       const raw = await smsRes.text().catch(() => "");
       console.log("SMS warning:", raw);
+    }
+
+    const buyerSmsRes = await fetch(SMS_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": KEY,
+        "Authorization": "Bearer " + KEY
+      },
+      body: JSON.stringify({
+        agent_phone: form.phone,
+        buyer_phone: form.phone,
+        buyer_name: form.name,
+        message: buildBuyerConfirmationMessage(form)
+      })
+    });
+
+    if(!buyerSmsRes.ok){
+      const raw = await buyerSmsRes.text().catch(() => "");
+      console.log("Buyer confirmation SMS warning:", raw);
     }
 
     btn.innerText = "Submitted ✓";
