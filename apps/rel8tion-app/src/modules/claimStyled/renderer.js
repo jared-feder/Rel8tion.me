@@ -273,6 +273,13 @@ export function showVerifyAgent() {
 }
 
 export function showAlreadyClaimed(agent) {
+  const onboardingUrl = new URL(ROUTES.onboarding, window.location.origin);
+  onboardingUrl.searchParams.set('agent', agent.slug || '');
+  if (state.uid) onboardingUrl.searchParams.set('uid', state.uid);
+  const activateUrl = new URL('/sign-demo-activate.html', window.location.origin);
+  activateUrl.searchParams.set('agent', agent.slug || '');
+  if (state.uid) activateUrl.searchParams.set('uid', state.uid);
+
   render(`
     <div>
       <h1 class="font-['Poppins'] text-[34px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">This Chip Is Already Active</h1>
@@ -285,7 +292,8 @@ export function showAlreadyClaimed(agent) {
         ${agent.email ? `<div class="text-slate-600 font-semibold">${esc(agent.email)}</div>` : ''}
       </div>
       <div class="space-y-3">
-        <a href="${ROUTES.onboarding}?agent=${encodeURIComponent(agent.slug || '')}" class="block w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all text-center" style="${primaryButtonStyle()}">Open Existing Setup</a>
+        <a href="${esc(`${activateUrl.pathname}${activateUrl.search}`)}" class="block w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] transition-all text-center" style="${primaryButtonStyle()}">Activate Smart Sign</a>
+        <a href="${esc(`${onboardingUrl.pathname}${onboardingUrl.search}`)}" class="block w-full py-4 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm transition-all text-center">Open Existing Setup</a>
       </div>
     </div>
   `);
