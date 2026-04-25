@@ -1,7 +1,27 @@
 {
   "snapshot_date": "2026-04-25",
   "production_url": "https://app.rel8tion.me",
-  "latest_deployed_commit": "662442e",
+  "latest_deployed_commit": "0e617c3",
+  "latest_deployed_commit_message": "Add demo smart sign reset action",
+  "demo_reset_action": {
+    "available": true,
+    "location": "Smart Sign activation success screen",
+    "button_label": "Reset This Demo Sign",
+    "confirmation_required": "Type the exact sign public code",
+    "current_demo_confirmation_code": "38e8d6eb579c",
+    "default_behavior": [
+      "delete open_house_events rows tied to the sign smart_sign_id",
+      "clear smart_sign_inventory.smart_sign_id",
+      "clear smart_sign_inventory.claimed_at",
+      "delete the smart_signs row for the confirmed public code",
+      "clear browser local Smart Sign activation session",
+      "leave agent keychain keys claimed"
+    ],
+    "optional_behavior": [
+      "if selected, unclaim the current keychain UID only"
+    ],
+    "normal_demo_instruction": "Leave the keychain reset checkbox unchecked when reusing the sign for another demo."
+  },
   "smart_sign": {
     "id": "2b0f9786-6476-4b99-99fc-13bdee0e90a9",
     "public_code": "38e8d6eb579c",

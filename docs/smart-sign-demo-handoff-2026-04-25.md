@@ -19,8 +19,50 @@ The tested physical flow is:
 9. App creates the open house event and marks the sign active.
 10. Buyer-facing live sign route opens.
 11. After activation, scanning either sign chip opens the live buyer sign route, not the agent activation flow.
+12. The activation success screen includes a guarded reset button so the same demo sign can be cleared and activated again.
 
 The demo has been proven with real QR, real NFC chips, real Supabase rows, and the production alias.
+
+## Demo Reset Button
+
+A reset control was added after the first handoff package was created.
+
+Where to find it:
+
+1. Open the Smart Sign activation success screen.
+2. Look under `Open Live Sign Route` and `Open Event Shell`.
+3. Tap `Reset This Demo Sign`.
+4. Type the exact sign public code to confirm.
+5. Tap `Delete Last Full Sign Activation`.
+
+For the current working sign, the confirmation code is:
+
+`38e8d6eb579c`
+
+The reset button is intentionally not on the buyer-facing `/s?code=...` page. It only appears on the activation success screen.
+
+What the reset does by default:
+
+- Deletes `open_house_events` rows tied to that `smart_sign_id`.
+- Clears the `smart_sign_inventory.smart_sign_id` link.
+- Clears `smart_sign_inventory.claimed_at`.
+- Deletes the `smart_signs` row for that public code.
+- Clears the browser's local Smart Sign activation session.
+- Leaves the agent Rel8tionChip/keychain claimed.
+
+What it does not do by default:
+
+- It does not delete or unclaim every key for the agent.
+- It does not wipe unrelated signs.
+- It does not reset other rows unless they are tied to the exact sign public code being confirmed.
+
+There is an optional checkbox:
+
+`Also unclaim this current keychain UID`
+
+Leave that unchecked for normal demo reset use. Only check it if the current agent keychain itself should be returned to first-time setup.
+
+The reset flow was tested with a throwaway sign/inventory/event before deployment. The real working sign `38e8d6eb579c` was confirmed still active after deployment.
 
 ## Current Live Production State
 
@@ -34,7 +76,7 @@ Branch used for deploys:
 
 Latest relevant deployed commit:
 
-`662442e Route active sign chips to live sign`
+`0e617c3 Add demo smart sign reset action`
 
 ### Working Smart Sign
 
@@ -424,6 +466,27 @@ Commit:
 
 `662442e Route active sign chips to live sign`
 
+### 9. Demo reset button added
+
+Need:
+
+For live demos, the same physical sign may be shown repeatedly instead of left with every agent. Manually deleting rows from Supabase would waste time and risks deleting the wrong rows.
+
+Fix:
+
+Add `Reset This Demo Sign` on the activation success screen.
+
+The reset requires typing the exact sign code and then:
+
+- Deletes event rows for the sign.
+- Clears the inventory claim/link.
+- Deletes the Smart Sign row, including chip bindings.
+- Optionally unclaims the current keychain only if the checkbox is selected.
+
+Commit:
+
+`0e617c3 Add demo smart sign reset action`
+
 ## Commit Trail
 
 Relevant commits in order:
@@ -441,6 +504,7 @@ e3b8741 Add paired sign handshake fallback
 739e2e8 Fix root smart sign activation handoff
 4c87aa9 Use host agent slug for sign events
 662442e Route active sign chips to live sign
+0e617c3 Add demo smart sign reset action
 ```
 
 ## What Must Not Be Lost Tomorrow
@@ -455,6 +519,10 @@ Do not reset or overwrite these rows unless intentionally starting a new demo si
 - `public_code = 38e8d6eb579c`
 - `uid_primary = 8ce0364c-411e-45f8-a9eb-2eb8954b0ca0`
 - `uid_secondary = 987fb582-6ca3-4d8a-8dc2-54b6af6e2962`
+
+Exception:
+
+If you intentionally use the new `Reset This Demo Sign` button and type the exact code `38e8d6eb579c`, these rows will be cleared so the same physical sign can be activated again. That is now the preferred reset path for demos.
 
 Do not run a broad cleanup against:
 
@@ -488,6 +556,8 @@ Before handing signs to agents:
 8. Confirm it opens the agent route/profile, not the sign activation flow.
 9. Confirm the database still shows `smart_signs.status = active`.
 10. Confirm `active_event_id = e19e02a8-f898-4859-8110-a8ee472d20a9`.
+11. If you need to reuse the same sign for another demo, use `Reset This Demo Sign` from the activation success screen and type the exact public code.
+12. After reset, scan the QR again and run the activation flow fresh.
 
 For each additional demo sign tomorrow:
 
@@ -512,8 +582,19 @@ Create a small "demo sign registry" note or table before giving signs to agents.
 - Event ID.
 - Whether buyer route was tested.
 - Whether both NFC chips were tested after activation.
+- Whether the sign was reset after the demo.
 
 This prevents physical signs and database rows from drifting apart.
+
+For signs you are only demoing and not leaving behind:
+
+1. Demo the live sign.
+2. If the agent will not keep it, return to the activation success screen.
+3. Tap `Reset This Demo Sign`.
+4. Type the exact public code.
+5. Leave `Also unclaim this current keychain UID` unchecked unless you mean to reset that specific keychain.
+6. Confirm the reset.
+7. The printed QR and sign chips are ready for the next activation.
 
 ### Stabilize the codebase
 
@@ -524,6 +605,7 @@ This prevents physical signs and database rows from drifting apart.
 5. Add a read-only verification script:
    - Given public code, show inventory row, sign row, event row, and chip routing expectation.
 6. Add a reset script for demo-only signs, but make it require the exact public code.
+7. Later, move the reset action behind a proper admin/demo-only gate before wider production usage.
 
 ### Database protection
 
@@ -565,6 +647,7 @@ After the demo is safe:
 3. Browser localStorage can still hold stale activation state, but active sign chip routing now clears it when the sign is live.
 4. `open_house_events` uses `host_agent_slug`; older code may still refer to `agent_slug`.
 5. `owner_agent_slug` is on `smart_signs`; event ownership is `host_agent_slug`.
+6. The reset button is powerful. It is guarded by exact public-code confirmation, but it is still a real database reset for that sign.
 
 ## Verified End State
 
