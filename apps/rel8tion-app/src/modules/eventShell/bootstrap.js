@@ -1,8 +1,8 @@
 import { ASSETS } from '../../core/config.js';
-import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1108';
-import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1108';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1108';
-import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1108';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1125';
+import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1125';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1125';
+import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1125';
 import { esc, money } from '../../core/utils.js';
 
 const CHECKIN_PATHS = Object.freeze({
@@ -181,6 +181,20 @@ function smsHref(phone, body = '') {
 
 function mailtoHref(email, subject = '') {
   return email ? `mailto:${email}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}` : '#';
+}
+
+function vcardHref(agent) {
+  if (!agent?.name && !agent?.phone && !agent?.email) return '#';
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${agent?.name || 'Host Agent'}`,
+    agent?.brokerage ? `ORG:${agent.brokerage}` : '',
+    agent?.phone ? `TEL;TYPE=CELL:${agent.phone}` : '',
+    agent?.email ? `EMAIL:${agent.email}` : '',
+    'END:VCARD'
+  ].filter(Boolean);
+  return `data:text/vcard;charset=utf-8,${encodeURIComponent(lines.join('\n'))}`;
 }
 
 function textOrDash(value) {
@@ -683,6 +697,11 @@ function renderEventShell() {
   const agentName = agent?.name || 'Host Agent';
   const agentImage = agentPhotoUrl(agent);
   const facts = propertyFacts(contextHouse);
+  const factSummary = facts
+    .filter((fact) => fact.value)
+    .map((fact) => `${esc(fact.value)} ${esc(fact.label)}`)
+    .join(' | ');
+  const contactHref = vcardHref(agent);
 
   const lastCheckinNeedsFinancing = pageState.lastCheckin?.metadata?.financing_requested === true;
 
@@ -700,42 +719,36 @@ function renderEventShell() {
       <div class="p-6 md:p-8">
         <div class="inline-flex items-center px-4 py-2 rounded-full text-xs font-black uppercase tracking-[0.18em] text-white mb-4" style="background:${status.color}">${esc(status.label)}</div>
         <div class="font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(contextHouse?.address || 'Open House Event')}</div>
-        ${contextHouse?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-3">${money(contextHouse.price)}</div>` : ''}
-        <div class="text-slate-600 text-base md:text-lg font-semibold">${esc(contextHouse?.brokerage || 'Brokerage info available on event record')}</div>
+        ${contextHouse?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-2">${money(contextHouse.price)}</div>` : ''}
+        ${factSummary ? `<div class="text-slate-700 text-base md:text-lg font-black mb-3">${factSummary}</div>` : ''}
+        <div class="text-slate-600 text-base md:text-lg font-semibold mb-6">${esc(contextHouse?.brokerage || 'Brokerage info available on event record')}</div>
 
-        <div class="grid grid-cols-1 md:grid-cols-[1.25fr_.9fr_.9fr] gap-4 mt-6">
-          <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4 flex items-center gap-4">
+        <div class="rounded-[26px] bg-slate-50 border border-slate-100 p-5">
+          <div class="flex items-center gap-4">
             ${agentImage ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="w-16 h-16 rounded-full object-cover bg-white border border-white shadow-sm">` : ''}
             <div>
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Hosted By</div>
-            <div class="text-slate-900 font-black text-lg">${esc(agentName)}</div>
-            <div class="text-slate-500 font-semibold text-sm">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
+              <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Hosted By</div>
+              <div class="text-slate-900 font-black text-xl">${esc(agentName)}</div>
+              <div class="text-slate-500 font-semibold text-sm">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
             </div>
           </div>
-          <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Open Window</div>
-            <div class="text-slate-900 font-bold">${esc(formatEventWindow(house))}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+            <a href="${esc(contactHref)}" download="${esc((agentName || 'host-agent').replace(/[^a-z0-9]+/gi, '-').toLowerCase())}.vcf" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)] ${contactHref === '#' ? 'pointer-events-none opacity-60' : ''}" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Save Contact</a>
+            <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/85 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
+            <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I am checking in for ${contextHouse?.address || 'your open house'}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/85 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
           </div>
-          <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Contact</div>
-            <div class="text-slate-900 font-bold">${textOrDash(agent?.phone)}</div>
-            <div class="text-slate-500 font-semibold text-sm break-all">${textOrDash(agent?.email)}</div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-          ${facts.map((fact) => `
-            <div class="rounded-[18px] bg-white/80 border border-slate-100 p-4">
-              <div class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">${esc(fact.label)}</div>
-              <div class="text-slate-900 font-black text-lg">${fact.value ? esc(fact.value) : '&mdash;'}</div>
-            </div>
-          `).join('')}
         </div>
       </div>
     </section>
 
-    <section class="grid grid-cols-1 lg:grid-cols-[1.2fr_.8fr] gap-5 mb-5">
-      <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
+    <section class="mb-5">
+      <article class="rounded-[28px] border border-sky-100 bg-white/82 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">CHECK IN HERE</div>
+          <h2 class="font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-2">Start Your Visit</h2>
+          <p class="text-slate-600 font-semibold leading-relaxed max-w-2xl mx-auto">Choose the option that matches you, then complete the quick form so the host can follow up about this property.</p>
+        </div>
+
         <div class="flex flex-wrap gap-3 mb-5">
           ${pathButton(CHECKIN_PATHS.BUYER, PATH_LABELS[CHECKIN_PATHS.BUYER])}
           ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_WITH_AGENT])}
@@ -777,28 +790,11 @@ function renderEventShell() {
           </div>
         `}
       </article>
-
-      <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Host Agent</h2>
-        <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-5 mb-4 flex items-center gap-4">
-          ${agentImage ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="w-20 h-20 rounded-full object-cover bg-white border border-white shadow-sm">` : ''}
-          <div>
-            <div class="text-slate-900 font-black text-xl">${esc(agentName)}</div>
-            <div class="text-slate-600 font-semibold">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
-            <div class="text-slate-500 font-semibold text-sm mt-1">${textOrDash(agent?.phone)}</div>
-          </div>
+      ${lastCheckinNeedsFinancing ? `
+        <div class="rounded-[20px] bg-sky-50 border border-sky-200 p-4 mt-4 text-sky-900 font-semibold">
+          Financing follow-up was requested for this check-in.
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
-          <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${contextHouse?.address || 'your open house'}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
-          <a href="${esc(mailtoHref(agent?.email || '', `Question about ${contextHouse?.address || 'your open house'}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
-        </div>
-          ${lastCheckinNeedsFinancing ? `
-            <div class="rounded-[20px] bg-sky-50 border border-sky-200 p-4">
-              Financing follow-up was requested for this check-in.
-            </div>
-          ` : ''}
-      </article>
+      ` : ''}
     </section>
 
     ${pageState.mode === 'guest' ? nextStepCards() : ''}
