@@ -245,6 +245,21 @@ async function markOpenHouse(openHouseId, enriched) {
   });
 }
 
+async function updateOpenHouseAgent(openHouse, agent) {
+  const patch = {
+    agent_scraped: true,
+    agent_enriched: true
+  };
+
+  if (!openHouse.agent && agent.name) patch.agent = agent.name;
+  if (!openHouse.agent_phone && agent.phone) patch.agent_phone = agent.phone;
+
+  await supabaseRequest(`open_houses?id=eq.${encodeURIComponent(openHouse.id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch)
+  });
+}
+
 async function processOpenHouse(openHouse) {
   const label = `${openHouse.id} ${openHouse.address || ''}`.trim();
   console.log(`[estately] processing ${label}`);
@@ -265,7 +280,7 @@ async function processOpenHouse(openHouse) {
     }
 
     await saveListingAgent(openHouse, agent);
-    await markOpenHouse(openHouse.id, true);
+    await updateOpenHouseAgent(openHouse, agent);
     console.log(`[estately] saved ${agent.name || 'agent'} ${agent.phone_normalized} for ${label}`);
     return { id: openHouse.id, saved: true, url: page.url, mode: page.mode };
   } catch (error) {

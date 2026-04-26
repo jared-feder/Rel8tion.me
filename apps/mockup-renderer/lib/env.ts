@@ -11,5 +11,5 @@ export const env = {
   publicBaseUrl: process.env.REL8TION_PUBLIC_BASE_URL || "https://rel8tion.me",
   generateFunctionUrl: must("GENERATE_FUNCTION_URL"),
   twilioSendFunctionUrl: must("TWILIO_SEND_FUNCTION_URL"),
-  cronSharedSecret: must("CRON_SHARED_SECRET")
+  cronSharedSecret: process.env.CRON_SHARED_SECRET || must("CRON_SECRET")
 };
