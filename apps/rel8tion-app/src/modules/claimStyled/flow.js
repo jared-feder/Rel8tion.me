@@ -23,6 +23,11 @@ import {
 import { sendActivationSMS } from '../../api/notifications.js';
 import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
 import {
+  clearPendingSignActivation,
+  getPendingSignActivation,
+  saveHostSession
+} from '../../core/hostSession.js';
+import {
   showAlreadyClaimed,
   showBrokerageStep,
   showDetection,
@@ -44,6 +49,24 @@ function onboardingRoute(slug) {
     url.searchParams.set('uid', state.uid);
   }
   return `${url.pathname}${url.search}`;
+}
+
+function routeAfterVerifiedAgent(slug, source = 'claim') {
+  saveHostSession({
+    agentSlug: slug,
+    uid: state.uid || '',
+    source
+  });
+
+  const pendingSign = getPendingSignActivation();
+  if (pendingSign?.code) {
+    clearPendingSignActivation();
+    const url = new URL(ROUTES.sign, window.location.origin);
+    url.searchParams.set('code', pendingSign.code);
+    return `${url.pathname}${url.search}`;
+  }
+
+  return onboardingRoute(slug);
 }
 
 export function bindPublicHandlers() {
@@ -356,7 +379,7 @@ export async function autoActivate() {
     await upsertAgent(agent);
     await linkKeyToAgent(slug);
     await sendActivationSMS(agent.phone, slug, agent.name);
-    window.location.href = onboardingRoute(slug);
+    window.location.href = routeAfterVerifiedAgent(slug, 'claim-auto-activate');
   } catch (e) {
     debug('AUTO ACTIVATE FAILED', { message: e?.message || String(e) });
     routeUnknownAgentFlow(h?.brokerage || '', 'Auto activation failed. Complete your profile below.');
@@ -410,7 +433,7 @@ export async function saveFullProfile() {
     await applyBranding(brokerage);
     await linkKeyToAgent(slug);
     await sendActivationSMS(phone, slug, name);
-    window.location.href = onboardingRoute(slug);
+    window.location.href = routeAfterVerifiedAgent(slug, 'claim-full-profile');
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
     showFullProfileForm(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
@@ -429,8 +452,13 @@ export async function init() {
   try {
     await loadAgentFromUID();
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
+      const nextRoute = routeAfterVerifiedAgent(state.keyRecord.agent_slug, 'claimed-chip-scan');
+      if (nextRoute !== onboardingRoute(state.keyRecord.agent_slug)) {
+        window.location.href = nextRoute;
+        return;
+      }
       if (state.prefilledAgent) showAlreadyClaimed(state.prefilledAgent);
-      else window.location.href = onboardingRoute(state.keyRecord.agent_slug);
+      else window.location.href = nextRoute;
       return;
     }
     showIntro();

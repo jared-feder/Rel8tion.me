@@ -1,7 +1,7 @@
 import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
 import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js';
 import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js';
-import { getHostSession, hostSessionLabel } from '../../core/hostSession.js';
+import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js';
 import {
   assignSmartSignToAgent,
   getActiveSmartSignEvent,
@@ -159,13 +159,22 @@ function activationCard(sign) {
   }
 
   if (!pageState.hostSession) {
+    savePendingSignActivation({
+      code: sign.public_code || '',
+      signId: sign.id || '',
+      source: 'inactive-sign-qr'
+    });
+
     return `
       <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mt-6">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Host Activation</div>
-        <div class="text-slate-900 font-black text-xl mb-3">Host session not detected</div>
+        <div class="text-slate-900 font-black text-xl mb-3">Scan Your Rel8tionChip To Verify</div>
         <p class="text-slate-600 font-semibold leading-relaxed">
-          This sign is ready, but no recent host chip scan was found on this device. Scan the claimed Rel8tionChip first, then scan this sign to bind it to the open house.
+          This sign is ready, but we need to verify the host before binding it to an open house. Tap or scan your claimed Rel8tionChip on this phone, then you will come right back here to pick the listing.
         </p>
+        <a href="/claim" class="mt-5 inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+          Open Rel8tionChip Scan
+        </a>
       </div>
     `;
   }
