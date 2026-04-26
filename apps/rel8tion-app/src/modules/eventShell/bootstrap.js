@@ -1,8 +1,8 @@
 import { ASSETS } from '../../core/config.js';
-import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1125';
-import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1125';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1125';
-import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1125';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1455';
+import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1455';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1455';
+import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1455';
 import { esc, money } from '../../core/utils.js';
 
 const CHECKIN_PATHS = Object.freeze({
@@ -89,7 +89,10 @@ function houseStatus(house) {
     const now = new Date();
     const start = house?.open_start ? new Date(house.open_start) : null;
     const end = house?.open_end ? new Date(house.open_end) : null;
-    if (start && end && now >= start && now <= end) return { label: 'Live Now', color: '#16a34a' };
+    const graceEnd = end ? new Date(end.getTime() + 6 * 60 * 60 * 1000) : null;
+    const today = start && start.toDateString() === now.toDateString();
+    if (start && end && now >= start && (!graceEnd || now <= graceEnd)) return { label: 'Live Now', color: '#16a34a' };
+    if (today) return { label: 'Open Today', color: '#16a34a' };
     if (start && now < start) return { label: 'Upcoming', color: '#2563eb' };
     return { label: 'Ended', color: '#6b7280' };
   } catch {

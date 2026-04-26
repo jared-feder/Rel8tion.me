@@ -1,14 +1,14 @@
 import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
-import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260426-1108';
-import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260426-1108';
-import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js?v=20260426-1108';
+import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260426-1455';
+import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260426-1455';
+import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js?v=20260426-1455';
 import {
   assignSmartSignToAgent,
   getActiveSmartSignEvent,
   getSmartSignByPublicCode,
   getSmartSignsByAssignedAgent,
   updateSmartSign
-} from '../../api/smartSigns.js?v=20260426-1108';
+} from '../../api/smartSigns.js?v=20260426-1455';
 import { authHeaders, esc, money } from '../../core/utils.js';
 
 const pageState = {
@@ -39,9 +39,9 @@ function openHouseTimeScore(house) {
 
 async function looseNearbyOpenHouses(lat, lng) {
   const now = new Date();
-  const from = new Date(now.getTime() - 18 * 60 * 60 * 1000).toISOString();
-  const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  const url = `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&select=*&order=open_start.asc&limit=250`;
+  const from = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString();
+  const url = `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&select=*&order=open_start.asc&limit=500`;
   const res = await fetch(url, { headers: authHeaders(KEY) });
   if (!res.ok) throw new Error(await res.text() || 'Unable to load fallback open houses.');
   const rows = await res.json();
@@ -55,9 +55,21 @@ async function looseNearbyOpenHouses(lat, lng) {
         _timeScore: openHouseTimeScore(house)
       };
     })
-    .filter((house) => house._distance <= 30 || house._distance === 999)
+    .filter((house) => house._distance <= 75 || house._distance === 999)
     .sort((a, b) => (a._distance - b._distance) || (a._timeScore - b._timeScore))
-    .slice(0, 15);
+    .slice(0, 30);
+}
+
+function mergeOpenHouses(...groups) {
+  const seen = new Set();
+  return groups
+    .flat()
+    .filter((house) => {
+      if (!house?.id || seen.has(String(house.id))) return false;
+      seen.add(String(house.id));
+      return true;
+    })
+    .sort((a, b) => ((a._distance ?? 999) - (b._distance ?? 999)) || (openHouseTimeScore(a) - openHouseTimeScore(b)));
 }
 
 function getCodeFromUrl() {
@@ -195,7 +207,7 @@ function activationCard(sign) {
   const housesMarkup = pageState.nearbyHouses.length
     ? `
       <div class="space-y-3 mt-5">
-        ${pageState.nearbyHouses.slice(0, 5).map((house) => `
+        ${pageState.nearbyHouses.slice(0, 12).map((house) => `
           <button type="button" class="activate-house-button w-full rounded-[24px] border border-white/80 bg-white/85 p-4 text-left shadow-sm hover:shadow-md transition-all" data-house-id="${esc(house.id)}">
             <div class="text-slate-900 font-black text-lg leading-tight mb-1">${esc(house.address || 'Open House')}</div>
             <div class="text-sky-600 font-black text-base mb-1">${house.price ? money(house.price) : ''}</div>
@@ -303,11 +315,12 @@ function attachInactiveHandlers(sign) {
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
-        let houses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
-        if (!Array.isArray(houses) || !houses.length) {
-          houses = await looseNearbyOpenHouses(position.coords.latitude, position.coords.longitude);
-        }
-        pageState.nearbyHouses = Array.isArray(houses) ? houses : [];
+        const preciseHouses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
+        const wideHouses = await looseNearbyOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
+        pageState.nearbyHouses = mergeOpenHouses(
+          Array.isArray(preciseHouses) ? preciseHouses : [],
+          Array.isArray(wideHouses) ? wideHouses : []
+        );
         pageState.statusMessage = pageState.nearbyHouses.length
           ? 'Select the listing you want to bind to this sign.'
           : 'No nearby open house was found in the wider demo window.';
