@@ -1,4 +1,4 @@
-import { ASSETS, ROUTES } from '../../core/config.js';
+import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
 import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js';
 import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js';
 import { getHostSession, hostSessionLabel } from '../../core/hostSession.js';
@@ -9,7 +9,7 @@ import {
   getSmartSignsByAssignedAgent,
   updateSmartSign
 } from '../../api/smartSigns.js';
-import { esc, money } from '../../core/utils.js';
+import { authHeaders, esc, money } from '../../core/utils.js';
 
 const pageState = {
   sign: null,
@@ -21,6 +21,44 @@ const pageState = {
 };
 
 const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
+
+function milesBetween(a, b, c, d) {
+  const toRad = (value) => Number(value) * Math.PI / 180;
+  const dLat = toRad(c - a);
+  const dLng = toRad(d - b);
+  const x = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a)) * Math.cos(toRad(c)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 3958.8 * Math.asin(Math.sqrt(x));
+}
+
+function openHouseTimeScore(house) {
+  const start = house?.open_start ? new Date(house.open_start).getTime() : 0;
+  if (!start) return 999;
+  return Math.abs(start - Date.now()) / (60 * 60 * 1000);
+}
+
+async function looseNearbyOpenHouses(lat, lng) {
+  const now = new Date();
+  const from = new Date(now.getTime() - 18 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const url = `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&select=*&order=open_start.asc&limit=250`;
+  const res = await fetch(url, { headers: authHeaders(KEY) });
+  if (!res.ok) throw new Error(await res.text() || 'Unable to load fallback open houses.');
+  const rows = await res.json();
+
+  return (Array.isArray(rows) ? rows : [])
+    .map((house) => {
+      const hasGeo = house.lat != null && house.lng != null;
+      return {
+        ...house,
+        _distance: hasGeo ? milesBetween(lat, lng, house.lat, house.lng) : 999,
+        _timeScore: openHouseTimeScore(house)
+      };
+    })
+    .filter((house) => house._distance <= 30 || house._distance === 999)
+    .sort((a, b) => (a._distance - b._distance) || (a._timeScore - b._timeScore))
+    .slice(0, 15);
+}
 
 function getCodeFromUrl() {
   return new URLSearchParams(window.location.search).get('code') || '';
@@ -241,14 +279,17 @@ function attachInactiveHandlers(sign) {
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
-        const houses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude);
+        let houses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
+        if (!Array.isArray(houses) || !houses.length) {
+          houses = await looseNearbyOpenHouses(position.coords.latitude, position.coords.longitude);
+        }
         pageState.nearbyHouses = Array.isArray(houses) ? houses : [];
         pageState.statusMessage = pageState.nearbyHouses.length
           ? 'Select the listing you want to bind to this sign.'
-          : 'No nearby open house was found for this location.';
+          : 'No nearby open house was found in the wider demo window.';
       } catch (error) {
         console.error(error);
-        pageState.activationError = error.message || 'Unable to load nearby listings.';
+        pageState.activationError = error.message || 'Unable to load nearby listings. Search or enter the listing manually from the activation flow.';
         pageState.statusMessage = '';
       } finally {
         pageState.activating = false;
@@ -256,13 +297,13 @@ function attachInactiveHandlers(sign) {
       }
     }, () => {
       pageState.activating = false;
-      pageState.activationError = 'Location permission was denied, so this sign could not be matched to a nearby listing.';
+      pageState.activationError = 'Location permission was denied. Use the activation flow search or manual listing fallback to keep going.';
       pageState.statusMessage = '';
       inactiveView(sign);
     }, {
       enableHighAccuracy: true,
       timeout: 20000,
-      maximumAge: 0
+      maximumAge: 300000
     });
   });
 
