@@ -64,6 +64,23 @@ function getCodeFromUrl() {
   return new URLSearchParams(window.location.search).get('code') || '';
 }
 
+function firstPresent(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || '';
+}
+
+function propertyImageUrl(house) {
+  return firstPresent(
+    house?.image,
+    house?.image_url,
+    house?.listing_photo_url,
+    house?.primary_photo_url,
+    house?.photo_url,
+    house?.thumbnail_url,
+    house?.media_url,
+    Array.isArray(house?.media) ? house.media[0]?.url || house.media[0]?.MediaURL : ''
+  );
+}
+
 function readSignActivationSession() {
   try {
     const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
@@ -234,13 +251,15 @@ function inactiveView(sign) {
 }
 
 function activeView(sign, eventRow, house) {
-  const image = house?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
+  const image = propertyImageUrl(house);
   shell(`
     <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Open House Check-In</div>
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Welcome In</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-8">You are being taken to this open house check-in.</p>
     <div class="rounded-[30px] overflow-hidden border border-white/70 bg-white/75 shadow-[0_18px_40px_rgba(31,42,90,0.08)] text-left mb-8">
-      <img src="${esc(image)}" alt="Property" class="w-full h-56 object-cover bg-slate-100">
+      ${image
+        ? `<img src="${esc(image)}" alt="${esc(house?.address || 'Property photo')}" class="w-full h-56 object-cover bg-slate-100">`
+        : `<div class="w-full h-56 bg-slate-100 flex items-center justify-center text-slate-400 font-black uppercase tracking-[0.18em]">Property Photo</div>`}
       <div class="p-6">
         <div class="text-slate-900 font-black text-2xl md:text-3xl mb-2">${esc(house?.address || 'Open House Event')}</div>
         ${house?.price ? `<div class="text-sky-600 font-black text-xl mb-2">${money(house.price)}</div>` : ''}

@@ -133,6 +133,41 @@ function safeUrl(url) {
   return `https://${url}`;
 }
 
+function isOneKeyUrl(url) {
+  try {
+    return new URL(safeUrl(url)).hostname.replace(/^www\./, '') === 'onekeymls.com';
+  } catch {
+    return false;
+  }
+}
+
+function oneKeyMlsNumber(house) {
+  const raw = firstPresent(house?.mls_number, house?.mls_id, house?.listing_id, house?.id);
+  const match = String(raw || '').match(/(\d{5,})$/);
+  return match ? match[1] : '';
+}
+
+function oneKeyAddressSlug(address) {
+  return String(address || '')
+    .replace(/#/g, '')
+    .replace(/[^\w\s-]/g, ' ')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+
+function oneKeyListingUrl(house) {
+  if (house?.link && isOneKeyUrl(house.link)) return safeUrl(house.link);
+
+  const source = String(house?.source || '').toLowerCase();
+  const id = String(house?.id || '');
+  const mlsNumber = oneKeyMlsNumber(house);
+  const addressSlug = oneKeyAddressSlug(house?.address);
+  const looksOneKey = source === 'onekey' || id.startsWith('M00000489-');
+
+  if (!looksOneKey || !mlsNumber || !addressSlug) return '';
+  return `https://www.onekeymls.com/address/${encodeURIComponent(addressSlug)}/${encodeURIComponent(mlsNumber)}`;
+}
+
 function telHref(phone) {
   const digits = String(phone || '').replace(/[^\d+]/g, '');
   return digits ? `tel:${digits}` : '#';
@@ -162,6 +197,19 @@ function agentPhotoUrl(agent) {
     agent?.primary_photo_url,
     agent?.directory_photo_url,
     agent?.photo_url
+  );
+}
+
+function propertyImageUrl(house) {
+  return firstPresent(
+    house?.image,
+    house?.image_url,
+    house?.listing_photo_url,
+    house?.primary_photo_url,
+    house?.photo_url,
+    house?.thumbnail_url,
+    house?.media_url,
+    Array.isArray(house?.media) ? house.media[0]?.url || house.media[0]?.MediaURL : ''
   );
 }
 
@@ -433,6 +481,7 @@ function nextStepCards() {
   const house = pageState.house;
   const agent = pageState.agent;
   const subjectAddress = house?.address || 'this property';
+  const listingUrl = oneKeyListingUrl(house);
   const askQuestionBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress} and had a quick question.`;
   const financingCopy = pageState.lastCheckin?.metadata?.financing_requested
     ? 'Financing follow-up was requested from this visit.'
@@ -448,8 +497,8 @@ function nextStepCards() {
         </p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-          <a href="${esc(safeUrl(house?.link || ''))}" ${house?.link ? 'target="_blank" rel="noopener noreferrer"' : ''} class="inline-flex items-center justify-center px-5 py-4 rounded-full font-bold text-sm md:text-base text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] ${house?.link ? '' : 'pointer-events-none opacity-60'}" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
-            View Listing
+          <a href="${esc(listingUrl || '#')}" ${listingUrl ? 'target="_blank" rel="noopener noreferrer"' : ''} class="inline-flex items-center justify-center px-5 py-4 rounded-full font-bold text-sm md:text-base text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] ${listingUrl ? '' : 'pointer-events-none opacity-60'}" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+            View OneKey Listing
           </a>
           <a href="${esc(smsHref(agent?.phone || '', askQuestionBody))}" class="inline-flex items-center justify-center px-5 py-4 rounded-full font-bold text-sm md:text-base bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">
             Ask a Question
@@ -628,7 +677,8 @@ function renderEventShell() {
     open_start: eventRow?.start_time || null,
     open_end: eventRow?.end_time || null
   };
-  const image = contextHouse?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
+  const image = propertyImageUrl(contextHouse);
+  const listingUrl = oneKeyListingUrl(contextHouse);
   const status = houseStatus(contextHouse);
   const agentName = agent?.name || 'Host Agent';
   const agentImage = agentPhotoUrl(agent);
@@ -644,7 +694,9 @@ function renderEventShell() {
     </div>
 
     <section class="rounded-[30px] overflow-hidden border border-white/70 bg-white/75 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-6">
-      <img src="${esc(image)}" alt="Property" class="w-full h-64 md:h-80 object-cover bg-slate-100">
+      ${image
+        ? `<img src="${esc(image)}" alt="${esc(contextHouse?.address || 'Property photo')}" class="w-full h-64 md:h-80 object-cover bg-slate-100">`
+        : `<div class="w-full h-64 md:h-80 bg-slate-100 flex items-center justify-center text-slate-400 font-black uppercase tracking-[0.18em]">Property Photo</div>`}
       <div class="p-6 md:p-8">
         <div class="inline-flex items-center px-4 py-2 rounded-full text-xs font-black uppercase tracking-[0.18em] text-white mb-4" style="background:${status.color}">${esc(status.label)}</div>
         <div class="font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(contextHouse?.address || 'Open House Event')}</div>
@@ -769,7 +821,7 @@ function renderEventShell() {
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Listing Link</div>
-            <div class="text-slate-900 font-bold">${house?.link ? `<a class="text-sky-600 underline" href="${esc(safeUrl(house.link))}" target="_blank" rel="noopener noreferrer">Open Listing</a>` : '&mdash;'}</div>
+            <div class="text-slate-900 font-bold">${listingUrl ? `<a class="text-sky-600 underline" href="${esc(listingUrl)}" target="_blank" rel="noopener noreferrer">Open OneKey Listing</a>` : '&mdash;'}</div>
           </div>
         </div>
       </article>
