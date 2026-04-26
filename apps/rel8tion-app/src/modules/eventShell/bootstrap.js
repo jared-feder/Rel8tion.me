@@ -1,8 +1,8 @@
 import { ASSETS } from '../../core/config.js';
-import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js';
-import { createCheckin, getEventById, touchEvent } from '../../api/events.js';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js';
-import { getOpenHouseById } from '../../api/openHouses.js';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1108';
+import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1108';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1108';
+import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1108';
 import { esc, money } from '../../core/utils.js';
 
 const CHECKIN_PATHS = Object.freeze({

@@ -26,7 +26,7 @@ import {
   clearPendingSignActivation,
   getPendingSignActivation,
   saveHostSession
-} from '../../core/hostSession.js';
+} from '../../core/hostSession.js?v=20260426-1108';
 import {
   showAlreadyClaimed,
   showBrokerageStep,

@@ -1,14 +1,14 @@
 import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
-import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js';
-import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js';
-import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js';
+import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260426-1108';
+import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260426-1108';
+import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js?v=20260426-1108';
 import {
   assignSmartSignToAgent,
   getActiveSmartSignEvent,
   getSmartSignByPublicCode,
   getSmartSignsByAssignedAgent,
   updateSmartSign
-} from '../../api/smartSigns.js';
+} from '../../api/smartSigns.js?v=20260426-1108';
 import { authHeaders, esc, money } from '../../core/utils.js';
 
 const pageState = {
