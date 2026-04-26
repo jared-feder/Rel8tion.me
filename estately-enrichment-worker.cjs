@@ -31,8 +31,13 @@ function requireEnv(name) {
 }
 
 function supabaseConfig() {
+  const url = requireEnv('SUPABASE_URL').replace(/\/$/, '');
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) {
+    throw new Error('Invalid SUPABASE_URL environment variable. Expected https://PROJECT_REF.supabase.co');
+  }
+
   return {
-    url: requireEnv('SUPABASE_URL').replace(/\/$/, ''),
+    url,
     key: requireEnv('SUPABASE_SERVICE_ROLE_KEY')
   };
 }
