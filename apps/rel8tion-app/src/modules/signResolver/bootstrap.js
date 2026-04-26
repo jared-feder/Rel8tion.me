@@ -419,6 +419,7 @@ async function activateSignToHouse(sign, house) {
     await updateSmartSign(effectiveSign.id, {
       active_event_id: eventRow.id,
       status: 'active',
+      deactivated_at: null,
       setup_confirmed_at: new Date().toISOString()
     });
 
