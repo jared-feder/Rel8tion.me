@@ -92,23 +92,10 @@
         return;
       }
 
-      const pendingSignActivation = readSignActivationSession();
       const activeSign = await findActiveSignByChipUid(uid);
       if (activeSign?.public_code) {
         setStatus('Opening Sign', 'Loading the live sign route.');
         goToLiveSign(activeSign.public_code);
-        return;
-      }
-
-      if (pendingSignActivation?.stage === 'waiting_for_sign_chip_1' || pendingSignActivation?.stage === 'waiting_for_second_sign_chip') {
-        setStatus('Smart Sign Chip', 'Continuing sign activation.');
-        continueSignActivation({ sign_uid: uid });
-        return;
-      }
-
-      if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.uid === uid) {
-        setStatus('Handshake Confirmed', 'Opening sign activation.');
-        continueSignActivation({ uid, agent: pendingSignActivation.agentSlug });
         return;
       }
 
@@ -129,6 +116,7 @@
 
       const rows = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(rows) || rows.length === 0) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         setStatus('First Time Setup...', 'Sending you to activation.');
         goToClaim();
         return;
@@ -175,17 +163,11 @@
       }
 
       setStatus('Setup Incomplete...', 'Finishing your activation.');
+      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
       goToClaim();
     }
 
     init().catch(() => {
-      const pendingSignActivation = readSignActivationSession();
-      if (pendingSignActivation?.stage === 'waiting_for_sign_chip_1' || pendingSignActivation?.stage === 'waiting_for_second_sign_chip') {
-        setStatus('Smart Sign Chip', 'Continuing sign activation.');
-        continueSignActivation({ sign_uid: uid });
-        return;
-      }
-
       setStatus('Connection Error', 'Something interrupted the chip lookup.');
     });
   </script>
