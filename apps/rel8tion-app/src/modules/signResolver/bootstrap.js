@@ -381,7 +381,7 @@ async function activateSignToHouse(sign, house) {
 
     const request = {
       smart_sign_id: effectiveSign.id,
-      agent_slug: pageState.hostSession.agentSlug,
+      host_agent_slug: pageState.hostSession.agentSlug,
       open_house_source_id: house.id
     };
 
@@ -402,8 +402,8 @@ async function activateSignToHouse(sign, house) {
         eventRow = await createOpenHouseEvent({
           smart_sign_id: effectiveSign.id,
           open_house_source_id: house.id,
-          agent_slug: pageState.hostSession.agentSlug,
-          status: 'live',
+          host_agent_slug: pageState.hostSession.agentSlug,
+          status: 'active',
           activation_uid_primary: pageState.hostSession.uid || null,
           activation_method: 'host_chip_session_sign_activation',
           setup_confirmed_at: new Date().toISOString(),

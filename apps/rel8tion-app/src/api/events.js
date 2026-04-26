@@ -87,8 +87,9 @@ export function resolveEventLifecycle({ activeEvent, request, now = new Date() }
     return { action: 'create_new', reason: 'different_sign' };
   }
 
-  const sameHost = activeEvent.agent_slug && request.agent_slug
-    && activeEvent.agent_slug === request.agent_slug;
+  const activeHost = activeEvent.host_agent_slug || activeEvent.agent_slug || activeEvent.setup_context?.agent_slug || '';
+  const requestHost = request.host_agent_slug || request.agent_slug || '';
+  const sameHost = activeHost && requestHost && activeHost === requestHost;
   const sameProperty = activeEvent.open_house_source_id && request.open_house_source_id
     && activeEvent.open_house_source_id === request.open_house_source_id;
 
