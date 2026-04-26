@@ -116,6 +116,16 @@
 
       const rows = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(rows) || rows.length === 0) {
+        const pendingSignActivation = readSignActivationSession();
+        if (
+          pendingSignActivation?.publicCode
+          && (pendingSignActivation.stage === 'waiting_for_sign_chip_1' || pendingSignActivation.stage === 'waiting_for_second_sign_chip')
+        ) {
+          setStatus('Smart Sign Chip', 'Continuing sign activation.');
+          continueSignActivation({ sign_uid: uid });
+          return;
+        }
+
         window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         setStatus('First Time Setup...', 'Sending you to activation.');
         goToClaim();
