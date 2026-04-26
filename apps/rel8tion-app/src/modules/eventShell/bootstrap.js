@@ -1,7 +1,7 @@
 import { ASSETS } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js';
 import { createCheckin, getEventById, touchEvent } from '../../api/events.js';
-import { sendBuyerConfirmationSMS, sendFinancingLeadAlert } from '../../api/notifications.js';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js';
 import { getOpenHouseById } from '../../api/openHouses.js';
 import { esc, money } from '../../core/utils.js';
 
@@ -229,22 +229,22 @@ function selectField(label, name, options) {
 
 function getPathDescription(path) {
   if (path === CHECKIN_PATHS.BUYER) {
-    return 'A fast direct check-in for buyers touring on their own. Clean, low-friction, and ready for follow-up the same day.';
+    return 'Check in quickly so the host can follow up with the right property details.';
   }
   if (path === CHECKIN_PATHS.BUYER_WITH_AGENT) {
-    return 'For represented buyers touring with an agent already in the picture. Keep the buyer relationship visible from the first touchpoint.';
+    return 'Add your information and your agent so the host knows you are represented.';
   }
-  return 'For buyer agents checking in on behalf of a client. Document representation and keep the event record accurate in real time.';
+  return 'Check in on behalf of your buyer and keep the visit connected to your representation.';
 }
 
 function renderFormFields() {
   if (pageState.selectedPath === CHECKIN_PATHS.BUYER) {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${field('Your Name', 'visitor_name', 'text', 'Jane Buyer', true)}
-        ${field('Phone', 'visitor_phone', 'tel', '(555) 555-5555')}
+        ${field('Your Name', 'visitor_name', 'text', 'Full name', true)}
+        ${field('Phone', 'visitor_phone', 'tel', 'Mobile number')}
         <div class="md:col-span-2">
-          ${field('Email', 'visitor_email', 'email', 'you@email.com')}
+          ${field('Email', 'visitor_email', 'email', 'Email address')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Pre-Approved', 'pre_approved', [
@@ -260,15 +260,15 @@ function renderFormFields() {
   if (pageState.selectedPath === CHECKIN_PATHS.BUYER_WITH_AGENT) {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${field('Buyer Name', 'visitor_name', 'text', 'Jane Buyer', true)}
-        ${field('Buyer Phone', 'visitor_phone', 'tel', '(555) 555-5555')}
+        ${field('Buyer Name', 'visitor_name', 'text', 'Full name', true)}
+        ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number')}
         <div class="md:col-span-2">
-          ${field('Buyer Email', 'visitor_email', 'email', 'buyer@email.com')}
+          ${field('Buyer Email', 'visitor_email', 'email', 'Email address')}
         </div>
-        ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent Name', true)}
-        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', '(555) 555-5555')}
+        ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
+        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone')}
         <div class="md:col-span-2">
-          ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'agent@email.com')}
+          ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Buyer Pre-Approved', 'pre_approved', [
@@ -283,15 +283,15 @@ function renderFormFields() {
 
   return `
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent Name', true)}
-      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', '(555) 555-5555')}
+      ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
+      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone')}
       <div class="md:col-span-2">
-        ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'agent@email.com')}
+        ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
       </div>
-      ${field('Buyer Name', 'visitor_name', 'text', 'Buyer Name', true)}
-      ${field('Buyer Phone', 'visitor_phone', 'tel', '(555) 555-5555')}
+      ${field('Buyer Name', 'visitor_name', 'text', 'Buyer name', true)}
+      ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone')}
       <div class="md:col-span-2">
-        ${field('Buyer Email', 'visitor_email', 'email', 'buyer@email.com')}
+        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email')}
       </div>
       <label class="md:col-span-2 flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-slate-700 font-semibold">
         <input type="checkbox" name="represented_buyer_confirmed" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
@@ -435,16 +435,16 @@ function nextStepCards() {
   const subjectAddress = house?.address || 'this property';
   const askQuestionBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress} and had a quick question.`;
   const financingCopy = pageState.lastCheckin?.metadata?.financing_requested
-    ? 'Financing help was requested from this visit, so your service-side follow-up can begin immediately.'
-    : 'If financing comes up later, the event is already structured to route that request cleanly.';
+    ? 'Financing follow-up was requested from this visit.'
+    : 'If financing comes up later, the host has the visit details needed to follow up.';
 
   return `
     <section class="grid grid-cols-1 xl:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <div class="inline-flex items-center px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-4">Checked In</div>
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Your Visit Is Live</h2>
+        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Check-In Complete</h2>
         <p class="text-slate-600 font-medium leading-relaxed mb-5">
-          This open-house visit is now tied to a real event, a real property, and the right people. That is the trust layer working the way it should.
+          Your visit was sent to the host. You can review the property details below or contact the agent directly.
         </p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
@@ -458,7 +458,7 @@ function nextStepCards() {
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Event Path</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Check-In Type</div>
             <div class="text-slate-900 font-black">${esc(PATH_LABELS[pageState.lastCheckin?.visitor_type || pageState.selectedPath] || 'Buyer')}</div>
           </div>
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
@@ -473,18 +473,18 @@ function nextStepCards() {
       </article>
 
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Next Best Actions</h2>
+        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">What Happens Next</h2>
         <div class="space-y-4 text-slate-600 font-medium leading-relaxed">
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            Use this visit to answer the buyer’s immediate questions while the property is still in front of them.
+            The host receives the check-in details by text so follow-up can happen quickly.
           </div>
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
             ${esc(financingCopy)}
           </div>
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
             ${pageState.lastCheckin?.represented_buyer_confirmed
-              ? 'Representation was preserved in the check-in record, which keeps the handoff cleaner for everyone involved.'
-              : 'If the buyer returns with an agent later, Rel8tion can document that relationship at the event level too.'}
+              ? 'Your agent information was included with the visit.'
+              : 'If you have questions about the home, use the agent contact options on this page.'}
           </div>
         </div>
       </article>
@@ -516,7 +516,7 @@ function nextStepCards() {
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-4">Host Contact</h2>
         <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-5 mb-4">
-          <div class="text-slate-900 font-black text-xl mb-1">${esc(agent?.name || hostAgentSlug(pageState.eventRow) || 'Host Agent')}</div>
+          <div class="text-slate-900 font-black text-xl mb-1">${esc(agent?.name || 'Host Agent')}</div>
           <div class="text-slate-600 font-semibold mb-3">${textOrDash(agent?.brokerage || house?.brokerage)}</div>
           <div class="space-y-1 text-slate-700 font-medium">
             <div>${textOrDash(agent?.phone)}</div>
@@ -572,15 +572,25 @@ function attachEventHandlers() {
       await sendBuyerConfirmationSMS({
         buyerPhone: payload.visitor_phone || '',
         buyerName: payload.visitor_name || '',
-        agentName: pageState.agent?.name || hostAgentSlug(pageState.eventRow) || '',
-            agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || pageState.eventRow?.setup_context?.detected_brokerage || '',
+        agentName: pageState.agent?.name || 'Host Agent',
+        agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || pageState.eventRow?.setup_context?.detected_brokerage || '',
         agentPhone: pageState.agent?.phone || '',
         propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || ''
       });
 
+      await sendAgentCheckinSMS({
+        agentPhone: pageState.agent?.phone || '',
+        buyerName: payload.visitor_name || '',
+        buyerPhone: payload.visitor_phone || '',
+        buyerEmail: payload.visitor_email || '',
+        propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || '',
+        preapproved: payload.pre_approved,
+        buyerAgentName: payload.buyer_agent_name || '',
+        buyerAgentPhone: payload.buyer_agent_phone || ''
+      });
+
       if (financingRequested) {
-        await sendFinancingLeadAlert({
-          agentPhone: pageState.agent?.phone || payload.buyer_agent_phone || '',
+        await sendJaredFinancingAlert({
           buyerPhone: payload.visitor_phone || '',
           buyerName: payload.visitor_name || 'Buyer',
           address: pageState.house?.address || pageState.eventRow?.setup_context?.address || 'Open House Visitor',
@@ -620,7 +630,7 @@ function renderEventShell() {
   };
   const image = contextHouse?.image || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80';
   const status = houseStatus(contextHouse);
-  const agentName = agent?.name || hostAgentSlug(eventRow) || 'Host Agent';
+  const agentName = agent?.name || 'Host Agent';
   const agentImage = agentPhotoUrl(agent);
   const facts = propertyFacts(contextHouse);
 
@@ -628,9 +638,9 @@ function renderEventShell() {
 
   shell(`
     <div class="text-center mb-8">
-      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Verified Live Event</div>
+      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Open House Check-In</div>
       <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Welcome In</h1>
-      <p class="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">This isn’t a floating form. It’s a real, time-stamped open-house event with the right property, the right host, and the right relationship trail behind it.</p>
+      <p class="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">Check in for this property and the host will receive your visit details.</p>
     </div>
 
     <section class="rounded-[30px] overflow-hidden border border-white/70 bg-white/75 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-6">
@@ -647,6 +657,7 @@ function renderEventShell() {
             <div>
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Hosted By</div>
             <div class="text-slate-900 font-black text-lg">${esc(agentName)}</div>
+            <div class="text-slate-500 font-semibold text-sm">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
             </div>
           </div>
           <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
@@ -654,8 +665,9 @@ function renderEventShell() {
             <div class="text-slate-900 font-bold">${esc(formatEventWindow(house))}</div>
           </div>
           <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Event ID</div>
-            <div class="text-slate-900 font-bold break-all">${esc(eventRow?.id || '')}</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Contact</div>
+            <div class="text-slate-900 font-bold">${textOrDash(agent?.phone)}</div>
+            <div class="text-slate-500 font-semibold text-sm break-all">${textOrDash(agent?.email)}</div>
           </div>
         </div>
 
@@ -715,23 +727,25 @@ function renderEventShell() {
       </article>
 
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Why This Feels Different</h2>
-        <div class="space-y-4 text-slate-600 font-medium leading-relaxed">
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            The check-in is attached to a live event, not a generic page floating around with no property context.
+        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Host Agent</h2>
+        <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-5 mb-4 flex items-center gap-4">
+          ${agentImage ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="w-20 h-20 rounded-full object-cover bg-white border border-white shadow-sm">` : ''}
+          <div>
+            <div class="text-slate-900 font-black text-xl">${esc(agentName)}</div>
+            <div class="text-slate-600 font-semibold">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
+            <div class="text-slate-500 font-semibold text-sm mt-1">${textOrDash(agent?.phone)}</div>
           </div>
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            If a buyer shows up with representation, that relationship can be documented at the point of contact.
-          </div>
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            Pre-approval status is captured while intent is high, not two days later in a cold follow-up thread.
-          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
+          <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${contextHouse?.address || 'your open house'}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
+          <a href="${esc(mailtoHref(agent?.email || '', `Question about ${contextHouse?.address || 'your open house'}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
+        </div>
           ${lastCheckinNeedsFinancing ? `
             <div class="rounded-[20px] bg-sky-50 border border-sky-200 p-4">
-              Financing follow-up was requested for this check-in.${pageState.financingAlertSent ? ' Your SMS alert path was triggered as well.' : ''} This turns an open-house visit into a live service opportunity instead of a forgotten note.
+              Financing follow-up was requested for this check-in.
             </div>
           ` : ''}
-        </div>
       </article>
     </section>
 
@@ -739,23 +753,19 @@ function renderEventShell() {
 
     <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Live Event Details</h2>
+        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Property Details</h2>
         <div class="grid grid-cols-1 gap-3 text-sm">
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Hosted By</div>
-            <div class="text-slate-900 font-bold">${esc(agentName)}</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Address</div>
+            <div class="text-slate-900 font-bold">${esc(contextHouse?.address || 'Open House')}</div>
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Open House Source</div>
-            <div class="text-slate-900 font-bold break-all">${esc(eventRow?.open_house_source_id || '')}</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Price</div>
+            <div class="text-slate-900 font-bold">${contextHouse?.price ? money(contextHouse.price) : '&mdash;'}</div>
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Host Agent Slug</div>
-            <div class="text-slate-900 font-bold break-all">${esc(hostAgentSlug(eventRow))}</div>
-          </div>
-          <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Event Status</div>
-            <div class="text-slate-900 font-bold">${esc(eventRow?.status || '')}</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Open House</div>
+            <div class="text-slate-900 font-bold">${esc(formatEventWindow(contextHouse))}</div>
           </div>
           <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Listing Link</div>
@@ -765,13 +775,13 @@ function renderEventShell() {
       </article>
 
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">What Comes Next</h2>
+        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">After You Check In</h2>
         <div class="space-y-4 text-slate-600 font-medium leading-relaxed">
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            This is where richer property content, school data, walkability, video, and disclosure packages can live next.
+            The host agent receives your check-in details by text.
           </div>
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            The check-in is already being saved with a stronger relationship trail, so the UI can now keep getting better without redoing the event logic.
+            If you are not pre-approved yet, financing follow-up is flagged right away.
           </div>
         </div>
       </article>
@@ -793,7 +803,7 @@ export async function initEventShellPage() {
   const eventId = getEventIdFromUrl();
   if (!eventId) {
     errorView(
-      'Missing Event ID',
+      'Event Not Found',
       'This event page is meant to open from a Smart Sign or a live event link. Open a sign flow first, or use a real event id in the URL.',
       `
         <a href="/sign" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Open Smart Sign Flow</a>
@@ -852,6 +862,6 @@ export async function initEventShellPage() {
     renderEventShell();
   } catch (error) {
     console.error(error);
-    errorView('Event Shell Failed', error.message || 'Something went wrong while loading this live event shell.');
+    errorView('Event Could Not Load', error.message || 'Something went wrong while loading this open house check-in.');
   }
 }
