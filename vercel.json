@@ -26,5 +26,11 @@
     { "source": "/nmb-verified.html", "destination": "/apps/rel8tion-app/nmb-verified.html" },
     { "source": "/services/nmb/activate", "destination": "/apps/rel8tion-app/nmb-activate.html" },
     { "source": "/services/nmb/verified", "destination": "/apps/rel8tion-app/nmb-verified.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/enrich-agents",
+      "schedule": "*/10 * * * *"
+    }
   ]
 }
