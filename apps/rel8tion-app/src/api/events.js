@@ -76,6 +76,90 @@ export async function createCheckin(payload) {
   return Array.isArray(created) && created.length ? created[0] : null;
 }
 
+export async function updateCheckinMetadata(checkinId, metadata) {
+  if (!checkinId) return null;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/event_checkins?id=eq.${encodeURIComponent(checkinId)}`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
+    body: JSON.stringify({ metadata })
+  });
+
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) throw new Error('Failed to update check-in preference: ' + raw);
+
+  let updated = null;
+  try { updated = raw ? JSON.parse(raw) : null; } catch {}
+  return Array.isArray(updated) && updated.length ? updated[0] : null;
+}
+
+export async function getLiveLoanOfficerSession(eventId) {
+  if (!eventId) return null;
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(eventId)}&status=eq.live&select=*&order=signed_in_at.desc&limit=1`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+export async function upsertLiveLoanOfficerSession(eventId, profile, uid) {
+  if (!eventId || !profile?.uid) return null;
+
+  const existing = await getLiveLoanOfficerSession(eventId);
+  if (existing?.id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/event_loan_officer_sessions?id=eq.${encodeURIComponent(existing.id)}`, {
+      method: 'PATCH',
+      headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
+      body: JSON.stringify({
+        verified_profile_uid: profile.uid,
+        loan_officer_uid: uid || profile.uid,
+        loan_officer_slug: profile.slug || '',
+        loan_officer_name: profile.full_name || '',
+        loan_officer_title: profile.title || '',
+        loan_officer_company: profile.company_name || '',
+        loan_officer_phone: profile.phone || '',
+        loan_officer_email: profile.email || '',
+        loan_officer_photo_url: profile.photo_url || '',
+        loan_officer_cta_url: profile.cta_url || '',
+        loan_officer_calendar_url: profile.calendar_url || '',
+        status: 'live',
+        signed_out_at: null,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    });
+
+    const raw = await res.text().catch(() => '');
+    if (!res.ok) throw new Error('Failed to update loan officer session: ' + raw);
+    const updated = raw ? JSON.parse(raw) : null;
+    return Array.isArray(updated) && updated.length ? updated[0] : null;
+  }
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/event_loan_officer_sessions`, {
+    method: 'POST',
+    headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
+    body: JSON.stringify({
+      open_house_event_id: eventId,
+      verified_profile_uid: profile.uid,
+      loan_officer_uid: uid || profile.uid,
+      loan_officer_slug: profile.slug || '',
+      loan_officer_name: profile.full_name || '',
+      loan_officer_title: profile.title || '',
+      loan_officer_company: profile.company_name || '',
+      loan_officer_phone: profile.phone || '',
+      loan_officer_email: profile.email || '',
+      loan_officer_photo_url: profile.photo_url || '',
+      loan_officer_cta_url: profile.cta_url || '',
+      loan_officer_calendar_url: profile.calendar_url || '',
+      status: 'live'
+    })
+  });
+
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) throw new Error('Failed to create loan officer session: ' + raw);
+  const created = raw ? JSON.parse(raw) : null;
+  return Array.isArray(created) && created.length ? created[0] : null;
+}
+
 export function resolveEventLifecycle({ activeEvent, request, now = new Date() }) {
   if (!activeEvent) {
     return { action: 'create_new', reason: 'no_active_event' };

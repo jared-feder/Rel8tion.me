@@ -109,21 +109,54 @@
   </div>
 
   <script type="module">
+    import { KEY, SUPABASE_URL } from '/apps/rel8tion-app/src/core/config.js?v=20260427-sign-onboarding';
     import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260426-1108';
 
     const urlParams = new URLSearchParams(window.location.search);
     const agent = urlParams.get('agent') || '';
-    const uid = urlParams.get('uid') || '';
+    let uid = urlParams.get('uid') || '';
+
+    async function recoverUidForAgent(agentSlug) {
+      if (!agentSlug) return '';
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/keys?agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid&limit=1`, {
+          headers: {
+            apikey: KEY,
+            Authorization: `Bearer ${KEY}`
+          }
+        });
+        const raw = await response.text().catch(() => '');
+        if (!response.ok) return '';
+        const rows = raw ? JSON.parse(raw) : [];
+        return Array.isArray(rows) && rows[0]?.uid ? rows[0].uid : '';
+      } catch {
+        return '';
+      }
+    }
+
+    function setLinks() {
+      const goLive = document.getElementById('goLive');
+      const activateSign = document.getElementById('activateSign');
+      const activateUrl = new URL('/sign-demo-activate.html', window.location.origin);
+
+      if (agent) activateUrl.searchParams.set('agent', agent);
+      if (uid) activateUrl.searchParams.set('uid', uid);
+
+      goLive.href = agent ? `/a?agent=${encodeURIComponent(agent)}` : '/claim';
+      activateSign.href = agent ? `${activateUrl.pathname}${activateUrl.search}` : '/claim';
+    }
+
+    setLinks();
+
+    if (agent && !uid) {
+      uid = await recoverUidForAgent(agent);
+      setLinks();
+    }
 
     if (agent) {
       saveHostSession({ agentSlug: agent, uid, source: 'onboarding' });
     }
-
-    document.getElementById('goLive').href = agent ? `/a?agent=${encodeURIComponent(agent)}` : '/claim';
-    const activateUrl = new URL('/sign-demo-activate.html', window.location.origin);
-    if (agent) activateUrl.searchParams.set('agent', agent);
-    if (uid) activateUrl.searchParams.set('uid', uid);
-    document.getElementById('activateSign').href = agent ? `${activateUrl.pathname}${activateUrl.search}` : '/claim';
   </script>
 </body>
 </html>

@@ -114,6 +114,90 @@ export async function sendJaredFinancingAlert({
   });
 }
 
+export async function sendLiveLoanOfficerFinancingAlert({
+  loanOfficer,
+  agentName,
+  buyerPhone,
+  buyerName,
+  buyerEmail,
+  address,
+  price,
+  preapproved = 'no'
+}) {
+  const loanOfficerPhone = loanOfficer?.loan_officer_phone || loanOfficer?.phone || '';
+  if (!loanOfficerPhone) return;
+
+  const message = [
+    `Live Rel8tion financing request${address ? ` at ${address}` : ''}.`,
+    agentName ? `Host: ${agentName}` : '',
+    buyerName ? `Buyer: ${buyerName}` : 'Buyer: Open house visitor',
+    buyerPhone ? `Buyer phone: ${buyerPhone}` : '',
+    buyerEmail ? `Buyer email: ${buyerEmail}` : '',
+    price ? `Property price: ${price}` : '',
+    preapproved === 'yes' ? 'Pre-approved: Yes' : 'Pre-approved: No',
+    'Please call or text the buyer now if available.'
+  ].filter(Boolean).join('\n');
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-lead-sms`, {
+      method: 'POST',
+      headers: jsonHeaders(KEY),
+      body: JSON.stringify({
+        agent_phone: loanOfficerPhone,
+        buyer_phone: buyerPhone || loanOfficerPhone,
+        buyer_name: buyerName || 'Buyer',
+        message
+      })
+    });
+
+    if (!response.ok) {
+      const raw = await response.text().catch(() => '');
+      throw new Error(raw || 'Loan officer financing SMS failed');
+    }
+  } catch (e) {
+    debug('LOAN OFFICER FINANCING SMS FAILED', { message: e?.message || String(e) });
+  }
+}
+
+export async function sendBuyerLoanOfficerIntroSMS({
+  buyerPhone,
+  buyerName,
+  loanOfficer,
+  propertyAddress
+}) {
+  if (!buyerPhone || !loanOfficer?.loan_officer_phone) return;
+
+  const name = loanOfficer.loan_officer_name || 'your financing specialist';
+  const company = loanOfficer.loan_officer_company || 'NMB';
+  const phone = loanOfficer.loan_officer_phone || '';
+  const message = [
+    `Thanks${buyerName ? ` ${buyerName}` : ''}. Financing support is live for this open house.`,
+    propertyAddress ? `Property: ${propertyAddress}` : '',
+    `${name} from ${company} can help with pre-approval questions now.`,
+    phone ? `Call/Text: ${phone}` : ''
+  ].filter(Boolean).join('\n');
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-lead-sms`, {
+      method: 'POST',
+      headers: jsonHeaders(KEY),
+      body: JSON.stringify({
+        agent_phone: buyerPhone,
+        buyer_phone: buyerPhone,
+        buyer_name: buyerName || 'Buyer',
+        message
+      })
+    });
+
+    if (!response.ok) {
+      const raw = await response.text().catch(() => '');
+      throw new Error(raw || 'Buyer loan officer intro SMS failed');
+    }
+  } catch (e) {
+    debug('BUYER LOAN OFFICER INTRO SMS FAILED', { message: e?.message || String(e) });
+  }
+}
+
 export async function sendBuyerConfirmationSMS({
   buyerPhone,
   buyerName,

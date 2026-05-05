@@ -1,8 +1,8 @@
 import { ASSETS } from '../../core/config.js';
-import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260426-1455';
-import { createCheckin, getEventById, touchEvent } from '../../api/events.js?v=20260426-1455';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendJaredFinancingAlert } from '../../api/notifications.js?v=20260426-1455';
-import { getOpenHouseById } from '../../api/openHouses.js?v=20260426-1455';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
+import { createCheckin, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260503-lo-live';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260503-lo-live';
+import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { esc, money } from '../../core/utils.js';
 
 const CHECKIN_PATHS = Object.freeze({
@@ -21,13 +21,17 @@ const pageState = {
   eventRow: null,
   house: null,
   agent: null,
+  loanOfficer: null,
   selectedPath: CHECKIN_PATHS.BUYER,
   mode: 'checkin',
   submitting: false,
   successMessage: '',
   errorMessage: '',
   lastCheckin: null,
-  financingAlertSent: false
+  financingAlertSent: false,
+  preferenceSaving: false,
+  preferenceStatus: '',
+  selectedPreferenceHome: null
 };
 
 function getEventIdFromUrl() {
@@ -250,6 +254,72 @@ function propertyFacts(house) {
     { label: 'Sq Ft', value: formatNumber(firstPresent(house?.sqft, house?.square_feet, house?.living_area)) },
     { label: 'Taxes', value: house?.taxes ? money(house.taxes) : '' }
   ];
+}
+
+function eventAreaLabel(house) {
+  const address = String(house?.address || '').split(',').map((part) => part.trim()).filter(Boolean);
+  if (address.length >= 2) return address[1].replace(/\s+NY\b.*$/i, '').trim();
+  return address[0] || 'this area';
+}
+
+function getPreferenceHomes(house) {
+  const area = eventAreaLabel(house);
+  return [
+    {
+      id: 'move-in-ready',
+      title: 'Move-In Ready',
+      summary: `Updated finishes and an easier move near ${area}.`,
+      image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=900&q=80'
+    },
+    {
+      id: 'rental-potential',
+      title: 'Rental Potential',
+      summary: `A setup with income upside, extra space, or flexible use near ${area}.`,
+      image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=900&q=80'
+    },
+    {
+      id: 'fixer-upper',
+      title: 'Fixer Upper',
+      summary: `A value-add home where updates could create more equity.`,
+      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=80'
+    }
+  ];
+}
+
+function renderPreferenceMatcher() {
+  if (!pageState.lastCheckin) return '';
+
+  const agentName = pageState.agent?.name || 'your agent';
+  const homes = getPreferenceHomes(pageState.house);
+
+  return `
+    <section class="rounded-[30px] border border-white/70 bg-white/80 p-6 md:p-8 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-5">
+      <div class="text-center max-w-3xl mx-auto mb-6">
+        <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">Buyer Preference</div>
+        <h2 class="font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">Congratulations</h2>
+        <p class="text-slate-600 font-semibold leading-relaxed">
+          ${esc(agentName)} knows what to keep an eye out for. Pick the property style that feels closest so follow-up can be more useful.
+        </p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        ${homes.map((home) => {
+          const selected = pageState.selectedPreferenceHome?.id === home.id;
+          return `
+            <button type="button" data-home-id="${esc(home.id)}" class="preference-home-button group text-left overflow-hidden rounded-[24px] border ${selected ? 'border-sky-400 ring-4 ring-sky-100' : 'border-slate-200'} bg-white shadow-[0_14px_34px_rgba(31,42,90,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(31,42,90,0.12)]">
+              <img src="${esc(home.image)}" alt="${esc(home.title)}" class="w-full aspect-[4/3] object-cover bg-slate-100">
+              <span class="block p-4">
+                <span class="block text-slate-900 font-black text-lg mb-1">${esc(home.title)}</span>
+                <span class="block text-slate-500 font-semibold text-sm leading-relaxed">${esc(home.summary)}</span>
+              </span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <div class="mt-5 rounded-[20px] border border-sky-100 bg-sky-50/80 px-4 py-4 text-center text-sky-900 font-semibold">
+        ${esc(pageState.preferenceStatus || 'Tap the closest match. This saves with the buyer check-in for better matching later.')}
+      </div>
+    </section>
+  `;
 }
 
 function buttonClasses(selected) {
@@ -656,18 +726,43 @@ function attachEventHandlers() {
       });
 
       if (financingRequested) {
-        await sendJaredFinancingAlert({
-          buyerPhone: payload.visitor_phone || '',
-          buyerName: payload.visitor_name || 'Buyer',
-          address: pageState.house?.address || pageState.eventRow?.setup_context?.address || 'Open House Visitor',
-          price: pageState.house?.price ? money(pageState.house.price) : '',
-          preapproved: payload.pre_approved === true ? 'yes' : 'no'
-        });
+        const liveLoanOfficer = pageState.loanOfficer || await getLiveLoanOfficerSession(pageState.eventRow.id).catch(() => null);
+        pageState.loanOfficer = liveLoanOfficer;
+        const address = pageState.house?.address || pageState.eventRow?.setup_context?.address || 'Open House Visitor';
+        const price = pageState.house?.price ? money(pageState.house.price) : '';
+        if (liveLoanOfficer?.loan_officer_phone) {
+          await sendLiveLoanOfficerFinancingAlert({
+            loanOfficer: liveLoanOfficer,
+            agentName: pageState.agent?.name || pageState.eventRow?.host_agent_slug || '',
+            buyerPhone: payload.visitor_phone || '',
+            buyerName: payload.visitor_name || 'Buyer',
+            buyerEmail: payload.visitor_email || '',
+            address,
+            price,
+            preapproved: payload.pre_approved === true ? 'yes' : 'no'
+          });
+          await sendBuyerLoanOfficerIntroSMS({
+            buyerPhone: payload.visitor_phone || '',
+            buyerName: payload.visitor_name || 'Buyer',
+            loanOfficer: liveLoanOfficer,
+            propertyAddress: address
+          });
+        } else {
+          await sendJaredFinancingAlert({
+            buyerPhone: payload.visitor_phone || '',
+            buyerName: payload.visitor_name || 'Buyer',
+            address,
+            price,
+            preapproved: payload.pre_approved === true ? 'yes' : 'no'
+          });
+        }
       }
 
       pageState.lastCheckin = { ...payload, id: createdCheckin?.id || null };
       pageState.mode = 'guest';
       pageState.financingAlertSent = financingRequested;
+      pageState.selectedPreferenceHome = null;
+      pageState.preferenceStatus = '';
       pageState.successMessage = financingRequested
         ? 'Check-in complete. Financing follow-up has been flagged from this visit.'
         : 'Check-in complete. Your visit is now linked to this live event.';
@@ -679,6 +774,49 @@ function attachEventHandlers() {
       pageState.submitting = false;
       renderEventShell();
     }
+  });
+
+  document.querySelectorAll('.preference-home-button').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const homeId = button.getAttribute('data-home-id');
+      if (!homeId || pageState.preferenceSaving) return;
+
+      const selected = getPreferenceHomes(pageState.house).find((home) => home.id === homeId);
+      if (!selected) return;
+
+      pageState.preferenceSaving = true;
+      pageState.selectedPreferenceHome = selected;
+      pageState.preferenceStatus = 'Saving preference...';
+      renderEventShell();
+
+      try {
+        const metadata = {
+          ...(pageState.lastCheckin?.metadata || {}),
+          preferred_example_home: {
+            id: selected.id,
+            title: selected.title,
+            summary: selected.summary,
+            image: selected.image,
+            selected_at: new Date().toISOString()
+          }
+        };
+
+        if (pageState.lastCheckin?.id) {
+          const updated = await updateCheckinMetadata(pageState.lastCheckin.id, metadata);
+          pageState.lastCheckin = updated || { ...pageState.lastCheckin, metadata };
+        } else {
+          pageState.lastCheckin = { ...pageState.lastCheckin, metadata };
+        }
+
+        pageState.preferenceStatus = `${selected.title} saved. ${pageState.agent?.name || 'The host'} can use this to understand the buyer's style.`;
+      } catch (error) {
+        console.log('Preference update skipped', error);
+        pageState.preferenceStatus = `${selected.title} selected. The page captured it, but saving it to the check-in needs a database permission check.`;
+      } finally {
+        pageState.preferenceSaving = false;
+        renderEventShell();
+      }
+    });
   });
 }
 
@@ -801,6 +939,7 @@ function renderEventShell() {
     </section>
 
     ${pageState.mode === 'guest' ? nextStepCards() : ''}
+    ${pageState.mode === 'guest' ? renderPreferenceMatcher() : ''}
 
     <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
@@ -893,6 +1032,7 @@ export async function initEventShellPage() {
       : null;
 
     pageState.agent = null;
+    pageState.loanOfficer = await getLiveLoanOfficerSession(eventId).catch(() => null);
     const agentSlug = hostAgentSlug(eventRow);
     if (agentSlug) {
       try {

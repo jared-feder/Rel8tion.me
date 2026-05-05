@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data, error } = await supabaseAdmin
     .from("agent_outreach_queue")
     .select("id,agent_name,agent_photo_url,brokerage,address,city,state,zip,open_start,open_end,listing_photo_url,sms_link")
-    .in("status", ["pending_approval", "approved"])
+    .eq("generation_status", "generated")
     .is("mockup_image_url", null)
     .in("mockup_status", ["pending", "retry"])
     .order("created_at", { ascending: true })

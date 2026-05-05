@@ -1,6 +1,6 @@
 const cheerio = require('cheerio');
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 20;
 const ESTATELY_BASE_URL = 'https://www.estately.com';
 const SOURCE_PRIORITY = {
   onekey: 1,
@@ -50,6 +50,35 @@ function delayBetweenListings() {
   return sleep(500 + Math.floor(Math.random() * 501));
 }
 
+function newYorkDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value),
+    month: Number(parts.find((part) => part.type === 'month')?.value),
+    day: Number(parts.find((part) => part.type === 'day')?.value)
+  };
+}
+
+function nextWeekendWindow(date = new Date()) {
+  const { year, month, day } = newYorkDateParts(date);
+  const todayUtc = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = todayUtc.getUTCDay();
+  const daysUntilSaturday = dayOfWeek === 0 ? -1 : (6 - dayOfWeek + 7) % 7;
+  const start = new Date(Date.UTC(year, month - 1, day + daysUntilSaturday));
+  const end = new Date(Date.UTC(year, month - 1, day + daysUntilSaturday + 2));
+
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString()
+  };
+}
+
 function restHeaders(extra = {}) {
   const { key } = supabaseConfig();
   return {
@@ -96,6 +125,41 @@ function normalizeAddressForEstately(address) {
     .replace(/^-+|-+$/g, '');
 }
 
+function addressParts(address) {
+  const value = String(address || '');
+  const zip = value.match(/\b\d{5}(?:-\d{4})?\b/)?.[0]?.slice(0, 5) || null;
+  const state = value.match(/,\s*([A-Z]{2})\s+\d{5}(?:-\d{4})?\b/)?.[1]?.toLowerCase() || null;
+  const streetNumber = value.match(/^\s*(\d+[a-z]?)/i)?.[1]?.toLowerCase() || null;
+  const commaParts = value.split(',').map((part) => part.trim()).filter(Boolean);
+  const city = commaParts.length >= 3 ? commaParts[commaParts.length - 2] : null;
+
+  return {
+    city,
+    state,
+    streetNumber,
+    zip
+  };
+}
+
+function estatelyUrlMatchesAddress(url, address) {
+  const { city, state, streetNumber, zip } = addressParts(address);
+  const slug = normalizeAddressForEstately(decodeURIComponent(new URL(url).pathname.split('/').pop() || ''));
+
+  if (!slug) return false;
+  if (zip && !slug.includes(zip)) return false;
+  if (state && !slug.split('-').includes(state)) return false;
+  if (streetNumber && !slug.split('-').includes(streetNumber)) return false;
+
+  if (city) {
+    const cityTokens = normalizeAddressForEstately(city).split('-').filter(Boolean);
+    if (cityTokens.length && !cityTokens.every((token) => slug.split('-').includes(token))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function normalizePhone(phone) {
   const digits = String(phone || '').replace(/\D/g, '');
   if (!digits) return null;
@@ -125,8 +189,11 @@ async function resolveEstatelyPage(address) {
 
   const directUrl = `${ESTATELY_BASE_URL}/listings/info/${normalized}`;
   const direct = await fetchText(directUrl);
-  if (direct.status === 200) {
+  if (direct.status === 200 && estatelyUrlMatchesAddress(direct.url, address)) {
     return { url: direct.url, html: direct.text, mode: 'direct' };
+  }
+  if (direct.status === 200) {
+    console.log(`[estately] rejected direct mismatch for ${address}: ${direct.url}`);
   }
 
   const searchUrl = `${ESTATELY_BASE_URL}/search?search=${encodeURIComponent(address)}`;
@@ -141,6 +208,11 @@ async function resolveEstatelyPage(address) {
 
   if (!href) return null;
   const finalUrl = new URL(href, ESTATELY_BASE_URL).toString();
+  if (!estatelyUrlMatchesAddress(finalUrl, address)) {
+    console.log(`[estately] rejected search fallback mismatch for ${address}: ${finalUrl}`);
+    return null;
+  }
+
   const finalPage = await fetchText(finalUrl);
   if (finalPage.status !== 200) return null;
   return { url: finalPage.url, html: finalPage.text, mode: 'search' };
@@ -172,9 +244,95 @@ function extractAgentInfo(html) {
 }
 
 async function getPendingOpenHouses() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const nextWindowIso = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
+  const weekendWindow = nextWeekendWindow(now);
+
+  const weekend = await supabaseRequest(
+    [
+      'open_houses?agent_scraped=eq.false',
+      'source=eq.onekey',
+      `open_start=gte.${encodeURIComponent(weekendWindow.startIso)}`,
+      `open_start=lt.${encodeURIComponent(weekendWindow.endIso)}`,
+      'select=*',
+      'order=open_start.asc.nullslast',
+      `limit=${BATCH_SIZE}`
+    ].join('&')
+  );
+
+  if (Array.isArray(weekend) && weekend.length > 0) {
+    console.log(`[estately] selected ${weekend.length} next-weekend open houses for enrichment`);
+    return weekend;
+  }
+
+  const upcoming = await supabaseRequest(
+    [
+      'open_houses?agent_scraped=eq.false',
+      'source=eq.onekey',
+      `open_end=gte.${encodeURIComponent(nowIso)}`,
+      `open_start=lte.${encodeURIComponent(nextWindowIso)}`,
+      'select=*',
+      'order=open_start.asc.nullslast',
+      `limit=${BATCH_SIZE}`
+    ].join('&')
+  );
+
+  if (Array.isArray(upcoming) && upcoming.length > 0) {
+    console.log(`[estately] selected ${upcoming.length} upcoming open houses for enrichment`);
+    return upcoming;
+  }
+
+  console.log('[estately] no upcoming open houses pending enrichment; falling back to prior backlog');
   return supabaseRequest(
     `open_houses?agent_scraped=eq.false&source=eq.onekey&select=*&order=open_start.asc.nullslast&limit=${BATCH_SIZE}`
   );
+}
+
+async function refreshOutreachQueue() {
+  return supabaseRequest('rpc/queue_recent_outreach_candidates', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+async function triggerOutreachGeneration(limit = BATCH_SIZE) {
+  const { url, key } = supabaseConfig();
+  const response = await fetch(`${url}/functions/v1/generate-agent-outreach`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ limit })
+  });
+
+  const text = await response.text().catch(() => '');
+  if (!response.ok) {
+    throw new Error(text || `generate-agent-outreach failed: ${response.status}`);
+  }
+
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return { raw: text };
+  }
+}
+
+async function hasPriorPhoneFailure(phoneNormalized) {
+  if (!phoneNormalized) return false;
+
+  const rows = await supabaseRequest(
+    [
+      'agent_outreach_queue?select=id',
+      `agent_phone_normalized=eq.${encodeURIComponent(phoneNormalized)}`,
+      'or=(initial_send_status.eq.blocked_invalid_mobile,followup_send_status.eq.blocked_invalid_mobile,initial_block_reason.eq.invalid_mobile,followup_block_reason.eq.invalid_mobile,initial_block_reason.eq.invalid_phone,followup_block_reason.eq.invalid_phone)',
+      'limit=1'
+    ].join('&')
+  );
+
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 async function findExistingAgent(openHouseId, phoneNormalized) {
@@ -279,6 +437,12 @@ async function processOpenHouse(openHouse) {
       return { id: openHouse.id, saved: false, reason: 'missing_phone', url: page.url };
     }
 
+    if (await hasPriorPhoneFailure(agent.phone_normalized)) {
+      console.log(`[estately] rejected known non-mobile phone ${agent.phone_normalized} for ${label}`);
+      await markOpenHouse(openHouse.id, false);
+      return { id: openHouse.id, saved: false, reason: 'known_non_mobile_phone', url: page.url };
+    }
+
     await saveListingAgent(openHouse, agent);
     await updateOpenHouseAgent(openHouse, agent);
     console.log(`[estately] saved ${agent.name || 'agent'} ${agent.phone_normalized} for ${label}`);
@@ -301,6 +465,17 @@ async function run() {
   for (const listing of batch) {
     results.push(await processOpenHouse(listing));
     await delayBetweenListings();
+  }
+
+  if (results.some((result) => result.saved)) {
+    try {
+      await refreshOutreachQueue();
+      console.log('[estately] outreach queue refresh complete');
+      const generation = await triggerOutreachGeneration(BATCH_SIZE);
+      console.log('[estately] outreach generation trigger complete:', JSON.stringify(generation));
+    } catch (error) {
+      console.error('[estately] outreach follow-up failed:', error.message || error);
+    }
   }
 
   console.log(`[estately] enrichment run complete: ${results.length} processed`);

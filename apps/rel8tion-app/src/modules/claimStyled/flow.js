@@ -40,7 +40,7 @@ import {
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js';
+} from './renderer.js?v=20260503-edit-profile';
 
 function onboardingRoute(slug) {
   const url = new URL(ROUTES.onboarding, window.location.origin);
@@ -61,8 +61,10 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
   const pendingSign = getPendingSignActivation();
   if (pendingSign?.code) {
     clearPendingSignActivation();
-    const url = new URL(ROUTES.sign, window.location.origin);
+    const url = new URL('/sign-demo-activate.html', window.location.origin);
     url.searchParams.set('code', pendingSign.code);
+    url.searchParams.set('uid', state.uid || '');
+    url.searchParams.set('agent', slug);
     return `${url.pathname}${url.search}`;
   }
 
@@ -85,9 +87,17 @@ export function bindPublicHandlers() {
   window.init = init;
   window.selectHouse = selectHouse;
   window.selectAgentByEncoded = selectAgentByEncoded;
+  window.editDetectedProfile = editDetectedProfile;
   window.showForm = showForm;
   window.showBrokerageStep = showBrokerageStep;
   window.showFullProfileForm = showFullProfileForm;
+}
+
+export function editDetectedProfile() {
+  showFullProfileForm(
+    state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '',
+    'Update or complete your profile below.'
+  );
 }
 
 function startLoaderTextCycle() {

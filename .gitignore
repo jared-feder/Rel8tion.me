@@ -1,0 +1,3 @@
+.vercel-*/
+.vercel-*.zip
+.supabase-deploy/

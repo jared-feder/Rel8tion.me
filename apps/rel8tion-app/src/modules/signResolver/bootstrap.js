@@ -102,14 +102,30 @@ function readSignActivationSession() {
   }
 }
 
+function saveSignActivationKeychainRequest(sign) {
+  if (!sign?.public_code) return;
+  try {
+    window.localStorage.setItem(SIGN_DEMO_SESSION_KEY, JSON.stringify({
+      uid: '',
+      agentSlug: '',
+      publicCode: sign.public_code || '',
+      signId: sign.id || '',
+      ownerAgentSlug: sign.owner_agent_slug || '',
+      primaryChipUid: sign.uid_primary || '',
+      stage: 'waiting_for_agent_keychain',
+      qrArmedAt: new Date().toISOString()
+    }));
+  } catch (_) {
+    // Local storage can be unavailable in hardened browser modes; the page still renders.
+  }
+}
+
 function continueSignActivationFromQr(code) {
   const pending = readSignActivationSession();
   if (!pending?.uid || !pending?.agentSlug) return false;
   if (pending.publicCode && pending.publicCode !== code) return false;
   if (!pending.publicCode && !pending.qrArmedAt) return false;
-  if (!['waiting_for_sign_code', 'waiting_for_sign_chip_1', 'waiting_for_second_sign_chip', 'waiting_for_handshake'].includes(pending.stage)) {
-    return false;
-  }
+  if (pending.stage !== 'waiting_for_sign_code') return false;
 
   const next = new URLSearchParams();
   next.set('code', code);
@@ -158,34 +174,42 @@ function activationCard(sign) {
   const hostOwnsSign = Boolean(pageState.hostSession?.agentSlug && sign?.assigned_agent_slug && sign.assigned_agent_slug === pageState.hostSession.agentSlug);
   const signAssignedToOtherHost = Boolean(pageState.hostSession?.agentSlug && sign?.assigned_agent_slug && sign.assigned_agent_slug !== pageState.hostSession.agentSlug);
 
-  if (!signReady) {
-    return `
-      <div class="rounded-[28px] border border-amber-200 bg-amber-50/90 p-6 text-left max-w-xl mx-auto mt-6">
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700 mb-3">Sign Setup Incomplete</div>
-        <div class="text-slate-900 font-black text-xl mb-3">Both Smart Sign chips must be registered first</div>
-        <p class="text-slate-700 font-semibold leading-relaxed">
-          This Smart Sign is missing one of its two embedded chip assignments. Register both sign chips to this sign before trying to activate it into a live event.
-        </p>
-      </div>
-    `;
-  }
-
   if (!pageState.hostSession) {
     savePendingSignActivation({
       code: sign.public_code || '',
       signId: sign.id || '',
       source: 'inactive-sign-qr'
     });
+    saveSignActivationKeychainRequest(sign);
 
     return `
       <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mt-6">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Host Activation</div>
-        <div class="text-slate-900 font-black text-xl mb-3">Scan Your Rel8tionChip To Verify</div>
+        <div class="text-slate-900 font-black text-xl mb-3">Tap Your Rel8tionChip To Verify</div>
         <p class="text-slate-600 font-semibold leading-relaxed">
-          This sign is ready, but we need to verify the host before binding it to an open house. Tap or scan your claimed Rel8tionChip on this phone, then you will come right back here to pick the listing.
+          This sign is inactive. Keep this page open and physically tap your claimed Rel8tionChip keychain to this phone now. The keychain tap will verify you and open the sign activation flow.
         </p>
-        <a href="/claim" class="mt-5 inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
-          Open Rel8tionChip Scan
+        <div class="mt-5 rounded-[22px] border border-sky-200 bg-sky-50/90 p-5 text-center">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-2">Next Physical Step</div>
+          <div class="text-slate-900 font-black text-2xl">Tap keychain now</div>
+        </div>
+        <a href="/claim" class="mt-4 inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">
+          Keychain Not Claimed Yet
+        </a>
+      </div>
+    `;
+  }
+
+  if (!signReady) {
+    return `
+      <div class="rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50/95 to-white p-6 text-left max-w-xl mx-auto mt-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-3">Host Verified</div>
+        <div class="text-slate-900 font-black text-xl mb-3">Finish Registering This Sign</div>
+        <p class="text-slate-600 font-semibold leading-relaxed">
+          Your keychain is recognized. Continue to register the front buyer chip and rear agent chip, then bind this sign to an open house.
+        </p>
+        <a href="/sign-demo-activate.html?code=${encodeURIComponent(sign.public_code || '')}&uid=${encodeURIComponent(pageState.hostSession.uid || '')}&agent=${encodeURIComponent(pageState.hostSession.agentSlug || '')}" class="mt-5 inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
+          Continue Sign Activation
         </a>
       </div>
     `;
@@ -480,6 +504,7 @@ export async function initSignResolverPage() {
     }
 
     if (!eventRow) {
+      pageState.hostSession = null;
       inactiveView(sign);
       return;
     }

@@ -20,8 +20,11 @@
     import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260426-1108';
 
     const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
+    const AGENT_DASHBOARD_SESSION_KEY = 'rel8tion_agent_dashboard_pending';
+    const LOAN_OFFICER_SESSION_KEY = 'rel8tion_loan_officer_pending';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
+    const signCode = params.get('code') || params.get('sign_code') || '';
     const statusEl = document.getElementById('status');
     const substatusEl = document.getElementById('substatus');
 
@@ -43,6 +46,51 @@
       }
     }
 
+    function readAgentDashboardSession() {
+      try {
+        const raw = window.localStorage.getItem(AGENT_DASHBOARD_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
+          window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function readLoanOfficerSession() {
+      try {
+        const raw = window.localStorage.getItem(LOAN_OFFICER_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
+          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function saveAgentDashboardSession(sign = {}) {
+      const payload = {
+        signId: sign.id || '',
+        publicCode: sign.public_code || '',
+        eventId: sign.active_event_id || '',
+        ownerAgentSlug: sign.owner_agent_slug || '',
+        createdAt: new Date().toISOString()
+      };
+      if (!payload.signId && !payload.publicCode) return null;
+      window.localStorage.setItem(AGENT_DASHBOARD_SESSION_KEY, JSON.stringify(payload));
+      return payload;
+    }
+
     function continueSignActivation(query = {}) {
       const next = new URLSearchParams();
       const pending = readSignActivationSession();
@@ -51,6 +99,7 @@
       if (pending?.publicCode) next.set('code', pending.publicCode);
       if (pending?.signId) next.set('sign_id', pending.signId);
       if (pending?.inventoryId) next.set('inventory_id', pending.inventoryId);
+      if (signCode && !next.has('code')) next.set('code', signCode);
       for (const [key, value] of Object.entries(query)) {
         if (value) next.set(key, value);
       }
@@ -72,9 +121,105 @@
       window.location.href = `${window.location.origin}/s?code=${encodeURIComponent(publicCode)}`;
     }
 
+    function goToAgentDashboard({ agentSlug, eventId, signId, publicCode }) {
+      if (!agentSlug) return;
+      const next = new URLSearchParams();
+      next.set('agent', agentSlug);
+      if (uid) next.set('uid', uid);
+      if (eventId) next.set('event', eventId);
+      if (signId) next.set('sign_id', signId);
+      if (publicCode) next.set('code', publicCode);
+      window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+      window.location.href = `${window.location.origin}/apps/rel8tion-app/agent-dashboard?${next.toString()}`;
+    }
+
+    async function request(path, options = {}) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        }
+      });
+      const raw = await response.text().catch(() => '');
+      if (!response.ok) throw new Error(raw || `Request failed: ${response.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function findRemoteSignActivationSession(stages = [], agentSlug = '') {
+      const now = new Date().toISOString();
+      const stageFilter = stages.length
+        ? `&stage=in.(${stages.map((stage) => encodeURIComponent(stage)).join(',')})`
+        : '';
+      const agentFilter = agentSlug ? `&agent_slug=eq.${encodeURIComponent(agentSlug)}` : '';
+      const rows = await request(
+        `smart_sign_activation_sessions?status=eq.pending&sign_id=not.is.null&expires_at=gt.${encodeURIComponent(now)}${stageFilter}${agentFilter}&select=*&order=updated_at.desc&limit=1`
+      ).catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function updateRemoteSignActivationSession(id, patch = {}) {
+      if (!id) return null;
+      const payload = {
+        ...patch,
+        updated_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 45 * 60 * 1000).toISOString()
+      };
+      const rows = await request(`smart_sign_activation_sessions?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      }).catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function loadVerifiedProfile(chipUid) {
+      const rows = await request(`verified_profiles?uid=eq.${encodeURIComponent(chipUid)}&is_active=eq.true&select=*&limit=1`);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function activateLoanOfficerSession(pending, profile) {
+      const existingRows = await request(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(pending.eventId)}&status=eq.live&select=*&limit=1`);
+      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+      const payload = {
+        open_house_event_id: pending.eventId,
+        verified_profile_uid: profile.uid,
+        loan_officer_uid: uid,
+        loan_officer_slug: profile.slug || '',
+        loan_officer_name: profile.full_name || '',
+        loan_officer_title: profile.title || '',
+        loan_officer_company: profile.company_name || '',
+        loan_officer_phone: profile.phone || '',
+        loan_officer_email: profile.email || '',
+        loan_officer_photo_url: profile.photo_url || '',
+        loan_officer_cta_url: profile.cta_url || '',
+        loan_officer_calendar_url: profile.calendar_url || '',
+        status: 'live',
+        signed_out_at: null,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      if (existing?.id) {
+        const rows = await request(`event_loan_officer_sessions?id=eq.${encodeURIComponent(existing.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      const rows = await request('event_loan_officer_sessions', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
     async function findActiveSignByChipUid(chipUid) {
       const encodedUid = encodeURIComponent(chipUid);
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&status=eq.active&select=id,public_code&limit=1`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&status=eq.active&select=id,public_code,uid_primary,uid_secondary,owner_agent_slug,active_event_id,primary_device_type,secondary_device_type&limit=1`, {
         headers: {
           apikey: KEY,
           Authorization: `Bearer ${KEY}`,
@@ -86,6 +231,15 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    function activeSignChipRole(sign, chipUid) {
+      if (!sign || !chipUid) return '';
+      if (sign.uid_secondary === chipUid) {
+        return /keychain/i.test(sign.secondary_device_type || '') ? 'keychain' : 'rear_agent';
+      }
+      if (sign.uid_primary === chipUid) return 'front_buyer';
+      return '';
+    }
+
     async function init() {
       if (!uid) {
         window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
@@ -94,8 +248,37 @@
 
       const activeSign = await findActiveSignByChipUid(uid);
       if (activeSign?.public_code) {
-        setStatus('Opening Sign', 'Loading the live sign route.');
-        goToLiveSign(activeSign.public_code);
+        const role = activeSignChipRole(activeSign, uid);
+        if (role === 'rear_agent') {
+          saveAgentDashboardSession(activeSign);
+          setStatus('Agent Side Found', 'Tap your Rel8tionChip keychain to verify and open the live event dashboard.');
+          return;
+        }
+        if (role === 'front_buyer') {
+          setStatus('Opening Sign', 'Loading the live buyer check-in route.');
+          goToLiveSign(activeSign.public_code);
+          return;
+        }
+      }
+
+      const pendingLoanOfficer = readLoanOfficerSession();
+      if (pendingLoanOfficer?.eventId) {
+        setStatus('Checking NMB Key...', 'Looking up the loan officer profile.');
+        const profile = await loadVerifiedProfile(uid);
+        if (!profile?.uid) {
+          setStatus('Activate NMB Profile', 'This chip needs a verified loan officer profile first.');
+          window.location.href = `${window.location.origin}/nmb-activate?uid=${encodeURIComponent(uid)}`;
+          return;
+        }
+        await activateLoanOfficerSession(pendingLoanOfficer, profile);
+        window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+        setStatus('Loan Officer Live', 'Returning to the agent event dashboard.');
+        goToAgentDashboard({
+          agentSlug: pendingLoanOfficer.agentSlug,
+          eventId: pendingLoanOfficer.eventId,
+          signId: pendingLoanOfficer.signId,
+          publicCode: pendingLoanOfficer.publicCode
+        });
         return;
       }
 
@@ -116,6 +299,12 @@
 
       const rows = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(rows) || rows.length === 0) {
+        if (signCode) {
+          setStatus('Smart Sign Chip', 'Opening sign setup for this printed sign.');
+          continueSignActivation({ sign_uid: uid, code: signCode });
+          return;
+        }
+
         const pendingSignActivation = readSignActivationSession();
         if (
           pendingSignActivation?.publicCode
@@ -123,6 +312,23 @@
         ) {
           setStatus('Smart Sign Chip', 'Continuing sign activation.');
           continueSignActivation({ sign_uid: uid });
+          return;
+        }
+
+        const remoteSignActivation = await findRemoteSignActivationSession([
+          'waiting_for_sign_chip_1',
+          'waiting_for_second_sign_chip'
+        ]);
+        if (remoteSignActivation?.public_code) {
+          setStatus('Smart Sign Chip', 'Continuing sign activation.');
+          continueSignActivation({
+            sign_uid: uid,
+            code: remoteSignActivation.public_code,
+            sign_id: remoteSignActivation.sign_id,
+            inventory_id: remoteSignActivation.inventory_id,
+            uid: remoteSignActivation.agent_key_uid,
+            agent: remoteSignActivation.agent_slug
+          });
           return;
         }
 
@@ -134,6 +340,23 @@
 
       const record = rows[0];
       if (record.claimed === true && record.agent_slug) {
+        const pendingAgentDashboard = readAgentDashboardSession();
+        if (pendingAgentDashboard?.publicCode || pendingAgentDashboard?.signId) {
+          if (pendingAgentDashboard.ownerAgentSlug && pendingAgentDashboard.ownerAgentSlug !== record.agent_slug) {
+            setStatus('Wrong Keychain', `This dashboard belongs to ${pendingAgentDashboard.ownerAgentSlug}.`);
+            return;
+          }
+          saveHostSession({ agentSlug: record.agent_slug, uid, source: 'agent-dashboard-keychain' });
+          setStatus('Keychain Verified', 'Opening the live event dashboard.');
+          goToAgentDashboard({
+            agentSlug: record.agent_slug,
+            eventId: pendingAgentDashboard.eventId,
+            signId: pendingAgentDashboard.signId,
+            publicCode: pendingAgentDashboard.publicCode
+          });
+          return;
+        }
+
         const pendingSignActivation = readSignActivationSession();
         if (pendingSignActivation?.stage === 'waiting_for_agent_keychain' && pendingSignActivation.publicCode) {
           if (pendingSignActivation.ownerAgentSlug && pendingSignActivation.ownerAgentSlug !== record.agent_slug) {
@@ -146,6 +369,37 @@
             agent: record.agent_slug,
             code: pendingSignActivation.publicCode,
             sign_id: pendingSignActivation.signId
+          });
+          return;
+        }
+
+        let remoteKeychainActivation = await findRemoteSignActivationSession([
+          'waiting_for_agent_keychain',
+          'waiting_for_handshake'
+        ], record.agent_slug);
+        if (!remoteKeychainActivation) {
+          remoteKeychainActivation = await findRemoteSignActivationSession(['waiting_for_agent_keychain']);
+        }
+        if (remoteKeychainActivation?.public_code) {
+          if (remoteKeychainActivation.owner_agent_slug && remoteKeychainActivation.owner_agent_slug !== record.agent_slug) {
+            setStatus('Wrong Keychain', `This sign is assigned to ${remoteKeychainActivation.owner_agent_slug}.`);
+            return;
+          }
+          await updateRemoteSignActivationSession(remoteKeychainActivation.id, {
+            agent_key_uid: uid,
+            agent_slug: record.agent_slug,
+            stage: remoteKeychainActivation.stage === 'waiting_for_handshake' ? 'waiting_for_handshake' : 'waiting_for_sign_chip_1'
+          });
+          setStatus(
+            remoteKeychainActivation.stage === 'waiting_for_handshake' ? 'Handshake Confirmed' : 'Keychain Confirmed',
+            'Opening sign activation.'
+          );
+          continueSignActivation({
+            uid,
+            agent: record.agent_slug,
+            code: remoteKeychainActivation.public_code,
+            sign_id: remoteKeychainActivation.sign_id,
+            inventory_id: remoteKeychainActivation.inventory_id
           });
           return;
         }

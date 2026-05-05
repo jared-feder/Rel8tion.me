@@ -288,7 +288,7 @@ export function showVerifyAgent() {
       </div>
       <div class="space-y-3">
         <button onclick="autoActivate()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Activate Now</button>
-        <button onclick="showFullProfileForm(state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '', 'Update or complete your profile below.')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Edit Profile</button>
+        <button onclick="editDetectedProfile()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Edit Profile</button>
       </div>
     </div>
   `);
