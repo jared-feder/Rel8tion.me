@@ -784,6 +784,25 @@ The exact live queue schema is broader than the SQL files inspected and needs ve
 
 ## Supabase Functions And RPCs
 
+### Latest Live Verification Result
+
+`[PARTIAL]` Latest anon verification run completed successfully with summary `PASS 79`, `WARN 3`, `NEEDS_VERIFICATION 14`, `FAIL 0`.
+
+Confirmed by that run:
+
+- Core tables and expected columns passed anon zero-row schema probes.
+- This confirms live schema exposure through the anon PostgREST access path.
+
+Still not confirmed:
+
+- Full RLS correctness or write behavior.
+- Privileged schema checks; service role was not used.
+- RPC definitions for `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
+- `send-lead-sms`; local source is missing and the verifier intentionally does not call SMS functions.
+- Edge Function deployment for source under `docs/supabase-functions`.
+- Vercel Cron state; root `vercel.json` has no `crons` block, so dashboard verification is still required.
+- Current production deployment health and production data quality.
+
 ### Checked-In Edge Functions
 
 `supabase/functions/twilio-inbound-router/index.ts`
@@ -967,8 +986,9 @@ Current concerns visible in code:
 - `[RISK]` `smart_sign_activation_sessions` stale rows can resume the wrong setup if cleanup fails.
 - `[RISK]` Estately scraping is brittle and can return bad office numbers.
 - `[NEEDS VERIFICATION]` Root enrichment cron is not present in root `vercel.json`.
-- `[NEEDS VERIFICATION]` Several referenced Supabase RPCs/functions are not checked into the repo.
+- `[NEEDS VERIFICATION]` Several referenced Supabase RPCs/functions still need live deployment/definition verification.
 - `[IMPLEMENTED]` A read-only verification kit exists under `docs/live-verification/` and can generate local JSON/Markdown reports with `npm run verify:live`.
+- `[PARTIAL]` Latest anon run returned `PASS 79`, `WARN 3`, `NEEDS_VERIFICATION 14`, `FAIL 0`; this confirms anon PostgREST schema exposure for core tables/columns, not RLS safety or full production health.
 - `[INTENDED]` No full automated E2E suite is present for the NFC/sign flows.
 - `[IMPLEMENTED]` One active event per sign and one live loan officer per event are current constraints.
 - `[PARTIAL]` Manual listings create events with `open_house_source_id = null`, which limits enrichment/outreach/listing-data behavior.
@@ -983,16 +1003,16 @@ Confirmed or needs-verification gaps:
 - `[INTENDED]` Chat/modal/video support between buyer, agent, and loan officer is not implemented.
 - `[PARTIAL]` Admin dashboard is placeholder only.
 - `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
-- `[NEEDS VERIFICATION]` RPC definitions are missing from checked-in SQL.
+- `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[NEEDS VERIFICATION]` Live production deploy state was not verified from the repo alone.
-- `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed from the repo alone.
+- `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
 - `[RISK]` `smart-sign-qr-export.sql` and the current activation flow disagree on whether QR source should be `smart_signs` or `smart_sign_inventory`.
 
 ## [INTENDED] Top Priority Next Task
 
-Run the live verification system in `docs/live-verification/` with real environment variables, then review the generated JSON/Markdown reports before treating live Supabase, deployed Edge Functions, RPCs, RLS, or Vercel routes as confirmed.
+Run privileged/dashboard verification for RLS policies, service-role schema checks, deployed Edge Functions, RPC definitions, and Vercel Cron state before treating live Supabase, deployed functions, SMS behavior, or production routing as fully confirmed.
 
 ## Verification Notes
 
@@ -1047,6 +1067,6 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `send-lead-sms` implementation is checked in. | `[NEEDS VERIFICATION]` | Calls exist, function source does not. |
 | Outreach generation/send functions under `docs/supabase-functions` are deployed. | `[NEEDS VERIFICATION]` | Source exists under docs, not under deployable `supabase/functions`. |
 | Supabase RPC definitions are present in repo SQL. | `[NEEDS VERIFICATION]` | RPCs are called but definitions were not found in checked-in SQL. |
-| Live production schema/RLS exactly matches repo assumptions. | `[NEEDS VERIFICATION]` | Repo contains partial migrations/snapshots only. |
+| Live production schema/RLS exactly matches repo assumptions. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
 | `event_loan_officer_sessions` RLS is production-safe. | `[RISK]` | SQL grants anon/auth access; RLS enablement was not found in that SQL file. |
 | QR source is unified between printed inventory and sign rows. | `[RISK]` | Activation uses `smart_sign_inventory`; `smart-sign-qr-export.sql` exports from `smart_signs`. |

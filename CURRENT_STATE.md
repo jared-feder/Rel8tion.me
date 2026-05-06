@@ -43,6 +43,7 @@ Status labels:
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
 - `[IMPLEMENTED]` A read-only live verification system exists under `docs/live-verification/` with `npm run verify:live`.
+- `[PARTIAL]` Latest live verification anon run succeeded with summary `PASS 79`, `WARN 3`, `NEEDS_VERIFICATION 14`, `FAIL 0`. Core tables and expected columns passed anon zero-row schema probes. This confirms live schema exposure through the anon PostgREST access path, not full RLS correctness, write behavior, deployment health, or production data quality.
 
 ## [PARTIAL] And [NEEDS VERIFICATION]
 
@@ -53,11 +54,13 @@ Status labels:
 - `[PARTIAL]` WordPress hot-list files exist locally, but they are not automatically synced to WordPress.
 - `[PARTIAL]` `/b` buyer profile and `/event` smart sign check-in are both active concepts but save into different tables.
 - `[RISK]` Several root/static pages are legacy or test artifacts. Use `vercel.json` before assuming a page is live.
-- `[NEEDS VERIFICATION]` Live RLS state is not fully knowable from checked-in files.
+- `[NEEDS VERIFICATION]` Live RLS state is not fully knowable from checked-in files or the latest anon zero-row schema probes.
 - `[RISK]` `event_loan_officer_sessions` SQL grants anon/auth select, insert, and update; live RLS state needs verification.
-- `[NEEDS VERIFICATION]` `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create` are used but their SQL definitions were not found.
-- `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its Edge Function source was not found.
-- `[NEEDS VERIFICATION]` Current production deployment was not verified by this documentation pass.
+- `[NEEDS VERIFICATION]` `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create` are still unverified after the latest anon run.
+- `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its local Edge Function source was not found, and the verification script intentionally does not call SMS functions.
+- `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
+- `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
+- `[NEEDS VERIFICATION]` Current production deployment is not fully verified.
 
 ## [INTENDED] Not Built Yet
 
@@ -90,9 +93,9 @@ Recent repo state includes:
 
 Highest-value next work:
 
-1. Run the live verification system in `docs/live-verification/` with real environment variables, then review `latest-live-verification-report.md`.
-2. Verify live Supabase schema, policies, RPCs, and deployed functions against this repo snapshot.
-3. Confirm the currently configured Vercel routes and whether the enrichment cron is intentionally disabled or missing.
+1. Run privileged/dashboard verification for RLS policies, service-role schema checks, deployed Edge Functions, RPC definitions, and Vercel Cron state.
+2. Confirm the currently configured Vercel routes and whether the enrichment cron is intentionally disabled or missing.
+3. Re-run `npm run verify:live` after schema, route, or function changes and review the generated report without committing it.
 4. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.
 5. Build formal remote LO coverage management:
    - loan officer profiles
@@ -182,5 +185,5 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |
 | `send-lead-sms` source is present. | `[NEEDS VERIFICATION]` | The app calls it, but function source was not found. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
-| Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Repo contains partial SQL/migrations; live policies were not checked. |
+| Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
 | QR inventory/export process is unified. | `[RISK]` | Activation uses `smart_sign_inventory`, but export SQL uses `smart_signs`. |
