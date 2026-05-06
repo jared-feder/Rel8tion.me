@@ -42,6 +42,7 @@ Status labels:
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
+- `[IMPLEMENTED]` A read-only live verification system exists under `docs/live-verification/` with `npm run verify:live`.
 
 ## [PARTIAL] And [NEEDS VERIFICATION]
 
@@ -89,7 +90,7 @@ Recent repo state includes:
 
 Highest-value next work:
 
-1. Create a live Supabase verification script or checklist to confirm tables, columns, RLS policies, deployed Edge Functions, RPC definitions, and Vercel routes.
+1. Run the live verification system in `docs/live-verification/` with real environment variables, then review `latest-live-verification-report.md`.
 2. Verify live Supabase schema, policies, RPCs, and deployed functions against this repo snapshot.
 3. Confirm the currently configured Vercel routes and whether the enrichment cron is intentionally disabled or missing.
 4. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.

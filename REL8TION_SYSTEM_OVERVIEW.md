@@ -968,6 +968,7 @@ Current concerns visible in code:
 - `[RISK]` Estately scraping is brittle and can return bad office numbers.
 - `[NEEDS VERIFICATION]` Root enrichment cron is not present in root `vercel.json`.
 - `[NEEDS VERIFICATION]` Several referenced Supabase RPCs/functions are not checked into the repo.
+- `[IMPLEMENTED]` A read-only verification kit exists under `docs/live-verification/` and can generate local JSON/Markdown reports with `npm run verify:live`.
 - `[INTENDED]` No full automated E2E suite is present for the NFC/sign flows.
 - `[IMPLEMENTED]` One active event per sign and one live loan officer per event are current constraints.
 - `[PARTIAL]` Manual listings create events with `open_house_source_id = null`, which limits enrichment/outreach/listing-data behavior.
@@ -991,7 +992,7 @@ Confirmed or needs-verification gaps:
 
 ## [INTENDED] Top Priority Next Task
 
-Create a live Supabase verification script or checklist to confirm tables, columns, RLS policies, deployed Edge Functions, RPC definitions, and Vercel routes.
+Run the live verification system in `docs/live-verification/` with real environment variables, then review the generated JSON/Markdown reports before treating live Supabase, deployed Edge Functions, RPCs, RLS, or Vercel routes as confirmed.
 
 ## Verification Notes
 

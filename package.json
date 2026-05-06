@@ -1,5 +1,8 @@
 {
   "private": true,
+  "scripts": {
+    "verify:live": "node docs/live-verification/verify-supabase-live.mjs"
+  },
   "dependencies": {
     "cheerio": "^1.0.0"
   }
