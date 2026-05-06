@@ -1,0 +1,185 @@
+# Current State
+
+Last inspected: 2026-05-06.
+
+This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
+
+Status labels:
+
+- `[IMPLEMENTED]` means code exists in the repo. It does not guarantee that the feature is deployed, live, passing RLS, or working with current Supabase production data.
+- `[PARTIAL]` means some code exists, but the complete product behavior is not built or not fully wired.
+- `[INTENDED]` means this is a REL8TION business/product rule or target architecture, not proof of current implementation.
+- `[NEEDS VERIFICATION]` means the repo is not enough to prove live behavior, deployment, schema, RLS, or external service state.
+- `[RISK]` means this can break demos, production data, security, SMS, or user trust if handled casually.
+
+## [IMPLEMENTED] Repo Code Present Today
+
+- `[IMPLEMENTED]` Agent keychain claim flow exists at `/claim`.
+- `[IMPLEMENTED]` Claimed keychains route through `/k` and then to `/a`, which redirects to `/b`.
+- `[IMPLEMENTED]` `/b` loads an agent by slug, shows agent info, captures buyer preferences, saves to `leads`, calls `send-lead-sms`, and shows a three-property preference modal.
+- `[IMPLEMENTED]` Agent onboarding exists at `/onboarding` and includes the smart sign activation entry point.
+- `[IMPLEMENTED]` Smart sign activation exists at `/sign-demo-activate`.
+- `[IMPLEMENTED]` Activation uses sign QR/public code lookup through `smart_sign_inventory`.
+- `[IMPLEMENTED]` Activation supports camera QR scan, camera photo fallback, and manual code entry.
+- `[IMPLEMENTED]` Activation supports front chip and rear chip pairing.
+- `[IMPLEMENTED]` Front chip is stored as buyer chip in `smart_signs.uid_primary`.
+- `[IMPLEMENTED]` Rear chip is stored as agent chip in `smart_signs.uid_secondary`.
+- `[IMPLEMENTED]` Agent keychain handshake is part of sign setup.
+- `[IMPLEMENTED]` Sign activation can bind a sign to an open house event.
+- `[IMPLEMENTED]` Binding has loose nearby/listing search behavior and a manual listing fallback.
+- `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`.
+- `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
+- `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
+- `[IMPLEMENTED]` `/event` shows property details, host agent, contact/save-contact actions, and check-in form.
+- `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.
+- `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
+- `[IMPLEMENTED]` Buyer preapproval/financing routing checks for a live loan officer session first, then falls back to Jared alert.
+- `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
+- `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, outreach count, relationship status, and loan officer coverage.
+- `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
+- `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
+- `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
+- `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
+- `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
+
+## [PARTIAL] And [NEEDS VERIFICATION]
+
+- `[NEEDS VERIFICATION]` Root `api/cron/enrich-agents.js` exists, but root `vercel.json` currently has no `crons` block. Cron scheduling is not proven by the repo.
+- `[PARTIAL]` The Estately worker can enrich `listing_agents`, but quality depends on Estately parsing and phone validation.
+- `[NEEDS VERIFICATION]` Outreach generation/sending source exists mostly under `docs/supabase-functions`; deployment state is not confirmed from repo files.
+- `[PARTIAL]` `/admin` is only a placeholder page, not a full admin dashboard.
+- `[PARTIAL]` WordPress hot-list files exist locally, but they are not automatically synced to WordPress.
+- `[PARTIAL]` `/b` buyer profile and `/event` smart sign check-in are both active concepts but save into different tables.
+- `[RISK]` Several root/static pages are legacy or test artifacts. Use `vercel.json` before assuming a page is live.
+- `[NEEDS VERIFICATION]` Live RLS state is not fully knowable from checked-in files.
+- `[RISK]` `event_loan_officer_sessions` SQL grants anon/auth select, insert, and update; live RLS state needs verification.
+- `[NEEDS VERIFICATION]` `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create` are used but their SQL definitions were not found.
+- `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its Edge Function source was not found.
+- `[NEEDS VERIFICATION]` Current production deployment was not verified by this documentation pass.
+
+## [INTENDED] Not Built Yet
+
+- `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[PARTIAL]` Loan officer support is currently scan/session based through a local tag verification flow.
+- `[INTENDED]` Buyer-agent-loan-officer chat modal is not built.
+- `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
+- `[INTENDED]` Full admin dashboard for signs, events, outreach, replies, and analytics is not built.
+- `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
+- `[RISK]` QR export needs cleanup: current activation expects `smart_sign_inventory.public_code`, while `smart-sign-qr-export.sql` exports from `smart_signs`.
+- `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
+
+## Changed Recently
+
+Recent repo state includes:
+
+- `[IMPLEMENTED]` Beta keychain/sign lane for `main-beta`.
+- `[IMPLEMENTED]` Beta reset/restore helpers in the claim flow.
+- `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
+- `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.
+- `[IMPLEMENTED]` Key reset scanner/admin API added.
+- `[IMPLEMENTED]` Buyer event page polished with hosted-by agent block, property facts, save contact, and check-in section.
+- `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
+- `[IMPLEMENTED]` Agent dashboard tightened to show event leads and live loan officer coverage.
+- `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
+- `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.
+
+## [INTENDED] Build Next
+
+Highest-value next work:
+
+1. Create a live Supabase verification script or checklist to confirm tables, columns, RLS policies, deployed Edge Functions, RPC definitions, and Vercel routes.
+2. Verify live Supabase schema, policies, RPCs, and deployed functions against this repo snapshot.
+3. Confirm the currently configured Vercel routes and whether the enrichment cron is intentionally disabled or missing.
+4. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.
+5. Build formal remote LO coverage management:
+   - loan officer profiles
+   - agent/loan officer relationships
+   - event invites
+   - accept/decline flow
+   - remote availability queue
+   - scheduled coverage assignment
+   - event start prompt
+   - live coverage session
+   - buyer financing alert and contact modal
+6. Replace placeholder `/admin` with a protected operational dashboard.
+7. Add a small E2E/runbook suite for:
+   - claim keychain
+   - activate sign QR
+   - pair front/rear chips
+   - bind listing
+   - buyer check-in
+   - rear dashboard challenge
+   - loan officer sign-in
+   - reset beta sign/key
+8. Unify `/b` profile leads and `/event` check-ins by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record.
+9. Harden outreach phone validation and queue rules before re-enabling broad automation.
+
+## [PARTIAL] Data Model Warning
+
+`[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
+
+## [RISK] Important Warnings
+
+- `[INTENDED]` Do not put smart sign activation on the buyer-facing page.
+- `[INTENDED]` Do not route the front/buyer chip to the agent dashboard.
+- `[IMPLEMENTED]` Current rear/agent chip routing requires keychain verification before dashboard access.
+- `[INTENDED]` Do not reset live field signs without explicit confirmation.
+- `[RISK]` Treat Elena/Galluzzo sign data as protected unless the user says otherwise.
+- `[RISK]` Stale `smart_sign_activation_sessions` rows can break activation flows.
+- `[RISK]` `open_house_events` uses `host_agent_slug`; do not reintroduce `agent_slug` writes for that table.
+- `[RISK]` Browser-side Supabase calls depend on live RLS policies. A code change that works locally can still fail with `42501`.
+- `[INTENDED]` Sensitive Supabase writes should move through Edge Functions or serverless APIs as the product hardens; current browser code still performs direct anon-key writes.
+- `[RISK]` Outreach and SMS changes can affect real people. Confirm filters before enabling send logic.
+- `[PARTIAL]` WordPress files in this repo are local tracking files, not automatic live WordPress deployment.
+
+## Verification Notes
+
+Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]`, `[RISK]`. `[IMPLEMENTED]` means code exists in the repo. It does not guarantee that the feature is deployed, live, passing RLS, or working with current Supabase production data.
+
+### [IMPLEMENTED] Repo Claims
+
+| Major claim | Status | Evidence |
+| --- | --- | --- |
+| Claim flow exists at `/claim`. | `[IMPLEMENTED]` | Root/app Vercel rewrites and `apps/rel8tion-app/claim.html` with `claimStyled` modules. |
+| Claimed keychains route through `/k` to `/a` and `/b`. | `[IMPLEMENTED]` | `k.html` calls `goToLiveProfile`; `a.html` redirects to `/b`. |
+| `/b` buyer profile captures leads and preferences. | `[IMPLEMENTED]` | `b.html` posts to `leads`, calls `send-lead-sms`, and renders preference modal choices. |
+| Smart sign activation exists and uses inventory lookup. | `[IMPLEMENTED]` | `sign-demo-activate.html` resolves `smart_sign_inventory.public_code`. |
+| Front chip is buyer/check-in side. | `[IMPLEMENTED]` | `sign-demo-activate.html` stores first chip as `front_buyer_chip`; `k.html` routes `front_buyer` to `/s`. |
+| Rear chip is agent/dashboard challenge side only. | `[IMPLEMENTED]` | `sign-demo-activate.html` stores second chip as `rear_agent_chip`; `k.html` stops on rear scan and asks for keychain. |
+| Rear sign scan must be followed by agent keychain scan. | `[IMPLEMENTED]` | `k.html` writes `rel8tion_agent_dashboard_pending` and waits. |
+| Sign activation can bind a sign to an event. | `[IMPLEMENTED]` | `createOrLockEvent` writes `open_house_events` and patches `smart_signs`. |
+| Buyer event check-in exists at `/event`. | `[IMPLEMENTED]` | Route rewrites plus `eventShell/bootstrap.js`. |
+| Buyer check-in saves to `event_checkins`. | `[IMPLEMENTED]` | `createCheckin` posts to `event_checkins`. |
+| Buyer not preapproved routes to live paired LO first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` checks `getLiveLoanOfficerSession` and sends LO alert/intro. |
+| Buyer not preapproved falls back to Jared if no live LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert`. |
+| Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Agent dashboard arms pending LO session; `/k` verifies `verified_profiles` and writes `event_loan_officer_sessions`. |
+| NMB activation/profile pages exist. | `[IMPLEMENTED]` | `nmb-activate.html` and `nmb-verified.html`. |
+| Admin key/sign reset exists. | `[PARTIAL]` | `key-reset.html` plus `api/admin/reset-key.js`; full admin dashboard is not built. |
+| Estately enrichment worker exists at batch size 20. | `[IMPLEMENTED]` | `estately-enrichment-worker.cjs`. |
+| Twilio inbound reply Edge Functions are present. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
+| WordPress files are local presentation/marketing/support files. | `[PARTIAL]` | `wordpress/README.md` says they are local tracking and not automatically synced. |
+
+### [INTENDED] Business Rules And Target Architecture
+
+| Major claim | Status | Evidence |
+| --- | --- | --- |
+| Buyer-facing sign side should stay buyer-only. | `[INTENDED]` | Current active front chip routes to `/s`/`/event`; keep this as a business rule for future edits. |
+| Rear sign side should be dashboard challenge only. | `[IMPLEMENTED]` | Current rear route requires keychain scan before dashboard. |
+| WordPress is marketing/presentation, not product brain. | `[INTENDED]` | App state and flows live in Vercel/Supabase; WordPress folder is local tracking. |
+| Supabase sensitive writes should move through Edge Functions. | `[INTENDED]` | Current browser pages still write directly with anon key, so this is not implemented. |
+| Formal remote LO coverage management should let agents and LOs request/link/accept coverage. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
+
+### [PARTIAL], [NEEDS VERIFICATION], And [RISK]
+
+| Major claim | Status | Evidence |
+| --- | --- | --- |
+| Formal remote LO coverage management is desired but not built. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
+| Buyer-agent-LO chat/video is desired but not built. | `[INTENDED]` | Current code only has SMS/call/text links. |
+| Full admin dashboard is built. | `[INTENDED]` | `/admin` is placeholder. |
+| Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |
+| `send-lead-sms` source is present. | `[NEEDS VERIFICATION]` | The app calls it, but function source was not found. |
+| Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
+| Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Repo contains partial SQL/migrations; live policies were not checked. |
+| QR inventory/export process is unified. | `[RISK]` | Activation uses `smart_sign_inventory`, but export SQL uses `smart_signs`. |
