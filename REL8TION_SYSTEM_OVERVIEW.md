@@ -849,6 +849,7 @@ File: `api/compliance/ny-disclosure.js`.
 - `POST { checkin_id }` generates a signed PDF packet from the saved check-in acknowledgement.
 - Signed PDF upload uses Supabase Storage through server-side `SUPABASE_SERVICE_ROLE_KEY`.
 - Signed PDF metadata is patched back into `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`.
+- New signed PDF objects use broker-readable event paths/filenames and store audit fields including document hash, event/check-in IDs, property address, buyer name, generated timestamp, storage path, and source form references.
 - `GET ?checkin=<checkinId>&download=1` returns the stored signed PDF when available or regenerates one from metadata.
 
 `[NEEDS VERIFICATION]` Live behavior depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.

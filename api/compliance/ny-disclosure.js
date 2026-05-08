@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -68,6 +69,13 @@ function safeFilenamePart(value) {
     .slice(0, 60) || 'document';
 }
 
+function shortToken(value, fallback = 'id') {
+  return cleanText(value, fallback)
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase()
+    .slice(0, 8) || fallback;
+}
+
 function todayLocalDate() {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -75,6 +83,17 @@ function todayLocalDate() {
     month: '2-digit',
     day: '2-digit'
   }).format(new Date());
+}
+
+function dateSlug(value) {
+  const date = value ? new Date(value) : new Date();
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(safeDate);
 }
 
 function formatDateTime(value) {
@@ -89,6 +108,35 @@ function formatDateTime(value) {
     hour: 'numeric',
     minute: '2-digit'
   }).format(date);
+}
+
+function eventDateValue(context, checkin) {
+  return firstPresent(
+    context.house?.open_start,
+    context.event?.start_time,
+    context.event?.created_at,
+    checkin?.created_at
+  );
+}
+
+function buildSignedDisclosureFileName(context, checkin) {
+  const date = dateSlug(eventDateValue(context, checkin));
+  const address = safeFilenamePart(context.address || 'open-house');
+  const buyer = safeFilenamePart(checkin.visitor_name || 'buyer');
+  const checkinId = shortToken(checkin.id, 'checkin');
+  return `${date}-${address}-${buyer}-${checkinId}-nys-disclosure.pdf`;
+}
+
+function buildSignedDisclosureStoragePath(context, checkin, fileName) {
+  const agentSlug = safeFilenamePart(firstPresent(context.event?.host_agent_slug, context.agent?.slug, 'unassigned-agent'));
+  const date = dateSlug(eventDateValue(context, checkin));
+  const address = safeFilenamePart(context.address || 'open-house');
+  const eventId = shortToken(context.eventId, 'event');
+  return `${agentSlug}/${date}-${address}-${eventId}/${fileName}`;
+}
+
+function sha256Hex(bytes) {
+  return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
 }
 
 function firstPresent(...values) {
@@ -341,7 +389,8 @@ async function handleDownloadSigned(req, res) {
     });
   }
 
-  return sendPdf(res, `signed-nys-disclosure-${safeFilenamePart(context.checkin.visitor_name)}.pdf`, bytes);
+  const filename = signedPdf.storage_file_name || buildSignedDisclosureFileName(context, context.checkin);
+  return sendPdf(res, filename, bytes);
 }
 
 async function handleGenerateSigned(req, res) {
@@ -365,14 +414,26 @@ async function handleGenerateSigned(req, res) {
   });
 
   const generatedAt = new Date().toISOString();
-  const path = `${safeFilenamePart(context.eventId || 'event')}/${checkin.id}.pdf`;
+  const fileName = buildSignedDisclosureFileName(context, checkin);
+  const path = buildSignedDisclosureStoragePath(context, checkin, fileName);
+  const documentSha256 = sha256Hex(bytes);
   await uploadSignedPdf(path, bytes);
   const signedPdf = {
     generated: true,
     storage_bucket: SIGNED_DISCLOSURE_BUCKET,
     storage_path: path,
+    storage_file_name: fileName,
     download_url: `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1`,
-    generated_at: generatedAt
+    generated_at: generatedAt,
+    document_sha256: documentSha256,
+    event_id: context.eventId || '',
+    checkin_id: checkin.id,
+    open_house_source_id: context.openHouseSourceId || '',
+    host_agent_slug: context.event?.host_agent_slug || '',
+    property_address: context.address || '',
+    buyer_name: checkin.visitor_name || '',
+    source_pdf_url: SOURCE_PDF_URL,
+    official_source_url: OFFICIAL_SOURCE_URL
   };
   const updatedCheckin = await patchCheckinMetadata(checkin, signedPdf);
 

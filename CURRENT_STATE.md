@@ -36,6 +36,7 @@ Status labels:
 - `[IMPLEMENTED]` `/event` uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF. The official DOS form page remains the source-of-truth reference.
 - `[IMPLEMENTED]` `/event` opens a server-generated prefilled NYS disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - `[PARTIAL]` After buyer check-in, `/event` attempts to generate a signed NYS disclosure PDF through `/api/compliance/ny-disclosure`, store it in Supabase Storage, and attach the storage/download details to `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`. Storage bucket/env availability needs live verification.
+- `[IMPLEMENTED]` New signed NYS disclosure PDFs are stored with broker-readable event paths and filenames, and the metadata includes document hash, event/check-in IDs, property address, buyer name, generated timestamp, and source form references for audit evidence.
 - `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
 - `[IMPLEMENTED]` Buyer preapproval/financing routing checks for a live loan officer session first, then falls back to Jared alert.
 - `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
