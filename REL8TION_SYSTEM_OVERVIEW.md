@@ -266,8 +266,12 @@ Inputs:
 - Provides a "Save Contact" VCard for the host agent.
 - Shows "CHECK IN HERE" with buyer path choices.
 - Inserts check-ins into `event_checkins`.
+- Requires buyer disclosure completion before check-in submit: official NYS Housing and Anti-Discrimination Disclosure form link is shown, the checkbox acknowledgement is accepted, and the buyer check-in name is available as the prefilled electronic signature.
+- Uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF.
+- Keeps the official DOS form page as the source-of-truth reference in config/docs.
+- Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
 - Saves preference selection into `event_checkins.metadata` after check-in.
-- Sends buyer and agent SMS through `send-lead-sms`.
+- Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
 - If buyer is not preapproved or requests financing, routes to live loan officer if assigned, otherwise alerts Jared.
 
 Check-in paths:
@@ -276,7 +280,7 @@ Check-in paths:
 - `buyer_with_agent`
 - `buyer_agent`
 
-Required check-in fields vary by path. The code validates visitor identity, contact info, disclosure acceptance, signature, and buyer agent details where needed.
+Required check-in fields vary by path. The code validates visitor identity, contact info, NYS disclosure checkbox acknowledgement/prefilled e-signature, and buyer agent details where needed.
 
 ### `/agent-dashboard`
 
@@ -302,7 +306,7 @@ Inputs:
 - Loads `agent_outreach_queue` rows for the listing.
 - Loads live `event_loan_officer_sessions`.
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
-- Shows lead cards with call/text actions.
+- Shows lead cards with call/text actions and NYS Disclosure signed/missing status.
 - Shows loan officer coverage card.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
 
@@ -395,7 +399,7 @@ This is separate from the smart sign `/event` check-in flow.
 3. `/k` routes to `/s?code=<publicCode>`.
 4. `/s` resolves the active event.
 5. Buyer lands on `/event?event=<eventId>`.
-6. Buyer checks in and SMS notifications are sent.
+6. Buyer completes the required NYS disclosure acknowledgement and check-in; SMS notifications are sent only after validation and save.
 
 ### Rear NFC Agent Dashboard Challenge
 
@@ -425,6 +429,7 @@ The smart sign event page validates buyer preapproval/financing status during ch
 `[IMPLEMENTED]` Confirmed behavior in `eventShell/bootstrap.js`:
 
 - Buyer check-in is saved first to `event_checkins`.
+- NYS disclosure acknowledgement validation happens before the check-in insert and before any SMS notification calls.
 - Agent SMS is sent with buyer details.
 - Buyer confirmation SMS is sent.
 - If financing help is requested or needed, the code checks `event_loan_officer_sessions` for a live loan officer.
@@ -678,6 +683,7 @@ Important fields:
 - `pre_approved`
 - `represented_buyer_confirmed`
 - `metadata`
+- `metadata.ny_discrimination_disclosure` stores MVP NYS Housing and Anti-Discrimination Disclosure acknowledgement details, including DOS-2156 `11/25` form metadata, provided-by agent/brokerage, consumer role, acknowledgement/review/e-sign flags, checkbox-plus-prefilled-name signature, timestamp/date, and user agent.
 
 Expected relationship:
 
@@ -1008,6 +1014,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` Live production deploy state was not verified from the repo alone.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
+- `[RISK]` NYS disclosure handling is implemented as a configurable REL8TION-hosted Supabase Storage PDF link plus stored acknowledgement metadata. The official DOS form page remains the source-of-truth reference, and final legal/form-version review remains `[NEEDS VERIFICATION]`.
 - `[RISK]` `smart-sign-qr-export.sql` and the current activation flow disagree on whether QR source should be `smart_signs` or `smart_sign_inventory`.
 
 ## [INTENDED] Top Priority Next Task
@@ -1034,6 +1041,10 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
+| `/event` requires NYS disclosure acknowledgement before SMS/check-in completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before creating the check-in and before notification calls. |
+| `/event` stores DOS-2156 acknowledgement metadata. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `event_checkins.metadata.ny_discrimination_disclosure` with form code/version, provided-by agent/brokerage, consumer role, checkbox-plus-prefilled-name signature, timestamps, and user agent. |
+| `/event` uses a configurable REL8TION-hosted disclosure PDF. | `[IMPLEMENTED]` | `src/core/config.js` defaults `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL` to the Supabase Storage PDF and keeps `OFFICIAL_NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_SOURCE_URL` for the official DOS source-of-truth reference. |
+| Agent dashboard lead cards show NYS disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.ny_discrimination_disclosure` and renders Signed/Missing plus signed date/time when present. |
 | Buyer not preapproved routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` treats `pre_approved=false` as financing requested, calls `getLiveLoanOfficerSession`, then sends LO alert/intro. |
 | Buyer not preapproved routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |

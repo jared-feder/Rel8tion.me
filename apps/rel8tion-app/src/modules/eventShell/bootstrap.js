@@ -1,4 +1,4 @@
-import { ASSETS } from '../../core/config.js';
+import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
 import { createCheckin, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260503-lo-live';
 import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260503-lo-live';
@@ -15,6 +15,12 @@ const PATH_LABELS = Object.freeze({
   [CHECKIN_PATHS.BUYER]: 'Buyer',
   [CHECKIN_PATHS.BUYER_WITH_AGENT]: 'Buyer With Agent',
   [CHECKIN_PATHS.BUYER_AGENT]: 'Buyer Agent'
+});
+
+const NY_DISCRIMINATION_DISCLOSURE = Object.freeze({
+  form_name: 'New York State Housing and Anti-Discrimination Disclosure Form',
+  form_code: 'DOS-2156',
+  form_version: '11/25'
 });
 
 const pageState = {
@@ -348,7 +354,11 @@ function field(label, name, type = 'text', placeholder = '', required = false) {
 }
 
 function todayDateValue() {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function selectField(label, name, options) {
@@ -443,26 +453,72 @@ function renderFormFields() {
   `;
 }
 
+function disclosureContext() {
+  const house = pageState.house || {};
+  const setup = pageState.eventRow?.setup_context || {};
+  return {
+    agentName: firstPresent(pageState.agent?.name, setup.agent_name, pageState.eventRow?.host_agent_slug, 'Host Agent'),
+    brokerage: firstPresent(pageState.agent?.brokerage, house?.brokerage, setup.detected_brokerage, setup.brokerage, ''),
+    address: firstPresent(house?.address, setup.address, ''),
+    eventId: pageState.eventRow?.id || '',
+    openHouseSourceId: pageState.eventRow?.open_house_source_id || '',
+    openWindow: formatEventWindow({
+      open_start: firstPresent(house?.open_start, pageState.eventRow?.start_time),
+      open_end: firstPresent(house?.open_end, pageState.eventRow?.end_time)
+    })
+  };
+}
+
 function renderDisclosureBlock() {
+  const context = disclosureContext();
+  const today = todayDateValue();
+
   return `
-    <div class="rounded-[22px] border border-slate-200 bg-white/80 p-5 space-y-4">
+    <div class="rounded-[22px] border border-sky-200 bg-white/90 p-5 space-y-4">
       <div>
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Disclosure & Consent</div>
-        <p class="text-slate-600 font-medium leading-relaxed">
-          I agree to be contacted about this property, similar homes, open houses, and financing options. If I am not pre-approved, I consent to speaking with a specialist.
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Required Compliance</div>
+        <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">NYS Housing & Anti-Discrimination Disclosure</h3>
+        <p class="mt-2 text-slate-600 font-medium leading-relaxed">
+          Review the official form, then check the acknowledgement below. Your check-in name will be used as your electronic signature.
         </p>
       </div>
-      <label class="flex items-start gap-3 text-slate-700 font-semibold">
-        <input type="checkbox" name="disclosure_accepted" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300">
-        <span>I have read and accept this disclosure.</span>
-      </label>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${field('Signature', 'signature_name', 'text', 'Type your full name', true)}
-        <label class="block">
-          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Today</div>
-          <input name="signature_date" type="date" value="${todayDateValue()}" required class="w-full rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-sky-400">
-        </label>
+
+      <div class="grid grid-cols-1 gap-3 text-sm">
+        <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Provided by</div>
+          <div class="text-slate-900 font-black">${esc(context.agentName)}</div>
+        </div>
+        <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Brokerage</div>
+          <div class="text-slate-900 font-black">${textOrDash(context.brokerage)}</div>
+        </div>
+        <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Date</div>
+          <div class="text-slate-900 font-black">${esc(today)}</div>
+        </div>
       </div>
+
+      <input type="hidden" name="ny_disclosure_signed_date" value="${esc(today)}">
+      <input type="hidden" id="ny-disclosure-signature-value" name="ny_disclosure_signature" value="">
+      <a
+        href="${esc(NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex w-full items-center justify-center rounded-full px-5 py-4 text-center text-base font-black text-white shadow-[0_18px_40px_rgba(59,130,246,0.24)]"
+        style="background:linear-gradient(90deg,#38bdf8,#2563eb);"
+      >
+        View Disclosure Form
+      </a>
+
+      <div class="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Electronic Signature</div>
+        <div id="ny-disclosure-signature-preview" class="text-slate-900 font-black">Enter your name above</div>
+      </div>
+
+      <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4 text-slate-700 font-semibold">
+        <input type="checkbox" name="ny_disclosure_acknowledged" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300">
+        <span>I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.</span>
+      </label>
     </div>
   `;
 }
@@ -518,27 +574,46 @@ function validateCheckin(values) {
     throw new Error('Financing follow-up needs a real way to reach the buyer. Add an email or phone number.');
   }
 
-  if (values.disclosure_accepted !== 'true') {
-    throw new Error('Accept the disclosure to continue.');
+  if (values.ny_disclosure_acknowledged !== 'true') {
+    throw new Error('Acknowledge the required NYS disclosure before submitting.');
   }
 
-  if (!normalizeValue(values.signature_name)) {
-    throw new Error('Type a full-name signature to complete the check-in.');
+  if (!normalizeValue(values.ny_disclosure_signature) && !normalizeValue(values.visitor_name)) {
+    throw new Error('Add the buyer name so it can serve as the NYS disclosure electronic signature.');
   }
+}
 
-  if (!normalizeValue(values.signature_date)) {
-    throw new Error('Add today’s date to complete the check-in.');
-  }
+function buildNyDisclosureMetadata(values, signedAt = new Date()) {
+  const context = disclosureContext();
+  const signedDate = normalizeValue(values.ny_disclosure_signed_date) || todayDateValue();
+  const signatureValue = normalizeValue(values.ny_disclosure_signature) || normalizeValue(values.visitor_name);
+
+  return {
+    ...NY_DISCRIMINATION_DISCLOSURE,
+    provided_by_agent_name: context.agentName,
+    provided_by_brokerage: context.brokerage || '',
+    consumer_role: PATH_LABELS[pageState.selectedPath] || pageState.selectedPath,
+    acknowledged: true,
+    reviewed: true,
+    esign_consent: true,
+    e_signature_type: 'checkbox_plus_prefilled_name',
+    e_signature_value: signatureValue,
+    signed_date: signedDate,
+    signed_at: signedAt.toISOString(),
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  };
 }
 
 function buildCheckinPayload(formData) {
   const values = Object.fromEntries(formData.entries());
   validateCheckin(values);
+  const signedAt = new Date();
   const preApproved = values.pre_approved === 'yes' ? true : (values.pre_approved === 'no' ? false : null);
   const financingRequested = values.financing_requested === 'true' || preApproved === false;
   const representedBuyerConfirmed = pageState.selectedPath === CHECKIN_PATHS.BUYER_WITH_AGENT
     ? true
     : values.represented_buyer_confirmed === 'true';
+  const nyDiscriminationDisclosure = buildNyDisclosureMetadata(values, signedAt);
 
   return {
     open_house_event_id: pageState.eventRow.id,
@@ -555,10 +630,11 @@ function buildCheckinPayload(formData) {
       source: 'app-event-shell',
       path: pageState.selectedPath,
       relationship_state: representedBuyerConfirmed ? 'represented' : 'direct',
-      disclosure_accepted: values.disclosure_accepted === 'true',
-      signature_name: normalizeValue(values.signature_name),
-      signature_date: normalizeValue(values.signature_date),
-      signature_timestamp: new Date().toISOString(),
+      disclosure_accepted: true,
+      signature_name: nyDiscriminationDisclosure.e_signature_value,
+      signature_date: nyDiscriminationDisclosure.signed_date,
+      signature_timestamp: nyDiscriminationDisclosure.signed_at,
+      ny_discrimination_disclosure: nyDiscriminationDisclosure,
       financing_requested: financingRequested
     }
   };
@@ -685,6 +761,18 @@ function attachEventHandlers() {
   });
 
   const form = document.getElementById('checkin-form');
+  const visitorNameInput = form?.querySelector('[name="visitor_name"]');
+  const signatureInput = document.getElementById('ny-disclosure-signature-value');
+  const signaturePreview = document.getElementById('ny-disclosure-signature-preview');
+  const syncDisclosureSignature = () => {
+    const signature = normalizeValue(visitorNameInput?.value);
+    if (signatureInput) signatureInput.value = signature || '';
+    if (signaturePreview) signaturePreview.textContent = signature || 'Enter your name above';
+  };
+
+  visitorNameInput?.addEventListener('input', syncDisclosureSignature);
+  syncDisclosureSignature();
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (pageState.submitting) return;
@@ -693,10 +781,20 @@ function attachEventHandlers() {
     pageState.successMessage = '';
     pageState.errorMessage = '';
     pageState.financingAlertSent = false;
+
+    let payload;
+    try {
+      payload = buildCheckinPayload(new FormData(form));
+    } catch (error) {
+      pageState.submitting = false;
+      pageState.errorMessage = error.message || 'Complete the required disclosure acknowledgement.';
+      renderEventShell();
+      return;
+    }
+
     renderEventShell();
 
     try {
-      const payload = buildCheckinPayload(new FormData(form));
       const createdCheckin = await createCheckin(payload);
       try {
         await touchEvent(pageState.eventRow.id);

@@ -32,10 +32,12 @@ Status labels:
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event` shows property details, host agent, contact/save-contact actions, and check-in form.
 - `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.
+- `[IMPLEMENTED]` `/event` requires a NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement before check-in submit. The buyer check-in name auto-fills as the electronic signature, and the acknowledgement is stored in `event_checkins.metadata.ny_discrimination_disclosure`.
+- `[IMPLEMENTED]` `/event` uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF. The official DOS form page remains the source-of-truth reference.
 - `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
 - `[IMPLEMENTED]` Buyer preapproval/financing routing checks for a live loan officer session first, then falls back to Jared alert.
 - `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
-- `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, outreach count, relationship status, and loan officer coverage.
+- `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, each lead card's NYS disclosure signed/missing status, outreach count, relationship status, and loan officer coverage.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
@@ -61,6 +63,7 @@ Status labels:
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
 - `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
 - `[NEEDS VERIFICATION]` Current production deployment is not fully verified.
+- `[NEEDS VERIFICATION]` Final NYS disclosure legal/form-version review remains unverified. The app points to a REL8TION-hosted Supabase Storage copy, while the official DOS form page remains the source-of-truth reference.
 
 ## [INTENDED] Not Built Yet
 
@@ -83,6 +86,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.
 - `[IMPLEMENTED]` Key reset scanner/admin API added.
 - `[IMPLEMENTED]` Buyer event page polished with hosted-by agent block, property facts, save contact, and check-in section.
+- `[IMPLEMENTED]` Buyer event page now blocks final check-in until the NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement is complete and the buyer name is available as the prefilled e-signature, then saves DOS-2156 metadata before SMS notifications are called.
 - `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
 - `[IMPLEMENTED]` Agent dashboard tightened to show event leads and live loan officer coverage.
 - `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
@@ -136,6 +140,7 @@ Highest-value next work:
 - `[RISK]` Browser-side Supabase calls depend on live RLS policies. A code change that works locally can still fail with `42501`.
 - `[INTENDED]` Sensitive Supabase writes should move through Edge Functions or serverless APIs as the product hardens; current browser code still performs direct anon-key writes.
 - `[RISK]` Outreach and SMS changes can affect real people. Confirm filters before enabling send logic.
+- `[RISK]` NYS disclosure handling links to a configurable REL8TION-hosted Supabase Storage copy and stores acknowledgement metadata, but the official DOS form page remains the source-of-truth reference and final legal/form-version review remains `[NEEDS VERIFICATION]`.
 - `[PARTIAL]` WordPress files in this repo are local tracking files, not automatic live WordPress deployment.
 
 ## Verification Notes
@@ -156,6 +161,10 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Sign activation can bind a sign to an event. | `[IMPLEMENTED]` | `createOrLockEvent` writes `open_house_events` and patches `smart_signs`. |
 | Buyer event check-in exists at `/event`. | `[IMPLEMENTED]` | Route rewrites plus `eventShell/bootstrap.js`. |
 | Buyer check-in saves to `event_checkins`. | `[IMPLEMENTED]` | `createCheckin` posts to `event_checkins`. |
+| `/event` requires NYS disclosure acknowledgement before check-in submit. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before building the check-in payload and before SMS calls. |
+| NYS disclosure acknowledgement is saved with event check-ins. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `metadata.ny_discrimination_disclosure` with DOS-2156 `11/25` form metadata, provided-by agent/brokerage, consumer role, checkbox/prefilled-name signature, timestamp, date, and user agent. |
+| `/event` uses a configurable REL8TION-hosted disclosure PDF. | `[IMPLEMENTED]` | `src/core/config.js` defaults `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL` to the Supabase Storage PDF and keeps an official DOS source URL constant for reference. |
+| Agent dashboard lead cards show NYS disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.ny_discrimination_disclosure` and renders Signed/Missing with signed date/time when present. |
 | Buyer not preapproved routes to live paired LO first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` checks `getLiveLoanOfficerSession` and sends LO alert/intro. |
 | Buyer not preapproved falls back to Jared if no live LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert`. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Agent dashboard arms pending LO session; `/k` verifies `verified_profiles` and writes `event_loan_officer_sessions`. |

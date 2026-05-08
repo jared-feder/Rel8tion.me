@@ -132,6 +132,26 @@
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-5"><div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-black ${colors}">${esc(value)}</div></div>`;
     }
 
+    function fmtDisclosureDate(value) {
+      if (!value) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return value;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function disclosureSummary(checkin) {
+      const disclosure = checkin?.metadata?.ny_discrimination_disclosure || {};
+      const signed = disclosure.acknowledged === true
+        && disclosure.reviewed === true
+        && disclosure.esign_consent === true
+        && Boolean(disclosure.e_signature_value);
+      return {
+        signed,
+        date: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || '')
+      };
+    }
+
     function renderLead(checkin) {
       const meta = checkin.metadata || {};
       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
@@ -139,6 +159,7 @@
       const email = checkin.visitor_email || checkin.email || meta.email || '';
       const preApproved = checkin.pre_approved === true ? 'Pre-approved' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
       const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
+      const disclosure = disclosureSummary(checkin);
       const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
         <div class="flex items-start justify-between gap-3">
@@ -147,6 +168,13 @@
             <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
           </div>
           <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(preApproved)}</div>
+        </div>
+        <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">NYS Disclosure</div>
+            <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Signed' : 'Missing'}</div>
+          </div>
+          ${disclosure.signed && disclosure.date ? `<div class="mt-1 text-sm font-bold text-slate-600">${esc(disclosure.date)}</div>` : ''}
         </div>
         ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>
