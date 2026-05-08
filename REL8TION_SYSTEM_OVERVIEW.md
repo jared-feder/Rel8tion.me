@@ -269,7 +269,9 @@ Inputs:
 - Requires buyer disclosure completion before check-in submit: official NYS Housing and Anti-Discrimination Disclosure form link is shown, the checkbox acknowledgement is accepted, and the buyer check-in name is available as the prefilled electronic signature.
 - Uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF.
 - Keeps the official DOS form page as the source-of-truth reference in config/docs.
+- Opens a server-generated prefilled disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
+- After check-in, attempts to generate a signed disclosure PDF and attach `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
 - Saves preference selection into `event_checkins.metadata` after check-in.
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
 - If buyer is not preapproved or requests financing, routes to live loan officer if assigned, otherwise alerts Jared.
@@ -306,7 +308,7 @@ Inputs:
 - Loads `agent_outreach_queue` rows for the listing.
 - Loads live `event_loan_officer_sessions`.
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
-- Shows lead cards with call/text actions and NYS Disclosure signed/missing status.
+- Shows lead cards with call/text actions, NYS Disclosure signed/missing status, and an `Open Signed PDF` action when the signed disclosure can be generated or stored.
 - Shows loan officer coverage card.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
 
@@ -430,6 +432,7 @@ The smart sign event page validates buyer preapproval/financing status during ch
 
 - Buyer check-in is saved first to `event_checkins`.
 - NYS disclosure acknowledgement validation happens before the check-in insert and before any SMS notification calls.
+- Signed NYS disclosure PDF generation is attempted after the check-in is saved. Failures are logged and do not block SMS notifications.
 - Agent SMS is sent with buyer details.
 - Buyer confirmation SMS is sent.
 - If financing help is requested or needed, the code checks `event_loan_officer_sessions` for a live loan officer.
@@ -684,6 +687,7 @@ Important fields:
 - `represented_buyer_confirmed`
 - `metadata`
 - `metadata.ny_discrimination_disclosure` stores MVP NYS Housing and Anti-Discrimination Disclosure acknowledgement details, including DOS-2156 `11/25` form metadata, provided-by agent/brokerage, consumer role, acknowledgement/review/e-sign flags, checkbox-plus-prefilled-name signature, timestamp/date, and user agent.
+- `metadata.ny_discrimination_disclosure.signed_pdf` stores signed PDF status/path metadata when the server-side generation/upload succeeds.
 
 Expected relationship:
 
@@ -834,6 +838,20 @@ Still not confirmed:
 - Called by browser code for activation SMS, buyer/agent check-in SMS, loan officer alerts, and `/b` profile SMS.
 - Source was not found under `supabase/functions`.
 - `[NEEDS VERIFICATION]` Needs verification before changing SMS payload contract.
+
+### `/api/compliance/ny-disclosure`
+
+File: `api/compliance/ny-disclosure.js`.
+
+`[IMPLEMENTED]` Confirmed repo behavior:
+
+- `GET ?event=<eventId>` returns a prefilled PDF packet with a REL8TION cover page plus the official form copy.
+- `POST { checkin_id }` generates a signed PDF packet from the saved check-in acknowledgement.
+- Signed PDF upload uses Supabase Storage through server-side `SUPABASE_SERVICE_ROLE_KEY`.
+- Signed PDF metadata is patched back into `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`.
+- `GET ?checkin=<checkinId>&download=1` returns the stored signed PDF when available or regenerates one from metadata.
+
+`[NEEDS VERIFICATION]` Live behavior depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.
 
 ### Reference Function Source Under `docs/supabase-functions`
 
@@ -1013,6 +1031,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[NEEDS VERIFICATION]` Live production deploy state was not verified from the repo alone.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
+- `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
 - `[RISK]` NYS disclosure handling is implemented as a configurable REL8TION-hosted Supabase Storage PDF link plus stored acknowledgement metadata. The official DOS form page remains the source-of-truth reference, and final legal/form-version review remains `[NEEDS VERIFICATION]`.
 - `[RISK]` `smart-sign-qr-export.sql` and the current activation flow disagree on whether QR source should be `smart_signs` or `smart_sign_inventory`.
@@ -1044,7 +1063,9 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `/event` requires NYS disclosure acknowledgement before SMS/check-in completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before creating the check-in and before notification calls. |
 | `/event` stores DOS-2156 acknowledgement metadata. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `event_checkins.metadata.ny_discrimination_disclosure` with form code/version, provided-by agent/brokerage, consumer role, checkbox-plus-prefilled-name signature, timestamps, and user agent. |
 | `/event` uses a configurable REL8TION-hosted disclosure PDF. | `[IMPLEMENTED]` | `src/core/config.js` defaults `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL` to the Supabase Storage PDF and keeps `OFFICIAL_NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_SOURCE_URL` for the official DOS source-of-truth reference. |
-| Agent dashboard lead cards show NYS disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.ny_discrimination_disclosure` and renders Signed/Missing plus signed date/time when present. |
+| Prefilled/signed NYS disclosure PDF API exists. | `[IMPLEMENTED]` | `api/compliance/ny-disclosure.js` generates preview and signed PDF packets with `pdf-lib`. |
+| Signed disclosure PDF storage is fully live. | `[NEEDS VERIFICATION]` | Requires live Vercel env vars and Supabase Storage bucket verification. |
+| Agent dashboard lead cards show NYS disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.ny_discrimination_disclosure` and renders Signed/Missing plus signed date/time and signed PDF link when present. |
 | Buyer not preapproved routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` treats `pre_approved=false` as financing requested, calls `getLiveLoanOfficerSession`, then sends LO alert/intro. |
 | Buyer not preapproved routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |

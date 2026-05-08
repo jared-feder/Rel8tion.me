@@ -148,7 +148,8 @@
         && Boolean(disclosure.e_signature_value);
       return {
         signed,
-        date: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || '')
+        date: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || ''),
+        pdfUrl: signed && checkin?.id ? `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1` : ''
       };
     }
 
@@ -175,6 +176,7 @@
             <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Signed' : 'Missing'}</div>
           </div>
           ${disclosure.signed && disclosure.date ? `<div class="mt-1 text-sm font-bold text-slate-600">${esc(disclosure.date)}</div>` : ''}
+          ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Signed PDF</a>` : ''}
         </div>
         ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>

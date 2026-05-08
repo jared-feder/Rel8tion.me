@@ -92,6 +92,31 @@ export async function updateCheckinMetadata(checkinId, metadata) {
   return Array.isArray(updated) && updated.length ? updated[0] : null;
 }
 
+export function getDisclosurePreviewUrl(eventId) {
+  if (!eventId) return '';
+  return `/api/compliance/ny-disclosure?event=${encodeURIComponent(eventId)}`;
+}
+
+export function getSignedDisclosurePdfUrl(checkinId) {
+  if (!checkinId) return '';
+  return `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkinId)}&download=1`;
+}
+
+export async function generateSignedDisclosurePdf(checkinId) {
+  if (!checkinId) return null;
+  const res = await fetch('/api/compliance/ny-disclosure', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checkin_id: checkinId })
+  });
+
+  const raw = await res.text().catch(() => '');
+  let payload = null;
+  try { payload = raw ? JSON.parse(raw) : null; } catch {}
+  if (!res.ok) throw new Error(payload?.error || raw || 'Failed to generate signed NYS disclosure PDF.');
+  return payload;
+}
+
 export async function getLiveLoanOfficerSession(eventId) {
   if (!eventId) return null;
   const rows = await fetchJson(

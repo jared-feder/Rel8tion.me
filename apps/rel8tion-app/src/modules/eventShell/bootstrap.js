@@ -1,6 +1,6 @@
 import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
-import { createCheckin, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260503-lo-live';
+import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260508-nys-pdf';
 import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260503-lo-live';
 import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { esc, money } from '../../core/utils.js';
@@ -472,6 +472,7 @@ function disclosureContext() {
 function renderDisclosureBlock() {
   const context = disclosureContext();
   const today = todayDateValue();
+  const disclosureUrl = getDisclosurePreviewUrl(pageState.eventRow?.id) || NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL;
 
   return `
     <div class="rounded-[22px] border border-sky-200 bg-white/90 p-5 space-y-4">
@@ -501,7 +502,7 @@ function renderDisclosureBlock() {
       <input type="hidden" name="ny_disclosure_signed_date" value="${esc(today)}">
       <input type="hidden" id="ny-disclosure-signature-value" name="ny_disclosure_signature" value="">
       <a
-        href="${esc(NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL)}"
+        href="${esc(disclosureUrl)}"
         target="_blank"
         rel="noopener noreferrer"
         class="inline-flex w-full items-center justify-center rounded-full px-5 py-4 text-center text-base font-black text-white shadow-[0_18px_40px_rgba(59,130,246,0.24)]"
@@ -795,11 +796,28 @@ function attachEventHandlers() {
     renderEventShell();
 
     try {
-      const createdCheckin = await createCheckin(payload);
+      let createdCheckin = await createCheckin(payload);
       try {
         await touchEvent(pageState.eventRow.id);
       } catch (error) {
         console.log('touchEvent after checkin skipped', error);
+      }
+
+      try {
+        const signedDisclosureResult = await generateSignedDisclosurePdf(createdCheckin?.id);
+        if (signedDisclosureResult?.checkin) {
+          createdCheckin = signedDisclosureResult.checkin;
+        } else if (signedDisclosureResult?.signed_pdf) {
+          payload.metadata = {
+            ...payload.metadata,
+            ny_discrimination_disclosure: {
+              ...(payload.metadata?.ny_discrimination_disclosure || {}),
+              signed_pdf: signedDisclosureResult.signed_pdf
+            }
+          };
+        }
+      } catch (error) {
+        console.log('Signed NYS disclosure PDF generation skipped', error);
       }
 
       const financingRequested = payload.metadata?.financing_requested === true;
@@ -856,7 +874,12 @@ function attachEventHandlers() {
         }
       }
 
-      pageState.lastCheckin = { ...payload, id: createdCheckin?.id || null };
+      pageState.lastCheckin = {
+        ...payload,
+        ...(createdCheckin || {}),
+        id: createdCheckin?.id || null,
+        metadata: createdCheckin?.metadata || payload.metadata
+      };
       pageState.mode = 'guest';
       pageState.financingAlertSent = financingRequested;
       pageState.selectedPreferenceHome = null;
