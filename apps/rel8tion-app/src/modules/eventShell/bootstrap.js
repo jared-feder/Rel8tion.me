@@ -413,11 +413,24 @@ function buttonClasses(selected) {
 
 function pathButton(path, label) {
   const selected = path === pageState.selectedPath;
-  const style = selected ? 'background:linear-gradient(90deg,#38bdf8,#2563eb);' : '';
+  const style = selected ? 'background:var(--event-gradient);' : '';
   return `
-    <button type="button" data-path="${path}" class="path-button inline-flex items-center justify-center px-5 py-3 rounded-full font-bold text-sm md:text-base ${buttonClasses(selected)}" ${style ? `style="${style}"` : ''}>
+    <button type="button" data-path="${path}" class="path-button inline-flex min-h-[42px] items-center justify-center rounded-full px-3.5 py-2 text-center text-[12px] font-black leading-tight ${buttonClasses(selected)}" ${style ? `style="${style}"` : ''}>
       ${esc(label)}
     </button>
+  `;
+}
+
+function renderPathSelector() {
+  return `
+    <div class="mb-5 rounded-[18px] border border-slate-200 bg-white/78 p-3">
+      <div class="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Check-in path</div>
+      <div class="grid grid-cols-3 gap-2">
+        ${pathButton(CHECKIN_PATHS.BUYER, 'Buyer')}
+        ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, 'With Agent')}
+        ${pathButton(CHECKIN_PATHS.BUYER_AGENT, 'Agent')}
+      </div>
+    </div>
   `;
 }
 
@@ -438,7 +451,7 @@ function inputAttrsFor(name, type) {
 }
 
 function requiredMarker(required) {
-  return required ? '<span class="ml-1 text-[10px] font-black text-rose-500">Required</span>' : '';
+  return required ? '<span class="ml-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style="background:var(--event-accent)" title="Required" aria-label="Required"></span>' : '';
 }
 
 function field(label, name, type = 'text', placeholder = '', required = false) {
@@ -486,7 +499,7 @@ function renderFormFields() {
         ${field('Your Name', 'visitor_name', 'text', 'Full name', true)}
         ${field('Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
         <div class="md:col-span-2">
-          ${field('Email', 'visitor_email', 'email', 'Email address', true)}
+          ${field('Email', 'visitor_email', 'email', 'Email address')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Pre-Approved', 'pre_approved', [
@@ -505,10 +518,10 @@ function renderFormFields() {
         ${field('Buyer Name', 'visitor_name', 'text', 'Full name', true)}
         ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
         <div class="md:col-span-2">
-          ${field('Buyer Email', 'visitor_email', 'email', 'Email address', true)}
+          ${field('Buyer Email', 'visitor_email', 'email', 'Email address')}
         </div>
         ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
-        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone')}
+        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true)}
         <div class="md:col-span-2">
           ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
         </div>
@@ -526,26 +539,19 @@ function renderFormFields() {
   return `
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
-      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone')}
+      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true)}
       <div class="md:col-span-2">
         ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
       </div>
       ${field('Buyer Name', 'visitor_name', 'text', 'Buyer name', true)}
       ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone', true)}
       <div class="md:col-span-2">
-        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email', true)}
+        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email')}
       </div>
       <label class="md:col-span-2 flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-slate-700 font-semibold">
         <input type="checkbox" name="represented_buyer_confirmed" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
         <span>I represent this buyer and want that relationship documented with this check-in.</span>
       </label>
-      <div class="md:col-span-2">
-        ${selectField('Buyer Pre-Approved', 'pre_approved', [
-          { value: '', label: 'Select' },
-          { value: 'yes', label: 'Yes' },
-          { value: 'no', label: 'No' }
-        ], true)}
-      </div>
     </div>
   `;
 }
@@ -740,6 +746,59 @@ function renderDisclosureMiniPreview({ label, url }) {
   `;
 }
 
+function renderLendingDisclosureStep() {
+  const liveLoanOfficer = pageState.loanOfficer;
+  const officerName = firstPresent(liveLoanOfficer?.loan_officer_name, liveLoanOfficer?.name, 'a live loan officer');
+  const hasLiveLoanOfficer = Boolean(liveLoanOfficer?.loan_officer_slug || liveLoanOfficer?.loan_officer_phone);
+
+  return `
+    <div data-guided-disclosure-panel="lending" class="guided-disclosure-panel hidden space-y-4">
+      <div data-lending-mode="none" class="rounded-[18px] border border-amber-200 bg-amber-50/90 p-4 text-amber-950 font-semibold">
+        Choose pre-approved status on the check-in form before finishing the required disclosures.
+      </div>
+
+      <div data-lending-mode="yes" class="hidden space-y-4">
+        <div>
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Financing Option</div>
+          <p class="text-slate-700 font-medium leading-relaxed">
+            Rel8tion strongly believes it is all about who you know. We have amazing professionals willing to give you a second opinion with no impact to your credit, potentially saving you thousands.
+          </p>
+        </div>
+        <fieldset>
+          <legend class="mb-3 text-slate-900 font-black">Ok to reach out?</legend>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center justify-center rounded-[18px] border border-slate-200 bg-white/90 px-4 py-4 font-black text-slate-800">
+              <input form="checkin-form" type="radio" name="second_opinion_ok" value="yes" class="mr-2">
+              Yes
+            </label>
+            <label class="flex items-center justify-center rounded-[18px] border border-slate-200 bg-white/90 px-4 py-4 font-black text-slate-800">
+              <input form="checkin-form" type="radio" name="second_opinion_ok" value="no" class="mr-2">
+              No
+            </label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div data-lending-mode="no" class="hidden rounded-[18px] border border-emerald-200 bg-emerald-50/90 p-4">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-2">
+          ${hasLiveLoanOfficer ? 'Live Loan Officer Available' : 'Lending Specialist Available'}
+        </div>
+        <p class="text-emerald-950 font-semibold leading-relaxed">
+          ${hasLiveLoanOfficer
+            ? `${esc(officerName)} is assisting this open house and can be with you shortly after check-in.`
+            : 'A lending specialist can follow up discreetly after check-in.'}
+        </p>
+        <label class="mt-3 flex items-start gap-3 text-emerald-950 font-black">
+          <input form="checkin-form" type="checkbox" name="loan_officer_contact_ok" value="true" class="mt-1 h-4 w-4 rounded border-emerald-300">
+          <span>Accept to speak discreetly about instant pre-approval.</span>
+        </label>
+      </div>
+
+      <button type="button" data-guided-disclosure-accept="lending" class="${primaryButtonClass()} w-full" style="background:var(--event-gradient);">Continue</button>
+    </div>
+  `;
+}
+
 function renderGuidedDisclosuresModal() {
   const context = disclosureContext();
   const today = todayDateValue();
@@ -750,7 +809,7 @@ function renderGuidedDisclosuresModal() {
       <div class="rel8tion-disclosure-panel w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]" tabindex="-1">
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
-            <div id="required-disclosure-kicker" class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Step 1 of 4</div>
+            <div id="required-disclosure-kicker" class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Step 1 of 5</div>
             <h3 id="required-disclosure-title" class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">New York State Agency Disclosure</h3>
           </div>
           <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
@@ -802,6 +861,8 @@ function renderGuidedDisclosuresModal() {
           <button type="button" data-guided-disclosure-accept="courtesy" class="${primaryButtonClass()} w-full bg-emerald-600">Accept / Sign</button>
         </div>
 
+        ${renderLendingDisclosureStep()}
+
         <div data-guided-disclosure-panel="final" class="guided-disclosure-panel hidden space-y-4">
           <div class="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Electronic Signature</div>
@@ -826,9 +887,9 @@ function renderRequiredDisclosuresBlock() {
   return `
     <section class="rounded-[26px] border border-sky-100 bg-gradient-to-br from-sky-50/90 to-white p-5 space-y-4">
       <div>
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Required Disclosures</div>
-        <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Please Review and Sign Required NY Disclosures</h3>
-        <p class="mt-2 text-slate-600 font-medium leading-relaxed">One guided step covers agency, housing and anti-discrimination, and the Rel8tion courtesy notice.</p>
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Disclosures${requiredMarker(true)}</div>
+        <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Please Review and Sign NY Disclosures</h3>
+        <p class="mt-2 text-slate-600 font-medium leading-relaxed">One guided step covers agency, housing and anti-discrimination, the Rel8tion courtesy notice, and any lending follow-up consent.</p>
       </div>
 
       <input type="hidden" name="agency_disclosure_reviewed" value="${agency.signed_at ? 'true' : ''}">
@@ -865,56 +926,9 @@ function renderRequiredDisclosuresBlock() {
   `;
 }
 
-function renderFinancingBlock() {
-  const liveLoanOfficer = pageState.loanOfficer;
-  const officerName = firstPresent(liveLoanOfficer?.loan_officer_name, liveLoanOfficer?.name, 'a live loan officer');
-  const hasLiveLoanOfficer = Boolean(liveLoanOfficer?.loan_officer_slug || liveLoanOfficer?.loan_officer_phone);
-  return `
-    <div id="lending-prompt" class="rounded-[22px] border border-sky-200 bg-sky-50/90 p-5 space-y-4">
-      <div>
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Financing Option</div>
-        <p class="text-slate-700 font-medium leading-relaxed">
-          Rel8tion strongly believes it is all about who you know. We have amazing professionals willing to give you a second opinion with no impact to your credit, potentially saving you thousands.
-        </p>
-      </div>
-      <fieldset>
-        <legend class="mb-3 text-slate-900 font-black">Ok to reach out?</legend>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="flex items-center justify-center rounded-[18px] border border-slate-200 bg-white/90 px-4 py-4 font-black text-slate-800">
-            <input type="radio" name="second_opinion_ok" value="yes" class="mr-2">
-            Yes
-          </label>
-          <label class="flex items-center justify-center rounded-[18px] border border-slate-200 bg-white/90 px-4 py-4 font-black text-slate-800">
-            <input type="radio" name="second_opinion_ok" value="no" class="mr-2">
-            No
-          </label>
-        </div>
-      </fieldset>
-      <div id="not-preapproved-lo-prompt" class="hidden rounded-[18px] border border-emerald-200 bg-emerald-50/90 p-4">
-        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-2">
-          ${hasLiveLoanOfficer ? 'Live Loan Officer Available' : 'Lending Specialist Available'}
-        </div>
-        <p class="text-emerald-950 font-semibold leading-relaxed">
-          ${hasLiveLoanOfficer
-            ? `${esc(officerName)} is assisting this open house and can be with you shortly after check-in.`
-            : 'A lending specialist can follow up discreetly after check-in.'}
-        </p>
-        <label class="mt-3 flex items-start gap-3 text-emerald-950 font-black">
-          <input type="checkbox" name="loan_officer_contact_ok" value="true" class="mt-1 h-4 w-4 rounded border-emerald-300">
-          <span>Accept to speak discreetly about instant pre-approval.</span>
-        </label>
-      </div>
-    </div>
-  `;
-}
-
 function normalizeValue(value) {
   const trimmed = String(value || '').trim();
   return trimmed || null;
-}
-
-function hasContactInfo(email, phone) {
-  return Boolean(normalizeValue(email) || normalizeValue(phone));
 }
 
 function validateCheckin(values) {
@@ -926,17 +940,13 @@ function validateCheckin(values) {
     throw new Error('Add the buyer phone number so the host has a real follow-up path after the visit.');
   }
 
-  if (!normalizeValue(values.visitor_email)) {
-    throw new Error('Add the buyer email address before continuing.');
-  }
-
   if (pageState.selectedPath !== CHECKIN_PATHS.BUYER) {
     if (!normalizeValue(values.buyer_agent_name)) {
       throw new Error('Add the buyer agent name so the represented relationship is clearly documented.');
     }
 
-    if (!hasContactInfo(values.buyer_agent_email, values.buyer_agent_phone)) {
-      throw new Error('Add at least an email or phone number for the buyer agent.');
+    if (!normalizeValue(values.buyer_agent_phone)) {
+      throw new Error('Add the buyer agent phone number so the host has a real follow-up path.');
     }
   }
 
@@ -944,11 +954,13 @@ function validateCheckin(values) {
     throw new Error('Confirm that you represent this buyer before submitting the check-in.');
   }
 
-  if (!['yes', 'no'].includes(values.pre_approved)) {
+  if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT && !['yes', 'no'].includes(values.pre_approved)) {
     throw new Error('Choose whether the buyer is pre-approved before continuing.');
   }
 
-  if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT && !['yes', 'no'].includes(values.second_opinion_ok)) {
+  if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT
+    && values.pre_approved === 'yes'
+    && !['yes', 'no'].includes(values.second_opinion_ok)) {
     throw new Error('Choose yes or no for the financing second-opinion option.');
   }
 
@@ -956,23 +968,25 @@ function validateCheckin(values) {
     throw new Error('Accept the discreet loan officer follow-up to continue without a pre-approval.');
   }
 
-  if (values.agency_disclosure_reviewed !== 'true'
-    || values.seller_representation_acknowledged !== 'true'
-    || !normalizeValue(values.agency_disclosure_signed_at)) {
-    throw new Error('Review and sign the New York State Agency Disclosure before submitting.');
-  }
+  if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT) {
+    if (values.agency_disclosure_reviewed !== 'true'
+      || values.seller_representation_acknowledged !== 'true'
+      || !normalizeValue(values.agency_disclosure_signed_at)) {
+      throw new Error('Review and sign the New York State Agency Disclosure before submitting.');
+    }
 
-  if (values.rel8tion_courtesy_acknowledged !== 'true'
-    || !normalizeValue(values.rel8tion_courtesy_signed_at)) {
-    throw new Error('Review and sign the Rel8tion Courtesy Notice before submitting.');
-  }
+    if (values.rel8tion_courtesy_acknowledged !== 'true'
+      || !normalizeValue(values.rel8tion_courtesy_signed_at)) {
+      throw new Error('Review and sign the Rel8tion Courtesy Notice before submitting.');
+    }
 
-  if (values.ny_disclosure_acknowledged !== 'true') {
-    throw new Error('Acknowledge the required NYS disclosure before submitting.');
-  }
+    if (values.ny_disclosure_acknowledged !== 'true') {
+      throw new Error('Acknowledge the required NYS disclosure before submitting.');
+    }
 
-  if (!normalizeValue(values.ny_disclosure_signature) && !normalizeValue(values.visitor_name)) {
-    throw new Error('Add the buyer name so it can serve as the NYS disclosure electronic signature.');
+    if (!normalizeValue(values.ny_disclosure_signature) && !normalizeValue(values.visitor_name)) {
+      throw new Error('Add the buyer name so it can serve as the NYS disclosure electronic signature.');
+    }
   }
 }
 
@@ -1025,17 +1039,19 @@ function buildCheckinPayload(formData) {
   const values = Object.fromEntries(formData.entries());
   validateCheckin(values);
   const signedAt = new Date();
-  const preApproved = values.pre_approved === 'yes' ? true : (values.pre_approved === 'no' ? false : null);
+  const disclosuresRequired = pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT;
+  const preApproved = disclosuresRequired
+    ? (values.pre_approved === 'yes' ? true : (values.pre_approved === 'no' ? false : null))
+    : null;
   const secondOpinionOk = values.second_opinion_ok === 'yes';
   const loanOfficerContactOk = values.loan_officer_contact_ok === 'true';
-  const financingRequested = pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT
-    && (secondOpinionOk || loanOfficerContactOk || preApproved === false);
+  const financingRequested = disclosuresRequired && (secondOpinionOk || loanOfficerContactOk || preApproved === false);
   const representedBuyerConfirmed = pageState.selectedPath === CHECKIN_PATHS.BUYER_WITH_AGENT
     ? true
     : values.represented_buyer_confirmed === 'true';
-  const nyDiscriminationDisclosure = buildNyDisclosureMetadata(values, signedAt);
-  const agencyDisclosure = buildAgencyDisclosureMetadata(values);
-  const courtesyNotice = buildCourtesyNoticeMetadata(values);
+  const nyDiscriminationDisclosure = disclosuresRequired ? buildNyDisclosureMetadata(values, signedAt) : null;
+  const agencyDisclosure = disclosuresRequired ? buildAgencyDisclosureMetadata(values) : null;
+  const courtesyNotice = disclosuresRequired ? buildCourtesyNoticeMetadata(values) : null;
 
   return {
     open_house_event_id: pageState.eventRow.id,
@@ -1052,18 +1068,18 @@ function buildCheckinPayload(formData) {
       source: 'app-event-shell',
       path: pageState.selectedPath,
       relationship_state: representedBuyerConfirmed ? 'represented' : 'direct',
-      disclosure_accepted: true,
-      signature_name: nyDiscriminationDisclosure.e_signature_value,
-      signature_date: nyDiscriminationDisclosure.signed_date,
-      signature_timestamp: nyDiscriminationDisclosure.signed_at,
-      agency_disclosure_reviewed: agencyDisclosure.agency_disclosure_reviewed,
-      seller_representation_acknowledged: agencyDisclosure.seller_representation_acknowledged,
-      agency_disclosure_signed_at: agencyDisclosure.agency_disclosure_signed_at,
-      agency_disclosure_pdf_url: agencyDisclosure.agency_disclosure_pdf_url,
-      agency_disclosure_version: agencyDisclosure.agency_disclosure_version,
-      agency_disclosure_type: agencyDisclosure.agency_disclosure_type,
-      rel8tion_courtesy_acknowledged: courtesyNotice.rel8tion_courtesy_acknowledged,
-      rel8tion_courtesy_signed_at: courtesyNotice.rel8tion_courtesy_signed_at,
+      disclosure_accepted: disclosuresRequired,
+      signature_name: nyDiscriminationDisclosure?.e_signature_value || null,
+      signature_date: nyDiscriminationDisclosure?.signed_date || null,
+      signature_timestamp: nyDiscriminationDisclosure?.signed_at || null,
+      agency_disclosure_reviewed: agencyDisclosure?.agency_disclosure_reviewed || false,
+      seller_representation_acknowledged: agencyDisclosure?.seller_representation_acknowledged || false,
+      agency_disclosure_signed_at: agencyDisclosure?.agency_disclosure_signed_at || null,
+      agency_disclosure_pdf_url: agencyDisclosure?.agency_disclosure_pdf_url || null,
+      agency_disclosure_version: agencyDisclosure?.agency_disclosure_version || null,
+      agency_disclosure_type: agencyDisclosure?.agency_disclosure_type || null,
+      rel8tion_courtesy_acknowledged: courtesyNotice?.rel8tion_courtesy_acknowledged || false,
+      rel8tion_courtesy_signed_at: courtesyNotice?.rel8tion_courtesy_signed_at || null,
       nys_agency_disclosure: agencyDisclosure,
       rel8tion_courtesy_notice: courtesyNotice,
       ny_discrimination_disclosure: nyDiscriminationDisclosure,
@@ -1219,6 +1235,7 @@ function attachEventHandlers() {
 
   const form = document.getElementById('checkin-form');
   const visitorNameInput = form?.querySelector('[name="visitor_name"]');
+  const preApprovalSelect = form?.querySelector('[name="pre_approved"]');
   const signatureInput = document.getElementById('ny-disclosure-signature-value');
   const signaturePreview = document.getElementById('ny-disclosure-signature-preview');
   const syncDisclosureSignature = () => {
@@ -1262,10 +1279,11 @@ function attachEventHandlers() {
 
   const showGuidedDisclosureStep = (step) => {
     const labels = {
-      agency: ['Step 1 of 4', 'New York State Agency Disclosure'],
-      housing: ['Step 2 of 4', 'NYS Housing & Anti-Discrimination Disclosure'],
-      courtesy: ['Step 3 of 4', 'Rel8tion Courtesy Notice'],
-      final: ['Step 4 of 4', 'Acknowledge & Complete Check-In']
+      agency: ['Step 1 of 5', 'New York State Agency Disclosure'],
+      housing: ['Step 2 of 5', 'NYS Housing & Anti-Discrimination Disclosure'],
+      courtesy: ['Step 3 of 5', 'Rel8tion Courtesy Notice'],
+      lending: ['Step 4 of 5', 'Financing Follow-Up'],
+      final: ['Step 5 of 5', 'Acknowledge & Complete Check-In']
     };
     document.querySelectorAll('.guided-disclosure-panel').forEach((panel) => {
       panel.classList.toggle('hidden', panel.getAttribute('data-guided-disclosure-panel') !== step);
@@ -1276,6 +1294,7 @@ function attachEventHandlers() {
     if (kickerEl) kickerEl.textContent = kicker;
     if (titleEl) titleEl.textContent = title;
     setGuidedDisclosureError('');
+    if (step === 'lending') syncLendingPromptMode();
     const panel = document.querySelector(`[data-guided-disclosure-panel="${step}"]`);
     if (panel) panel.scrollTop = 0;
   };
@@ -1315,12 +1334,44 @@ function attachEventHandlers() {
     return null;
   };
 
+  const requirePreApprovalBeforeDisclosure = () => {
+    if (pageState.selectedPath === CHECKIN_PATHS.BUYER_AGENT) return true;
+    if (['yes', 'no'].includes(preApprovalSelect?.value)) {
+      setGuidedDisclosureError('');
+      return true;
+    }
+    setGuidedDisclosureError('Choose pre-approved status before reviewing disclosures.');
+    preApprovalSelect?.focus({ preventScroll: false });
+    return false;
+  };
+
+  const syncLendingPromptMode = () => {
+    const value = preApprovalSelect?.value || 'none';
+    document.querySelectorAll('[data-lending-mode]').forEach((node) => {
+      node.classList.toggle('hidden', node.getAttribute('data-lending-mode') !== value);
+    });
+  };
+
+  const isLendingStepComplete = () => {
+    if (pageState.selectedPath === CHECKIN_PATHS.BUYER_AGENT) return true;
+    const value = preApprovalSelect?.value;
+    if (value === 'yes') {
+      return Boolean(document.querySelector('[name="second_opinion_ok"]:checked'));
+    }
+    if (value === 'no') {
+      return document.querySelector('[name="loan_officer_contact_ok"]')?.checked === true;
+    }
+    return false;
+  };
+
   document.querySelectorAll('[data-required-disclosures-open]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!requireVisitorNameForSignature()) return;
+      if (!requirePreApprovalBeforeDisclosure()) return;
       if (!pageState.requiredDisclosures.agency?.signed_at) return openGuidedDisclosuresModal('agency');
       if (!pageState.requiredDisclosures.housing?.reviewed_at) return openGuidedDisclosuresModal('housing');
       if (!pageState.requiredDisclosures.courtesy?.signed_at) return openGuidedDisclosuresModal('courtesy');
+      if (!isLendingStepComplete()) return openGuidedDisclosuresModal('lending');
       openGuidedDisclosuresModal('final');
     });
   });
@@ -1337,6 +1388,19 @@ function attachEventHandlers() {
     button.addEventListener('click', () => {
       if (!requireVisitorNameForSignature()) return;
       const key = button.getAttribute('data-guided-disclosure-accept');
+      if (key === 'lending') {
+        if (!requirePreApprovalBeforeDisclosure()) return;
+        if (preApprovalSelect?.value === 'yes' && !document.querySelector('[name="second_opinion_ok"]:checked')) {
+          setGuidedDisclosureError('Choose yes or no before continuing.');
+          return;
+        }
+        if (preApprovalSelect?.value === 'no' && document.querySelector('[name="loan_officer_contact_ok"]')?.checked !== true) {
+          setGuidedDisclosureError('Accept the discreet loan officer follow-up before continuing.');
+          return;
+        }
+        showGuidedDisclosureStep('final');
+        return;
+      }
       const signedAt = new Date();
       const signedAtIso = signedAt.toISOString();
       const displayTime = signedAt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -1363,7 +1427,7 @@ function attachEventHandlers() {
         form.querySelector('[name="rel8tion_courtesy_acknowledged"]').value = 'true';
         form.querySelector('[name="rel8tion_courtesy_signed_at"]').value = signedAtIso;
         updateDisclosureStatus('courtesy-status', `Courtesy Notice signed ${displayTime}`);
-        showGuidedDisclosureStep('final');
+        showGuidedDisclosureStep('lending');
       }
     });
   });
@@ -1374,14 +1438,15 @@ function attachEventHandlers() {
     if (completeCheckinButton) completeCheckinButton.classList.toggle('hidden', !finalDisclosureCheckbox.checked);
   });
 
-  const preApprovalSelect = form?.querySelector('[name="pre_approved"]');
-  const noPreapprovalPrompt = document.getElementById('not-preapproved-lo-prompt');
-  const updatePreapprovalPrompt = () => {
-    if (!noPreapprovalPrompt) return;
-    noPreapprovalPrompt.classList.toggle('hidden', preApprovalSelect?.value !== 'no');
-  };
-  preApprovalSelect?.addEventListener('change', updatePreapprovalPrompt);
-  updatePreapprovalPrompt();
+  preApprovalSelect?.addEventListener('change', () => {
+    document.querySelectorAll('[name="second_opinion_ok"]').forEach((radio) => {
+      radio.checked = false;
+    });
+    const loanOfficerConsent = document.querySelector('[name="loan_officer_contact_ok"]');
+    if (loanOfficerConsent) loanOfficerConsent.checked = false;
+    syncLendingPromptMode();
+  });
+  syncLendingPromptMode();
 
   document.querySelectorAll('[data-disclosure-open]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -1478,21 +1543,23 @@ function attachEventHandlers() {
         console.log('touchEvent after checkin skipped', error);
       }
 
-      try {
-        const signedDisclosureResult = await generateSignedDisclosurePdf(createdCheckin?.id);
-        if (signedDisclosureResult?.checkin) {
-          createdCheckin = signedDisclosureResult.checkin;
-        } else if (signedDisclosureResult?.signed_pdf) {
-          payload.metadata = {
-            ...payload.metadata,
-            ny_discrimination_disclosure: {
-              ...(payload.metadata?.ny_discrimination_disclosure || {}),
-              signed_pdf: signedDisclosureResult.signed_pdf
-            }
-          };
+      if (payload.metadata?.disclosure_accepted) {
+        try {
+          const signedDisclosureResult = await generateSignedDisclosurePdf(createdCheckin?.id);
+          if (signedDisclosureResult?.checkin) {
+            createdCheckin = signedDisclosureResult.checkin;
+          } else if (signedDisclosureResult?.signed_pdf) {
+            payload.metadata = {
+              ...payload.metadata,
+              ny_discrimination_disclosure: {
+                ...(payload.metadata?.ny_discrimination_disclosure || {}),
+                signed_pdf: signedDisclosureResult.signed_pdf
+              }
+            };
+          }
+        } catch (error) {
+          console.log('Signed NYS disclosure PDF generation skipped', error);
         }
-      } catch (error) {
-        console.log('Signed NYS disclosure PDF generation skipped', error);
       }
 
       const financingRequested = payload.metadata?.financing_requested === true;
@@ -1658,6 +1725,7 @@ function renderEventShell() {
 
     <section class="mb-5">
       <article class="rounded-[28px] border border-sky-100 bg-white/82 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
+        ${pageState.mode === 'checkin' ? renderPathSelector() : ''}
         <div class="mb-5">
           <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">CHECK IN HERE</div>
           <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Enjoy Your Stay!</h2>
@@ -1674,26 +1742,21 @@ function renderEventShell() {
         ${pageState.mode === 'checkin' ? `
           <form id="checkin-form" class="space-y-4">
             ${renderFormFields()}
-            ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderFinancingBlock() : ''}
-            <div class="rounded-[18px] border border-slate-200 bg-white/80 p-4">
-              <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Need a different check-in path?</div>
-              <div class="flex flex-wrap gap-2">
-                ${pathButton(CHECKIN_PATHS.BUYER, PATH_LABELS[CHECKIN_PATHS.BUYER])}
-                ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_WITH_AGENT])}
-                ${pathButton(CHECKIN_PATHS.BUYER_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_AGENT])}
+            ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderRequiredDisclosuresBlock() : `
+              <button type="submit" class="${primaryButtonClass()} w-full" style="background:var(--event-gradient);">Complete Agent Check-In</button>
+            `}
+            ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? `
+              <div class="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-center text-sm font-bold text-slate-500">
+                Complete Check-In appears after the disclosure acknowledgement.
               </div>
-            </div>
-            ${renderRequiredDisclosuresBlock()}
-            <div class="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-center text-sm font-bold text-slate-500">
-              Complete Check-In appears after the required disclosure acknowledgement.
-            </div>
+            ` : ''}
             ${pageState.errorMessage ? `<div class="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-4 text-rose-700 font-semibold">${esc(pageState.errorMessage)}</div>` : ''}
           </form>
         ` : `
           <div class="space-y-4">
             <div class="rounded-[22px] border border-slate-200 bg-white/85 p-5">
               <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">What Happens Next</div>
-              <p class="text-slate-700 font-medium leading-relaxed">You can still switch the path above if you need to log a different relationship type, but this visit is already tied to the active event and ready for the guided experience below.</p>
+              <p class="text-slate-700 font-medium leading-relaxed">This visit is tied to the active event and ready for the guided experience below.</p>
             </div>
             <button type="button" id="new-checkin-button" class="inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/85 border border-slate-200 text-slate-700">
               Start Another Check-In

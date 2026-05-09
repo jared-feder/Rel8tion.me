@@ -276,13 +276,13 @@ Inputs:
 - Loads linked `open_houses` via `open_house_source_id` when present.
 - Loads agent profile by `host_agent_slug`.
 - Attempts fallback agent photo lookup from `listing_agents`.
-- Builds a buyer-first welcome screen with "Welcome to <property address>", property image when available, hosted-by agent photo/name/brokerage, and immediate required name/phone/email/pre-approval inputs.
+- Builds a buyer-first welcome screen with "Welcome to <property address>", property image when available, hosted-by agent photo/name/brokerage, compact top check-in path buttons, and immediate name/phone/pre-approval inputs on buyer-facing paths. Email is optional.
 - Uses the Rel8tion cloud background layer from the current app styling.
 - Applies matched brokerage theme colors/fonts through the `brokerages` lookup when a brokerage match is available; otherwise falls back to Rel8tion defaults.
 - Shows host contact/save-contact actions only after successful check-in.
-- Shows "CHECK IN HERE" with buyer path choices below the primary name/phone/email/pre-approval inputs so buyers can begin check-in without scrolling through contact controls.
+- Shows "CHECK IN HERE" with small buyer path choices at the top of the check-in card so buyers can choose Buyer, With Agent, or Agent before entering details.
 - Inserts check-ins into `event_checkins`.
-- Requires a single guided disclosure modal before check-in submit: New York State Agency Disclosure, NYS Housing and Anti-Discrimination Disclosure review, Rel8tion Courtesy Notice, then final acknowledgement checkbox. V1 explicitly documents that the listing agent may currently represent the seller; it does not expose dual agency or imply buyer representation.
+- Requires a single guided disclosure modal before buyer-facing check-in submit: New York State Agency Disclosure, NYS Housing and Anti-Discrimination Disclosure review, Rel8tion Courtesy Notice, lending consent when applicable, then final acknowledgement checkbox. V1 explicitly documents that the listing agent may currently represent the seller; it does not expose dual agency or imply buyer representation. The `buyer_agent` path skips pre-approval and disclosure prompts.
 - Blocks disclosure signing until the buyer/check-in name exists, then uses that name as the prefilled electronic signature for the final acknowledgement.
 - Opens guided disclosure Review & Sign dialogs as fixed viewport overlays instead of leaving the dialogs at the bottom of the long buyer page.
 - Saves agency/courtesy acknowledgement details in `event_checkins.metadata`, including signed timestamps, PDF URL/version/type, root convenience fields, and nested `nys_agency_disclosure` / `rel8tion_courtesy_notice` objects.
@@ -294,7 +294,7 @@ Inputs:
 - After check-in, attempts to generate a signed disclosure PDF and attach `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
 - Saves preference selection into `event_checkins.metadata` after check-in.
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
-- Asks for pre-approval status, shows the second-opinion lending prompt, requires discreet loan officer contact acceptance when the buyer is not pre-approved, then routes to live loan officer if assigned or alerts Jared.
+- Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt only when the buyer selected `yes`; when the buyer selected `no`, it requires discreet loan officer contact acceptance, then routes to live loan officer if assigned or alerts Jared.
 - After check-in, shows property snapshot, host contact/save-contact actions, SMS message links, and loan officer support contact when available.
 - `[INTENDED]` A richer buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent buyer-agent-loan-officer chat is not built. Current implementation uses available stored listing data plus call/SMS links.
 
@@ -304,7 +304,7 @@ Check-in paths:
 - `buyer_with_agent`
 - `buyer_agent`
 
-Required check-in fields vary by path. The code validates visitor name, visitor phone, visitor email, pre-approval status, NYS Agency Disclosure signature, Rel8tion Courtesy Notice signature, NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement/prefilled e-signature, and buyer agent details where needed.
+Required check-in fields vary by path. The code validates visitor name and phone for all paths, keeps visitor email optional, validates pre-approval status plus disclosure signatures on buyer-facing paths, and validates buyer-agent details where needed. The `buyer_agent` path skips pre-approval and NYS/Rel8tion disclosure prompts.
 
 ### `/agent-dashboard`
 
@@ -423,8 +423,8 @@ This is separate from the smart sign `/event` check-in flow.
 3. `/k` routes to `/s?code=<publicCode>`.
 4. `/s` resolves the active event.
 5. Buyer lands on `/event?event=<eventId>`.
-6. Buyer sees the property-address welcome, agent/property imagery, host context, and immediate required name/phone/email/pre-approval inputs before contact actions.
-7. Buyer reviews/signs the NYS Agency Disclosure and Rel8tion Courtesy Notice, then accepts the NYS Housing and Anti-Discrimination Disclosure.
+6. Buyer sees the property-address welcome, agent/property imagery, host context, compact relationship path buttons, and immediate name/phone/pre-approval inputs before contact actions. Email is optional.
+7. Buyer-facing paths review/sign the NYS Agency Disclosure and Rel8tion Courtesy Notice, accept the NYS Housing and Anti-Discrimination Disclosure, then answer any lending follow-up consent inside the guided modal. The `buyer_agent` path skips pre-approval and disclosure prompts.
 8. Buyer completes check-in; SMS notifications are sent only after validation and save.
 
 ### Rear NFC Agent Dashboard Challenge
@@ -1093,7 +1093,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
-| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders property address/image, hosted-by agent photo/name/brokerage, and immediate required name/phone/email/pre-approval inputs before contact/save-contact actions. |
+| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders property address/image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |
 | `/event` cloud background and disclosure overlay behavior are present. | `[IMPLEMENTED]` | `event.html` defines the cloud background layer; `eventShell/bootstrap.js` portals the guided disclosure modal to `document.body` and opens it as a fixed viewport overlay. |
 | `/event` requires guided NYS/Rel8tion disclosure completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` runs agency disclosure, housing disclosure review, courtesy notice, and final acknowledgement in one guided modal, blocks signing until buyer name exists, and validates timestamps/acknowledgement before creating the check-in. |
 | `/event` stores agency/courtesy disclosure evidence. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes agency/courtesy disclosure metadata into `event_checkins.metadata`. |

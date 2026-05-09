@@ -41,7 +41,7 @@ Status labels:
 - `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
-- `[IMPLEMENTED]` `/event` first visible screen is buyer-first: "Welcome to <property address>", property image when available, hosted-by agent photo/name/brokerage, then immediate required name, phone, email, and pre-approval inputs. Host contact/save-contact actions are intentionally shown after successful check-in.
+- `[IMPLEMENTED]` `/event` first visible screen is buyer-first: "Welcome to <property address>", property image when available, hosted-by agent photo/name/brokerage, then small top check-in path buttons and immediate name/phone/pre-approval inputs. Email is optional. Host contact/save-contact actions are intentionally shown after successful check-in.
 - `[IMPLEMENTED]` `/event` uses the Rel8tion cloud background layer and opens agency/courtesy disclosure dialogs as fixed viewport overlays, so tapping Review & Sign does not require scrolling to the bottom of the page.
 - `[IMPLEMENTED]` `/event` applies matched brokerage theme colors/fonts from the `brokerages` lookup when a brokerage match is available; otherwise it falls back to Rel8tion defaults.
 - `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.
@@ -53,7 +53,7 @@ Status labels:
 - `[PARTIAL]` After buyer check-in, `/event` attempts to generate a signed NYS disclosure PDF through `/api/compliance/ny-disclosure`, store it in Supabase Storage, and attach the storage/download details to `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`. Storage bucket/env availability needs live verification.
 - `[IMPLEMENTED]` New signed NYS disclosure PDFs are stored with broker-readable event paths and filenames, and the metadata includes document hash, event/check-in IDs, property address, buyer name, generated timestamp, and source form references for audit evidence.
 - `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
-- `[IMPLEMENTED]` Buyer preapproval/financing routing asks for pre-approval status, offers a second-opinion lending prompt, requires discreet loan officer contact acceptance when the buyer is not pre-approved, checks for a live loan officer session first, then falls back to Jared alert.
+- `[IMPLEMENTED]` Buyer preapproval/financing routing asks for pre-approval status on buyer-facing paths, then handles the second-opinion or discreet loan-officer consent inside the guided disclosure modal after disclosures are reviewed. It checks for a live loan officer session first, then falls back to Jared alert. The `buyer_agent` path skips pre-approval and disclosure prompts.
 - `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
 - `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, each lead card's NYS disclosure signed/missing status, signed PDF link when available, outreach count, relationship status, and loan officer coverage.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
@@ -115,11 +115,11 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
 - `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.
 - `[IMPLEMENTED]` Key reset scanner/admin API added.
-- `[IMPLEMENTED]` Buyer event page changed to a low-scroll first screen with property-address welcome, property image, hosted-by agent photo/avatar, and immediate required buyer name/phone/email/pre-approval inputs.
+- `[IMPLEMENTED]` Buyer event page changed to a low-scroll first screen with property-address welcome, property image, hosted-by agent photo/avatar, top relationship-path buttons, and immediate buyer name/phone/pre-approval inputs. Email is optional.
 - `[IMPLEMENTED]` Buyer event page moved host Save Contact/Call/Text/Email actions to the post-check-in success/contact section.
 - `[IMPLEMENTED]` Buyer event page restored the Rel8tion cloud background and moved agency/courtesy disclosure modals into fixed viewport overlays so the Review & Sign actions open immediately on screen.
-- `[IMPLEMENTED]` Buyer event page now welcomes buyers by property address, displays property and agent imagery when available, requires name/phone/email/pre-approval, enables mobile autofill attributes, applies matched brokerage theme colors/fonts, and guides all required disclosure steps through one modal.
-- `[IMPLEMENTED]` Buyer event page now shows the lending second-opinion prompt after pre-approval status and requires discreet LO acceptance when the buyer is not pre-approved.
+- `[IMPLEMENTED]` Buyer event page now welcomes buyers by property address, displays property and agent imagery when available, requires name/phone/pre-approval on buyer-facing paths, keeps email optional, enables mobile autofill attributes, applies matched brokerage theme colors/fonts, and guides disclosure plus lending consent steps through one modal.
+- `[IMPLEMENTED]` Buyer event page now keeps the lending second-opinion prompt off the main page; it appears inside the guided modal only after disclosures when the buyer selected `yes` to pre-approved. Not-pre-approved buyers see the discreet LO consent step in that same modal. The `buyer_agent` path skips these prompts.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the New York State Agency Disclosure and Rel8tion Courtesy Notice are accepted/signed, then stores the timestamps and disclosure metadata in `event_checkins.metadata`.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement is complete and the buyer name is available as the prefilled e-signature, then saves DOS-2156 metadata before SMS notifications are called.
 - `[PARTIAL]` Buyer event page now requests signed NYS disclosure PDF generation after check-in and before SMS notification calls continue; failure is logged and does not block buyer/agent SMS.
@@ -198,7 +198,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Rear sign scan must be followed by agent keychain scan. | `[IMPLEMENTED]` | `k.html` writes `rel8tion_agent_dashboard_pending` and waits. |
 | Sign activation can bind a sign to an event. | `[IMPLEMENTED]` | `createOrLockEvent` writes `open_house_events` and patches `smart_signs`. |
 | Buyer event check-in exists at `/event`. | `[IMPLEMENTED]` | Route rewrites plus `eventShell/bootstrap.js`. |
-| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders property address/image, hosted-by agent photo/name/brokerage, then immediate required name/phone/email/pre-approval inputs; contact/save-contact actions render after successful check-in. |
+| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders property address/image, hosted-by agent photo/name/brokerage, then compact top check-in path buttons and immediate name/phone/pre-approval inputs. Email is optional; contact/save-contact actions render after successful check-in. |
 | Buyer check-in saves to `event_checkins`. | `[IMPLEMENTED]` | `createCheckin` posts to `event_checkins`. |
 | `/event` requires guided disclosure completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a single guided disclosure modal, blocks signing until buyer name exists, validates agency/courtesy timestamps and final NYS acknowledgement before building the check-in payload. |
 | Agency/courtesy disclosure evidence is saved with event check-ins. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `metadata.nys_agency_disclosure`, `metadata.rel8tion_courtesy_notice`, and root metadata convenience fields for signed timestamps/version/type. |
