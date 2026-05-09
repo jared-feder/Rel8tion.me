@@ -284,8 +284,8 @@ Inputs:
 - Loads `open_house_events`.
 - Loads linked `open_houses` via `open_house_source_id` when present.
 - Loads agent profile by `host_agent_slug`.
-- Attempts fallback agent photo lookup from `listing_agents`.
-- Builds a buyer-first welcome screen with "Welcome to <property address>", property image when available, hosted-by agent photo/name/brokerage, compact top check-in path buttons, and immediate name/phone/pre-approval inputs on buyer-facing paths. Email is optional.
+- Attempts fallback agent photo lookup from the current agent object, local prefilled profile when it matches the host slug, and `listing_agents`.
+- Builds a buyer-first welcome screen with a formatted "Welcome to" property-address header, property image when available, hosted-by agent photo/name/brokerage, compact top check-in path buttons, and immediate name/phone/pre-approval inputs on buyer-facing paths. Email is optional.
 - Uses the Rel8tion cloud background layer from the current app styling.
 - Applies matched brokerage theme colors/fonts through the `brokerages` lookup when a brokerage match is available; otherwise falls back to Rel8tion defaults.
 - Shows host contact/save-contact actions only after successful check-in.
@@ -302,8 +302,9 @@ Inputs:
 - Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
 - After check-in, attempts to generate a signed REL8TION disclosure packet PDF covering the NYS Agency Disclosure, NYS Housing and Anti-Discrimination acknowledgement, and Rel8tion Courtesy Notice. It attaches `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
-- Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt only when the buyer selected `yes`; when the buyer selected `no`, it requires discreet loan officer contact acceptance, then routes to live loan officer if assigned or alerts Jared.
-- After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, and loan officer support contact when available. It no longer asks event check-in buyers to choose one of three preferred property examples.
+- Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt when the buyer selected `yes`; when the buyer selected `no`, the financing follow-up checkbox is optional. Selecting "not pre-approved" alone does not trigger financing SMS.
+- When financing help is requested, the code routes to a live loan officer if assigned or alerts Jared. The current buyer UI hides unfinished loan-officer support cards and uses a temporary post-check-in financing SMS prompt to `347-775-8059`.
+- After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, and neighborhood/financing prompts. It no longer shows OneKey listing links, internal buyer status cards, loan-officer support cards, a second check-in button, or the one-of-three preferred property examples.
 - `[INTENDED]` A richer buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent buyer-agent-loan-officer chat is not built. Current implementation uses available stored listing data plus call/SMS links.
 
 Check-in paths:
@@ -432,7 +433,7 @@ This is separate from the smart sign `/event` check-in flow.
 4. `/s` resolves the active event.
 5. Buyer lands on `/event?event=<eventId>`.
 6. Buyer sees the property-address welcome, agent/property imagery, host context, compact relationship path buttons, and immediate name/phone/pre-approval inputs before contact actions. Email is optional.
-7. Buyer-facing paths review/sign the NYS Agency Disclosure and Rel8tion Courtesy Notice, accept the NYS Housing and Anti-Discrimination Disclosure, then answer any lending follow-up consent inside the guided modal. The `buyer_agent` path skips pre-approval and disclosure prompts.
+7. Buyer-facing paths review/sign the NYS Agency Disclosure and Rel8tion Courtesy Notice, accept the NYS Housing and Anti-Discrimination Disclosure, then answer optional lending follow-up consent inside the guided modal. The `buyer_agent` path skips pre-approval and disclosure prompts.
 8. Buyer completes check-in; SMS notifications are sent only after validation and save.
 
 ### Rear NFC Agent Dashboard Challenge
@@ -467,7 +468,7 @@ The smart sign event page validates buyer preapproval/financing status during ch
 - Signed NYS disclosure PDF generation is attempted after the check-in is saved. Failures are logged and do not block SMS notifications.
 - Agent SMS is sent with buyer details.
 - Buyer confirmation SMS is sent.
-- If financing help is requested or needed, the code checks `event_loan_officer_sessions` for a live loan officer.
+- If financing help is requested, the code checks `event_loan_officer_sessions` for a live loan officer. Selecting "not pre-approved" without opting into follow-up does not trigger financing outreach.
 - If a live loan officer exists and has a phone number:
   - send financing alert to the loan officer
   - send loan officer intro SMS to the buyer
@@ -1102,7 +1103,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
-| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders property address/image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |
+| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a formatted property-address welcome, property image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |
 | `/event` cloud background and disclosure overlay behavior are present. | `[IMPLEMENTED]` | `event.html` defines the cloud background layer; `eventShell/bootstrap.js` portals the guided disclosure modal to `document.body` and opens it as a fixed viewport overlay. |
 | `/event` requires guided NYS/Rel8tion disclosure completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` runs agency disclosure, housing disclosure review, courtesy notice, and final acknowledgement in one guided modal, blocks signing until buyer name exists, and validates timestamps/acknowledgement before creating the check-in. |
 | `/event` stores agency/courtesy disclosure evidence. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes agency/courtesy disclosure metadata into `event_checkins.metadata`. |
@@ -1112,8 +1113,9 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Prefilled/signed REL8TION disclosure packet PDF API exists. | `[IMPLEMENTED]` | `api/compliance/ny-disclosure.js` generates preview and signed PDF packets with `pdf-lib`, including agency, housing, and courtesy evidence. |
 | Signed disclosure PDF storage is fully live. | `[NEEDS VERIFICATION]` | Requires live Vercel env vars and Supabase Storage bucket verification. |
 | Agent dashboard lead cards show disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.nys_agency_disclosure`, `metadata.ny_discrimination_disclosure`, and `metadata.rel8tion_courtesy_notice`, then renders signed/missing status plus disclosure packet PDF link when present. |
-| Buyer not preapproved routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` treats `pre_approved=false` as financing requested, calls `getLiveLoanOfficerSession`, then sends LO alert/intro. |
-| Buyer not preapproved routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch. |
+| Buyer financing help is opt-in. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` only marks financing requested when the buyer chooses second-opinion help or checks optional financing follow-up. `pre_approved=false` alone does not send financing outreach. |
+| Buyer financing opt-in routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `getLiveLoanOfficerSession`, then sends LO alert/intro only when financing help was requested. |
+| Buyer financing opt-in routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch; the buyer UI also has a temporary SMS financing button to `347-775-8059`. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |
 | `/nmb-activate` and `/nmb-verified` are loan officer profile routes. | `[PARTIAL]` | `apps/rel8tion-app/nmb-activate.html` and `nmb-verified.html`; Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
 | `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |

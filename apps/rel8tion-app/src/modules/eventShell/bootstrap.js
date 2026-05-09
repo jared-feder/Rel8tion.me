@@ -7,6 +7,8 @@ import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { state as appState } from '../../core/state.js';
 import { esc, money } from '../../core/utils.js';
 
+const TEMP_FINANCING_SUPPORT_PHONE = '3477758059';
+
 const CHECKIN_PATHS = Object.freeze({
   BUYER: 'buyer',
   BUYER_WITH_AGENT: 'buyer_with_agent',
@@ -159,12 +161,6 @@ function formatEventWindow(house) {
   }
 }
 
-function safeUrl(url) {
-  if (!url) return '#';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  return `https://${url}`;
-}
-
 function safeColor(value, fallback) {
   const color = String(value || '').trim();
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? color : fallback;
@@ -192,41 +188,6 @@ function themeStyle(extra = '') {
 
 function primaryButtonClass() {
   return 'inline-flex items-center justify-center rounded-full px-5 py-4 text-center text-base font-black text-white shadow-[0_18px_40px_rgba(31,42,90,0.20)]';
-}
-
-function isOneKeyUrl(url) {
-  try {
-    return new URL(safeUrl(url)).hostname.replace(/^www\./, '') === 'onekeymls.com';
-  } catch {
-    return false;
-  }
-}
-
-function oneKeyMlsNumber(house) {
-  const raw = firstPresent(house?.mls_number, house?.mls_id, house?.listing_id, house?.id);
-  const match = String(raw || '').match(/(\d{5,})$/);
-  return match ? match[1] : '';
-}
-
-function oneKeyAddressSlug(address) {
-  return String(address || '')
-    .replace(/#/g, '')
-    .replace(/[^\w\s-]/g, ' ')
-    .trim()
-    .replace(/\s+/g, '-');
-}
-
-function oneKeyListingUrl(house) {
-  if (house?.link && isOneKeyUrl(house.link)) return safeUrl(house.link);
-
-  const source = String(house?.source || '').toLowerCase();
-  const id = String(house?.id || '');
-  const mlsNumber = oneKeyMlsNumber(house);
-  const addressSlug = oneKeyAddressSlug(house?.address);
-  const looksOneKey = source === 'onekey' || id.startsWith('M00000489-');
-
-  if (!looksOneKey || !mlsNumber || !addressSlug) return '';
-  return `https://www.onekeymls.com/address/${encodeURIComponent(addressSlug)}/${encodeURIComponent(mlsNumber)}`;
 }
 
 function telHref(phone) {
@@ -269,10 +230,24 @@ function firstPresent(...values) {
 function agentPhotoUrl(agent) {
   return firstPresent(
     agent?.image_url,
+    agent?.profile_photo_url,
+    agent?.avatar_url,
+    agent?.headshot_url,
     agent?.primary_photo_url,
     agent?.directory_photo_url,
-    agent?.photo_url
+    agent?.photo_url,
+    agent?.agent_photo_url,
+    agent?.photo,
+    agent?.image
   );
+}
+
+function propertyAddressParts(address) {
+  const parts = String(address || '').split(',').map((part) => part.trim()).filter(Boolean);
+  return {
+    primary: parts[0] || 'this open house',
+    secondary: parts.slice(1).join(', ')
+  };
 }
 
 function initials(name) {
@@ -684,22 +659,6 @@ function renderCourtesyNoticeModal() {
   `;
 }
 
-function renderDisclosureMiniPreview({ label, url }) {
-  return `
-    <button type="button" data-disclosure-preview-toggle class="mt-4 flex w-full items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50/90 p-3 text-left">
-      <span class="flex h-16 w-12 shrink-0 items-center justify-center rounded-[10px] border border-slate-200 bg-white text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">PDF</span>
-      <span class="min-w-0">
-        <span class="block text-sm font-black text-slate-900">${esc(label)}</span>
-        <span class="block text-xs font-semibold text-slate-500">Tap to expand preview</span>
-      </span>
-    </button>
-    <div class="disclosure-pdf-preview mt-3 hidden overflow-hidden rounded-[18px] border border-slate-200 bg-white">
-      <iframe src="${esc(url)}" title="${esc(label)}" class="h-[360px] w-full bg-white"></iframe>
-      <a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="block border-t border-slate-200 px-4 py-3 text-center text-sm font-black text-[var(--event-accent)]">Open full PDF</a>
-    </div>
-  `;
-}
-
 function renderLendingDisclosureStep() {
   const liveLoanOfficer = pageState.loanOfficer;
   const officerName = firstPresent(liveLoanOfficer?.loan_officer_name, liveLoanOfficer?.name, 'a live loan officer');
@@ -744,7 +703,7 @@ function renderLendingDisclosureStep() {
         </p>
         <label class="mt-3 flex items-start gap-3 text-emerald-950 font-black">
           <input form="checkin-form" type="checkbox" name="loan_officer_contact_ok" value="true" class="mt-1 h-4 w-4 rounded border-emerald-300">
-          <span>Accept to speak discreetly about instant pre-approval.</span>
+          <span>Optional: I am open to a discreet financing follow-up.</span>
         </label>
       </div>
 
@@ -776,7 +735,6 @@ function renderGuidedDisclosuresModal() {
             <p>Please review the official New York State Agency Disclosure PDF before signing.</p>
           </div>
           <a href="${esc(NYS_AGENCY_DISCLOSURE_PDF_URL)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View NYS Agency Disclosure PDF</a>
-          ${renderDisclosureMiniPreview({ label: 'NYS Agency Disclosure', url: NYS_AGENCY_DISCLOSURE_PDF_URL })}
           <button type="button" data-guided-disclosure-accept="agency" class="${primaryButtonClass()} w-full bg-emerald-600">Accept / Sign</button>
         </div>
 
@@ -800,7 +758,6 @@ function renderGuidedDisclosuresModal() {
             </div>
           </div>
           <a href="${esc(housingUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View Prefilled Disclosure Packet</a>
-          ${renderDisclosureMiniPreview({ label: 'NYS Housing & Anti-Discrimination Disclosure', url: housingUrl })}
           <button type="button" data-guided-disclosure-accept="housing" class="${primaryButtonClass()} w-full bg-emerald-600">I Reviewed This Form</button>
         </div>
 
@@ -920,10 +877,6 @@ function validateCheckin(values) {
     throw new Error('Choose yes or no for the financing second-opinion option.');
   }
 
-  if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT && values.pre_approved === 'no' && values.loan_officer_contact_ok !== 'true') {
-    throw new Error('Accept the discreet loan officer follow-up to continue without a pre-approval.');
-  }
-
   if (pageState.selectedPath !== CHECKIN_PATHS.BUYER_AGENT) {
     if (values.agency_disclosure_reviewed !== 'true'
       || values.seller_representation_acknowledged !== 'true'
@@ -1008,7 +961,7 @@ function buildCheckinPayload(formData) {
     : null;
   const secondOpinionOk = values.second_opinion_ok === 'yes';
   const loanOfficerContactOk = values.loan_officer_contact_ok === 'true';
-  const financingRequested = disclosuresRequired && (secondOpinionOk || loanOfficerContactOk || preApproved === false);
+  const financingRequested = disclosuresRequired && (secondOpinionOk || loanOfficerContactOk);
   const representedBuyerConfirmed = pageState.selectedPath === CHECKIN_PATHS.BUYER_WITH_AGENT
     ? true
     : values.represented_buyer_confirmed === 'true';
@@ -1054,83 +1007,20 @@ function buildCheckinPayload(formData) {
 }
 
 function nextStepCards() {
-  const house = pageState.house;
+  const house = pageState.house || {
+    address: pageState.eventRow?.setup_context?.address || '',
+    brokerage: pageState.eventRow?.setup_context?.detected_brokerage || '',
+    price: pageState.eventRow?.setup_context?.price || null,
+    open_start: pageState.eventRow?.start_time || null,
+    open_end: pageState.eventRow?.end_time || null
+  };
   const agent = pageState.agent;
   const subjectAddress = house?.address || 'this property';
-  const listingUrl = oneKeyListingUrl(house);
   const contactHref = vcardHref(agent);
-  const askQuestionBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress} and had a quick question.`;
-  const loanOfficer = pageState.loanOfficer;
-  const loanOfficerName = firstPresent(loanOfficer?.loan_officer_name, 'Lending Specialist');
-  const loanOfficerCompany = firstPresent(loanOfficer?.loan_officer_company, 'NMB');
-  const loanOfficerPhoto = firstPresent(loanOfficer?.loan_officer_photo_url, 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png');
-  const loanOfficerPhone = loanOfficer?.loan_officer_phone || '';
-  const loanOfficerBody = `Hi ${loanOfficerName}, I just checked in at ${subjectAddress} through Rel8tion and would like to talk about pre-approval.`;
-  const financingCopy = pageState.lastCheckin?.metadata?.financing_requested
-    ? 'Financing follow-up was requested from this visit.'
-    : 'If financing comes up later, the host has the visit details needed to follow up.';
+  const neighborhoodBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress}. Can you tell me more about the neighborhood and nearby open houses?`;
+  const financingBody = `Hi, I just checked in through Rel8tion for ${subjectAddress} and would like to talk about financing.`;
 
   return `
-    <section class="grid grid-cols-1 xl:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
-      <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <div class="inline-flex items-center px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-4">Checked In</div>
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Thanks for checking in</h2>
-        <p class="text-slate-600 font-medium leading-relaxed mb-5">
-          Your visit was sent to the host. Save the agent contact or message the agent if a question comes up during the open house.
-        </p>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-          <a href="${esc(listingUrl || '#')}" ${listingUrl ? 'target="_blank" rel="noopener noreferrer"' : ''} class="inline-flex items-center justify-center px-5 py-4 rounded-full font-bold text-sm md:text-base text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] ${listingUrl ? '' : 'pointer-events-none opacity-60'}" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">
-            View OneKey Listing
-          </a>
-          <a href="${esc(smsHref(agent?.phone || '', askQuestionBody))}" class="inline-flex items-center justify-center px-5 py-4 rounded-full font-bold text-sm md:text-base bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">
-            Message Agent
-          </a>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Check-In Type</div>
-            <div class="text-slate-900 font-black">${esc(PATH_LABELS[pageState.lastCheckin?.visitor_type || pageState.selectedPath] || 'Buyer')}</div>
-          </div>
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Buyer Status</div>
-            <div class="text-slate-900 font-black">${pageState.lastCheckin?.pre_approved === true ? 'Pre-Approved' : (pageState.lastCheckin?.pre_approved === false ? 'Needs Financing' : 'Status Not Shared')}</div>
-          </div>
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Relationship</div>
-            <div class="text-slate-900 font-black">${pageState.lastCheckin?.represented_buyer_confirmed ? 'Represented' : 'Direct Visitor'}</div>
-          </div>
-        </div>
-      </article>
-
-      <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Loan Officer Support</h2>
-        <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-4 mb-4">
-          <div class="flex items-center gap-4">
-            <img src="${esc(loanOfficerPhoto)}" onerror="this.style.display='none';" alt="${esc(loanOfficerName)}" class="h-14 w-14 rounded-full object-cover bg-white border border-white">
-            <div>
-              <div class="font-black text-slate-900">${esc(loanOfficerName)}</div>
-              <div class="text-sm font-semibold text-slate-500">${esc(loanOfficerCompany)}</div>
-            </div>
-          </div>
-        </div>
-        <div class="space-y-4 text-slate-600 font-medium leading-relaxed">
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            ${esc(financingCopy)}
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <a href="${esc(smsHref(loanOfficerPhone, loanOfficerBody))}" class="inline-flex items-center justify-center rounded-full px-5 py-4 text-sm font-black text-white ${loanOfficerPhone ? '' : 'pointer-events-none opacity-60'}" style="background:var(--event-gradient);">
-              Start Pre-Approval Chat
-            </a>
-            <a href="${esc(telHref(loanOfficerPhone))}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-sm font-black text-slate-700 ${loanOfficerPhone ? '' : 'pointer-events-none opacity-60'}">
-              Call Specialist
-            </a>
-          </div>
-        </div>
-      </article>
-    </section>
-
     <section class="grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-4">Property Snapshot</h2>
@@ -1157,6 +1047,9 @@ function nextStepCards() {
             <div class="text-slate-900 font-bold">${textOrDash(house?.brokerage)}</div>
           </div>
         </div>
+        <a href="${esc(smsHref(agent?.phone || '', neighborhoodBody))}" class="mt-4 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white/82 px-5 py-4 text-sm font-black text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">
+          Ask About The Neighborhood
+        </a>
       </article>
 
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
@@ -1180,6 +1073,7 @@ function nextStepCards() {
           <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
           <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${subjectAddress}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
           <a href="${esc(mailtoHref(agent?.email || '', `Question about ${subjectAddress}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
+          <a href="${esc(smsHref(TEMP_FINANCING_SUPPORT_PHONE, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)]" style="background:var(--event-gradient);">Start Financing Chat</a>
         </div>
       </article>
     </section>
@@ -1328,7 +1222,7 @@ function attachEventHandlers() {
       return Boolean(document.querySelector('[name="second_opinion_ok"]:checked'));
     }
     if (value === 'no') {
-      return document.querySelector('[name="loan_officer_contact_ok"]')?.checked === true;
+      return true;
     }
     return false;
   };
@@ -1345,14 +1239,6 @@ function attachEventHandlers() {
     });
   });
 
-  document.querySelectorAll('[data-disclosure-preview-toggle]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const preview = button.nextElementSibling;
-      if (!preview) return;
-      preview.classList.toggle('hidden');
-    });
-  });
-
   document.querySelectorAll('[data-guided-disclosure-accept]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!requireVisitorNameForSignature()) return;
@@ -1361,10 +1247,6 @@ function attachEventHandlers() {
         if (!requirePreApprovalBeforeDisclosure()) return;
         if (preApprovalSelect?.value === 'yes' && !document.querySelector('[name="second_opinion_ok"]:checked')) {
           setGuidedDisclosureError('Choose yes or no before continuing.');
-          return;
-        }
-        if (preApprovalSelect?.value === 'no' && document.querySelector('[name="loan_officer_contact_ok"]')?.checked !== true) {
-          setGuidedDisclosureError('Accept the discreet loan officer follow-up before continuing.');
           return;
         }
         showGuidedDisclosureStep('final');
@@ -1596,8 +1478,8 @@ function attachEventHandlers() {
       pageState.mode = 'guest';
       pageState.financingAlertSent = financingRequested;
       pageState.successMessage = financingRequested
-        ? 'Check-in complete. Financing follow-up has been flagged from this visit.'
-        : 'Check-in complete. Your visit is now linked to this live event.';
+        ? 'Check-in complete. Someone will be in contact shortly regarding financing.'
+        : 'Check-in complete. Make yourself at home and do not hesitate to ask questions.';
       form.reset();
     } catch (error) {
       console.error(error);
@@ -1622,12 +1504,14 @@ function renderEventShell() {
     open_start: eventRow?.start_time || null,
     open_end: eventRow?.end_time || null
   };
-  const listingUrl = oneKeyListingUrl(contextHouse);
   const status = houseStatus(contextHouse);
   const agentName = agent?.name || 'Host Agent';
   const brokerageName = agent?.brokerage || contextHouse?.brokerage || eventRow?.setup_context?.detected_brokerage || '';
-
-  const lastCheckinNeedsFinancing = pageState.lastCheckin?.metadata?.financing_requested === true;
+  const addressParts = propertyAddressParts(contextHouse?.address || 'this open house');
+  const financingRequested = pageState.lastCheckin?.metadata?.financing_requested === true;
+  const nextStepsCopy = financingRequested
+    ? `Someone will be in contact shortly regarding financing. If this is the house you love, make sure to speak to ${agentName} about next steps before you leave. If it is not the one, ask about nearby open houses that may fit better.`
+    : `If this is the house you love, make sure to speak to ${agentName} about next steps before you leave. If it is not the one, ask about nearby open houses that may fit better.`;
 
   shell(`
     <div style="${themeStyle()}">
@@ -1635,7 +1519,9 @@ function renderEventShell() {
       <div class="grid grid-cols-[1fr_auto] items-center gap-4">
         <div class="min-w-0">
           <div class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white" style="background:${status.color}">${esc(status.label)}</div>
-          <h1 class="mt-3 font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">Welcome to ${esc(contextHouse?.address || 'this open house')}</h1>
+          <div class="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Welcome to</div>
+          <h1 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.03]">${esc(addressParts.primary)}</h1>
+          ${addressParts.secondary ? `<div class="mt-2 text-base md:text-lg font-black text-slate-600 leading-snug">${esc(addressParts.secondary)}</div>` : ''}
         </div>
         ${renderPropertyImage(contextHouse, 'h-24 w-24 md:h-32 md:w-32')}
       </div>
@@ -1661,7 +1547,7 @@ function renderEventShell() {
 
         ${pageState.mode === 'guest' ? `
           <div class="rounded-[24px] border border-emerald-200 bg-emerald-50/90 p-5 mb-5">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-2">Visit Confirmed</div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-2">Make Yourself At Home</div>
             <p class="text-emerald-900 font-semibold leading-relaxed">${esc(pageState.successMessage)}</p>
           </div>
         ` : ''}
@@ -1683,24 +1569,16 @@ function renderEventShell() {
           <div class="space-y-4">
             <div class="rounded-[22px] border border-slate-200 bg-white/85 p-5">
               <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">What Happens Next</div>
-              <p class="text-slate-700 font-medium leading-relaxed">This visit is tied to the active event and ready for the guided experience below.</p>
+              <p class="text-slate-700 font-medium leading-relaxed">${esc(nextStepsCopy)}</p>
             </div>
-            <button type="button" id="new-checkin-button" class="inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/85 border border-slate-200 text-slate-700">
-              Start Another Check-In
-            </button>
           </div>
         `}
       </article>
-      ${lastCheckinNeedsFinancing ? `
-        <div class="rounded-[20px] bg-sky-50 border border-sky-200 p-4 mt-4 text-sky-900 font-semibold">
-          Financing follow-up was requested for this check-in.
-        </div>
-      ` : ''}
     </section>
 
     ${pageState.mode === 'guest' ? nextStepCards() : ''}
 
-    <section class="${pageState.mode === 'guest' ? 'grid' : 'hidden'} grid-cols-1 md:grid-cols-2 gap-5">
+    <section class="${pageState.mode === 'guest' ? 'grid' : 'hidden'} grid-cols-1 gap-5">
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Property Details</h2>
         <div class="grid grid-cols-1 gap-3 text-sm">
@@ -1716,38 +1594,14 @@ function renderEventShell() {
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Open House</div>
             <div class="text-slate-900 font-bold">${esc(formatEventWindow(contextHouse))}</div>
           </div>
-          <div class="rounded-[18px] bg-slate-50 border border-slate-100 p-4">
-            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Listing Link</div>
-            <div class="text-slate-900 font-bold">${listingUrl ? `<a class="text-sky-600 underline" href="${esc(listingUrl)}" target="_blank" rel="noopener noreferrer">Open OneKey Listing</a>` : '&mdash;'}</div>
-          </div>
-        </div>
-      </article>
-
-      <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">After You Check In</h2>
-        <div class="space-y-4 text-slate-600 font-medium leading-relaxed">
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            The host agent receives your check-in details by text.
-          </div>
-          <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
-            If you are not pre-approved yet, financing follow-up is flagged right away.
-          </div>
         </div>
       </article>
     </section>
+    <footer class="pt-8 pb-1 text-center text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Copyright 2026 Rel8tion LLC</footer>
     </div>
   `);
 
   attachEventHandlers();
-
-  const newCheckinButton = document.getElementById('new-checkin-button');
-  newCheckinButton?.addEventListener('click', () => {
-    pageState.mode = 'checkin';
-    pageState.successMessage = '';
-    pageState.errorMessage = '';
-    pageState.requiredDisclosures = { agency: null, housing: null, courtesy: null };
-    renderEventShell();
-  });
 }
 
 export async function initEventShellPage() {
@@ -1799,6 +1653,12 @@ export async function initEventShellPage() {
     if (agentSlug) {
       try {
         pageState.agent = await getAgentBySlug(agentSlug);
+        if (pageState.agent && !agentPhotoUrl(pageState.agent)) {
+          const localProfile = appState.prefilledAgent || {};
+          if (localProfile.slug === agentSlug && agentPhotoUrl(localProfile)) {
+            pageState.agent.image_url = agentPhotoUrl(localProfile);
+          }
+        }
         if (pageState.agent && !agentPhotoUrl(pageState.agent)) {
           const photo = await findListingAgentPhoto({
             openHouseId: eventRow.open_house_source_id || '',
