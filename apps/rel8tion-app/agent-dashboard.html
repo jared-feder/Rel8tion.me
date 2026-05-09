@@ -141,16 +141,38 @@
     }
 
     function disclosureSummary(checkin) {
-      const disclosure = checkin?.metadata?.ny_discrimination_disclosure || {};
-      const signed = disclosure.acknowledged === true
+      const meta = checkin?.metadata || {};
+      const agency = meta.nys_agency_disclosure || {};
+      const courtesy = meta.rel8tion_courtesy_notice || {};
+      const disclosure = meta.ny_discrimination_disclosure || {};
+      const agencySigned = (agency.agency_disclosure_reviewed === true || meta.agency_disclosure_reviewed === true)
+        && (agency.seller_representation_acknowledged === true || meta.seller_representation_acknowledged === true)
+        && Boolean(agency.agency_disclosure_signed_at || meta.agency_disclosure_signed_at);
+      const housingSigned = disclosure.acknowledged === true
         && disclosure.reviewed === true
         && disclosure.esign_consent === true
         && Boolean(disclosure.e_signature_value);
+      const courtesySigned = (courtesy.rel8tion_courtesy_acknowledged === true || meta.rel8tion_courtesy_acknowledged === true)
+        && Boolean(courtesy.rel8tion_courtesy_signed_at || meta.rel8tion_courtesy_signed_at);
+      const signed = agencySigned && housingSigned && courtesySigned;
       return {
         signed,
-        date: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || ''),
+        agencySigned,
+        agencyDate: fmtDisclosureDate(agency.agency_disclosure_signed_at || meta.agency_disclosure_signed_at || ''),
+        housingSigned,
+        housingDate: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || ''),
+        courtesySigned,
+        courtesyDate: fmtDisclosureDate(courtesy.rel8tion_courtesy_signed_at || meta.rel8tion_courtesy_signed_at || ''),
+        date: fmtDisclosureDate(disclosure.signed_at || agency.agency_disclosure_signed_at || courtesy.rel8tion_courtesy_signed_at || ''),
         pdfUrl: signed && checkin?.id ? `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1` : ''
       };
+    }
+
+    function disclosureLine(label, signed, date) {
+      return `<div class="flex items-center justify-between gap-3 rounded-2xl bg-white/75 px-3 py-2">
+        <span class="text-xs font-black uppercase tracking-[.12em] text-slate-500">${esc(label)}</span>
+        <span class="text-right text-xs font-black ${signed ? 'text-emerald-700' : 'text-rose-700'}">${signed ? `Signed${date ? ` ${esc(date)}` : ''}` : 'Missing'}</span>
+      </div>`;
     }
 
     function renderLead(checkin) {
@@ -172,11 +194,15 @@
         </div>
         <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">NYS Disclosure</div>
-            <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Signed' : 'Missing'}</div>
+            <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">Required Disclosures</div>
+            <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Complete' : 'Incomplete'}</div>
           </div>
-          ${disclosure.signed && disclosure.date ? `<div class="mt-1 text-sm font-bold text-slate-600">${esc(disclosure.date)}</div>` : ''}
-          ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Signed PDF</a>` : ''}
+          <div class="mt-3 grid gap-2">
+            ${disclosureLine('Agency', disclosure.agencySigned, disclosure.agencyDate)}
+            ${disclosureLine('Housing', disclosure.housingSigned, disclosure.housingDate)}
+            ${disclosureLine('Courtesy', disclosure.courtesySigned, disclosure.courtesyDate)}
+          </div>
+          ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Disclosure Packet PDF</a>` : ''}
         </div>
         ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>

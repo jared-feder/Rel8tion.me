@@ -845,9 +845,9 @@ function renderGuidedDisclosuresModal() {
               <div class="text-slate-900 font-black">${esc(today)}</div>
             </div>
           </div>
-          <a href="${esc(housingUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View Housing Disclosure PDF</a>
+          <a href="${esc(housingUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View Prefilled Disclosure Packet</a>
           ${renderDisclosureMiniPreview({ label: 'NYS Housing & Anti-Discrimination Disclosure', url: housingUrl })}
-          <button type="button" data-guided-disclosure-accept="housing" class="${primaryButtonClass()} w-full bg-emerald-600">Accept / Continue</button>
+          <button type="button" data-guided-disclosure-accept="housing" class="${primaryButtonClass()} w-full bg-emerald-600">I Reviewed This Form</button>
         </div>
 
         <div data-guided-disclosure-panel="courtesy" class="guided-disclosure-panel hidden space-y-4">
@@ -900,6 +900,8 @@ function renderRequiredDisclosuresBlock() {
       <input type="hidden" name="agency_disclosure_type" value="${esc(NYS_AGENCY_DISCLOSURE_TYPE)}">
       <input type="hidden" name="rel8tion_courtesy_acknowledged" value="${courtesy.signed_at ? 'true' : ''}">
       <input type="hidden" name="rel8tion_courtesy_signed_at" value="${esc(courtesy.signed_at || '')}">
+      <input type="hidden" name="ny_housing_disclosure_reviewed" value="${housing.reviewed_at ? 'true' : ''}">
+      <input type="hidden" name="ny_housing_disclosure_reviewed_at" value="${esc(housing.reviewed_at || '')}">
       <input type="hidden" name="ny_disclosure_signed_date" value="${esc(todayDateValue())}">
       <input type="hidden" id="ny-disclosure-signature-value" name="ny_disclosure_signature" value="">
 
@@ -980,6 +982,11 @@ function validateCheckin(values) {
       throw new Error('Review and sign the Rel8tion Courtesy Notice before submitting.');
     }
 
+    if (values.ny_housing_disclosure_reviewed !== 'true'
+      || !normalizeValue(values.ny_housing_disclosure_reviewed_at)) {
+      throw new Error('Review the NYS Housing and Anti-Discrimination Disclosure before submitting.');
+    }
+
     if (values.ny_disclosure_acknowledged !== 'true') {
       throw new Error('Acknowledge the required NYS disclosure before submitting.');
     }
@@ -1002,6 +1009,8 @@ function buildNyDisclosureMetadata(values, signedAt = new Date()) {
     consumer_role: PATH_LABELS[pageState.selectedPath] || pageState.selectedPath,
     acknowledged: true,
     reviewed: true,
+    reviewed_at: normalizeValue(values.ny_housing_disclosure_reviewed_at) || signedAt.toISOString(),
+    reviewed_pdf_url: getDisclosurePreviewUrl(pageState.eventRow?.id) || NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL,
     esign_consent: true,
     e_signature_type: 'checkbox_plus_prefilled_name',
     e_signature_value: signatureValue,
@@ -1417,6 +1426,8 @@ function attachEventHandlers() {
 
       if (key === 'housing') {
         pageState.requiredDisclosures.housing = { reviewed_at: signedAtIso };
+        form.querySelector('[name="ny_housing_disclosure_reviewed"]').value = 'true';
+        form.querySelector('[name="ny_housing_disclosure_reviewed_at"]').value = signedAtIso;
         updateDisclosureStatus('housing-status', `Housing Disclosure reviewed ${displayTime}`);
         showGuidedDisclosureStep('courtesy');
         return;

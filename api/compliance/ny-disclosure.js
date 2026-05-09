@@ -7,8 +7,19 @@ const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHAB
 const SOURCE_PDF_URL = process.env.REL8TION_NYS_DISCLOSURE_PDF_URL
   || process.env.NYS_DISCLOSURE_PDF_URL
   || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nyhousingantidisc.pdf';
+const AGENCY_SOURCE_PDF_URL = process.env.REL8TION_NYS_AGENCY_DISCLOSURE_PDF_URL
+  || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nysellerbuyerdisclosure.pdf';
 const OFFICIAL_SOURCE_URL = 'https://dos.ny.gov/housing-and-anti-discrimination-disclosure-form';
 const SIGNED_DISCLOSURE_BUCKET = process.env.SIGNED_DISCLOSURE_BUCKET || 'signed-disclosures';
+const DISCLOSURE_PACKET_TYPE = 'rel8tion_open_house_disclosure_packet';
+const DISCLOSURE_PACKET_VERSION = '2026-05-09-three-step-v1';
+const COURTESY_NOTICE_TEXT = [
+  'Rel8tion was created to make real estate interactions clearer, faster, and more transparent for everyone involved.',
+  'At this open house, the listing agent may currently represent the seller. This does not mean you are alone, unwelcome, or unable to ask questions. It simply means the relationship is being disclosed clearly from the start.',
+  'Rel8tion supports fair housing, equal treatment, clear communication, professional accountability, and informed decision-making.',
+  'Rel8tion does not replace or modify any required agency disclosure. Rel8tion helps document and clarify the interaction, but does not create a buyer-agent, dual-agency, legal, lending, or fiduciary relationship unless separately agreed to in writing.',
+  'You may choose your own real estate agent, attorney, lender, inspector, or other professional at any time.'
+];
 
 function sendJson(res, status, payload) {
   res.status(status).json(payload);
@@ -124,7 +135,7 @@ function buildSignedDisclosureFileName(context, checkin) {
   const address = safeFilenamePart(context.address || 'open-house');
   const buyer = safeFilenamePart(checkin.visitor_name || 'buyer');
   const checkinId = shortToken(checkin.id, 'checkin');
-  return `${date}-${address}-${buyer}-${checkinId}-nys-disclosure.pdf`;
+  return `${date}-${address}-${buyer}-${checkinId}-rel8tion-disclosure-packet.pdf`;
 }
 
 function buildSignedDisclosureStoragePath(context, checkin, fileName) {
@@ -234,30 +245,40 @@ function drawField(page, { label, value, x, y, width = 500, font, boldFont }) {
   });
 }
 
-async function fetchSourcePdf() {
-  const response = await fetch(SOURCE_PDF_URL);
-  if (!response.ok) throw new Error(`Unable to fetch disclosure source PDF: ${response.status}`);
+async function fetchSourcePdf(url = SOURCE_PDF_URL, label = 'disclosure') {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Unable to fetch ${label} source PDF: ${response.status}`);
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function buildDisclosurePdf(context, options = {}) {
-  const sourceBytes = await fetchSourcePdf();
+async function appendSourcePdf(pdf, url, label) {
+  const sourceBytes = await fetchSourcePdf(url, label);
   const sourcePdf = await PDFDocument.load(sourceBytes);
+  const copiedPages = await pdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+  copiedPages.forEach((page) => pdf.addPage(page));
+}
+
+async function buildDisclosurePdf(context, options = {}) {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const agency = options.agency || {};
+  const courtesy = options.courtesy || {};
+  const agencySignedAt = firstPresent(agency.agency_disclosure_signed_at, options.agencySignedAt);
+  const courtesySignedAt = firstPresent(courtesy.rel8tion_courtesy_signed_at, options.courtesySignedAt);
+  const housingReviewedAt = firstPresent(options.housingReviewedAt, options.signedAt);
 
   const cover = pdf.addPage([612, 792]);
   cover.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(0.94, 0.98, 1) });
   cover.drawText('REL8TION', { x: 42, y: 728, size: 12, font: boldFont, color: rgb(0.03, 0.42, 0.72) });
-  cover.drawText('NYS Housing & Anti-Discrimination Disclosure', {
+  cover.drawText('Open House Disclosure Packet', {
     x: 42,
     y: 692,
     size: 22,
     font: boldFont,
     color: rgb(0.06, 0.09, 0.16)
   });
-  cover.drawText('Prefilled acknowledgement packet', {
+  cover.drawText(options.signed ? 'Signed acknowledgement packet' : 'Prefilled acknowledgement preview', {
     x: 42,
     y: 666,
     size: 12,
@@ -273,11 +294,13 @@ async function buildDisclosurePdf(context, options = {}) {
   if (options.signed) {
     drawField(cover, { label: 'Consumer role', value: options.consumerRole || 'Buyer', x: 42, y: 420, width: 244, font, boldFont });
     drawField(cover, { label: 'Electronic signature', value: options.signature || '-', x: 326, y: 420, width: 244, font, boldFont });
-    drawField(cover, { label: 'Signed at', value: formatDateTime(options.signedAt), x: 42, y: 362, width: 528, font, boldFont });
+    drawField(cover, { label: 'NYS Agency Disclosure signed', value: formatDateTime(agencySignedAt), x: 42, y: 362, width: 528, font, boldFont });
+    drawField(cover, { label: 'Housing & Anti-Discrimination reviewed', value: formatDateTime(housingReviewedAt), x: 42, y: 304, width: 528, font, boldFont });
+    drawField(cover, { label: 'Rel8tion Courtesy Notice signed', value: formatDateTime(courtesySignedAt), x: 42, y: 246, width: 528, font, boldFont });
     drawTextBlock(cover, {
-      text: 'The consumer acknowledged receipt and review of the New York State Housing and Anti-Discrimination Disclosure Form and agreed that their check-in name serves as their electronic signature for this acknowledgement.',
+      text: 'The consumer completed the buyer-facing REL8TION disclosure sequence: New York State Agency Disclosure, New York State Housing and Anti-Discrimination Disclosure, and Rel8tion Courtesy Notice. The check-in name is recorded as the electronic signature where applicable.',
       x: 42,
-      y: 308,
+      y: 192,
       size: 10,
       font,
       maxChars: 92,
@@ -285,7 +308,7 @@ async function buildDisclosurePdf(context, options = {}) {
     });
   } else {
     drawTextBlock(cover, {
-      text: 'This preview is prefilled with event context. The signed acknowledgement is generated after the buyer completes check-in and accepts the required checkbox.',
+      text: 'This preview is prefilled with event context. The signed packet is generated after the buyer completes the required disclosure sequence and final acknowledgement.',
       x: 42,
       y: 420,
       size: 10,
@@ -295,18 +318,45 @@ async function buildDisclosurePdf(context, options = {}) {
     });
   }
 
-  cover.drawText('Official source reference:', { x: 42, y: 96, size: 8, font: boldFont, color: rgb(0.28, 0.35, 0.45) });
-  cover.drawText(OFFICIAL_SOURCE_URL, { x: 42, y: 82, size: 8, font, color: rgb(0.03, 0.42, 0.72) });
-  cover.drawText('The official form pages follow this REL8TION acknowledgement cover.', {
+  cover.drawText('Source references:', { x: 42, y: 96, size: 8, font: boldFont, color: rgb(0.28, 0.35, 0.45) });
+  cover.drawText(AGENCY_SOURCE_PDF_URL, { x: 42, y: 82, size: 8, font, color: rgb(0.03, 0.42, 0.72) });
+  cover.drawText(OFFICIAL_SOURCE_URL, { x: 42, y: 69, size: 8, font, color: rgb(0.03, 0.42, 0.72) });
+  cover.drawText('Source form pages follow this REL8TION acknowledgement cover and courtesy notice page.', {
     x: 42,
-    y: 58,
+    y: 50,
     size: 8,
     font,
     color: rgb(0.35, 0.45, 0.58)
   });
 
-  const copiedPages = await pdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-  copiedPages.forEach((page) => pdf.addPage(page));
+  const courtesyPage = pdf.addPage([612, 792]);
+  courtesyPage.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(0.98, 1, 0.98) });
+  courtesyPage.drawText('REL8TION', { x: 42, y: 728, size: 12, font: boldFont, color: rgb(0.03, 0.42, 0.72) });
+  courtesyPage.drawText('Rel8tion Courtesy Notice', { x: 42, y: 692, size: 22, font: boldFont, color: rgb(0.06, 0.09, 0.16) });
+  if (options.signed) {
+    drawField(courtesyPage, { label: 'Electronic signature', value: options.signature || '-', x: 42, y: 636, width: 244, font, boldFont });
+    drawField(courtesyPage, { label: 'Signed at', value: formatDateTime(courtesySignedAt), x: 326, y: 636, width: 244, font, boldFont });
+  }
+  let courtesyY = 560;
+  COURTESY_NOTICE_TEXT.forEach((paragraph) => {
+    courtesyY = drawTextBlock(courtesyPage, {
+      text: paragraph,
+      x: 42,
+      y: courtesyY,
+      size: 11,
+      font,
+      color: rgb(0.12, 0.18, 0.28),
+      maxChars: 88,
+      lineHeight: 16
+    }) - 18;
+  });
+
+  try {
+    await appendSourcePdf(pdf, AGENCY_SOURCE_PDF_URL, 'agency disclosure');
+  } catch (error) {
+    console.log('[ny-disclosure] agency source append skipped', error.message || error);
+  }
+  await appendSourcePdf(pdf, SOURCE_PDF_URL, 'housing and anti-discrimination disclosure');
   return pdf.save();
 }
 
@@ -366,18 +416,21 @@ async function handlePreview(req, res) {
   if (!eventId) return sendJson(res, 400, { ok: false, error: 'Missing event.' });
   const context = await loadEventContext(eventId);
   const bytes = await buildDisclosurePdf(context, { signed: false });
-  return sendPdf(res, `nys-disclosure-${safeFilenamePart(context.address)}.pdf`, bytes);
+  return sendPdf(res, `rel8tion-disclosure-packet-${safeFilenamePart(context.address)}.pdf`, bytes);
 }
 
 async function handleDownloadSigned(req, res) {
   const checkinId = cleanText(req.query.checkin);
   if (!checkinId) return sendJson(res, 400, { ok: false, error: 'Missing checkin.' });
   const context = await loadCheckinContext(checkinId);
-  const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
+  const metadata = context.checkin.metadata || {};
+  const disclosure = metadata.ny_discrimination_disclosure || {};
+  const agency = metadata.nys_agency_disclosure || {};
+  const courtesy = metadata.rel8tion_courtesy_notice || {};
   const signedPdf = disclosure.signed_pdf || {};
 
   let bytes;
-  if (signedPdf.storage_bucket && signedPdf.storage_path) {
+  if (signedPdf.storage_bucket && signedPdf.storage_path && signedPdf.document_type === DISCLOSURE_PACKET_TYPE) {
     bytes = await downloadStoredPdf(signedPdf.storage_bucket, signedPdf.storage_path);
   } else {
     bytes = await buildDisclosurePdf(context, {
@@ -385,7 +438,10 @@ async function handleDownloadSigned(req, res) {
       signature: disclosure.e_signature_value || context.checkin.visitor_name,
       signedAt: disclosure.signed_at || context.checkin.created_at,
       signedDate: disclosure.signed_date,
-      consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer'
+      consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
+      housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || context.checkin.created_at,
+      agency,
+      courtesy
     });
   }
 
@@ -400,7 +456,10 @@ async function handleGenerateSigned(req, res) {
 
   const context = await loadCheckinContext(checkinId);
   const checkin = context.checkin;
-  const disclosure = checkin.metadata?.ny_discrimination_disclosure || {};
+  const metadata = checkin.metadata || {};
+  const disclosure = metadata.ny_discrimination_disclosure || {};
+  const agency = metadata.nys_agency_disclosure || {};
+  const courtesy = metadata.rel8tion_courtesy_notice || {};
   if (disclosure.acknowledged !== true || !disclosure.e_signature_value) {
     return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
   }
@@ -410,7 +469,10 @@ async function handleGenerateSigned(req, res) {
     signature: disclosure.e_signature_value || checkin.visitor_name,
     signedAt: disclosure.signed_at || checkin.created_at,
     signedDate: disclosure.signed_date,
-    consumerRole: disclosure.consumer_role || checkin.visitor_type || 'Buyer'
+    consumerRole: disclosure.consumer_role || checkin.visitor_type || 'Buyer',
+    housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || checkin.created_at,
+    agency,
+    courtesy
   });
 
   const generatedAt = new Date().toISOString();
@@ -420,6 +482,13 @@ async function handleGenerateSigned(req, res) {
   await uploadSignedPdf(path, bytes);
   const signedPdf = {
     generated: true,
+    document_type: DISCLOSURE_PACKET_TYPE,
+    packet_version: DISCLOSURE_PACKET_VERSION,
+    packet_includes: [
+      'nys_agency_disclosure',
+      'ny_housing_anti_discrimination_disclosure',
+      'rel8tion_courtesy_notice'
+    ],
     storage_bucket: SIGNED_DISCLOSURE_BUCKET,
     storage_path: path,
     storage_file_name: fileName,
@@ -433,6 +502,7 @@ async function handleGenerateSigned(req, res) {
     property_address: context.address || '',
     buyer_name: checkin.visitor_name || '',
     source_pdf_url: SOURCE_PDF_URL,
+    agency_source_pdf_url: AGENCY_SOURCE_PDF_URL,
     official_source_url: OFFICIAL_SOURCE_URL
   };
   const updatedCheckin = await patchCheckinMetadata(checkin, signedPdf);

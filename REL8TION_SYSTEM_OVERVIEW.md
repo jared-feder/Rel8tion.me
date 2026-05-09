@@ -295,7 +295,7 @@ Inputs:
 - Keeps the official DOS form page as the source-of-truth reference in config/docs.
 - Opens a server-generated prefilled disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
-- After check-in, attempts to generate a signed disclosure PDF and attach `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
+- After check-in, attempts to generate a signed REL8TION disclosure packet PDF covering the NYS Agency Disclosure, NYS Housing and Anti-Discrimination acknowledgement, and Rel8tion Courtesy Notice. It attaches `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
 - Saves preference selection into `event_checkins.metadata` after check-in.
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
 - Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt only when the buyer selected `yes`; when the buyer selected `no`, it requires discreet loan officer contact acceptance, then routes to live loan officer if assigned or alerts Jared.
@@ -334,7 +334,7 @@ Inputs:
 - Loads `agent_outreach_queue` rows for the listing.
 - Loads live `event_loan_officer_sessions`.
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
-- Shows lead cards with call/text actions, NYS Disclosure signed/missing status, and an `Open Signed PDF` action when the signed disclosure can be generated or stored.
+- Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
 - Shows loan officer coverage card.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
 
@@ -879,12 +879,12 @@ File: `api/compliance/ny-disclosure.js`.
 
 `[IMPLEMENTED]` Confirmed repo behavior:
 
-- `GET ?event=<eventId>` returns a prefilled PDF packet with a REL8TION cover page plus the official form copy.
-- `POST { checkin_id }` generates a signed PDF packet from the saved check-in acknowledgement.
+- `GET ?event=<eventId>` returns a prefilled REL8TION disclosure packet with a REL8TION cover page, Rel8tion Courtesy Notice page, and source form pages when available.
+- `POST { checkin_id }` generates a signed disclosure packet from the saved check-in acknowledgement metadata.
 - Signed PDF upload uses Supabase Storage through server-side `SUPABASE_SERVICE_ROLE_KEY`.
 - Signed PDF metadata is patched back into `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`.
-- New signed PDF objects use broker-readable event paths/filenames and store audit fields including document hash, event/check-in IDs, property address, buyer name, generated timestamp, storage path, and source form references.
-- `GET ?checkin=<checkinId>&download=1` returns the stored signed PDF when available or regenerates one from metadata.
+- New signed packet PDF objects use broker-readable event paths/filenames and store audit fields including document hash, event/check-in IDs, property address, buyer name, generated timestamp, packet version, storage path, and source form references.
+- `GET ?checkin=<checkinId>&download=1` returns the stored signed packet when available or regenerates one from metadata. Legacy one-form signed PDFs are regenerated as full packets when opened.
 
 `[NEEDS VERIFICATION]` Live behavior depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.
 
@@ -1104,9 +1104,9 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `/event` requires NYS disclosure acknowledgement before SMS/check-in completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before creating the check-in and before notification calls. |
 | `/event` stores DOS-2156 acknowledgement metadata. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `event_checkins.metadata.ny_discrimination_disclosure` with form code/version, provided-by agent/brokerage, consumer role, checkbox-plus-prefilled-name signature, timestamps, and user agent. |
 | `/event` uses a configurable REL8TION-hosted disclosure PDF. | `[IMPLEMENTED]` | `src/core/config.js` defaults `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL` to the Supabase Storage PDF and keeps `OFFICIAL_NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_SOURCE_URL` for the official DOS source-of-truth reference. |
-| Prefilled/signed NYS disclosure PDF API exists. | `[IMPLEMENTED]` | `api/compliance/ny-disclosure.js` generates preview and signed PDF packets with `pdf-lib`. |
+| Prefilled/signed REL8TION disclosure packet PDF API exists. | `[IMPLEMENTED]` | `api/compliance/ny-disclosure.js` generates preview and signed PDF packets with `pdf-lib`, including agency, housing, and courtesy evidence. |
 | Signed disclosure PDF storage is fully live. | `[NEEDS VERIFICATION]` | Requires live Vercel env vars and Supabase Storage bucket verification. |
-| Agent dashboard lead cards show NYS disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.ny_discrimination_disclosure` and renders Signed/Missing plus signed date/time and signed PDF link when present. |
+| Agent dashboard lead cards show disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.nys_agency_disclosure`, `metadata.ny_discrimination_disclosure`, and `metadata.rel8tion_courtesy_notice`, then renders signed/missing status plus disclosure packet PDF link when present. |
 | Buyer not preapproved routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` treats `pre_approved=false` as financing requested, calls `getLiveLoanOfficerSession`, then sends LO alert/intro. |
 | Buyer not preapproved routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |
