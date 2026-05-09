@@ -1,4 +1,4 @@
-import { bindPublicHandlers, init } from './flow.js?v=20260505-beta-reset';
+import { bindPublicHandlers, init } from './flow.js?v=20260509-profile-lock';
 
 export function initClaimStyledPage() {
   bindPublicHandlers();
