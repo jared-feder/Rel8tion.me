@@ -33,6 +33,7 @@ export async function closeEvent(eventId) {
     method: 'PATCH',
     headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
     body: JSON.stringify({
+      status: 'ended',
       ended_at: new Date().toISOString(),
       last_activity_at: new Date().toISOString()
     })

@@ -239,6 +239,7 @@ Listing binding:
 
 - Uses RPC `find_nearest_open_house`.
 - Adds wider fallback search from approximately now minus 3 days to now plus 21 days.
+- Prioritizes open houses in or near the current time window so imperfect feed timestamps do not bury listings that are already underway or about to start.
 - Allows manual listing fallback when no listing can be found.
 
 Current field names:
@@ -342,6 +343,8 @@ Inputs:
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
 - Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
 - Shows loan officer coverage card.
+- Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, and setting the sign inactive.
+- Can move the same sign to another open house by closing the current event and opening sign activation for the next listing.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
 
 ### `/nmb-activate`
@@ -1128,6 +1131,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Sign activation uses sign inventory/public code lookup. | `[IMPLEMENTED]` | `sign-demo-activate.html` queries `smart_sign_inventory?public_code=eq...` before sign fallback. |
 | Smart sign activation stores front and rear chip roles. | `[IMPLEMENTED]` | `registerFirstChip` writes `primary_device_type: front_buyer_chip`; `registerSecondChip` writes `secondary_device_type: rear_agent_chip`. |
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
+| Agent dashboard can end or move a live sign event. | `[IMPLEMENTED]` | `agent-dashboard.html` patches `open_house_events.status/ended_at`, clears `smart_signs.active_event_id`, sets the sign inactive, and can route into `/sign-demo-activate.html` for the next listing. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
 | `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a formatted property-address welcome, property image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |

@@ -33,8 +33,12 @@ function milesBetween(a, b, c, d) {
 
 function openHouseTimeScore(house) {
   const start = house?.open_start ? new Date(house.open_start).getTime() : 0;
+  const end = house?.open_end ? new Date(house.open_end).getTime() : 0;
+  const now = Date.now();
   if (!start) return 999;
-  return Math.abs(start - Date.now()) / (60 * 60 * 1000);
+  if (end && now >= start - 2 * 60 * 60 * 1000 && now <= end + 6 * 60 * 60 * 1000) return 0;
+  if (Math.abs(start - now) <= 18 * 60 * 60 * 1000) return 1;
+  return Math.abs(start - now) / (60 * 60 * 1000);
 }
 
 async function looseNearbyOpenHouses(lat, lng) {

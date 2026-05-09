@@ -297,6 +297,10 @@
               <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Sign Status</div>
               <div class="mt-2 text-xl font-black">${esc(state.sign?.public_code || state.code || '-')}</div>
               <div class="mt-2 text-sm font-bold text-slate-500">Front buyer chip opens check-in. Rear agent chip opens this dashboard after keychain verification.</div>
+              <div class="mt-4 grid gap-2">
+                <button onclick="window.moveSignToAnotherOpenHouse()" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-sm">Move Sign To Another Open House</button>
+                <button onclick="window.endCurrentOpenHouse()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">End This Open House</button>
+              </div>
             </div>
             <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
               <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Listing Outreach</div>
@@ -307,6 +311,61 @@
         </section>
       `;
     }
+
+    async function closeCurrentOpenHouse({ move = false } = {}) {
+      if (!state.event?.id || !state.sign?.id) throw new Error('Missing active event or sign.');
+      const ok = window.confirm(move
+        ? 'End this open house and move the sign to another listing? Buyer check-ins already captured will stay saved.'
+        : 'End this open house now? Buyer check-ins already captured will stay saved.');
+      if (!ok) return;
+
+      const now = new Date().toISOString();
+      await request(`open_house_events?id=eq.${encodeURIComponent(state.event.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'ended',
+          ended_at: now,
+          last_activity_at: now
+        })
+      });
+      await request(`smart_signs?id=eq.${encodeURIComponent(state.sign.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          active_event_id: null,
+          status: 'inactive',
+          deactivated_at: now
+        })
+      });
+
+      if (move) {
+        const params = new URLSearchParams();
+        if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+        if (state.agent) params.set('agent', state.agent);
+        params.set('move', '1');
+        window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+        return;
+      }
+
+      app.innerHTML = `<div class="py-14 text-center">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">This Sign Is Available</h1>
+        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">The event was closed and the sign is no longer attached to this open house. Existing check-ins remain saved.</p>
+        <button onclick="window.moveSignToAnotherOpenHouse(true)" class="mt-6 rounded-full bg-sky-600 px-6 py-3 font-black text-white shadow-sm">Start Another Open House</button>
+      </div>`;
+    }
+
+    window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => renderError(error.message || 'Could not end this open house.'));
+    window.moveSignToAnotherOpenHouse = (skipConfirm = false) => {
+      if (skipConfirm) {
+        const params = new URLSearchParams();
+        if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+        if (state.agent) params.set('agent', state.agent);
+        params.set('move', '1');
+        window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+        return;
+      }
+      closeCurrentOpenHouse({ move: true }).catch((error) => renderError(error.message || 'Could not move this sign.'));
+    };
 
     window.armLoanOfficerSignIn = function armLoanOfficerSignIn() {
       if (!state.event?.id) return;
