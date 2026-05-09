@@ -7,3 +7,13 @@ tmp/
 supabase/.temp/
 docs/live-verification/latest-live-verification-report.json
 docs/live-verification/latest-live-verification-report.md
+
+# Local/generated exports, backups, and legacy scratch files.
+claim2.html
+docs/*.docx
+docs/*.pdf
+docs/*.html
+docs/*-assets-*/
+docs/*backup*.json
+docs/replied-agents-current-*.json
+docs/sign-detach-backup-*.json
