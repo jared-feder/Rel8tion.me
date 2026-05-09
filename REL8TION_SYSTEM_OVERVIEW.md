@@ -243,8 +243,8 @@ QR handling:
 Listing binding:
 
 - Uses RPC `find_nearest_open_house`.
-- Adds wider fallback search from approximately now minus 3 days to now plus 21 days.
-- Prioritizes open houses in or near the current time window so imperfect feed timestamps do not bury listings that are already underway or about to start.
+- Adds a tight local fallback search from approximately now minus 12 hours to now plus 7 days.
+- Recomputes listing distance from `lat`/`lng` on the client, compares listing dates in `America/New_York`, and ranks closest active/upcoming listings first. Time looseness is retained for active/open-soon status, but distance/locality stays ahead of time so farther borough listings do not outrank nearby Oceanside-area rows.
 - Allows manual listing fallback when no listing can be found.
 
 Current field names:

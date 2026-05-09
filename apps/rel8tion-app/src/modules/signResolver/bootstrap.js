@@ -1,6 +1,6 @@
 import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
 import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260426-1455';
-import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260426-1455';
+import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260509-local-rank';
 import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js?v=20260426-1455';
 import {
   assignSmartSignToAgent,
@@ -41,39 +41,89 @@ function openHouseTimeScore(house) {
   return Math.abs(start - now) / (60 * 60 * 1000);
 }
 
+function nyDateParts(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short'
+  }).formatToParts(date).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return { key: `${parts.year}-${parts.month}-${parts.day}`, weekday: parts.weekday };
+}
+
+function isWeekendNY(value) {
+  const parts = nyDateParts(value);
+  return parts?.weekday === 'Sat' || parts?.weekday === 'Sun';
+}
+
+function openHouseDayScore(house) {
+  const start = house?.open_start ? new Date(house.open_start) : null;
+  const end = house?.open_end ? new Date(house.open_end) : null;
+  const now = new Date();
+  if (!start) return 9;
+  if (end && now >= new Date(start.getTime() - 2 * 60 * 60 * 1000)
+    && now <= new Date(end.getTime() + 6 * 60 * 60 * 1000)) {
+    return 0;
+  }
+  if (nyDateParts(start)?.key === nyDateParts(now)?.key) return 1;
+  if (start > now) return 2;
+  return 4;
+}
+
+function distanceMilesFor(house, lat, lng) {
+  if (house?.lat != null && house?.lng != null) return milesBetween(lat, lng, house.lat, house.lng);
+  const distance = Number(house?.distance);
+  if (Number.isFinite(distance)) return distance > 250 ? distance / 1609.344 : distance;
+  return 999;
+}
+
+function rankOpenHouses(rows, lat, lng) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((house) => ({
+      ...house,
+      _distance: house._distance ?? distanceMilesFor(house, lat, lng),
+      _dayScore: openHouseDayScore(house),
+      _timeScore: openHouseTimeScore(house)
+    }))
+    .filter((house) => house._dayScore < 4)
+    .sort((a, b) => (
+      (a._distance - b._distance)
+      || (a._dayScore - b._dayScore)
+      || (a._timeScore - b._timeScore)
+    ));
+}
+
 async function looseNearbyOpenHouses(lat, lng) {
   const now = new Date();
-  const from = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  const to = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString();
-  const url = `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&select=*&order=open_start.asc&limit=500`;
+  const from = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const radius = isWeekendNY(now) ? 30 : 45;
+  const url = `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&select=*&order=open_start.asc&limit=300`;
   const res = await fetch(url, { headers: authHeaders(KEY) });
   if (!res.ok) throw new Error(await res.text() || 'Unable to load fallback open houses.');
   const rows = await res.json();
 
-  return (Array.isArray(rows) ? rows : [])
-    .map((house) => {
-      const hasGeo = house.lat != null && house.lng != null;
-      return {
-        ...house,
-        _distance: hasGeo ? milesBetween(lat, lng, house.lat, house.lng) : 999,
-        _timeScore: openHouseTimeScore(house)
-      };
-    })
-    .filter((house) => house._distance <= 75 || house._distance === 999)
-    .sort((a, b) => (a._distance - b._distance) || (a._timeScore - b._timeScore))
-    .slice(0, 30);
+  return rankOpenHouses(rows, lat, lng)
+    .filter((house) => house._distance <= radius)
+    .slice(0, 20);
 }
 
-function mergeOpenHouses(...groups) {
+function mergeOpenHouses(lat, lng, ...groups) {
   const seen = new Set();
-  return groups
+  const rows = groups
     .flat()
     .filter((house) => {
       if (!house?.id || seen.has(String(house.id))) return false;
       seen.add(String(house.id));
       return true;
-    })
-    .sort((a, b) => ((a._distance ?? 999) - (b._distance ?? 999)) || (openHouseTimeScore(a) - openHouseTimeScore(b)));
+    });
+  return rankOpenHouses(rows, lat, lng).slice(0, 20);
 }
 
 function getCodeFromUrl() {
@@ -346,6 +396,8 @@ function attachInactiveHandlers(sign) {
         const preciseHouses = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
         const wideHouses = await looseNearbyOpenHouses(position.coords.latitude, position.coords.longitude).catch(() => []);
         pageState.nearbyHouses = mergeOpenHouses(
+          position.coords.latitude,
+          position.coords.longitude,
           Array.isArray(preciseHouses) ? preciseHouses : [],
           Array.isArray(wideHouses) ? wideHouses : []
         );
