@@ -129,6 +129,11 @@
       }
     }
 
+    function sessionTimeMs(value) {
+      const time = new Date(value || 0).getTime();
+      return Number.isFinite(time) ? time : 0;
+    }
+
     function normalizeRemoteAddKeychainSession(row) {
       if (!row?.agent_slug) return null;
       return {
@@ -624,6 +629,17 @@
           'waiting_for_sign_chip_1',
           'waiting_for_second_sign_chip'
         ]);
+        const pendingAddKeychain = await readAnyAddKeychainSession();
+        const backupIsNewer = pendingAddKeychain?.agentSlug
+          && (
+            !remoteSignActivation?.public_code
+            || sessionTimeMs(pendingAddKeychain.createdAt) >= sessionTimeMs(remoteSignActivation.updated_at || remoteSignActivation.started_at)
+          );
+
+        if (backupIsNewer && await maybeHandleAddKeychainSession()) {
+          return;
+        }
+
         if (remoteSignActivation?.public_code) {
           setStatus('Smart Sign Chip', 'Continuing sign activation.');
           continueSignActivation({
@@ -641,7 +657,7 @@
           return;
         }
 
-        if (await maybeHandleAddKeychainSession()) {
+        if (!backupIsNewer && await maybeHandleAddKeychainSession()) {
           return;
         }
 

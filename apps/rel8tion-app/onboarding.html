@@ -122,6 +122,7 @@
     let uid = urlParams.get('uid') || '';
     const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
     const ADD_KEYCHAIN_REMOTE_PREFIX = 'backup-keychain-';
+    const BACKUP_PROMPT_PREFIX = 'rel8tion_backup_keychain_prompt_';
 
     async function request(path, options = {}) {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -183,6 +184,28 @@
         return parsed;
       } catch {
         window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+        return null;
+      }
+    }
+
+    function backupPromptKey() {
+      return `${BACKUP_PROMPT_PREFIX}${agent || 'unknown'}`;
+    }
+
+    function rememberBackupPromptChoice(choice) {
+      try {
+        window.localStorage.setItem(backupPromptKey(), JSON.stringify({
+          choice,
+          updatedAt: new Date().toISOString()
+        }));
+      } catch {}
+    }
+
+    function readBackupPromptChoice() {
+      try {
+        const raw = window.localStorage.getItem(backupPromptKey());
+        return raw ? JSON.parse(raw) : null;
+      } catch {
         return null;
       }
     }
@@ -287,10 +310,55 @@
     async function refreshKeychainPanel(notice = '') {
       if (!agent) {
         renderKeychainPanel([], 'Claim a keychain first, then you can add a backup.');
-        return;
+        return [];
       }
       const rows = await loadKeychains(agent);
       renderKeychainPanel(rows, notice);
+      return rows;
+    }
+
+    function closeBackupPrompt() {
+      const modal = document.getElementById('backupKeychainPrompt');
+      if (modal) modal.remove();
+    }
+
+    function showBackupKeychainPrompt(rows = []) {
+      if (!agent || urlParams.get('keychain_added')) return;
+      if (readAddKeychainSession()?.agentSlug === agent) return;
+      if (rows.length !== 1) return;
+      const saved = readBackupPromptChoice();
+      if (saved?.choice === 'single-keychain') return;
+
+      closeBackupPrompt();
+      const modal = document.createElement('div');
+      modal.id = 'backupKeychainPrompt';
+      modal.className = 'fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 px-4 py-5 backdrop-blur-sm sm:items-center';
+      modal.innerHTML = `
+        <section class="w-full max-w-lg rounded-[32px] border border-white/80 bg-white p-6 text-center shadow-[0_25px_70px_rgba(15,23,42,.24)]">
+          <div class="mx-auto mb-4 inline-flex rounded-full bg-sky-50 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700">Keychain Setup</div>
+          <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold leading-tight text-slate-950">Do you have a second keychain?</h2>
+          <p class="mx-auto mt-3 max-w-md text-base font-semibold leading-relaxed text-slate-600">If yes, tap it next. Rel8tion will connect it as this agent's backup keychain before you activate a smart sign.</p>
+          <div class="mt-5 grid gap-3">
+            <button id="backupPromptYes" class="w-full rounded-full bg-slate-950 px-5 py-4 text-base font-black text-white">Yes, Add Second Keychain</button>
+            <button id="backupPromptNo" class="w-full rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white">No, Activate Smart Sign</button>
+            <button id="backupPromptLater" class="w-full rounded-full bg-white px-5 py-3 text-sm font-black text-slate-500 ring-1 ring-slate-200">Not Now</button>
+          </div>
+        </section>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById('backupPromptYes')?.addEventListener('click', async () => {
+        closeBackupPrompt();
+        await window.armBackupKeychain();
+      });
+      document.getElementById('backupPromptNo')?.addEventListener('click', () => {
+        rememberBackupPromptChoice('single-keychain');
+        closeBackupPrompt();
+        const target = document.getElementById('activateSign')?.href || '/sign-demo-activate';
+        window.location.href = target;
+      });
+      document.getElementById('backupPromptLater')?.addEventListener('click', () => {
+        closeBackupPrompt();
+      });
     }
 
     window.armBackupKeychain = async function armBackupKeychain() {
@@ -328,6 +396,13 @@
 
       goLive.href = agent ? `/a?agent=${encodeURIComponent(agent)}` : '/claim';
       activateSign.href = agent ? `${activateUrl.pathname}${activateUrl.search}` : '/claim';
+      activateSign.onclick = async (event) => {
+        const pending = readAddKeychainSession();
+        if (pending?.agentSlug === agent) {
+          event.preventDefault();
+          await refreshKeychainPanel('Finish the backup keychain scan or cancel it before activating a smart sign.');
+        }
+      };
     }
 
     setLinks();
@@ -341,7 +416,8 @@
       saveHostSession({ agentSlug: agent, uid, source: 'onboarding' });
     }
 
-    await refreshKeychainPanel(urlParams.get('keychain_added') ? 'Backup keychain connected.' : '');
+    const keychainRows = await refreshKeychainPanel(urlParams.get('keychain_added') ? 'Backup keychain connected.' : '');
+    showBackupKeychainPrompt(keychainRows);
   </script>
 </body>
 </html>

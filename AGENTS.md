@@ -62,6 +62,7 @@ Important route behavior:
 - `[IMPLEMENTED]` Current sign activation carries a selected open house from the keychain claim host session and offers it first for sign binding.
 - `[IMPLEMENTED]` Current sign activation loads agent profile data and displays agent name/brokerage instead of relying on raw slugs in the visible activation flow.
 - `[IMPLEMENTED]` `/onboarding` can arm an "Add Backup Keychain" flow. `/k` links the next scanned keychain to the same agent using `keys.device_role = keychain` and `keys.assigned_slot` 1/2. Keep the localStorage plus short-lived `smart_sign_activation_sessions` remote fallback, because iPhone/new-tab NFC handoff can lose same-tab local state.
+- `[IMPLEMENTED]` `/onboarding` prompts for a second keychain before smart sign activation when an agent has exactly one keychain. Do not let smart sign activation start while a backup-keychain scan is armed.
 - `[PARTIAL]` Multiple printed sign QR codes can be used for one sign only when their `smart_sign_inventory.public_code` rows point to the same `smart_sign_id`. `/s` and `/agent-dashboard` resolve inventory aliases, and the activation success screen can link a second printed QR to the current sign. There is no polished admin dashboard for QR alias management yet.
 
 The repo also has root wrapper files such as `claim.html`, `event.html`, `s.html`, and `sign.html` that redirect into `apps/rel8tion-app`. Do not assume root and app copies are identical.

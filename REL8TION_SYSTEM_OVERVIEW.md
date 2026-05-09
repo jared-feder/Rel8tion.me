@@ -202,8 +202,10 @@ Role: simple post-claim agent setup page.
 - Activation URL is `/sign-demo-activate.html?agent=<agent>&uid=<uid>`.
 - Live profile URL is `/a?agent=<agent>`.
 - Shows claimed keychain slots for the agent.
+- Prompts agents who have exactly one keychain to choose whether they have a second keychain before moving to smart sign activation.
 - Can arm an "Add Backup Keychain" flow; the next scanned Rel8tionChip is linked through `/k` to the same `agent_slug` as `device_role = keychain` with `assigned_slot` 1 or 2.
 - Stores backup-keychain pending state locally and as a short-lived `smart_sign_activation_sessions` row with a `backup-keychain-` public-code prefix. This exists because mobile NFC popups can open `/k` in a new tab/browser context where same-tab localStorage is unavailable.
+- Blocks smart sign activation while a backup-keychain scan is armed so the agent must finish or cancel the second-keychain intent first.
 
 ### `/sign-demo-activate`
 
