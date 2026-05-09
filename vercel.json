@@ -12,6 +12,8 @@
     { "source": "/k", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k.html", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k-test.html", "destination": "/apps/rel8tion-app/k.html" },
+    { "source": "/key-reset", "destination": "/apps/rel8tion-app/key-reset.html" },
+    { "source": "/key-reset.html", "destination": "/apps/rel8tion-app/key-reset.html" },
     { "source": "/s", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/s.html", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/sign", "destination": "/apps/rel8tion-app/sign.html" },

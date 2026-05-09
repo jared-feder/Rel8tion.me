@@ -6,6 +6,7 @@
     { "source": "/onboarding", "destination": "/onboarding.html" },
     { "source": "/sign-demo-activate", "destination": "/sign-demo-activate.html" },
     { "source": "/k", "destination": "/k.html" },
+    { "source": "/key-reset", "destination": "/key-reset.html" },
     { "source": "/s", "destination": "/sign.html" },
     { "source": "/sign", "destination": "/sign.html" },
     { "source": "/event", "destination": "/event.html" },

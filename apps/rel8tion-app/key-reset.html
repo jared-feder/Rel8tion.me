@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Rel8tion Key Reset Scanner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #38bdf8 0%, #e8f8ff 48%, #f8fbff 100%);
+      color: #17224f;
+      font-family: Inter, sans-serif;
+      padding: 18px;
+    }
+    .wrap { width: min(680px, 100%); margin: 0 auto; }
+    .topbar,
+    .panel {
+      border: 1px solid rgba(255,255,255,.82);
+      background: rgba(255,255,255,.54);
+      border-radius: 28px;
+      box-shadow: 0 24px 70px rgba(23,34,79,.14);
+      backdrop-filter: blur(16px) saturate(155%);
+      -webkit-backdrop-filter: blur(16px) saturate(155%);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+    .logo { height: 34px; width: auto; }
+    .title {
+      font-family: "Plus Jakarta Sans", sans-serif;
+      font-size: clamp(24px, 7vw, 46px);
+      line-height: 1;
+      letter-spacing: 0;
+      font-weight: 800;
+      margin: 0 0 10px;
+    }
+    .panel { padding: clamp(22px, 5vw, 36px); }
+    .eyebrow {
+      display: inline-flex;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid rgba(23,34,79,.08);
+      color: #1d4ed8;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    p { color: #58677c; font-size: 16px; line-height: 1.55; font-weight: 700; margin: 0 0 18px; }
+    .stack { display: grid; gap: 12px; }
+    .field {
+      width: 100%;
+      min-height: 58px;
+      border-radius: 18px;
+      border: 1px solid rgba(23,34,79,.1);
+      background: rgba(255,255,255,.82);
+      color: #17224f;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 14px 16px;
+      outline: none;
+    }
+    .button {
+      min-height: 58px;
+      border: 0;
+      border-radius: 18px;
+      padding: 16px 18px;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(180deg, #273276, #1e285f);
+      box-shadow: 0 18px 34px rgba(31,42,90,.22);
+    }
+    .button.secondary {
+      color: #17224f;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(23,34,79,.08);
+      box-shadow: 0 10px 24px rgba(23,34,79,.06);
+    }
+    .button.danger { background: linear-gradient(180deg, #dc2626, #991b1b); }
+    .button:disabled { opacity: .6; cursor: not-allowed; }
+    .card {
+      padding: 16px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.74);
+      border: 1px solid rgba(23,34,79,.08);
+    }
+    .label {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: #65758b;
+      margin-bottom: 6px;
+    }
+    .value { font-size: 17px; font-weight: 900; word-break: break-word; }
+    .notice {
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 900;
+    }
+    .notice.warn { color: #7c4709; background: rgba(217,119,6,.12); border: 1px solid rgba(217,119,6,.22); }
+    .notice.error { color: #991b1b; background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.22); }
+    .notice.success { color: #166534; background: rgba(22,163,74,.12); border: 1px solid rgba(22,163,74,.22); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    @media (max-width: 620px) {
+      body { padding: 12px; }
+      .topbar { border-radius: 22px; }
+      .logo { height: 28px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <img class="logo" src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+      <div class="label">Key Reset</div>
+    </header>
+    <section id="app" class="panel"></section>
+  </main>
+
+  <script>
+    const RESET_PENDING_KEY = 'rel8tion_key_reset_pending';
+    const RESET_TOKEN_KEY = 'rel8tion_key_reset_admin_token';
+    const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
+    const BETA_SIGN_FRONT_UID = 'f005e166-70b3-407c-ba24-b91464a3d22a';
+    const BETA_SIGN_REAR_UID = 'b70d2bde-d185-43ee-8962-083b64fa4347';
+    const BETA_UIDS = new Set([BETA_KEYCHAIN_UID, BETA_SIGN_FRONT_UID, BETA_SIGN_REAR_UID]);
+    const params = new URLSearchParams(window.location.search);
+    let currentUid = params.get('uid') || '';
+    const app = document.getElementById('app');
+    let nfcReader = null;
+    let currentLookup = { key: null, signMatches: [] };
+
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+
+    function token() {
+      return window.localStorage.getItem(RESET_TOKEN_KEY) || '';
+    }
+
+    function saveToken(value) {
+      window.localStorage.setItem(RESET_TOKEN_KEY, value || '');
+    }
+
+    function isBetaUid(uid) {
+      return BETA_UIDS.has(String(uid || '').trim());
+    }
+
+    function armReset() {
+      const adminToken = document.getElementById('adminToken')?.value?.trim() || token();
+      if (!adminToken) {
+        renderHome('Enter the admin code first.');
+        return;
+      }
+      saveToken(adminToken);
+      window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
+      renderArmed();
+    }
+
+    function clearArm() {
+      window.localStorage.removeItem(RESET_PENDING_KEY);
+      renderHome('Reset scanner is off.');
+    }
+
+    function extractUidFromText(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      try {
+        const url = new URL(text, window.location.origin);
+        return url.searchParams.get('uid') || url.searchParams.get('sign_uid') || '';
+      } catch (_) {
+        const match = text.match(/[?&](?:uid|sign_uid)=([^&#\s]+)/i);
+        return match ? decodeURIComponent(match[1]) : '';
+      }
+    }
+
+    function decodeNfcRecord(record) {
+      if (!record) return '';
+      if (record.recordType === 'absolute-url' && record.data == null) {
+        return record.id || '';
+      }
+      if (!record.data) return '';
+      try {
+        return new TextDecoder(record.encoding || 'utf-8').decode(record.data);
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function extractUidFromNfcEvent(event) {
+      const records = Array.from(event?.message?.records || []);
+      for (const record of records) {
+        const found = extractUidFromText(decodeNfcRecord(record));
+        if (found) return found;
+      }
+      return '';
+    }
+
+    async function startAndroidNfcScan() {
+      const adminToken = document.getElementById('adminToken')?.value?.trim() || token();
+      if (!adminToken) {
+        renderHome('Enter the admin code first.');
+        return;
+      }
+      saveToken(adminToken);
+      window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
+
+      if (!('NDEFReader' in window)) {
+        renderArmed('This browser did not expose Android NFC scanning, so fallback mode is armed. Tap the chip and let Android open the chip URL.');
+        return;
+      }
+
+      renderNfcScanning();
+      try {
+        nfcReader = new NDEFReader();
+        nfcReader.onreadingerror = () => {
+          renderNfcScanning('The phone saw a tag, but could not read its saved URL. Try once more or use fallback mode.');
+        };
+        let handled = false;
+        nfcReader.onreading = (event) => {
+          if (handled) return;
+          const scannedUid = extractUidFromNfcEvent(event);
+          if (!scannedUid) {
+            renderNfcScanning('The tag was read, but no uid was found in the saved URL.');
+            return;
+          }
+          handled = true;
+          currentUid = scannedUid;
+          window.history.replaceState(null, '', `/key-reset.html?uid=${encodeURIComponent(scannedUid)}`);
+          loadScannedKey(scannedUid);
+        };
+        await nfcReader.scan();
+      } catch (err) {
+        renderArmed(err.message || 'Android NFC scan was blocked, so fallback mode is armed. Tap the chip and let Android open the chip URL.');
+      }
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Token': token(),
+          ...(options.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `Request failed: ${res.status}`);
+      return data;
+    }
+
+    function keyCard(key) {
+      if (!key) {
+        return '<div class="notice warn">No row exists in the keys table for this UID.</div>';
+      }
+
+      return `
+        <div class="grid">
+          <div class="card"><div class="label">UID</div><div class="value">${esc(key.uid)}</div></div>
+          <div class="card"><div class="label">Claimed</div><div class="value">${key.claimed ? 'Yes' : 'No'}</div></div>
+          <div class="card"><div class="label">Agent Slug</div><div class="value">${esc(key.agent_slug || '-')}</div></div>
+          <div class="card"><div class="label">Device Type</div><div class="value">${esc(key.device_type || '-')}</div></div>
+        </div>
+      `;
+    }
+
+    function signWarning(signMatches) {
+      if (!Array.isArray(signMatches) || !signMatches.length) return '';
+
+      return `
+        <div class="notice warn">
+          This UID also appears on ${signMatches.length} smart sign record(s). Deleting a keys-table row will not unpair a smart sign chip. Use sign reset for sign chips.
+        </div>
+        <div class="grid">
+          ${signMatches.map((sign) => `
+            <div class="card">
+              <div class="label">Smart Sign</div>
+              <div class="value">${esc(sign.public_code || sign.id || '-')}</div>
+              <div class="label" style="margin-top:10px;">Status</div>
+              <div class="value">${esc(sign.status || '-')}</div>
+              <div class="label" style="margin-top:10px;">Owner</div>
+              <div class="value">${esc(sign.owner_agent_slug || '-')}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderHome(notice = '') {
+      app.innerHTML = `
+        <div class="eyebrow">Scanner Control</div>
+        <h1 class="title">Reset Keys By Scanning</h1>
+        <p>Enter the admin code, arm the scanner, then tap the dedicated beta keychain or beta sign chip. This page is restricted to the one beta lane so field signs and live agent keys stay untouched.</p>
+        <div class="stack">
+          <input id="adminToken" class="field" type="password" placeholder="Admin code" value="${esc(token())}">
+          <button class="button" onclick="startAndroidNfcScan()">Scan With Android NFC</button>
+          <button class="button" onclick="armReset()">Arm Reset Scanner</button>
+        </div>
+        ${notice ? `<div class="notice error">${esc(notice)}</div>` : ''}
+        <div class="notice warn">This resets only Main Beta and sign code 0e4b015f3782.</div>
+      `;
+    }
+
+    function renderArmed(notice = '') {
+      app.innerHTML = `
+        <div class="eyebrow">Armed</div>
+        <h1 class="title">Tap A Chip Now</h1>
+        <p>Reset mode is active for this browser. Tap the beta keychain, front sign chip, or rear sign chip. When the chip opens, it will route back here with the scanned UID.</p>
+        <div class="stack">
+          <button class="button secondary" onclick="clearArm()">Turn Off Scanner</button>
+        </div>
+        ${notice ? `<div class="notice warn">${esc(notice)}</div>` : ''}
+        <div class="notice warn">Keep this tab open. If Android opens the chip URL in a new tab, reset mode will still catch it in the same browser.</div>
+      `;
+    }
+
+    function renderNfcScanning(notice = '') {
+      app.innerHTML = `
+        <div class="eyebrow">Android NFC</div>
+        <h1 class="title">Ready To Scan</h1>
+        <p>Hold the chip against the phone. This page will read the saved chip URL and pull the UID into the reset review screen.</p>
+        <div class="stack">
+          <button class="button secondary" onclick="armReset()">Use Fallback Mode</button>
+          <button class="button secondary" onclick="clearArm()">Turn Off Scanner</button>
+        </div>
+        ${notice ? `<div class="notice warn">${esc(notice)}</div>` : ''}
+      `;
+    }
+
+    function renderLoading() {
+      app.innerHTML = `
+        <div class="eyebrow">Checking UID</div>
+        <h1 class="title">Loading Key</h1>
+        <p>Looking up <strong>${esc(currentUid)}</strong>.</p>
+      `;
+    }
+
+    function nextScanButton() {
+      return 'NDEFReader' in window
+        ? '<button class="button" onclick="startAndroidNfcScan()">Scan Next Chip</button>'
+        : '<button class="button" onclick="armReset()">Arm Next Scan</button>';
+    }
+
+    function renderResult(data, notice = '', resetComplete = false) {
+      currentLookup = {
+        key: data.key || null,
+        signMatches: Array.isArray(data.signMatches) ? data.signMatches : []
+      };
+      const hasSignMatch = currentLookup.signMatches.length > 0;
+      const betaUid = isBetaUid(currentUid);
+      app.innerHTML = `
+        <div class="eyebrow">Scanned UID</div>
+        <h1 class="title">Review Before Reset</h1>
+        <p>This is the row currently attached to the scanned chip.</p>
+        ${keyCard(data.key)}
+        ${signWarning(data.signMatches)}
+        <div class="stack">
+          ${betaUid && !resetComplete ? '<button class="button danger" onclick="resetBetaLane()">Reset Main Beta Keychain + Sign</button>' : ''}
+          ${resetComplete ? nextScanButton() : ''}
+          ${resetComplete ? '<button class="button secondary" onclick="armReset()">Fallback Arm Next Scan</button>' : ''}
+          ${!resetComplete && hasSignMatch ? '<button class="button danger" onclick="resetMatchedSmartSign()">Reset Matched Smart Sign</button>' : ''}
+          ${resetComplete ? '<button class="button secondary" onclick="clearArm()">Done</button>' : nextScanButton()}
+        </div>
+        ${notice ? `<div class="notice success">${esc(notice)}</div>` : ''}
+      `;
+    }
+
+    async function loadScannedKey(scannedUid = currentUid) {
+      currentUid = scannedUid || '';
+      if (!token()) {
+        renderHome('Enter the admin code to reset this UID.');
+        return;
+      }
+      if (!currentUid) {
+        renderHome('No UID was found on that scan.');
+        return;
+      }
+      renderLoading();
+      try {
+        const data = await api(`/api/admin/reset-key?uid=${encodeURIComponent(currentUid)}`);
+        renderResult(data);
+      } catch (err) {
+        renderHome(err.message || 'Could not load this key.');
+      }
+    }
+
+    async function resetScannedKey(action) {
+      if (!currentUid) return;
+      const label = action === 'unclaim' ? 'unclaim this key' : 'delete this key row';
+      if (!window.confirm(`Really ${label}?\n\n${currentUid}`)) return;
+      try {
+        const data = await api('/api/admin/reset-key', {
+          method: 'POST',
+          body: JSON.stringify({ uid: currentUid, action })
+        });
+        window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
+        renderResult(data.after, action === 'unclaim' ? 'Key was unclaimed. Press Scan Next Chip for the next one.' : 'Key row was deleted. Press Scan Next Chip for the next one.', true);
+      } catch (err) {
+        renderResult({ key: null, signMatches: [] }, err.message || 'Reset failed.');
+      }
+    }
+
+    async function resetBetaLane() {
+      if (!isBetaUid(currentUid)) {
+        renderResult(currentLookup, 'This page is restricted to the Main Beta keychain and beta sign chips.');
+        return;
+      }
+      const confirmed = window.confirm('Reset the Main Beta keychain and sign 0e4b015f3782?\n\nThis clears only the dedicated beta sign, its activation/session rows, and restores the beta keychain to Main Beta.');
+      if (!confirmed) return;
+
+      try {
+        const data = await api('/api/admin/reset-key', {
+          method: 'POST',
+          body: JSON.stringify({
+            uid: BETA_KEYCHAIN_UID,
+            action: 'reset_beta_lane'
+          })
+        });
+        window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
+        renderResult(data.after, 'Main Beta keychain and beta sign are reset. Press Scan Next Chip for another check.', true);
+      } catch (err) {
+        renderResult(currentLookup, err.message || 'Beta lane reset failed.');
+      }
+    }
+
+    async function resetMatchedSmartSign() {
+      if (!currentUid) return;
+      const matches = currentLookup.signMatches || [];
+      if (!matches.length) {
+        renderResult(currentLookup, 'No smart sign pairing was found for this scan.');
+        return;
+      }
+
+      let target = matches[0];
+      if (matches.length > 1) {
+        const typedCode = window.prompt(`This UID matched ${matches.length} smart signs. Type the exact public code to reset one:\n\n${matches.map((sign) => sign.public_code || sign.id).join('\n')}`);
+        if (!typedCode) return;
+        target = matches.find((sign) => String(sign.public_code || '').trim() === typedCode.trim());
+      }
+      if (!target) {
+        renderResult(currentLookup, 'That public code did not match the scanned smart sign.');
+        return;
+      }
+
+      const isActive = target.status === 'active' || Boolean(target.active_event_id);
+      let forceActive = false;
+      if (isActive) {
+        forceActive = window.confirm(`This sign is currently active.\n\nCode: ${target.public_code}\nOwner: ${target.owner_agent_slug || '-'}\n\nOnly continue if you physically have this test sign and want to remove it from the system.`);
+        if (!forceActive) return;
+      }
+
+      const confirmed = window.confirm(`Reset smart sign pairing for ${target.public_code || target.id}?\n\nThis removes the sign row and frees this chip for fresh setup.`);
+      if (!confirmed) return;
+
+      try {
+        const data = await api('/api/admin/reset-key', {
+          method: 'POST',
+          body: JSON.stringify({
+            uid: currentUid,
+            action: 'reset_sign_pairing',
+            publicCode: target.public_code || '',
+            forceActive
+          })
+        });
+        window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
+        renderResult(data.after, 'Smart sign pairing was reset. Press Scan Next Chip for the next one.', true);
+      } catch (err) {
+        renderResult(currentLookup, err.message || 'Smart sign reset failed.');
+      }
+    }
+
+    window.armReset = armReset;
+    window.startAndroidNfcScan = startAndroidNfcScan;
+    window.clearArm = clearArm;
+    window.deleteScannedKey = () => resetScannedKey('delete');
+    window.unclaimScannedKey = () => resetScannedKey('unclaim');
+    window.resetMatchedSmartSign = resetMatchedSmartSign;
+    window.resetBetaLane = resetBetaLane;
+
+    if (currentUid) loadScannedKey();
+    else renderHome();
+  </script>
+</body>
+</html>

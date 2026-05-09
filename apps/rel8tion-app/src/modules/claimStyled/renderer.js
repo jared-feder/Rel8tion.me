@@ -321,6 +321,35 @@ export function showAlreadyClaimed(agent) {
   `);
 }
 
+export function showBetaClaimMenu(agent = {}, notice = '') {
+  const currentSlug = agent?.slug || state.keyRecord?.agent_slug || 'unclaimed';
+  const currentName = agent?.name || currentSlug;
+  const currentBrokerage = agent?.brokerage || '';
+
+  render(`
+    <div>
+      <div class="inline-flex items-center justify-center mb-6">
+        <div class="px-4 py-2 rounded-full bg-white/70 border border-white/80 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">Beta Keychain</div>
+      </div>
+      <h1 class="font-['Poppins'] text-[32px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">Choose Test Mode</h1>
+      <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">This dedicated test keychain can behave like a fresh chip without needing to keep deleting and re-registering it.</p>
+      ${notice ? `<div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+      <div class="rounded-[30px] border border-white/70 bg-white/60 backdrop-blur-sm p-6 text-left mb-8">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Current Connection</div>
+        <div class="text-slate-900 font-black text-2xl mb-1">${esc(currentName)}</div>
+        <div class="text-slate-500 font-bold text-sm">${esc(currentSlug)}</div>
+        ${currentBrokerage ? `<div class="text-slate-500 font-bold uppercase tracking-[0.14em] text-xs mt-3">${esc(currentBrokerage)}</div>` : ''}
+      </div>
+      <div class="space-y-3">
+        <button onclick="startBetaClaimTest()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Reset + Start Fresh Claim Test</button>
+        <button onclick="continueBetaClaim()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Continue Current Setup</button>
+        <button onclick="resetLastBetaTrial()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Reset Last Beta Trial</button>
+        <button onclick="restoreBetaKeychain()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Restore Main Beta</button>
+      </div>
+    </div>
+  `);
+}
+
 export function showMissingChipNotice() {
   showIntro('This preview was opened without a chip uid. You can review the flow here, but live activation requires a real Rel8tionChip link.');
 }

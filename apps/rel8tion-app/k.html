@@ -22,6 +22,8 @@
     const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const AGENT_DASHBOARD_SESSION_KEY = 'rel8tion_agent_dashboard_pending';
     const LOAN_OFFICER_SESSION_KEY = 'rel8tion_loan_officer_pending';
+    const KEY_RESET_SESSION_KEY = 'rel8tion_key_reset_pending';
+    const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
     const signCode = params.get('code') || params.get('sign_code') || '';
@@ -31,6 +33,10 @@
     function setStatus(title, subtitle = '') {
       statusEl.textContent = title;
       substatusEl.textContent = subtitle;
+    }
+
+    function isBetaKeychain(chipUid) {
+      return chipUid === BETA_KEYCHAIN_UID;
     }
 
     function goToClaim() {
@@ -74,6 +80,23 @@
         }
         return parsed;
       } catch (_) {
+        return null;
+      }
+    }
+
+    function readKeyResetSession() {
+      try {
+        const raw = window.localStorage.getItem(KEY_RESET_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 10 * 60 * 1000) {
+          window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
         return null;
       }
     }
@@ -243,6 +266,12 @@
     async function init() {
       if (!uid) {
         window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
+        return;
+      }
+
+      if (readKeyResetSession()) {
+        setStatus('Key Reset Scanner', 'Opening the reset page for this scanned UID.');
+        window.location.href = `${window.location.origin}/key-reset.html?uid=${encodeURIComponent(uid)}`;
         return;
       }
 
@@ -418,6 +447,12 @@
             code: pendingSignActivation.publicCode,
             sign_id: pendingSignActivation.signId
           });
+          return;
+        }
+
+        if (isBetaKeychain(uid)) {
+          setStatus('Beta Keychain', 'Opening the beta claim test menu.');
+          window.location.href = `${window.location.origin}/claim?uid=${encodeURIComponent(uid)}`;
           return;
         }
 

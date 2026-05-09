@@ -15,6 +15,7 @@ import { findNearestOpenHouses, searchOpenHouses } from '../../api/openHouses.js
 import {
   findAgentByEmail,
   findAgentByPhoneNormalized,
+  getAgentBySlug,
   findListingAgentPhoto,
   findListingAgentsByOpenHouse,
   upsertAgent,
@@ -29,6 +30,7 @@ import {
 } from '../../core/hostSession.js?v=20260426-1108';
 import {
   showAlreadyClaimed,
+  showBetaClaimMenu,
   showBrokerageStep,
   showDetection,
   showError,
@@ -40,7 +42,11 @@ import {
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js?v=20260503-edit-profile';
+} from './renderer.js?v=20260505-beta-reset';
+
+const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
+const BETA_AGENT_SLUG = 'main-beta';
+const RESET_TOKEN_KEY = 'rel8tion_key_reset_admin_token';
 
 function onboardingRoute(slug) {
   const url = new URL(ROUTES.onboarding, window.location.origin);
@@ -49,6 +55,58 @@ function onboardingRoute(slug) {
     url.searchParams.set('uid', state.uid);
   }
   return `${url.pathname}${url.search}`;
+}
+
+function isBetaKeychain() {
+  return state.uid === BETA_KEYCHAIN_UID;
+}
+
+function clearBetaBrowserSignState() {
+  clearPendingSignActivation();
+  try {
+    window.localStorage.removeItem('rel8tion_sign_demo_session');
+    window.localStorage.removeItem('rel8tion_agent_dashboard_pending');
+    window.localStorage.removeItem('rel8tion_loan_officer_pending');
+  } catch (_) {}
+}
+
+function getResetAdminToken() {
+  let token = '';
+  try {
+    token = window.localStorage.getItem(RESET_TOKEN_KEY) || '';
+  } catch (_) {}
+  if (!token) {
+    token = window.prompt('Enter the beta reset admin code') || '';
+    if (token) {
+      try { window.localStorage.setItem(RESET_TOKEN_KEY, token); } catch (_) {}
+    }
+  }
+  return token.trim();
+}
+
+async function betaResetApi(action) {
+  const token = getResetAdminToken();
+  if (!token) throw new Error('Missing beta reset admin code.');
+
+  const res = await fetch('/api/admin/reset-key', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Token': token
+    },
+    body: JSON.stringify({
+      uid: BETA_KEYCHAIN_UID,
+      action
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) {
+    if (res.status === 401) {
+      try { window.localStorage.removeItem(RESET_TOKEN_KEY); } catch (_) {}
+    }
+    throw new Error(data.error || `Beta reset request failed: ${res.status}`);
+  }
+  return data;
 }
 
 function routeAfterVerifiedAgent(slug, source = 'claim') {
@@ -91,6 +149,10 @@ export function bindPublicHandlers() {
   window.showForm = showForm;
   window.showBrokerageStep = showBrokerageStep;
   window.showFullProfileForm = showFullProfileForm;
+  window.startBetaClaimTest = startBetaClaimTest;
+  window.continueBetaClaim = continueBetaClaim;
+  window.resetLastBetaTrial = resetLastBetaTrial;
+  window.restoreBetaKeychain = restoreBetaKeychain;
 }
 
 export function editDetectedProfile() {
@@ -126,6 +188,70 @@ export function startOfficeFlow() {
   resetDetectionState();
   setSelectedBrokerage('');
   showBrokerageStep('Choose your brokerage to continue.');
+}
+
+export async function startBetaClaimTest() {
+  if (!isBetaKeychain()) return;
+  const shouldReset = window.confirm('Reset the last beta trial first?\n\nThis restores the keychain to Main Beta and clears the beta sign, listing event, and activation session so the next run behaves fresh.');
+  if (!shouldReset) return;
+  showLoading('Resetting beta trial...');
+  try {
+    await resetLastBetaTrial({ renderMenu: false });
+    resetDetectionState();
+    setSelectedBrokerage('');
+    setPrefilledAgent(null);
+    showIntro('Beta fresh-claim mode is on. The beta keychain and beta sign will behave like a new activation for this test run.');
+  } catch (e) {
+    debug('START BETA CLAIM TEST FAILED', { message: e?.message || String(e) });
+    showBetaClaimMenu(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not reset the last beta trial. Try again before starting the fresh test.');
+  }
+}
+
+export function continueBetaClaim() {
+  const slug = state.keyRecord?.agent_slug || BETA_AGENT_SLUG;
+  window.location.href = routeAfterVerifiedAgent(slug, 'beta-current-claim');
+}
+
+export async function resetLastBetaTrial({ renderMenu = true } = {}) {
+  if (!isBetaKeychain()) return null;
+  clearBetaBrowserSignState();
+  resetDetectionState();
+  setSelectedBrokerage('');
+  if (renderMenu) showLoading('Resetting last beta trial...');
+
+  const result = await betaResetApi('reset_beta_lane');
+  await loadAgentFromUID();
+  const agent = await getAgentBySlug(BETA_AGENT_SLUG);
+  setPrefilledAgent(agent || {
+    slug: BETA_AGENT_SLUG,
+    name: 'Main Beta',
+    brokerage: 'Rel8tion Beta'
+  });
+
+  if (renderMenu) {
+    showBetaClaimMenu(state.prefilledAgent, 'Last beta trial was cleared. The keychain is back to Main Beta and the beta sign is fresh.');
+  }
+
+  return result?.changed?.restoredKey || state.keyRecord;
+}
+
+export async function restoreBetaKeychain() {
+  if (!isBetaKeychain()) return;
+  showLoading('Restoring Main Beta...');
+  try {
+    const result = await betaResetApi('restore_beta_keychain');
+    await loadAgentFromUID();
+    const agent = await getAgentBySlug(BETA_AGENT_SLUG);
+    setPrefilledAgent(agent || {
+      slug: BETA_AGENT_SLUG,
+      name: 'Main Beta',
+      brokerage: 'Rel8tion Beta'
+    });
+    showBetaClaimMenu(state.prefilledAgent, `Restored this keychain to ${result?.changed?.agent_slug || BETA_AGENT_SLUG}.`);
+  } catch (e) {
+    debug('RESTORE BETA KEYCHAIN FAILED', { message: e?.message || String(e) });
+    showBetaClaimMenu(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not restore Main Beta. Try again.');
+  }
 }
 
 export function routeUnknownAgentFlow(brokerage = '', notice = '') {
@@ -461,6 +587,13 @@ export async function init() {
 
   try {
     await loadAgentFromUID();
+    if (isBetaKeychain()) {
+      showBetaClaimMenu(state.prefilledAgent || {
+        slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG,
+        name: state.keyRecord?.agent_slug || 'Main Beta'
+      });
+      return;
+    }
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
       const nextRoute = routeAfterVerifiedAgent(state.keyRecord.agent_slug, 'claimed-chip-scan');
       if (nextRoute !== onboardingRoute(state.keyRecord.agent_slug)) {
