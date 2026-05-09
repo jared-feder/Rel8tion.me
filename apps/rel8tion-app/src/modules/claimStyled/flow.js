@@ -523,13 +523,14 @@ export async function autoActivate() {
     const sourceEmail = state.prefilledAgent?.email || h?.agent_email || null;
     const phoneNormalized = normalizePhoneForMatch(sourcePhone);
 
-    const reusablePrefilledSlug = isGeneratedGenericAgent(state.prefilledAgent) ? '' : state.prefilledAgent?.slug;
+    const reusablePrefilledSlug = state.prefilledAgent?.slug || '';
     let existingAgent = reusablePrefilledSlug ? state.prefilledAgent : null;
     if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
     if (!existingAgent && sourceEmail) existingAgent = await findAgentByEmail(sourceEmail);
-    if (isGeneratedGenericAgent(existingAgent)) existingAgent = null;
 
-    const resolvedName = existingAgent?.name || sourceName;
+    const resolvedName = isGeneratedGenericAgent(existingAgent)
+      ? sourceName
+      : existingAgent?.name || sourceName;
     if (!existingAgent && isGenericAgentName(resolvedName)) {
       routeUnknownAgentFlow(h?.brokerage || state.selectedBrokerage || '', 'Complete your profile below so this keychain saves under your real name.');
       return;
@@ -583,11 +584,10 @@ export async function saveFullProfile() {
   showLoading('Saving your profile...');
 
   try {
-    const reusablePrefilledSlug = isGeneratedGenericAgent(state.prefilledAgent) ? '' : state.prefilledAgent?.slug;
+    const reusablePrefilledSlug = state.prefilledAgent?.slug || '';
     let existingAgent = reusablePrefilledSlug ? state.prefilledAgent : null;
     if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
     if (!existingAgent && email) existingAgent = await findAgentByEmail(email);
-    if (isGeneratedGenericAgent(existingAgent)) existingAgent = null;
 
     const slug = existingAgent?.slug || reusablePrefilledSlug || `${slugify(name) || 'agent'}-${randSuffix()}`;
     const imageUrl = await uploadFullProfilePhoto(slug);
