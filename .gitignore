@@ -1,7 +1,9 @@
 .vercel-*/
 .vercel-*.zip
 .supabase-deploy/
+.env*
 node_modules/
 tmp/
+supabase/.temp/
 docs/live-verification/latest-live-verification-report.json
 docs/live-verification/latest-live-verification-report.md
