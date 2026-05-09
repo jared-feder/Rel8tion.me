@@ -179,6 +179,7 @@ Beta support:
 - Special beta keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`.
 - Beta menu can reset the test sign lane, continue setup, reset last beta trial, or restore `main-beta`.
 - The protected beta sign lane is keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`.
+- Beta fresh-claim cleanup clears stale browser host/sign activation sessions. Inactive sign QR scans preserve the current host session so the just-claimed keychain profile carries into sign activation instead of falling back to stale `agent-*` context.
 
 ### `/onboarding`
 

@@ -504,7 +504,6 @@ export async function initSignResolverPage() {
     }
 
     if (!eventRow) {
-      pageState.hostSession = null;
       inactiveView(sign);
       return;
     }

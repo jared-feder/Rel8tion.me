@@ -138,6 +138,8 @@
   <script>
     const RESET_PENDING_KEY = 'rel8tion_key_reset_pending';
     const RESET_TOKEN_KEY = 'rel8tion_key_reset_admin_token';
+    const HOST_SESSION_KEY = 'rel8tion_host_session';
+    const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const BETA_SIGN_FRONT_UID = 'f005e166-70b3-407c-ba24-b91464a3d22a';
     const BETA_SIGN_REAR_UID = 'b70d2bde-d185-43ee-8962-083b64fa4347';
@@ -432,6 +434,8 @@
             action: 'reset_beta_lane'
           })
         });
+        window.localStorage.removeItem(HOST_SESSION_KEY);
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         window.localStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ createdAt: new Date().toISOString() }));
         renderResult(data.after, 'Main Beta keychain and beta sign are reset. Press Scan Next Chip for another check.', true);
       } catch (err) {
