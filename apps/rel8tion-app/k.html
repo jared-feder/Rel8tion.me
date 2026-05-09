@@ -46,8 +46,16 @@
     function readSignActivationSession() {
       try {
         const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
-        return raw ? JSON.parse(raw) : null;
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.updatedAt || parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 45 * 60 * 1000) {
+          window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          return null;
+        }
+        return parsed;
       } catch (_) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         return null;
       }
     }
@@ -413,6 +421,31 @@
           return;
         }
 
+        if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.agentSlug === record.agent_slug) {
+          setStatus('Handshake Confirmed', 'Opening sign activation.');
+          continueSignActivation({ uid, agent: record.agent_slug });
+          return;
+        }
+
+        if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.publicCode && pendingSignActivation.signId && pendingSignActivation.ownerAgentSlug === record.agent_slug) {
+          setStatus('Handshake Confirmed', 'Opening sign activation.');
+          continueSignActivation({
+            uid,
+            agent: record.agent_slug,
+            code: pendingSignActivation.publicCode,
+            sign_id: pendingSignActivation.signId
+          });
+          return;
+        }
+
+        if (isBetaKeychain(uid)) {
+          window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+          setStatus('Beta Keychain', 'Opening the beta claim test menu.');
+          window.location.href = `${window.location.origin}/claim?uid=${encodeURIComponent(uid)}`;
+          return;
+        }
+
         let remoteKeychainActivation = await findRemoteSignActivationSession([
           'waiting_for_agent_keychain',
           'waiting_for_handshake'
@@ -444,30 +477,7 @@
           return;
         }
 
-        if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.agentSlug === record.agent_slug) {
-          setStatus('Handshake Confirmed', 'Opening sign activation.');
-          continueSignActivation({ uid, agent: record.agent_slug });
-          return;
-        }
-
-        if (pendingSignActivation?.stage === 'waiting_for_handshake' && pendingSignActivation.publicCode && pendingSignActivation.signId && pendingSignActivation.ownerAgentSlug === record.agent_slug) {
-          setStatus('Handshake Confirmed', 'Opening sign activation.');
-          continueSignActivation({
-            uid,
-            agent: record.agent_slug,
-            code: pendingSignActivation.publicCode,
-            sign_id: pendingSignActivation.signId
-          });
-          return;
-        }
-
         if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: false })) {
-          return;
-        }
-
-        if (isBetaKeychain(uid)) {
-          setStatus('Beta Keychain', 'Opening the beta claim test menu.');
-          window.location.href = `${window.location.origin}/claim?uid=${encodeURIComponent(uid)}`;
           return;
         }
 
