@@ -34,11 +34,12 @@
       left: 0;
       z-index: 0;
       width: 200%;
-      height: 500px;
+      height: 245px;
+      opacity: 0.76;
       pointer-events: none;
       background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
       background-repeat: repeat-x;
-      background-size: 800px auto;
+      background-size: 660px auto;
       animation: eventCloudDrift 120s linear infinite;
     }
 
@@ -47,7 +48,7 @@
       inset: 0;
       z-index: 1;
       pointer-events: none;
-      background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 20%, rgba(240, 247, 255, 0.86) 100%);
+      background: linear-gradient(180deg, rgba(240, 247, 255, 0.08) 0%, rgba(240, 247, 255, 0.72) 265px, rgba(240, 247, 255, 1) 100%);
     }
 
     .event-app-layer {
@@ -95,14 +96,14 @@
   </style>
 </head>
 <body class="bg-[#f0f7ff]">
-  <main class="event-page-shell flex items-center justify-center px-4 py-8">
+  <main class="event-page-shell flex items-start justify-center px-4 py-8 md:py-10">
     <div class="event-moving-clouds" aria-hidden="true"></div>
     <div class="event-cloud-wash" aria-hidden="true"></div>
     <div id="app" class="event-app-layer w-full flex items-center justify-center"></div>
   </main>
 
   <script type="module">
-    import { initEventShellPage } from '/apps/rel8tion-app/src/modules/eventShell/bootstrap.js?v=20260509-cloud-modal-fix';
+    import { initEventShellPage } from '/apps/rel8tion-app/src/modules/eventShell/bootstrap.js?v=20260509-guided-checkin';
     initEventShellPage();
   </script>
 </body>
