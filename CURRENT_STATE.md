@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-06.
+Last inspected: 2026-05-09.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -11,6 +11,13 @@ Status labels:
 - `[INTENDED]` means this is a REL8TION business/product rule or target architecture, not proof of current implementation.
 - `[NEEDS VERIFICATION]` means the repo is not enough to prove live behavior, deployment, schema, RLS, or external service state.
 - `[RISK]` means this can break demos, production data, security, SMS, or user trust if handled casually.
+
+## [IMPLEMENTED] Current Live Code Anchor
+
+- `[IMPLEMENTED]` The latest known live production deploy was made from `modular-claim-test` commit `51d2d1a`, tagged `production-51d2d1a-2026-05-08`.
+- `[RISK]` `main` does not currently match the live app. It has diverged from `modular-claim-test` and should not be deployed until the branches are reconciled and reviewed.
+- `[INTENDED]` The desired clean repo state is for `main` to become the production source of truth after reconciliation, with the live production commit preserved by tag.
+- `[RISK]` Do not force-push `main` and do not reset either branch while production is anchored to `modular-claim-test`.
 
 ## [IMPLEMENTED] Repo Code Present Today
 
@@ -27,6 +34,8 @@ Status labels:
 - `[IMPLEMENTED]` Agent keychain handshake is part of sign setup.
 - `[IMPLEMENTED]` Sign activation can bind a sign to an open house event.
 - `[IMPLEMENTED]` Binding has loose nearby/listing search behavior and a manual listing fallback.
+- `[IMPLEMENTED]` When a keychain claim flow stores a selected open house in the host session, smart sign activation offers that selected listing first before other nearby/search/manual options.
+- `[IMPLEMENTED]` Smart sign activation now loads the agent profile and displays the agent name/brokerage instead of relying on raw slugs in the visible activation flow.
 - `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
@@ -46,6 +55,7 @@ Status labels:
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
+- `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
@@ -86,6 +96,10 @@ Status labels:
 
 Recent repo state includes:
 
+- `[IMPLEMENTED]` Production was deployed from `modular-claim-test` commit `51d2d1a` and tagged `production-51d2d1a-2026-05-08`.
+- `[IMPLEMENTED]` Sign activation now carries forward the open house selected during keychain claim and offers it first for sign binding.
+- `[IMPLEMENTED]` Sign activation now displays agent profile name/brokerage from the agent row instead of showing only a raw slug such as `agent-gwh`.
+- `[IMPLEMENTED]` Root env files were removed from git tracking, `.env*` is ignored, and `.vercelignore` helps keep local/docs artifacts out of deploy uploads.
 - `[IMPLEMENTED]` Beta keychain/sign lane for `main-beta`.
 - `[IMPLEMENTED]` Beta reset/restore helpers in the claim flow.
 - `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
@@ -144,6 +158,8 @@ Highest-value next work:
 - `[IMPLEMENTED]` Current rear/agent chip routing requires keychain verification before dashboard access.
 - `[INTENDED]` Do not reset live field signs without explicit confirmation.
 - `[RISK]` Treat Elena/Galluzzo sign data as protected unless the user says otherwise.
+- `[RISK]` `main` is not the current live source of truth. Reconcile it with `modular-claim-test` before making it the production branch.
+- `[RISK]` The worktree contains many untracked docs, backup exports, WordPress files, and generated artifacts. Clean them by classifying into commit/ignore/archive groups; do not blindly delete them.
 - `[RISK]` Stale `smart_sign_activation_sessions` rows can break activation flows.
 - `[RISK]` `open_house_events` uses `host_agent_slug`; do not reintroduce `agent_slug` writes for that table.
 - `[RISK]` Browser-side Supabase calls depend on live RLS policies. A code change that works locally can still fail with `42501`.

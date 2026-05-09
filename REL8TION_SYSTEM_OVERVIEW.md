@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-06.
+Last inspected: 2026-05-09.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -11,6 +11,13 @@ Status labels used in this file:
 - `[INTENDED]` means this is a REL8TION business/product rule or target architecture, not proof of current implementation.
 - `[NEEDS VERIFICATION]` means the repo is not enough to prove live behavior, deployment, schema, RLS, or external service state.
 - `[RISK]` means this can break demos, production data, security, SMS, or user trust if handled casually.
+
+## [IMPLEMENTED] Current Live Code Anchor
+
+- `[IMPLEMENTED]` The latest known live production deploy was made from `modular-claim-test` commit `51d2d1a`, tagged `production-51d2d1a-2026-05-08`.
+- `[RISK]` `main` is not currently the live source of truth. It has diverged from `modular-claim-test` and should not be deployed until reconciliation is reviewed.
+- `[INTENDED]` The intended clean Git state is for `main` to become the production branch after the live sign/disclosure work and any main-only work are reconciled without force-pushing.
+- `[NEEDS VERIFICATION]` The exact Vercel dashboard production-branch setting still needs dashboard verification; the repo anchor above records the commit that was manually deployed live.
 
 ## Product Purpose
 
@@ -162,12 +169,14 @@ Role: claim a Rel8tionChip/keychain into an agent identity.
 - Updates/inserts `keys` with claimed state and `agent_slug`.
 - Sends activation SMS through `send-lead-sms`.
 - Saves a short host session after verification.
+- Stores the selected open house in the host session when the agent selected one during claim/onboarding.
 - Routes to `/onboarding` or back to pending `/sign-demo-activate`.
 
 Beta support:
 
 - Special beta keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`.
 - Beta menu can reset the test sign lane, continue setup, reset last beta trial, or restore `main-beta`.
+- The protected beta sign lane is keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`.
 
 ### `/onboarding`
 
@@ -199,10 +208,13 @@ Role: smart sign activation and binding flow.
 5. Tap front chip, stored as buyer chip in `uid_primary`.
 6. Tap rear chip, stored as agent chip in `uid_secondary`.
 7. Tap the agent keychain again for handshake.
-8. Find/select listing with loose location and date rules, search fallback, or manual listing fallback.
-9. Create or update `open_house_events`.
-10. Patch `smart_signs` active state and `active_event_id`.
-11. Mark activation session completed and clear local session.
+8. Offer the open house selected during keychain claim first when `rel8tion_host_session.selectedOpenHouse` is present.
+9. Find/select listing with loose location and date rules, search fallback, or manual listing fallback.
+10. Create or update `open_house_events`.
+11. Patch `smart_signs` active state and `active_event_id`.
+12. Mark activation session completed and clear local session.
+
+`[IMPLEMENTED]` The visible activation flow loads the agent row and displays agent name/brokerage where available, instead of making the raw slug the primary visible identity.
 
 QR handling:
 
@@ -1014,6 +1026,7 @@ Important gaps/risks:
 
 Current concerns visible in code:
 
+- `[RISK]` Current production is anchored to `modular-claim-test` commit `51d2d1a`; `main` has diverged and should not be treated as deploy-ready until reconciled.
 - `[RISK]` Duplicate root and app route files can create confusion.
 - `[RISK]` `/a` and `/b` live at root while most app routes are rewritten into `apps/rel8tion-app`.
 - `[RISK]` iPhone NFC popup behavior can differ from Android direct navigation.
@@ -1040,7 +1053,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
-- `[NEEDS VERIFICATION]` Live production deploy state was not verified from the repo alone.
+- `[NEEDS VERIFICATION]` Latest known production deploy commit/tag is documented, but Vercel dashboard production-branch state still needs verification.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.

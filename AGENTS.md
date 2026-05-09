@@ -2,7 +2,7 @@
 
 Repo operating guide for future Codex sessions working on REL8TION.
 
-Last inspected: 2026-05-06.
+Last inspected: 2026-05-09.
 
 Status labels used in this file:
 
@@ -15,6 +15,12 @@ Status labels used in this file:
 ## Read This First
 
 `[IMPLEMENTED]` This repo is a product workspace with static Vercel pages, Supabase data access, Twilio/SMS integration points, WordPress-side working files, and many historical handoff docs. Treat the current route files and current source code as the source of truth. Older docs are useful context but should not override the current implementation.
+
+`[IMPLEMENTED]` Latest known live production code anchor: `modular-claim-test` commit `51d2d1a`, tagged `production-51d2d1a-2026-05-08`.
+
+`[RISK]` `main` does not currently match the live app. Do not deploy `main`, force-push `main`, or reset branch history until `modular-claim-test` and `main` are reconciled and reviewed. The desired clean state is for `main` to become production source of truth after that reconciliation.
+
+`[INTENDED]` After any production-flow change, update `CURRENT_STATE.md` immediately and update `REL8TION_SYSTEM_OVERVIEW.md` when routes, schema expectations, NFC behavior, SMS behavior, dashboard behavior, compliance behavior, or deployment/source-of-truth status changes.
 
 Before making changes, inspect:
 
@@ -53,6 +59,8 @@ Important route behavior:
 - `[PARTIAL]` `/key-reset` is an admin/beta reset utility. It is not a full admin dashboard.
 - `[IMPLEMENTED]` `/a` is a root static redirect page that sends claimed agent chip traffic to `/b`.
 - `[IMPLEMENTED]` `/b` is a root static buyer profile and lead capture page tied to an agent slug.
+- `[IMPLEMENTED]` Current sign activation carries a selected open house from the keychain claim host session and offers it first for sign binding.
+- `[IMPLEMENTED]` Current sign activation loads agent profile data and displays agent name/brokerage instead of relying on raw slugs in the visible activation flow.
 
 The repo also has root wrapper files such as `claim.html`, `event.html`, `s.html`, and `sign.html` that redirect into `apps/rel8tion-app`. Do not assume root and app copies are identical.
 
@@ -77,6 +85,7 @@ These rules matter more than code style.
   - sign public code `0e4b015f3782`
   - front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`
   - rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`
+- `[IMPLEMENTED]` `/key-reset` is token-protected and restricted to the beta lane above. Do not broaden reset scope without explicit approval.
 - `[RISK]` Smart sign QR activation currently resolves `smart_sign_inventory.public_code` first. The older `smart-sign-qr-export.sql` exports from `smart_signs.public_code`; reconcile this before batch printing.
 - `[RISK]` Outreach and auto-reply behavior can spend money and affect real agent conversations. Do not deploy or enable new outbound behavior without checking filters, quiet hours, opt-out handling, and owner approval.
 
@@ -106,6 +115,7 @@ Create a live Supabase verification script or checklist to confirm tables, colum
 - Use `git status --short` before major edits and before final handoff.
 - Do not run destructive database actions unless the user explicitly asks for that exact action.
 - Do not use `git reset --hard` or checkout old versions unless explicitly requested.
+- Do not clean untracked files by deleting them blindly. Classify them as source to commit, generated artifact to ignore, or local archive to move after approval.
 - Do not hardcode service role keys, Twilio secrets, Vercel tokens, or admin reset tokens.
 - The Supabase anon key is intentionally public in browser code. Service role access belongs only in serverless or Edge Function code.
 - Be careful with RLS. Browser code must only depend on policies intentionally available to anon/authenticated users.
