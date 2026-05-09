@@ -4,6 +4,7 @@ import {
   setDetectedAgentPhoto,
   setDetectedHouse,
   setLoaderInterval,
+  setManuallyEnteredProfile,
   setNearbyHouses,
   setPrefilledAgent,
   setSelectedBrokerage,
@@ -60,6 +61,16 @@ function onboardingRoute(slug) {
 
 function isBetaKeychain() {
   return state.uid === BETA_KEYCHAIN_UID;
+}
+
+function hasLockedProfileIdentity() {
+  return Boolean(
+    state.prefilledAgent?.slug
+      && (
+        state.manuallyEnteredProfile
+        || (isBetaKeychain() && !isGeneratedGenericAgent(state.prefilledAgent))
+      )
+  );
 }
 
 function clearBetaBrowserSignState() {
@@ -219,6 +230,7 @@ export async function startBetaClaimTest() {
     resetDetectionState();
     setSelectedBrokerage('');
     setPrefilledAgent(null);
+    setManuallyEnteredProfile(false);
     showIntro('Beta fresh-claim mode is on. The beta keychain and beta sign will behave like a new activation for this test run.');
   } catch (e) {
     debug('START BETA CLAIM TEST FAILED', { message: e?.message || String(e) });
@@ -236,6 +248,7 @@ export async function resetLastBetaTrial({ renderMenu = true } = {}) {
   clearBetaBrowserSignState();
   resetDetectionState();
   setSelectedBrokerage('');
+  setManuallyEnteredProfile(false);
   if (renderMenu) showLoading('Resetting last beta trial...');
 
   const result = await betaResetApi('reset_beta_lane');
@@ -266,6 +279,7 @@ export async function restoreBetaKeychain() {
       name: 'Main Beta',
       brokerage: 'Rel8tion Beta'
     });
+    setManuallyEnteredProfile(false);
     showBetaClaimMenu(state.prefilledAgent, `Restored this keychain to ${result?.changed?.agent_slug || BETA_AGENT_SLUG}.`);
   } catch (e) {
     debug('RESTORE BETA KEYCHAIN FAILED', { message: e?.message || String(e) });
@@ -386,6 +400,11 @@ async function showAgentSelection() {
   const h = state.detectedHouse;
   if (!h) return;
 
+  if (hasLockedProfileIdentity()) {
+    showVerifyAgent();
+    return;
+  }
+
   try {
     const agents = await findListingAgentsByOpenHouse(h.id);
 
@@ -452,9 +471,16 @@ export async function confirmListing() {
     return;
   }
 
-  if (state.detectedHouse.brokerage) {
+  const profileLocked = hasLockedProfileIdentity();
+
+  if (!profileLocked && state.detectedHouse.brokerage) {
     setSelectedBrokerage(state.detectedHouse.brokerage);
     await applyBranding(state.detectedHouse.brokerage);
+  }
+
+  if (profileLocked) {
+    showVerifyAgent();
+    return;
   }
 
   showLoading('Checking listing agents...');
@@ -476,6 +502,11 @@ export function selectAgentByEncoded(encoded) {
 }
 
 function selectAgent(agent) {
+  if (hasLockedProfileIdentity()) {
+    showVerifyAgent();
+    return;
+  }
+
   setPrefilledAgent({
     ...(state.prefilledAgent || {}),
     name: agent.name || state.prefilledAgent?.name || '',
@@ -603,6 +634,7 @@ export async function saveFullProfile() {
     };
 
     await upsertAgent(agent);
+    setManuallyEnteredProfile(true);
     setSelectedBrokerage(brokerage);
     await applyBranding(brokerage);
     await linkKeyToAgent(slug);

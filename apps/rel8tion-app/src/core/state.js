@@ -4,6 +4,7 @@ export const state = {
   nearbyHouses: [],
   currentBrand: null,
   prefilledAgent: null,
+  manuallyEnteredProfile: false,
   keyRecord: null,
   loaderInterval: null,
   detectedAgentPhoto: null,
@@ -22,6 +23,10 @@ export function setCurrentBrand(brand) {
 
 export function setPrefilledAgent(agent) {
   state.prefilledAgent = agent;
+}
+
+export function setManuallyEnteredProfile(value) {
+  state.manuallyEnteredProfile = Boolean(value);
 }
 
 export function setKeyRecord(keyRecord) {

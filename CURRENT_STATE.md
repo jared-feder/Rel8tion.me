@@ -61,6 +61,7 @@ Status labels:
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
 - `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
 - `[IMPLEMENTED]` Beta fresh-claim cleanup clears stale browser host/sign activation sessions and inactive sign QR scans preserve the current host session, so a newly claimed demo keychain profile can carry forward into sign activation instead of falling back to stale `agent-*` context.
+- `[IMPLEMENTED]` In the beta keychain claim flow, once a real typed profile is saved, that profile identity is locked for the activation run. Selecting an open house can still attach the listing/property context, but stale `listing_agents` or `open_houses.agent` data should not overwrite the typed keychain profile name/phone/brokerage.
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment implementation was found during the 2026-05-09 repo audit. Current tracked enrichment is the Estately + Cheerio worker. If Browserless/Trulia enrichment is intended, it needs implementation or source recovery.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
@@ -114,6 +115,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Beta keychain/sign lane for `main-beta`.
 - `[IMPLEMENTED]` Beta reset/restore helpers in the claim flow.
 - `[IMPLEMENTED]` Beta fresh-claim flow now clears stale host session state and blocks auto-activation from generating a generic `Agent` slug when no real agent name is available.
+- `[IMPLEMENTED]` Beta claim now protects the typed keychain profile from being replaced by stale listing-agent enrichment when a listing is selected for sign/event context.
 - `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
 - `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.
 - `[IMPLEMENTED]` Key reset scanner/admin API added.
