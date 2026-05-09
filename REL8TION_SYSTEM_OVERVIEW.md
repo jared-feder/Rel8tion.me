@@ -301,10 +301,9 @@ Inputs:
 - Opens a server-generated prefilled disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
 - After check-in, attempts to generate a signed REL8TION disclosure packet PDF covering the NYS Agency Disclosure, NYS Housing and Anti-Discrimination acknowledgement, and Rel8tion Courtesy Notice. It attaches `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
-- Saves preference selection into `event_checkins.metadata` after check-in.
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
 - Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt only when the buyer selected `yes`; when the buyer selected `no`, it requires discreet loan officer contact acceptance, then routes to live loan officer if assigned or alerts Jared.
-- After check-in, shows property snapshot, host contact/save-contact actions, SMS message links, and loan officer support contact when available.
+- After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, and loan officer support contact when available. It no longer asks event check-in buyers to choose one of three preferred property examples.
 - `[INTENDED]` A richer buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent buyer-agent-loan-officer chat is not built. Current implementation uses available stored listing data plus call/SMS links.
 
 Check-in paths:

@@ -131,7 +131,8 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the New York State Agency Disclosure and Rel8tion Courtesy Notice are accepted/signed, then stores the timestamps and disclosure metadata in `event_checkins.metadata`.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement is complete and the buyer name is available as the prefilled e-signature, then saves DOS-2156 metadata before SMS notifications are called.
 - `[PARTIAL]` Buyer event page now requests signed REL8TION disclosure packet PDF generation after check-in and before SMS notification calls continue; failure is logged and does not block buyer/agent SMS.
-- `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
+- `[IMPLEMENTED]` Buyer event post-check-in no longer asks visitors to choose one of three property examples; it keeps the working success/contact flow and shows a short host agent bio instead.
+- `[IMPLEMENTED]` `/b` profile lead submit still has the buyer preference selection flow.
 - `[IMPLEMENTED]` Agent dashboard tightened to show event leads and live loan officer coverage.
 - `[IMPLEMENTED]` `/k` routing now prevents stale LO sign-in state from hijacking rear-sign agent keychain verification, and dashboard cancel clears the pending LO sign-in browser state.
 - `[IMPLEMENTED]` Agent onboarding can arm and link a backup keychain slot for the same agent.
