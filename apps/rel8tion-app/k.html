@@ -567,10 +567,6 @@
         return;
       }
 
-      if (readAddKeychainSession() && await maybeHandleAddKeychainSession()) {
-        return;
-      }
-
       const activeSign = await findActiveSignByChipUid(uid);
       if (activeSign?.public_code) {
         const role = activeSignChipRole(activeSign, uid);
@@ -588,10 +584,6 @@
       }
 
       if (await maybeHandleExtraSignChipSession()) {
-        return;
-      }
-
-      if (await maybeHandleAddKeychainSession()) {
         return;
       }
 
@@ -646,6 +638,10 @@
         }
 
         if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: true })) {
+          return;
+        }
+
+        if (await maybeHandleAddKeychainSession()) {
           return;
         }
 
@@ -708,6 +704,9 @@
         }
 
         if (isBetaKeychain(uid)) {
+          if (await maybeHandleAddKeychainSession()) {
+            return;
+          }
           window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
           window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
           setStatus('Beta Keychain', 'Opening the beta claim test menu.');
@@ -750,8 +749,16 @@
           return;
         }
 
+        if (await maybeHandleAddKeychainSession()) {
+          return;
+        }
+
         setStatus('Already Active', 'Opening the live profile.');
         goToLiveProfile(record.agent_slug);
+        return;
+      }
+
+      if (await maybeHandleAddKeychainSession()) {
         return;
       }
 

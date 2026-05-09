@@ -214,6 +214,7 @@ There is no confirmed full automated test suite for the main static REL8TION app
 ## [RISK] High-Risk Areas
 
 - `/k` routing order. It decides whether a scan is a buyer chip, rear agent chip, loan officer tag, reset scan, pending sign chip, claimed keychain, or unclaimed keychain.
+- `/k` must let sign activation win before backup-keychain linking. A fresh front/rear sign chip scanned during activation must never be claimed as an agent backup keychain, even if a backup-keychain session is still pending.
 - `smart_sign_activation_sessions`. Stale rows can make a scan resume the wrong setup.
 - `open_house_events`. Historical code sometimes expected `agent_slug`; current event host field is `host_agent_slug`.
 - `smart_sign_inventory` to `smart_signs` linking. QR code binding depends on this relationship.

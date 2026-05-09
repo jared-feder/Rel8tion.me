@@ -150,6 +150,8 @@ Important localStorage keys:
 
 `[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
+`[IMPLEMENTED]` Router priority rule: sign activation chip scans take precedence over backup-keychain linking. If a sign activation session is waiting for front/rear sign chips, `/k` continues sign activation before considering any pending backup-keychain session, so a fresh sign chip cannot be stored as an agent keychain.
+
 ### `/claim`
 
 Files:
