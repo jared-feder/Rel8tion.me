@@ -14,8 +14,9 @@ Status labels used in this file:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `1d901ec` (`Document main production branch alignment`), deployed through Vercel Git production branch automation.
-- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `1d901eceb64bf3cc83f8f5f884e06cbbcb278b9d`.
+- `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
+- `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 
@@ -1057,7 +1058,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
-- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@1d901ec`, and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
 - `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.

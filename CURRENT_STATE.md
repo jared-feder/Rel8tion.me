@@ -14,8 +14,9 @@ Status labels:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `1d901ec` (`Document main production branch alignment`), deployed through Vercel Git production branch automation.
-- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `1d901eceb64bf3cc83f8f5f884e06cbbcb278b9d`.
+- `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
+- `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 - `[RISK]` Do not force-push `main` and do not reset either branch. Preserve production tags and use normal merge/PR history.
@@ -80,8 +81,8 @@ Status labels:
 - `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its local Edge Function source was not found, and the verification script intentionally does not call SMS functions.
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
 - `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
-- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@1d901ec`, and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
-- `[PARTIAL]` Live route smoke check after the `main@1d901ec` deployment returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[PARTIAL]` Live route smoke checks on the current `main` production deployment returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
 - `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Final NYS disclosure legal/form-version review remains unverified. The app points to a REL8TION-hosted Supabase Storage copy, while the official DOS form page remains the source-of-truth reference.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF storage depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.
@@ -101,7 +102,7 @@ Status labels:
 
 Recent repo state includes:
 
-- `[IMPLEMENTED]` Production now deploys from `main` and is live at commit `1d901ec`.
+- `[IMPLEMENTED]` Production now deploys from `main`; the `/event` cloud/modal fix was verified live after commit `c8789ae`.
 - `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.
 - `[IMPLEMENTED]` The older production deploy from `modular-claim-test` commit `51d2d1a` remains tagged as `production-51d2d1a-2026-05-08`.
 - `[IMPLEMENTED]` Sign activation now carries forward the open house selected during keychain claim and offers it first for sign binding.
