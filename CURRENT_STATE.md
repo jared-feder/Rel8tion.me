@@ -27,8 +27,10 @@ Status labels:
 - `[IMPLEMENTED]` Claimed keychains route through `/k` and then to `/a`, which redirects to `/b`.
 - `[IMPLEMENTED]` `/b` loads an agent by slug, shows agent info, captures buyer preferences, saves to `leads`, calls `send-lead-sms`, and shows a three-property preference modal.
 - `[IMPLEMENTED]` Agent onboarding exists at `/onboarding` and includes the smart sign activation entry point.
+- `[IMPLEMENTED]` `/onboarding` shows Rel8tionChip keychain slots and can arm an "Add Backup Keychain" flow. The next scanned keychain is linked to the same agent through `/k` using `keys.device_role = keychain` and `keys.assigned_slot` slot 1/2.
 - `[IMPLEMENTED]` Smart sign activation exists at `/sign-demo-activate`.
 - `[IMPLEMENTED]` Activation uses sign QR/public code lookup through `smart_sign_inventory`.
+- `[PARTIAL]` Multiple printed QR codes can point to the same smart sign when each `smart_sign_inventory.public_code` row is linked to the same `smart_sign_id`; `/s` and `/agent-dashboard` resolve that inventory alias back to the canonical sign. The activation success screen can link a second printed QR code to the current sign, but there is not yet a polished admin dashboard for ongoing QR alias management.
 - `[IMPLEMENTED]` Activation supports camera QR scan, camera photo fallback, and manual code entry.
 - `[IMPLEMENTED]` Activation supports front chip and rear chip pairing.
 - `[IMPLEMENTED]` Front chip is stored as buyer chip in `smart_signs.uid_primary`.
@@ -132,6 +134,8 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
 - `[IMPLEMENTED]` Agent dashboard tightened to show event leads and live loan officer coverage.
 - `[IMPLEMENTED]` `/k` routing now prevents stale LO sign-in state from hijacking rear-sign agent keychain verification, and dashboard cancel clears the pending LO sign-in browser state.
+- `[IMPLEMENTED]` Agent onboarding can arm and link a backup keychain slot for the same agent.
+- `[PARTIAL]` Old physical signs with two printed QR codes can link a second QR/public-code inventory row to the same smart sign from the activation success screen.
 - `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.

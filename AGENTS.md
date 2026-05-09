@@ -61,6 +61,8 @@ Important route behavior:
 - `[IMPLEMENTED]` `/b` is a root static buyer profile and lead capture page tied to an agent slug.
 - `[IMPLEMENTED]` Current sign activation carries a selected open house from the keychain claim host session and offers it first for sign binding.
 - `[IMPLEMENTED]` Current sign activation loads agent profile data and displays agent name/brokerage instead of relying on raw slugs in the visible activation flow.
+- `[IMPLEMENTED]` `/onboarding` can arm an "Add Backup Keychain" flow. `/k` links the next scanned keychain to the same agent using `keys.device_role = keychain` and `keys.assigned_slot` 1/2.
+- `[PARTIAL]` Multiple printed sign QR codes can be used for one sign only when their `smart_sign_inventory.public_code` rows point to the same `smart_sign_id`. `/s` and `/agent-dashboard` resolve inventory aliases, and the activation success screen can link a second printed QR to the current sign. There is no polished admin dashboard for QR alias management yet.
 
 The repo also has root wrapper files such as `claim.html`, `event.html`, `s.html`, and `sign.html` that redirect into `apps/rel8tion-app`. Do not assume root and app copies are identical.
 
@@ -78,6 +80,7 @@ These rules matter more than code style.
 - `[INTENDED]` The buyer path should stay low-friction and route to the live check-in or profile experience.
 - `[INTENDED]` Activation controls belong in agent/onboarding/sign activation flows, not on the buyer page.
 - `[IMPLEMENTED]` A live sign is designed in SQL/code to attach to one active `open_house_events` row at a time.
+- `[IMPLEMENTED]` Each smart sign still has two NFC chip roles in the current data model: front buyer chip and rear agent chip. Extra printed QR codes are not extra NFC chips; they must be inventory aliases for the same sign.
 - `[RISK]` Do not detach or reset real field signs unless explicitly requested. Elena/Galluzzo sign data has been treated as protected in reset code.
 - `[IMPLEMENTED]` The demo/beta lane currently uses:
   - keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`

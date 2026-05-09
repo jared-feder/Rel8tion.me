@@ -101,6 +101,11 @@
                 <a id="activateSign" href="#" class="cta-button block w-full py-5 px-6 rounded-full text-white font-black text-[18px] md:text-[20px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">Activate Smart Sign</a>
                 <a id="goLive" href="#" class="block w-full py-4 px-6 rounded-full bg-white/80 border border-white/80 text-slate-700 font-black text-[16px] md:text-[17px] leading-none text-center uppercase tracking-[-0.02em] whitespace-nowrap hover:scale-[1.01] active:scale-[0.99] transition-all no-underline">See It Live</a>
               </div>
+
+              <div id="keychainPanel" class="glass-card rounded-[28px] p-5 md:p-6 mt-5">
+                <div class="text-[11px] font-black uppercase tracking-[0.22em] text-indigo-600 mb-2">Rel8tionChip Keychains</div>
+                <div class="text-slate-700 font-bold text-sm">Loading keychain slots...</div>
+              </div>
             </div>
           </div>
         </section>
@@ -115,6 +120,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const agent = urlParams.get('agent') || '';
     let uid = urlParams.get('uid') || '';
+    const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
 
     async function recoverUidForAgent(agentSlug) {
       if (!agentSlug) return '';
@@ -134,6 +140,114 @@
         return '';
       }
     }
+
+    function shortUid(value) {
+      const clean = String(value || '').trim();
+      if (!clean) return '-';
+      return clean.length > 16 ? `${clean.slice(0, 8)}...${clean.slice(-6)}` : clean;
+    }
+
+    function keychainLabel(row, index) {
+      const slot = Number(row?.assigned_slot);
+      if (slot === 1) return 'Primary';
+      if (slot === 2) return 'Backup';
+      return index === 0 ? 'Primary' : `Keychain ${index + 1}`;
+    }
+
+    function readAddKeychainSession() {
+      try {
+        const raw = window.localStorage.getItem(ADD_KEYCHAIN_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
+          window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch {
+        window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+        return null;
+      }
+    }
+
+    async function loadKeychains(agentSlug) {
+      if (!agentSlug) return [];
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/keys?agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid,device_role,assigned_slot&order=assigned_slot.asc.nullslast`, {
+          headers: {
+            apikey: KEY,
+            Authorization: `Bearer ${KEY}`
+          }
+        });
+        const raw = await response.text().catch(() => '');
+        if (!response.ok) return [];
+        const rows = raw ? JSON.parse(raw) : [];
+        return (Array.isArray(rows) ? rows : []).filter((row) => {
+          const role = String(row?.device_role || '').trim().toLowerCase();
+          return !role || role === 'keychain';
+        });
+      } catch {
+        return [];
+      }
+    }
+
+    function renderKeychainPanel(rows = [], notice = '') {
+      const panel = document.getElementById('keychainPanel');
+      if (!panel) return;
+      const pending = readAddKeychainSession();
+      const pendingForAgent = pending?.agentSlug === agent;
+      const slotRows = rows.slice(0, 2);
+      const hasBackup = slotRows.length >= 2;
+      panel.innerHTML = `
+        <div class="text-[11px] font-black uppercase tracking-[0.22em] text-indigo-600 mb-2">Rel8tionChip Keychains</div>
+        <div class="text-slate-900 font-black text-[20px] md:text-[22px] mb-2">${slotRows.length || 0} of 2 active</div>
+        <p class="text-slate-700 text-[14px] leading-relaxed font-semibold mb-4">Add a backup keychain so the same agent can verify sign activation or open the rear-chip dashboard from either Rel8tionChip.</p>
+        ${notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50/90 text-sky-700 px-4 py-3 text-sm font-bold mb-4">${notice}</div>` : ''}
+        ${pendingForAgent ? `<div class="rounded-[18px] border border-amber-200 bg-amber-50/90 text-amber-800 px-4 py-3 text-sm font-bold mb-4">Scanner armed. Tap the backup keychain to this phone now.</div>` : ''}
+        <div class="space-y-2 mb-4">
+          ${slotRows.length ? slotRows.map((row, index) => `
+            <div class="rounded-[18px] bg-white/75 border border-white/80 px-4 py-3">
+              <div class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">${keychainLabel(row, index)}</div>
+              <div class="text-slate-900 font-black text-sm mt-1">${shortUid(row.uid)}</div>
+            </div>
+          `).join('') : `<div class="rounded-[18px] bg-white/75 border border-white/80 px-4 py-3 text-slate-600 font-bold text-sm">No claimed keychain rows found yet.</div>`}
+        </div>
+        ${hasBackup
+          ? `<div class="rounded-[18px] border border-emerald-200 bg-emerald-50/90 text-emerald-700 px-4 py-3 text-sm font-black">Backup keychain is active.</div>`
+          : `<button onclick="window.armBackupKeychain()" class="w-full py-4 px-5 rounded-full bg-white/90 border border-white/90 text-slate-800 font-black text-[15px] uppercase tracking-[-0.01em] shadow-sm active:scale-[0.99] transition-all">Add Backup Keychain</button>`}
+        ${pendingForAgent ? `<button onclick="window.cancelBackupKeychain()" class="mt-3 w-full py-3 px-5 rounded-full bg-transparent border border-white/70 text-slate-500 font-black text-[13px] uppercase tracking-[0.08em] active:scale-[0.99] transition-all">Cancel Backup Scan</button>` : ''}
+      `;
+    }
+
+    async function refreshKeychainPanel(notice = '') {
+      if (!agent) {
+        renderKeychainPanel([], 'Claim a keychain first, then you can add a backup.');
+        return;
+      }
+      const rows = await loadKeychains(agent);
+      renderKeychainPanel(rows, notice);
+    }
+
+    window.armBackupKeychain = async function armBackupKeychain() {
+      if (!agent) return;
+      const rows = await loadKeychains(agent);
+      if (rows.length >= 2) {
+        renderKeychainPanel(rows, 'This agent already has two active keychains.');
+        return;
+      }
+      window.localStorage.setItem(ADD_KEYCHAIN_SESSION_KEY, JSON.stringify({
+        agentSlug: agent,
+        primaryUid: uid || rows[0]?.uid || '',
+        createdAt: new Date().toISOString()
+      }));
+      renderKeychainPanel(rows, 'Ready. Tap the second keychain now.');
+    };
+
+    window.cancelBackupKeychain = function cancelBackupKeychain() {
+      window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+      refreshKeychainPanel('Backup keychain scan canceled.');
+    };
 
     function setLinks() {
       const goLive = document.getElementById('goLive');
@@ -157,6 +271,8 @@
     if (agent) {
       saveHostSession({ agentSlug: agent, uid, source: 'onboarding' });
     }
+
+    await refreshKeychainPanel(urlParams.get('keychain_added') ? 'Backup keychain connected.' : '');
   </script>
 </body>
 </html>

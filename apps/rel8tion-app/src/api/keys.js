@@ -12,6 +12,43 @@ export async function getKeyByUid(uid) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
+async function getClaimedKeysForAgent(slug) {
+  if (!slug) return [];
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/keys?agent_slug=eq.${encodeURIComponent(slug)}&claimed=eq.true&select=uid,device_role,assigned_slot&order=assigned_slot.asc.nullslast`,
+    { headers: authHeaders(KEY) }
+  ).catch(() => []);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function isKeychainLike(row) {
+  const role = String(row?.device_role || '').trim().toLowerCase();
+  return !role || role === 'keychain';
+}
+
+function resolveKeychainSlot({ existingRow, agentKeys, uid }) {
+  const currentSlot = Number(existingRow?.assigned_slot);
+  if (currentSlot === 1 || currentSlot === 2) return currentSlot;
+
+  const otherKeychains = (agentKeys || [])
+    .filter((row) => row?.uid !== uid && isKeychainLike(row));
+  const usedSlots = new Set(
+    otherKeychains
+      .map((row) => Number(row.assigned_slot))
+      .filter((slot) => slot === 1 || slot === 2)
+  );
+
+  if (otherKeychains.length && !usedSlots.has(1)) {
+    usedSlots.add(1);
+  }
+
+  if (otherKeychains.length >= 2) return null;
+  if (!otherKeychains.length) return 1;
+  if (!usedSlots.has(2)) return 2;
+  if (!usedSlots.has(1)) return 1;
+  return null;
+}
+
 export async function loadAgentFromUID() {
   if (!state.uid) return null;
 
@@ -41,12 +78,24 @@ export async function linkKeyToAgent(slug) {
   if (!state.uid) throw new Error('Missing chip uid');
 
   const existingRow = await getKeyByUid(state.uid);
+  const agentKeys = await getClaimedKeysForAgent(slug);
+  const assignedSlot = resolveKeychainSlot({ existingRow, agentKeys, uid: state.uid });
+  if (!assignedSlot) {
+    throw new Error('This agent already has two active keychains.');
+  }
+
+  const payload = {
+    agent_slug: slug,
+    claimed: true,
+    device_role: 'keychain',
+    assigned_slot: assignedSlot
+  };
 
   if (existingRow) {
     const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/keys?uid=eq.${encodeURIComponent(state.uid)}`, {
       method: 'PATCH',
       headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
-      body: JSON.stringify({ agent_slug: slug, claimed: true })
+      body: JSON.stringify(payload)
     });
     const raw = await patchRes.text().catch(() => '');
     if (!patchRes.ok) throw new Error('Failed patching existing key row: ' + raw);
@@ -54,7 +103,7 @@ export async function linkKeyToAgent(slug) {
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/keys`, {
       method: 'POST',
       headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
-      body: JSON.stringify({ uid: state.uid, agent_slug: slug, claimed: true })
+      body: JSON.stringify({ uid: state.uid, ...payload })
     });
     const raw = await insertRes.text().catch(() => '');
     if (!insertRes.ok) throw new Error('Failed inserting new key row: ' + raw);

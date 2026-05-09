@@ -172,6 +172,13 @@ async function resetSmartSignPairing(uid, publicCode, forceActive = false) {
       claimed_at: null
     })
   }).catch(() => null);
+  await supabaseRequest(`smart_sign_inventory?smart_sign_id=eq.${signId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      smart_sign_id: null,
+      claimed_at: null
+    })
+  }).catch(() => null);
   const deleted = await supabaseRequest(`smart_signs?id=eq.${signId}`, {
     method: 'DELETE',
     headers: { Prefer: 'return=representation' }
@@ -265,6 +272,13 @@ async function resetBetaLane() {
     }
 
     await supabaseRequest(`smart_sign_activation_sessions?sign_id=eq.${signId}`, { method: 'DELETE' }).catch(() => null);
+    await supabaseRequest(`smart_sign_inventory?smart_sign_id=eq.${signId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        smart_sign_id: null,
+        claimed_at: null
+      })
+    }).catch(() => null);
     const deleted = await supabaseRequest(`smart_signs?id=eq.${signId}`, {
       method: 'DELETE',
       headers: { Prefer: 'return=representation' }

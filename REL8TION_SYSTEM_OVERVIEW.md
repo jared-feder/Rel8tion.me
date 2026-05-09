@@ -199,6 +199,8 @@ Role: simple post-claim agent setup page.
 - Shows activation entry point for smart signs.
 - Activation URL is `/sign-demo-activate.html?agent=<agent>&uid=<uid>`.
 - Live profile URL is `/a?agent=<agent>`.
+- Shows claimed keychain slots for the agent.
+- Can arm an "Add Backup Keychain" flow; the next scanned Rel8tionChip is linked through `/k` to the same `agent_slug` as `device_role = keychain` with `assigned_slot` 1 or 2.
 
 ### `/sign-demo-activate`
 
@@ -229,6 +231,8 @@ QR handling:
 - Uses `jsQR` CDN fallback for camera/photo QR decoding.
 - Accepts manual code entry.
 - Extracts public code from raw code or URL.
+- Resolves `smart_sign_inventory.public_code` first. If an inventory row already points to `smart_sign_id`, the activation flow uses that canonical sign row.
+- After a sign is activated, the success screen can link a second printed QR/public code inventory row to the same `smart_sign_id` for old physical signs with two front QR codes.
 
 Listing binding:
 
@@ -254,7 +258,7 @@ Role: public smart sign resolver.
 `[IMPLEMENTED]` Confirmed repo behavior:
 
 - Reads `code` from URL.
-- Resolves smart sign by `smart_signs.public_code`.
+- Resolves smart sign by `smart_signs.public_code`, then falls back to `smart_sign_inventory.public_code -> smart_sign_id` so an inventory/public-code alias can open the same canonical sign.
 - If no sign exists, routes to `/sign-demo-activate.html?code=<code>&fresh_qr=1`.
 - If sign has an active event, redirects to `/event?event=<eventId>`.
 - If sign exists but has no active event, renders "Sign Found" and activation options.
@@ -575,6 +579,7 @@ Used for:
 - printed sign QR/public code inventory
 - public code resolution before sign row exists
 - optional link to `smart_signs.id`
+- optional QR aliasing when more than one printed public code row points to the same `smart_sign_id`
 - claimed state
 
 Important fields:

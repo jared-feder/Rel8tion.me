@@ -23,6 +23,7 @@
     const AGENT_DASHBOARD_SESSION_KEY = 'rel8tion_agent_dashboard_pending';
     const LOAN_OFFICER_SESSION_KEY = 'rel8tion_loan_officer_pending';
     const KEY_RESET_SESSION_KEY = 'rel8tion_key_reset_pending';
+    const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
@@ -48,7 +49,7 @@
         const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        const ageMs = Date.now() - new Date(parsed.updatedAt || parsed.createdAt || 0).getTime();
+        const ageMs = Date.now() - new Date(parsed.updatedAt || parsed.createdAt || parsed.qrArmedAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 45 * 60 * 1000) {
           window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
           return null;
@@ -105,6 +106,23 @@
         return parsed;
       } catch (_) {
         window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
+        return null;
+      }
+    }
+
+    function readAddKeychainSession() {
+      try {
+        const raw = window.localStorage.getItem(ADD_KEYCHAIN_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
+          window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
         return null;
       }
     }
@@ -289,6 +307,12 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    async function findAnySignByChipUid(chipUid) {
+      const encodedUid = encodeURIComponent(chipUid);
+      const rows = await request(`smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid},activation_uid_primary.eq.${encodedUid},activation_uid_secondary.eq.${encodedUid})&select=id,public_code,status,uid_primary,uid_secondary&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
     function activeSignChipRole(sign, chipUid) {
       if (!sign || !chipUid) return '';
       if (sign.uid_secondary === chipUid) {
@@ -296,6 +320,100 @@
       }
       if (sign.uid_primary === chipUid) return 'front_buyer';
       return '';
+    }
+
+    function isKeychainLike(row) {
+      const role = String(row?.device_role || '').trim().toLowerCase();
+      return !role || role === 'keychain';
+    }
+
+    function resolveAdditionalKeychainSlot({ existingRow, agentKeys, scannedUid }) {
+      const currentSlot = Number(existingRow?.assigned_slot);
+      if (currentSlot === 1 || currentSlot === 2) return currentSlot;
+
+      const otherKeychains = (agentKeys || [])
+        .filter((row) => row?.uid !== scannedUid && isKeychainLike(row));
+      const usedSlots = new Set(
+        otherKeychains
+          .map((row) => Number(row.assigned_slot))
+          .filter((slot) => slot === 1 || slot === 2)
+      );
+
+      if (otherKeychains.length && !usedSlots.has(1)) {
+        usedSlots.add(1);
+      }
+
+      if (otherKeychains.length >= 2) return null;
+      if (!otherKeychains.length) return 1;
+      if (!usedSlots.has(2)) return 2;
+      if (!usedSlots.has(1)) return 1;
+      return null;
+    }
+
+    async function maybeHandleAddKeychainSession() {
+      const pending = readAddKeychainSession();
+      if (!pending?.agentSlug) return false;
+
+      setStatus('Adding Keychain...', 'Checking this chip before linking it as a backup.');
+
+      const signMatch = await findAnySignByChipUid(uid);
+      if (signMatch?.id) {
+        setStatus('Sign Chip Detected', `This chip belongs to sign ${signMatch.public_code || signMatch.id}. Use a real keychain chip for the backup slot.`);
+        return true;
+      }
+
+      const keyRows = await request(`keys?uid=eq.${encodeURIComponent(uid)}&select=*`).catch(() => []);
+      const existingRow = Array.isArray(keyRows) ? keyRows[0] : null;
+
+      if (existingRow?.claimed === true && existingRow.agent_slug && existingRow.agent_slug !== pending.agentSlug) {
+        setStatus('Already Claimed', `This keychain is already claimed to ${existingRow.agent_slug}.`);
+        return true;
+      }
+
+      if (pending.primaryUid && pending.primaryUid === uid && existingRow?.agent_slug === pending.agentSlug) {
+        setStatus('Primary Keychain', 'This is already the primary keychain. Tap the backup keychain instead.');
+        return true;
+      }
+
+      const agentKeys = await request(`keys?agent_slug=eq.${encodeURIComponent(pending.agentSlug)}&claimed=eq.true&select=uid,device_role,assigned_slot&order=assigned_slot.asc.nullslast`).catch(() => []);
+      const slot = resolveAdditionalKeychainSlot({
+        existingRow,
+        agentKeys: Array.isArray(agentKeys) ? agentKeys : [],
+        scannedUid: uid
+      });
+
+      if (!slot) {
+        setStatus('Two Keychains Active', 'This agent already has both keychain slots active.');
+        return true;
+      }
+
+      const payload = {
+        uid,
+        agent_slug: pending.agentSlug,
+        claimed: true,
+        device_role: 'keychain',
+        assigned_slot: slot
+      };
+
+      if (existingRow?.uid) {
+        await request(`keys?uid=eq.${encodeURIComponent(uid)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await request('keys', {
+          method: 'POST',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+      saveHostSession({ agentSlug: pending.agentSlug, uid, source: 'backup-keychain-added' });
+      setStatus(slot === 2 ? 'Backup Added' : 'Keychain Added', 'Returning to onboarding.');
+      window.location.href = `${window.location.origin}/onboarding?agent=${encodeURIComponent(pending.agentSlug)}&uid=${encodeURIComponent(uid)}&keychain_added=1`;
+      return true;
     }
 
     async function init() {
@@ -324,6 +442,10 @@
           goToLiveSign(activeSign.public_code);
           return;
         }
+      }
+
+      if (await maybeHandleAddKeychainSession()) {
+        return;
       }
 
       setStatus('Checking Key...', 'Looking up your Rel8tion chip.');

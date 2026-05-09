@@ -8,7 +8,27 @@ export async function getSmartSignByPublicCode(publicCode) {
     `${SUPABASE_URL}/rest/v1/smart_signs?public_code=eq.${encodeURIComponent(publicCode)}&select=*`,
     { headers: authHeaders(KEY) }
   );
-  return Array.isArray(rows) && rows.length ? rows[0] : null;
+  if (Array.isArray(rows) && rows.length) return rows[0];
+
+  const inventoryRows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}&select=id,public_code,smart_sign_id&limit=1`,
+    { headers: authHeaders(KEY) }
+  ).catch(() => []);
+  const inventory = Array.isArray(inventoryRows) ? inventoryRows[0] : null;
+  if (!inventory?.smart_sign_id) return null;
+
+  const signRows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=*&limit=1`,
+    { headers: authHeaders(KEY) }
+  );
+  const sign = Array.isArray(signRows) && signRows.length ? signRows[0] : null;
+  return sign
+    ? {
+        ...sign,
+        inventory_public_code: inventory.public_code,
+        public_code_alias: publicCode
+      }
+    : null;
 }
 
 export async function getActiveSmartSignEvent(signId) {

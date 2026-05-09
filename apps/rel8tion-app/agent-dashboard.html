@@ -82,7 +82,13 @@
       }
       if (state.code) {
         const rows = await request(`smart_signs?public_code=eq.${encodeURIComponent(state.code)}&select=*&limit=1`);
-        return Array.isArray(rows) ? rows[0] : null;
+        if (Array.isArray(rows) && rows[0]) return rows[0];
+        const inventoryRows = await request(`smart_sign_inventory?public_code=eq.${encodeURIComponent(state.code)}&select=id,public_code,smart_sign_id&limit=1`).catch(() => []);
+        const inventory = Array.isArray(inventoryRows) ? inventoryRows[0] : null;
+        if (inventory?.smart_sign_id) {
+          const aliasRows = await request(`smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=*&limit=1`);
+          return Array.isArray(aliasRows) ? aliasRows[0] : null;
+        }
       }
       return null;
     }
