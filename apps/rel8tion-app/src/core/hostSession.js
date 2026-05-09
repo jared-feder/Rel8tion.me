@@ -8,6 +8,7 @@ export function saveHostSession(session = {}) {
     agentSlug: session.agentSlug || '',
     uid: session.uid || '',
     source: session.source || 'unknown',
+    selectedOpenHouse: session.selectedOpenHouse || null,
     createdAt: new Date().toISOString()
   };
 

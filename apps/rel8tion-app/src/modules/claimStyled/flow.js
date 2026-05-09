@@ -110,10 +110,27 @@ async function betaResetApi(action) {
 }
 
 function routeAfterVerifiedAgent(slug, source = 'claim') {
+  const h = state.detectedHouse || null;
   saveHostSession({
     agentSlug: slug,
     uid: state.uid || '',
-    source
+    source,
+    selectedOpenHouse: h?.id ? {
+      id: h.id,
+      address: h.address || '',
+      brokerage: h.brokerage || '',
+      price: h.price || null,
+      beds: h.beds || null,
+      baths: h.baths || null,
+      sqft: h.sqft || h.square_feet || null,
+      square_feet: h.square_feet || h.sqft || null,
+      image: h.image || h.image_url || '',
+      image_url: h.image_url || h.image || '',
+      open_start: h.open_start || null,
+      open_end: h.open_end || null,
+      lat: h.lat || null,
+      lng: h.lng || null
+    } : null
   });
 
   const pendingSign = getPendingSignActivation();
