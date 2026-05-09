@@ -24,6 +24,7 @@
     const LOAN_OFFICER_SESSION_KEY = 'rel8tion_loan_officer_pending';
     const KEY_RESET_SESSION_KEY = 'rel8tion_key_reset_pending';
     const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
+    const EXTRA_SIGN_CHIP_SESSION_KEY = 'rel8tion_extra_sign_chip_pending';
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
@@ -123,6 +124,23 @@
         return parsed;
       } catch (_) {
         window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+        return null;
+      }
+    }
+
+    function readExtraSignChipSession() {
+      try {
+        const raw = window.localStorage.getItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
+          window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
         return null;
       }
     }
@@ -304,17 +322,33 @@
       });
       if (!response.ok) return null;
       const rows = await response.json().catch(() => []);
-      return Array.isArray(rows) ? rows[0] : null;
+      const directSign = Array.isArray(rows) ? rows[0] : null;
+      if (directSign) return directSign;
+      const aliasSign = await findSignByChipAliasUid(chipUid).catch(() => null);
+      return aliasSign?.status === 'active' ? aliasSign : null;
+    }
+
+    async function findSignByChipAliasUid(chipUid) {
+      const aliasRows = await request(`smart_sign_chip_aliases?uid=eq.${encodeURIComponent(chipUid)}&active=eq.true&select=*&limit=1`).catch(() => []);
+      const alias = Array.isArray(aliasRows) ? aliasRows[0] : null;
+      if (!alias?.smart_sign_id) return null;
+      const signRows = await request(`smart_signs?id=eq.${encodeURIComponent(alias.smart_sign_id)}&select=id,public_code,uid_primary,uid_secondary,owner_agent_slug,active_event_id,primary_device_type,secondary_device_type,status&limit=1`).catch(() => []);
+      const sign = Array.isArray(signRows) ? signRows[0] : null;
+      return sign ? { ...sign, alias_uid: chipUid, alias_device_type: alias.device_type || 'front_buyer_chip' } : null;
     }
 
     async function findAnySignByChipUid(chipUid) {
       const encodedUid = encodeURIComponent(chipUid);
       const rows = await request(`smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid},activation_uid_primary.eq.${encodedUid},activation_uid_secondary.eq.${encodedUid})&select=id,public_code,status,uid_primary,uid_secondary&limit=1`).catch(() => []);
-      return Array.isArray(rows) ? rows[0] : null;
+      const directSign = Array.isArray(rows) ? rows[0] : null;
+      return directSign || await findSignByChipAliasUid(chipUid).catch(() => null);
     }
 
     function activeSignChipRole(sign, chipUid) {
       if (!sign || !chipUid) return '';
+      if (sign.alias_uid === chipUid) {
+        return /front|buyer/i.test(sign.alias_device_type || '') ? 'front_buyer' : '';
+      }
       if (sign.uid_secondary === chipUid) {
         return /keychain/i.test(sign.secondary_device_type || '') ? 'keychain' : 'rear_agent';
       }
@@ -416,6 +450,71 @@
       return true;
     }
 
+    async function maybeHandleExtraSignChipSession() {
+      const pending = readExtraSignChipSession();
+      if (!pending?.signId || !pending?.publicCode) return false;
+
+      setStatus('Adding Buyer NFC Chip...', 'Checking this chip before linking it to the live sign.');
+
+      const signMatch = await findAnySignByChipUid(uid);
+      if (signMatch?.id && signMatch.id !== pending.signId) {
+        setStatus('Sign Chip Detected', `This chip already belongs to sign ${signMatch.public_code || signMatch.id}.`);
+        return true;
+      }
+      if (signMatch?.id === pending.signId) {
+        window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+        setStatus('Already Linked', 'This chip already opens this sign. Opening the live buyer route.');
+        goToLiveSign(pending.publicCode);
+        return true;
+      }
+
+      const keyRows = await request(`keys?uid=eq.${encodeURIComponent(uid)}&select=uid,claimed,agent_slug&limit=1`).catch(() => []);
+      if (Array.isArray(keyRows) && keyRows[0]?.claimed === true) {
+        setStatus('Keychain Detected', 'That UID is a claimed keychain. Use an extra front buyer NFC chip instead.');
+        return true;
+      }
+
+      const existingAliasRows = await request(`smart_sign_chip_aliases?uid=eq.${encodeURIComponent(uid)}&select=*&limit=1`).catch(() => []);
+      const existingAlias = Array.isArray(existingAliasRows) ? existingAliasRows[0] : null;
+      const payload = {
+        smart_sign_id: pending.signId,
+        uid,
+        device_type: 'front_buyer_chip',
+        label: 'extra_front_buyer_chip',
+        active: true,
+        created_by_agent_slug: pending.agentSlug || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (existingAlias?.id) {
+          if (existingAlias.smart_sign_id && existingAlias.smart_sign_id !== pending.signId) {
+            setStatus('Already Linked Elsewhere', 'That extra NFC chip is already linked to another smart sign.');
+            return true;
+          }
+          await request(`smart_sign_chip_aliases?id=eq.${encodeURIComponent(existingAlias.id)}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=representation' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await request('smart_sign_chip_aliases', {
+            method: 'POST',
+            headers: { Prefer: 'return=representation' },
+            body: JSON.stringify(payload)
+          });
+        }
+      } catch (error) {
+        setStatus('Extra Chip Setup Needed', 'The NFC chip alias table is not available yet. Apply the smart_sign_chip_aliases migration, then try again.');
+        return true;
+      }
+
+      window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+      setStatus('Extra Buyer Chip Linked', 'Opening the live buyer check-in route.');
+      goToLiveSign(pending.publicCode);
+      return true;
+    }
+
     async function init() {
       if (!uid) {
         window.location.href = 'https://rel8tion.me/?kerror=missing_uid';
@@ -442,6 +541,10 @@
           goToLiveSign(activeSign.public_code);
           return;
         }
+      }
+
+      if (await maybeHandleExtraSignChipSession()) {
+        return;
       }
 
       if (await maybeHandleAddKeychainSession()) {

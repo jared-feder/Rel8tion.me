@@ -51,6 +51,17 @@
           "active_event_id"
         ]
       },
+      "smart_sign_chip_aliases": {
+        "required": true,
+        "columns": [
+          "smart_sign_id",
+          "uid",
+          "device_type",
+          "label",
+          "active",
+          "created_by_agent_slug"
+        ]
+      },
       "smart_sign_activation_sessions": {
         "required": true,
         "columns": []
@@ -133,6 +144,12 @@
         "from": "open_house_events.smart_sign_id",
         "to": "smart_signs.id",
         "verification": "Dashboard/database inspection required for formal FK."
+      },
+      {
+        "name": "smart_sign_chip_aliases.smart_sign_id_to_smart_signs.id",
+        "from": "smart_sign_chip_aliases.smart_sign_id",
+        "to": "smart_signs.id",
+        "verification": "Repo migration creates this FK with cascade delete. Live dashboard/database inspection required to confirm it has been applied."
       },
       {
         "name": "event_checkins.open_house_event_id_to_open_house_events.id",

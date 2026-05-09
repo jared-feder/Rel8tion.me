@@ -222,6 +222,7 @@ Role: smart sign activation and binding flow.
 10. Create or update `open_house_events`.
 11. Patch `smart_signs` active state and `active_event_id`.
 12. Mark activation session completed and clear local session.
+13. Optionally arm or manually link an extra front/buyer NFC chip UID to the same sign through `smart_sign_chip_aliases`.
 
 `[IMPLEMENTED]` The visible activation flow loads the agent row and displays agent name/brokerage where available, instead of making the raw slug the primary visible identity.
 
@@ -232,7 +233,7 @@ QR handling:
 - Accepts manual code entry.
 - Extracts public code from raw code or URL.
 - Resolves `smart_sign_inventory.public_code` first. If an inventory row already points to `smart_sign_id`, the activation flow uses that canonical sign row.
-- After a sign is activated, the success screen can link a second printed QR/public code inventory row to the same `smart_sign_id` for old physical signs with two front QR codes.
+- After a sign is activated, the success screen can link an extra physical front/buyer NFC chip to the same `smart_sign_id` through `smart_sign_chip_aliases`. This is for another NFC chip only; it is not a second QR-code setup path and does not replace the rear agent dashboard chip.
 
 Listing binding:
 
@@ -579,7 +580,7 @@ Used for:
 - printed sign QR/public code inventory
 - public code resolution before sign row exists
 - optional link to `smart_signs.id`
-- optional QR aliasing when more than one printed public code row points to the same `smart_sign_id`
+- legacy public-code aliasing when more than one printed inventory row points to the same `smart_sign_id`
 - claimed state
 
 Important fields:
@@ -625,6 +626,31 @@ Expected relationships:
 - `smart_signs.active_event_id` references `open_house_events.id` by convention. Formal FK needs verification.
 - `open_house_events.smart_sign_id` references `smart_signs.id`.
 - `smart_sign_inventory.smart_sign_id` references `smart_signs.id`.
+
+### `smart_sign_chip_aliases`
+
+`[PARTIAL]` Implemented in repo migration `sql/migrations/20260509_smart_sign_chip_aliases.sql`; live Supabase application remains `[NEEDS VERIFICATION]`.
+
+Used for:
+
+- optional extra physical front/buyer NFC chip UIDs for the same sign
+- routing extra buyer NFC scans through `/k` to the same public sign route
+- keeping rear/agent dashboard access restricted to `smart_signs.uid_secondary`
+
+Important fields:
+
+- `id`
+- `smart_sign_id`
+- `uid`
+- `device_type`
+- `label`
+- `active`
+- `created_by_agent_slug`
+
+Expected relationships:
+
+- `smart_sign_chip_aliases.smart_sign_id` references `smart_signs.id` with cascade delete in the repo migration.
+- `device_type` is currently restricted to `front_buyer_chip`; alias chips must not open the rear dashboard challenge.
 
 ### `smart_sign_activation_sessions`
 
@@ -1095,6 +1121,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Vercel/app routes are product routes. | `[IMPLEMENTED]` | Root `vercel.json` rewrites product paths into `apps/rel8tion-app`; app `vercel.json` mirrors the route surface. |
 | `/k` routes keychains, front sign chips, rear sign chips, reset scans, pending sign activation, and loan officer scans. | `[IMPLEMENTED]` | `apps/rel8tion-app/k.html`. |
 | Front smart sign NFC equals buyer check-in route. | `[IMPLEMENTED]` | `sign-demo-activate.html` stores the first sign chip as `uid_primary` and `front_buyer_chip`; `k.html` routes role `front_buyer` to `/s?code=...`. |
+| Extra front/buyer NFC chip aliases are supported in repo code. | `[PARTIAL]` | `sign-demo-activate.html` can arm/manual-link an extra buyer NFC UID; `k.html` checks `smart_sign_chip_aliases` and routes active aliases as `front_buyer`. Live migration/RLS needs verification before relying on it in a demo. |
 | Rear smart sign NFC equals dashboard challenge route only. | `[IMPLEMENTED]` | `k.html` classifies `uid_secondary` as `rear_agent`, saves dashboard pending state, and does not directly open dashboard. |
 | Rear sign scan must be followed by agent keychain scan. | `[IMPLEMENTED]` | `k.html` renders "Tap your Rel8tionChip keychain to verify and open the live event dashboard" for rear sign scans. |
 | Agent keychain scan opens dashboard only after matching the pending challenge. | `[IMPLEMENTED]` | `k.html` uses `rel8tion_agent_dashboard_pending` and then calls `goToAgentDashboard` after claimed key handling. |

@@ -202,9 +202,9 @@
       panel.innerHTML = `
         <div class="text-[11px] font-black uppercase tracking-[0.22em] text-indigo-600 mb-2">Rel8tionChip Keychains</div>
         <div class="text-slate-900 font-black text-[20px] md:text-[22px] mb-2">${slotRows.length || 0} of 2 active</div>
-        <p class="text-slate-700 text-[14px] leading-relaxed font-semibold mb-4">Add a backup keychain so the same agent can verify sign activation or open the rear-chip dashboard from either Rel8tionChip.</p>
+        <p class="text-slate-700 text-[14px] leading-relaxed font-semibold mb-4">Add a backup keychain so the same agent can verify sign activation or open the rear-chip dashboard from either Rel8tionChip. Both slots use the same /k route, so iPhone users can tap either keychain and choose the NFC popup.</p>
         ${notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50/90 text-sky-700 px-4 py-3 text-sm font-bold mb-4">${notice}</div>` : ''}
-        ${pendingForAgent ? `<div class="rounded-[18px] border border-amber-200 bg-amber-50/90 text-amber-800 px-4 py-3 text-sm font-bold mb-4">Scanner armed. Tap the backup keychain to this phone now.</div>` : ''}
+        ${pendingForAgent ? `<div class="rounded-[18px] border border-amber-200 bg-amber-50/90 text-amber-800 px-4 py-3 text-sm font-bold mb-4">Scanner armed. On iPhone, tap the backup keychain and choose the NFC popup. Android can tap the chip the same way.</div>` : ''}
         <div class="space-y-2 mb-4">
           ${slotRows.length ? slotRows.map((row, index) => `
             <div class="rounded-[18px] bg-white/75 border border-white/80 px-4 py-3">
