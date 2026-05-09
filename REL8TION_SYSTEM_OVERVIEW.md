@@ -1044,8 +1044,9 @@ Endpoint and cron:
 
 - `api/cron/refresh-open-house-data.js` imports the worker and returns JSON.
 - Root `vercel.json` schedules `/api/cron/refresh-open-house-data` every 30 minutes.
+- Vercel production deployment for `main` commit `9fa417d` includes the route as serverless function `api/cron/refresh-open-house-data`. A safe `HEAD` smoke check returned `405`, confirming the route exists without running the write path.
 
-`[NEEDS VERIFICATION]` Live deployment, cron execution, service-role env state, and RLS behavior still need live verification before treating the pipeline as fully operational. The additive Supabase schema migration was applied and anon zero-row schema probes passed on 2026-05-09.
+`[NEEDS VERIFICATION]` Cron execution, service-role env state, and RLS behavior still need live verification before treating the pipeline as fully operational. The additive Supabase schema migration was applied and anon zero-row schema probes passed on 2026-05-09.
 
 `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` is marked with `manual_price_override = 1399900`, `source_price = 1399998`, and `freshness_status = manual_override_active` so the live demo display stays at the requested `$1,399,900` while preserving the current OneKey source price. A privileged SQL check confirmed a matching `open_house_price_history` audit row from old `$1,450,000` to display `$1,399,900`.
 

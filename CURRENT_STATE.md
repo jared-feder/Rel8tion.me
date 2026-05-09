@@ -16,6 +16,7 @@ Status labels:
 
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
+- `[IMPLEMENTED]` Latest inspected production deployment is `main` commit `9fa417d` (`Add OneKey listing freshness checks`). Vercel inspect shows `api/cron/refresh-open-house-data` included as a serverless function and aliased to `app.rel8tion.me`.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
@@ -73,7 +74,7 @@ Status labels:
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[IMPLEMENTED]` OneKey listing freshness worker exists at `onekey-freshness-worker.cjs` with API route `api/cron/refresh-open-house-data.js`. It checks current OneKey listing records by tight lat/lng search, matches by `UniqueListingId`, updates listing facts/prices, records price-history rows when the migration is applied, and refreshes active event price snapshots.
 - `[PARTIAL]` OneKey freshness schema is represented by migration `sql/migrations/20260509_open_house_freshness.sql`, adding `open_houses` verification/override fields and `open_house_price_history`. The migration was applied live on 2026-05-09 and anon zero-row schema verification passed; privileged RLS/service-role behavior remains `[NEEDS VERIFICATION]`.
-- `[IMPLEMENTED]` Root `vercel.json` now includes a Vercel Cron entry for `/api/cron/refresh-open-house-data` every 30 minutes. Deployment/dashboard cron state remains `[NEEDS VERIFICATION]` until Vercel reports it live.
+- `[PARTIAL]` Root `vercel.json` now includes a Vercel Cron entry for `/api/cron/refresh-open-house-data` every 30 minutes. Production deployment includes the function and a safe `HEAD` request returned `405` without invoking writes; Vercel Cron dashboard/execution state remains `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment implementation was found during the 2026-05-09 repo audit. Current tracked enrichment is the Estately + Cheerio worker. If Browserless/Trulia enrichment is intended, it needs implementation or source recovery.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
