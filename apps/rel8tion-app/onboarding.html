@@ -121,6 +121,22 @@
     const agent = urlParams.get('agent') || '';
     let uid = urlParams.get('uid') || '';
     const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
+    const ADD_KEYCHAIN_REMOTE_PREFIX = 'backup-keychain-';
+
+    async function request(path, options = {}) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        }
+      });
+      const raw = await response.text().catch(() => '');
+      if (!response.ok) throw new Error(raw || `Request failed: ${response.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
 
     async function recoverUidForAgent(agentSlug) {
       if (!agentSlug) return '';
@@ -192,6 +208,54 @@
       }
     }
 
+    async function createRemoteAddKeychainSession(agentSlug, primaryUid = '') {
+      if (!agentSlug) return null;
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const activePrefix = encodeURIComponent(`${ADD_KEYCHAIN_REMOTE_PREFIX}%`);
+
+      await request(
+        `smart_sign_activation_sessions?agent_slug=eq.${encodeURIComponent(agentSlug)}&sign_id=is.null&public_code=like.${activePrefix}&status=eq.pending`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'cancelled',
+            updated_at: now.toISOString(),
+            expires_at: expiresAt
+          })
+        }
+      ).catch(() => null);
+
+      const rows = await request('smart_sign_activation_sessions', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          public_code: `${ADD_KEYCHAIN_REMOTE_PREFIX}${agentSlug}-${now.getTime()}`,
+          sign_id: null,
+          inventory_id: null,
+          agent_key_uid: primaryUid || null,
+          agent_slug: agentSlug,
+          owner_agent_slug: agentSlug,
+          stage: 'waiting_for_agent_keychain',
+          status: 'pending',
+          updated_at: now.toISOString(),
+          expires_at: expiresAt
+        })
+      });
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function cancelRemoteAddKeychainSession(sessionId) {
+      if (!sessionId) return;
+      await request(`smart_sign_activation_sessions?id=eq.${encodeURIComponent(sessionId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+      }).catch(() => null);
+    }
+
     function renderKeychainPanel(rows = [], notice = '') {
       const panel = document.getElementById('keychainPanel');
       if (!panel) return;
@@ -204,7 +268,7 @@
         <div class="text-slate-900 font-black text-[20px] md:text-[22px] mb-2">${slotRows.length || 0} of 2 active</div>
         <p class="text-slate-700 text-[14px] leading-relaxed font-semibold mb-4">Add a backup keychain so the same agent can verify sign activation or open the rear-chip dashboard from either Rel8tionChip. Both slots use the same /k route, so iPhone users can tap either keychain and choose the NFC popup.</p>
         ${notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50/90 text-sky-700 px-4 py-3 text-sm font-bold mb-4">${notice}</div>` : ''}
-        ${pendingForAgent ? `<div class="rounded-[18px] border border-amber-200 bg-amber-50/90 text-amber-800 px-4 py-3 text-sm font-bold mb-4">Scanner armed. On iPhone, tap the backup keychain and choose the NFC popup. Android can tap the chip the same way.</div>` : ''}
+        ${pendingForAgent ? `<div class="rounded-[18px] border border-amber-200 bg-amber-50/90 text-amber-800 px-4 py-3 text-sm font-bold mb-4">Scanner armed. Tap the backup keychain and choose the NFC popup. If the phone opens a new tab or browser, the remote backup session will still complete the link.</div>` : ''}
         <div class="space-y-2 mb-4">
           ${slotRows.length ? slotRows.map((row, index) => `
             <div class="rounded-[18px] bg-white/75 border border-white/80 px-4 py-3">
@@ -236,16 +300,21 @@
         renderKeychainPanel(rows, 'This agent already has two active keychains.');
         return;
       }
+      const primaryUid = uid || rows[0]?.uid || '';
+      const remoteSession = await createRemoteAddKeychainSession(agent, primaryUid).catch(() => null);
       window.localStorage.setItem(ADD_KEYCHAIN_SESSION_KEY, JSON.stringify({
         agentSlug: agent,
-        primaryUid: uid || rows[0]?.uid || '',
+        primaryUid,
+        remoteSessionId: remoteSession?.id || '',
         createdAt: new Date().toISOString()
       }));
       renderKeychainPanel(rows, 'Ready. Tap the second keychain now.');
     };
 
     window.cancelBackupKeychain = function cancelBackupKeychain() {
+      const pending = readAddKeychainSession();
       window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+      cancelRemoteAddKeychainSession(pending?.remoteSessionId);
       refreshKeychainPanel('Backup keychain scan canceled.');
     };
 

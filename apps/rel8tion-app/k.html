@@ -25,6 +25,7 @@
     const KEY_RESET_SESSION_KEY = 'rel8tion_key_reset_pending';
     const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
     const EXTRA_SIGN_CHIP_SESSION_KEY = 'rel8tion_extra_sign_chip_pending';
+    const ADD_KEYCHAIN_REMOTE_PREFIX = 'backup-keychain-';
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const params = new URLSearchParams(window.location.search);
     const uid = params.get('uid');
@@ -126,6 +127,43 @@
         window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
         return null;
       }
+    }
+
+    function normalizeRemoteAddKeychainSession(row) {
+      if (!row?.agent_slug) return null;
+      return {
+        agentSlug: row.agent_slug,
+        primaryUid: row.agent_key_uid || '',
+        remoteSessionId: row.id || '',
+        createdAt: row.updated_at || row.started_at || new Date().toISOString(),
+        source: 'remote'
+      };
+    }
+
+    async function findRemoteAddKeychainSession() {
+      const now = new Date().toISOString();
+      const prefix = encodeURIComponent(`${ADD_KEYCHAIN_REMOTE_PREFIX}%`);
+      const rows = await request(
+        `smart_sign_activation_sessions?status=eq.pending&sign_id=is.null&public_code=like.${prefix}&expires_at=gt.${encodeURIComponent(now)}&select=id,agent_slug,agent_key_uid,public_code,started_at,updated_at&order=updated_at.desc&limit=1`
+      ).catch(() => []);
+      const row = Array.isArray(rows) ? rows[0] : null;
+      return normalizeRemoteAddKeychainSession(row);
+    }
+
+    async function readAnyAddKeychainSession() {
+      return readAddKeychainSession() || await findRemoteAddKeychainSession();
+    }
+
+    async function finishAddKeychainSession(pending, status = 'completed') {
+      window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+      if (!pending?.remoteSessionId) return;
+      await request(`smart_sign_activation_sessions?id=eq.${encodeURIComponent(pending.remoteSessionId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status,
+          updated_at: new Date().toISOString()
+        })
+      }).catch(() => null);
     }
 
     function readExtraSignChipSession() {
@@ -385,7 +423,7 @@
     }
 
     async function maybeHandleAddKeychainSession() {
-      const pending = readAddKeychainSession();
+      const pending = await readAnyAddKeychainSession();
       if (!pending?.agentSlug) return false;
 
       setStatus('Adding Keychain...', 'Checking this chip before linking it as a backup.');
@@ -406,6 +444,7 @@
 
       if (pending.primaryUid && pending.primaryUid === uid && existingRow?.agent_slug === pending.agentSlug) {
         setStatus('Primary Keychain', 'This is already the primary keychain. Tap the backup keychain instead.');
+        substatusEl.innerHTML = `This is already the primary keychain. Tap the backup keychain now, or <a class="font-black text-blue-700 underline" href="/onboarding?agent=${encodeURIComponent(pending.agentSlug)}&uid=${encodeURIComponent(uid)}">return to onboarding</a>.`;
         return true;
       }
 
@@ -417,6 +456,7 @@
       });
 
       if (!slot) {
+        await finishAddKeychainSession(pending, 'cancelled');
         setStatus('Two Keychains Active', 'This agent already has both keychain slots active.');
         return true;
       }
@@ -443,7 +483,7 @@
         });
       }
 
-      window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+      await finishAddKeychainSession(pending, 'completed');
       saveHostSession({ agentSlug: pending.agentSlug, uid, source: 'backup-keychain-added' });
       setStatus(slot === 2 ? 'Backup Added' : 'Keychain Added', 'Returning to onboarding.');
       window.location.href = `${window.location.origin}/onboarding?agent=${encodeURIComponent(pending.agentSlug)}&uid=${encodeURIComponent(uid)}&keychain_added=1`;
@@ -524,6 +564,10 @@
       if (readKeyResetSession()) {
         setStatus('Key Reset Scanner', 'Opening the reset page for this scanned UID.');
         window.location.href = `${window.location.origin}/key-reset.html?uid=${encodeURIComponent(uid)}`;
+        return;
+      }
+
+      if (readAddKeychainSession() && await maybeHandleAddKeychainSession()) {
         return;
       }
 
