@@ -23,6 +23,10 @@ const NY_DISCRIMINATION_DISCLOSURE = Object.freeze({
   form_version: '11/25'
 });
 
+const NYS_AGENCY_DISCLOSURE_PDF_URL = 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nysellerbuyerdisclosure.pdf';
+const NYS_AGENCY_DISCLOSURE_VERSION = 'nys-dos-buyer-seller-disclosure-v1';
+const NYS_AGENCY_DISCLOSURE_TYPE = 'seller_representation_open_house';
+
 const pageState = {
   eventRow: null,
   house: null,
@@ -37,7 +41,11 @@ const pageState = {
   financingAlertSent: false,
   preferenceSaving: false,
   preferenceStatus: '',
-  selectedPreferenceHome: null
+  selectedPreferenceHome: null,
+  requiredDisclosures: {
+    agency: null,
+    courtesy: null
+  }
 };
 
 function getEventIdFromUrl() {
@@ -227,6 +235,11 @@ function agentPhotoUrl(agent) {
   );
 }
 
+function initials(name) {
+  const parts = String(name || 'Host Agent').trim().split(/\s+/).filter(Boolean);
+  return `${parts[0]?.[0] || 'H'}${parts[1]?.[0] || 'A'}`.toUpperCase();
+}
+
 function propertyImageUrl(house) {
   return firstPresent(
     house?.image,
@@ -387,9 +400,9 @@ function renderFormFields() {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         ${field('Your Name', 'visitor_name', 'text', 'Full name', true)}
-        ${field('Phone', 'visitor_phone', 'tel', 'Mobile number')}
+        ${field('Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
         <div class="md:col-span-2">
-          ${field('Email', 'visitor_email', 'email', 'Email address')}
+          ${field('Email Optional', 'visitor_email', 'email', 'Email address')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Pre-Approved', 'pre_approved', [
@@ -406,9 +419,9 @@ function renderFormFields() {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         ${field('Buyer Name', 'visitor_name', 'text', 'Full name', true)}
-        ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number')}
+        ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
         <div class="md:col-span-2">
-          ${field('Buyer Email', 'visitor_email', 'email', 'Email address')}
+          ${field('Buyer Email Optional', 'visitor_email', 'email', 'Email address')}
         </div>
         ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
         ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone')}
@@ -434,9 +447,9 @@ function renderFormFields() {
         ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
       </div>
       ${field('Buyer Name', 'visitor_name', 'text', 'Buyer name', true)}
-      ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone')}
+      ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone', true)}
       <div class="md:col-span-2">
-        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email')}
+        ${field('Buyer Email Optional', 'visitor_email', 'email', 'Buyer email')}
       </div>
       <label class="md:col-span-2 flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-slate-700 font-semibold">
         <input type="checkbox" name="represented_buyer_confirmed" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
@@ -524,6 +537,146 @@ function renderDisclosureBlock() {
   `;
 }
 
+function disclosureSignedTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function disclosureStatusBlock(id, signedAt = '') {
+  const signedTime = disclosureSignedTime(signedAt);
+  const signedClasses = 'rounded-[16px] border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm font-black text-emerald-700';
+  const unsignedClasses = 'rounded-[16px] border border-slate-200 bg-slate-50/90 px-4 py-3 text-sm font-bold text-slate-500';
+  return `
+    <div id="${id}" class="${signedTime ? signedClasses : unsignedClasses}">
+      ${signedTime ? `Accepted / Signed ${esc(signedTime)}` : 'Not signed yet'}
+    </div>
+  `;
+}
+
+function renderDisclosureActionCard({ key, title, description }) {
+  const signedAt = pageState.requiredDisclosures?.[key]?.signed_at || '';
+  return `
+    <div class="rounded-[22px] border border-slate-200 bg-white/90 p-5 space-y-4">
+      <div>
+        <h4 class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold tracking-tight text-slate-900">${esc(title)}</h4>
+        <p class="mt-2 text-slate-600 font-medium leading-relaxed">${esc(description)}</p>
+      </div>
+      ${disclosureStatusBlock(`${key}-status`, signedAt)}
+      <button
+        type="button"
+        data-disclosure-open="${esc(key)}"
+        class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800"
+      >
+        ${signedAt ? 'Review Again' : 'Review & Sign'}
+      </button>
+    </div>
+  `;
+}
+
+function renderAgencyDisclosureModal() {
+  return `
+    <div id="agency-disclosure-modal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/45 px-3 py-4 md:items-center" aria-hidden="true">
+      <div class="w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Required Disclosure</div>
+            <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">New York State Agency Disclosure</h3>
+          </div>
+          <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
+        </div>
+        <div class="space-y-4 text-slate-700 font-medium leading-relaxed">
+          <p>At this open house, the listing agent may currently represent the seller. This disclosure is meant to make the agency relationship clear from the beginning.</p>
+          <p>Please review the official New York State Agency Disclosure PDF before signing.</p>
+        </div>
+        <a
+          href="${esc(NYS_AGENCY_DISCLOSURE_PDF_URL)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-5 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800"
+        >
+          View NYS Agency Disclosure PDF
+        </a>
+        <button
+          type="button"
+          data-disclosure-accept="agency"
+          class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-4 text-center text-base font-black text-white shadow-[0_18px_40px_rgba(22,163,74,0.24)]"
+        >
+          Accept / Sign
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCourtesyNoticeModal() {
+  return `
+    <div id="courtesy-disclosure-modal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/45 px-3 py-4 md:items-center" aria-hidden="true">
+      <div class="w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Courtesy Notice</div>
+            <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Rel8tion Courtesy Notice</h3>
+          </div>
+          <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
+        </div>
+        <div class="max-h-[58vh] space-y-4 overflow-y-auto pr-1 text-slate-700 font-medium leading-relaxed">
+          <p>Rel8tion was created to make real estate interactions clearer, faster, and more transparent for everyone involved.</p>
+          <p>At this open house, the listing agent may currently represent the seller. This does not mean you are alone, unwelcome, or unable to ask questions. It simply means the relationship is being disclosed clearly from the start.</p>
+          <p>Rel8tion supports fair housing, equal treatment, clear communication, professional accountability, and informed decision-making.</p>
+          <p>Rel8tion does not replace or modify any required agency disclosure. Rel8tion helps document and clarify the interaction, but does not create a buyer-agent, dual-agency, legal, lending, or fiduciary relationship unless separately agreed to in writing.</p>
+          <p>You may choose your own real estate agent, attorney, lender, inspector, or other professional at any time.</p>
+        </div>
+        <button
+          type="button"
+          data-disclosure-accept="courtesy"
+          class="mt-5 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-4 text-center text-base font-black text-white shadow-[0_18px_40px_rgba(22,163,74,0.24)]"
+        >
+          Accept / Sign
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequiredDisclosuresBlock() {
+  const agency = pageState.requiredDisclosures.agency || {};
+  const courtesy = pageState.requiredDisclosures.courtesy || {};
+  return `
+    <section class="rounded-[26px] border border-sky-100 bg-gradient-to-br from-sky-50/90 to-white p-5 space-y-4">
+      <div>
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Required Disclosures</div>
+        <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Review & Sign</h3>
+        <p class="mt-2 text-slate-600 font-medium leading-relaxed">Please review and sign each required item before submitting your check-in.</p>
+      </div>
+
+      <input type="hidden" name="agency_disclosure_reviewed" value="${agency.signed_at ? 'true' : ''}">
+      <input type="hidden" name="seller_representation_acknowledged" value="${agency.signed_at ? 'true' : ''}">
+      <input type="hidden" name="agency_disclosure_signed_at" value="${esc(agency.signed_at || '')}">
+      <input type="hidden" name="agency_disclosure_pdf_url" value="${esc(NYS_AGENCY_DISCLOSURE_PDF_URL)}">
+      <input type="hidden" name="agency_disclosure_version" value="${esc(NYS_AGENCY_DISCLOSURE_VERSION)}">
+      <input type="hidden" name="agency_disclosure_type" value="${esc(NYS_AGENCY_DISCLOSURE_TYPE)}">
+      <input type="hidden" name="rel8tion_courtesy_acknowledged" value="${courtesy.signed_at ? 'true' : ''}">
+      <input type="hidden" name="rel8tion_courtesy_signed_at" value="${esc(courtesy.signed_at || '')}">
+
+      ${renderDisclosureActionCard({
+        key: 'agency',
+        title: 'New York State Agency Disclosure',
+        description: 'Listing agent seller representation disclosure for this open house.'
+      })}
+      ${renderDisclosureActionCard({
+        key: 'courtesy',
+        title: 'Rel8tion Courtesy Notice',
+        description: 'Clear communication notice about what Rel8tion does and does not create.'
+      })}
+      ${renderDisclosureBlock()}
+    </section>
+    ${renderAgencyDisclosureModal()}
+    ${renderCourtesyNoticeModal()}
+  `;
+}
+
 function renderFinancingBlock() {
   return `
     <div class="rounded-[22px] border border-sky-200 bg-sky-50/90 p-5 space-y-3">
@@ -553,8 +706,8 @@ function validateCheckin(values) {
     throw new Error('Add the visitor name so this check-in stays tied to a real person.');
   }
 
-  if (!hasContactInfo(values.visitor_email, values.visitor_phone)) {
-    throw new Error('Add at least an email or phone number so there is a real follow-up path after the visit.');
+  if (!normalizeValue(values.visitor_phone)) {
+    throw new Error('Add the buyer phone number so the host has a real follow-up path after the visit.');
   }
 
   if (pageState.selectedPath !== CHECKIN_PATHS.BUYER) {
@@ -573,6 +726,17 @@ function validateCheckin(values) {
 
   if (values.pre_approved === 'no' && !hasContactInfo(values.visitor_email, values.visitor_phone)) {
     throw new Error('Financing follow-up needs a real way to reach the buyer. Add an email or phone number.');
+  }
+
+  if (values.agency_disclosure_reviewed !== 'true'
+    || values.seller_representation_acknowledged !== 'true'
+    || !normalizeValue(values.agency_disclosure_signed_at)) {
+    throw new Error('Review and sign the New York State Agency Disclosure before submitting.');
+  }
+
+  if (values.rel8tion_courtesy_acknowledged !== 'true'
+    || !normalizeValue(values.rel8tion_courtesy_signed_at)) {
+    throw new Error('Review and sign the Rel8tion Courtesy Notice before submitting.');
   }
 
   if (values.ny_disclosure_acknowledged !== 'true') {
@@ -605,6 +769,30 @@ function buildNyDisclosureMetadata(values, signedAt = new Date()) {
   };
 }
 
+function buildAgencyDisclosureMetadata(values) {
+  return {
+    agency_disclosure_reviewed: values.agency_disclosure_reviewed === 'true',
+    seller_representation_acknowledged: values.seller_representation_acknowledged === 'true',
+    agency_disclosure_signed_at: normalizeValue(values.agency_disclosure_signed_at),
+    agency_disclosure_pdf_url: normalizeValue(values.agency_disclosure_pdf_url) || NYS_AGENCY_DISCLOSURE_PDF_URL,
+    agency_disclosure_version: normalizeValue(values.agency_disclosure_version) || NYS_AGENCY_DISCLOSURE_VERSION,
+    agency_disclosure_type: normalizeValue(values.agency_disclosure_type) || NYS_AGENCY_DISCLOSURE_TYPE,
+    e_signature_type: 'button_accept_sign',
+    signed_by_name: normalizeValue(values.visitor_name),
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  };
+}
+
+function buildCourtesyNoticeMetadata(values) {
+  return {
+    rel8tion_courtesy_acknowledged: values.rel8tion_courtesy_acknowledged === 'true',
+    rel8tion_courtesy_signed_at: normalizeValue(values.rel8tion_courtesy_signed_at),
+    e_signature_type: 'button_accept_sign',
+    signed_by_name: normalizeValue(values.visitor_name),
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  };
+}
+
 function buildCheckinPayload(formData) {
   const values = Object.fromEntries(formData.entries());
   validateCheckin(values);
@@ -615,6 +803,8 @@ function buildCheckinPayload(formData) {
     ? true
     : values.represented_buyer_confirmed === 'true';
   const nyDiscriminationDisclosure = buildNyDisclosureMetadata(values, signedAt);
+  const agencyDisclosure = buildAgencyDisclosureMetadata(values);
+  const courtesyNotice = buildCourtesyNoticeMetadata(values);
 
   return {
     open_house_event_id: pageState.eventRow.id,
@@ -635,6 +825,16 @@ function buildCheckinPayload(formData) {
       signature_name: nyDiscriminationDisclosure.e_signature_value,
       signature_date: nyDiscriminationDisclosure.signed_date,
       signature_timestamp: nyDiscriminationDisclosure.signed_at,
+      agency_disclosure_reviewed: agencyDisclosure.agency_disclosure_reviewed,
+      seller_representation_acknowledged: agencyDisclosure.seller_representation_acknowledged,
+      agency_disclosure_signed_at: agencyDisclosure.agency_disclosure_signed_at,
+      agency_disclosure_pdf_url: agencyDisclosure.agency_disclosure_pdf_url,
+      agency_disclosure_version: agencyDisclosure.agency_disclosure_version,
+      agency_disclosure_type: agencyDisclosure.agency_disclosure_type,
+      rel8tion_courtesy_acknowledged: courtesyNotice.rel8tion_courtesy_acknowledged,
+      rel8tion_courtesy_signed_at: courtesyNotice.rel8tion_courtesy_signed_at,
+      nys_agency_disclosure: agencyDisclosure,
+      rel8tion_courtesy_notice: courtesyNotice,
       ny_discrimination_disclosure: nyDiscriminationDisclosure,
       financing_requested: financingRequested
     }
@@ -646,6 +846,7 @@ function nextStepCards() {
   const agent = pageState.agent;
   const subjectAddress = house?.address || 'this property';
   const listingUrl = oneKeyListingUrl(house);
+  const contactHref = vcardHref(agent);
   const askQuestionBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress} and had a quick question.`;
   const financingCopy = pageState.lastCheckin?.metadata?.financing_requested
     ? 'Financing follow-up was requested from this visit.'
@@ -736,7 +937,8 @@ function nextStepCards() {
             <div class="break-all">${textOrDash(agent?.email)}</div>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a href="${esc(contactHref)}" download="${esc((agent?.name || 'host-agent').replace(/[^a-z0-9]+/gi, '-').toLowerCase())}.vcf" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${contactHref === '#' ? 'pointer-events-none opacity-60' : ''}">Save Contact</a>
           <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
           <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${subjectAddress}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
           <a href="${esc(mailtoHref(agent?.email || '', `Question about ${subjectAddress}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
@@ -756,6 +958,7 @@ function attachEventHandlers() {
       pageState.successMessage = '';
       pageState.errorMessage = '';
       pageState.financingAlertSent = false;
+      pageState.requiredDisclosures = { agency: null, courtesy: null };
       setPathInUrl(nextPath);
       renderEventShell();
     });
@@ -773,6 +976,59 @@ function attachEventHandlers() {
 
   visitorNameInput?.addEventListener('input', syncDisclosureSignature);
   syncDisclosureSignature();
+
+  const closeDisclosureModals = () => {
+    document.querySelectorAll('[id$="-disclosure-modal"]').forEach((modal) => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      modal.setAttribute('aria-hidden', 'true');
+    });
+  };
+
+  document.querySelectorAll('[data-disclosure-open]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const key = button.getAttribute('data-disclosure-open');
+      const modal = document.getElementById(`${key}-disclosure-modal`);
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      modal.setAttribute('aria-hidden', 'false');
+    });
+  });
+
+  document.querySelectorAll('[data-disclosure-close]').forEach((button) => {
+    button.addEventListener('click', closeDisclosureModals);
+  });
+
+  document.querySelectorAll('[data-disclosure-accept]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const key = button.getAttribute('data-disclosure-accept');
+      const signedAt = new Date();
+      const signedAtIso = signedAt.toISOString();
+      const status = document.getElementById(`${key}-status`);
+      const displayTime = signedAt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+      if (key === 'agency') {
+        pageState.requiredDisclosures.agency = { signed_at: signedAtIso };
+        form.querySelector('[name="agency_disclosure_reviewed"]').value = 'true';
+        form.querySelector('[name="seller_representation_acknowledged"]').value = 'true';
+        form.querySelector('[name="agency_disclosure_signed_at"]').value = signedAtIso;
+      }
+
+      if (key === 'courtesy') {
+        pageState.requiredDisclosures.courtesy = { signed_at: signedAtIso };
+        form.querySelector('[name="rel8tion_courtesy_acknowledged"]').value = 'true';
+        form.querySelector('[name="rel8tion_courtesy_signed_at"]').value = signedAtIso;
+      }
+
+      if (status) {
+        status.className = 'rounded-[16px] border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm font-black text-emerald-700';
+        status.textContent = `Accepted / Signed ${displayTime}`;
+      }
+      button.textContent = 'Accepted / Signed';
+      closeDisclosureModals();
+    });
+  });
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -953,7 +1209,6 @@ function renderEventShell() {
     open_start: eventRow?.start_time || null,
     open_end: eventRow?.end_time || null
   };
-  const image = propertyImageUrl(contextHouse);
   const listingUrl = oneKeyListingUrl(contextHouse);
   const status = houseStatus(contextHouse);
   const agentName = agent?.name || 'Host Agent';
@@ -963,64 +1218,39 @@ function renderEventShell() {
     .filter((fact) => fact.value)
     .map((fact) => `${esc(fact.value)} ${esc(fact.label)}`)
     .join(' | ');
-  const contactHref = vcardHref(agent);
 
   const lastCheckinNeedsFinancing = pageState.lastCheckin?.metadata?.financing_requested === true;
 
   shell(`
-    <div class="text-center mb-8">
-      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Open House Check-In</div>
-      <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Welcome In</h1>
-      <p class="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">Check in for this property and the host will receive your visit details.</p>
-    </div>
+    <section class="rounded-[30px] border border-white/70 bg-white/82 p-5 md:p-7 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-5">
+      <div class="flex items-center gap-4">
+        ${agentImage
+          ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="h-16 w-16 rounded-full border border-white bg-white object-cover shadow-sm">`
+          : `<div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl font-black text-sky-700 shadow-sm">${esc(initials(agentName))}</div>`}
+        <div class="min-w-0">
+          <div class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white" style="background:${status.color}">${esc(status.label)}</div>
+          <h1 class="mt-3 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900">Welcome to my open house</h1>
+          <div class="mt-1 text-base font-black text-slate-900">${esc(agentName)}</div>
+          <div class="text-sm font-semibold text-slate-500">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
+        </div>
+      </div>
 
-    <section class="rounded-[30px] overflow-hidden border border-white/70 bg-white/75 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-6">
-      ${image
-        ? `<img src="${esc(image)}" alt="${esc(contextHouse?.address || 'Property photo')}" class="w-full h-64 md:h-80 object-cover bg-slate-100">`
-        : `<div class="w-full h-64 md:h-80 bg-slate-100 flex items-center justify-center text-slate-400 font-black uppercase tracking-[0.18em]">Property Photo</div>`}
-      <div class="p-6 md:p-8">
-        <div class="inline-flex items-center px-4 py-2 rounded-full text-xs font-black uppercase tracking-[0.18em] text-white mb-4" style="background:${status.color}">${esc(status.label)}</div>
-        <div class="font-['Plus_Jakarta_Sans'] text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(contextHouse?.address || 'Open House Event')}</div>
-        ${contextHouse?.price ? `<div class="text-sky-600 font-black text-2xl md:text-3xl mb-2">${money(contextHouse.price)}</div>` : ''}
-        ${factSummary ? `<div class="text-slate-700 text-base md:text-lg font-black mb-3">${factSummary}</div>` : ''}
-        <div class="text-slate-600 text-base md:text-lg font-semibold mb-6">${esc(contextHouse?.brokerage || 'Brokerage info available on event record')}</div>
-
-        <div class="rounded-[26px] bg-slate-50 border border-slate-100 p-5">
-          <div class="flex items-center gap-4">
-            ${agentImage ? `<img src="${esc(agentImage)}" onerror="this.style.display='none';" alt="${esc(agentName)}" class="w-16 h-16 rounded-full object-cover bg-white border border-white shadow-sm">` : ''}
-            <div>
-              <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Hosted By</div>
-              <div class="text-slate-900 font-black text-xl">${esc(agentName)}</div>
-              <div class="text-slate-500 font-semibold text-sm">${textOrDash(agent?.brokerage || contextHouse?.brokerage)}</div>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-            <a href="${esc(contactHref)}" download="${esc((agentName || 'host-agent').replace(/[^a-z0-9]+/gi, '-').toLowerCase())}.vcf" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)] ${contactHref === '#' ? 'pointer-events-none opacity-60' : ''}" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Save Contact</a>
-            <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/85 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
-            <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I am checking in for ${contextHouse?.address || 'your open house'}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/85 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
-          </div>
+      <div class="mt-5 rounded-[22px] border border-slate-100 bg-slate-50/90 p-4">
+        <div class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold tracking-tight text-slate-900">${esc(contextHouse?.address || 'Open House Event')}</div>
+        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-black text-slate-600">
+          ${contextHouse?.price ? `<span class="text-sky-600">${money(contextHouse.price)}</span>` : ''}
+          ${factSummary ? `<span>${factSummary}</span>` : ''}
+          <span>${esc(formatEventWindow(contextHouse))}</span>
         </div>
       </div>
     </section>
 
     <section class="mb-5">
       <article class="rounded-[28px] border border-sky-100 bg-white/82 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        <div class="text-center mb-6">
+        <div class="mb-5">
           <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">CHECK IN HERE</div>
-          <h2 class="font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-2">Start Your Visit</h2>
-          <p class="text-slate-600 font-semibold leading-relaxed max-w-2xl mx-auto">Choose the option that matches you, then complete the quick form so the host can follow up about this property.</p>
-        </div>
-
-        <div class="flex flex-wrap gap-3 mb-5">
-          ${pathButton(CHECKIN_PATHS.BUYER, PATH_LABELS[CHECKIN_PATHS.BUYER])}
-          ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_WITH_AGENT])}
-          ${pathButton(CHECKIN_PATHS.BUYER_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_AGENT])}
-        </div>
-
-        <div class="rounded-[24px] border border-sky-100 bg-gradient-to-br from-sky-50/95 to-white p-5 mb-5">
-          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Check-In Path</div>
-          <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-2">${esc(PATH_LABELS[selectedPath])}</h2>
-          <p class="text-slate-600 font-medium leading-relaxed">${esc(getPathDescription(selectedPath))}</p>
+          <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Start Your Visit</h2>
+          <p class="text-slate-600 font-semibold leading-relaxed">Enter your name and phone to begin check-in.</p>
         </div>
 
         ${pageState.mode === 'guest' ? `
@@ -1033,7 +1263,15 @@ function renderEventShell() {
         ${pageState.mode === 'checkin' ? `
           <form id="checkin-form" class="space-y-4">
             ${renderFormFields()}
-            ${renderDisclosureBlock()}
+            <div class="rounded-[18px] border border-slate-200 bg-white/80 p-4">
+              <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Need a different check-in path?</div>
+              <div class="flex flex-wrap gap-2">
+                ${pathButton(CHECKIN_PATHS.BUYER, PATH_LABELS[CHECKIN_PATHS.BUYER])}
+                ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_WITH_AGENT])}
+                ${pathButton(CHECKIN_PATHS.BUYER_AGENT, PATH_LABELS[CHECKIN_PATHS.BUYER_AGENT])}
+              </div>
+            </div>
+            ${renderRequiredDisclosuresBlock()}
             ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderFinancingBlock() : ''}
             <button type="submit" class="inline-flex items-center justify-center w-full px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)] disabled:opacity-70" style="background:linear-gradient(90deg,#38bdf8,#2563eb);" ${pageState.submitting ? 'disabled' : ''}>
               ${pageState.submitting ? 'Saving Check-In...' : 'Complete Check-In'}
@@ -1106,6 +1344,7 @@ function renderEventShell() {
     pageState.mode = 'checkin';
     pageState.successMessage = '';
     pageState.errorMessage = '';
+    pageState.requiredDisclosures = { agency: null, courtesy: null };
     renderEventShell();
   });
 }
@@ -1130,6 +1369,7 @@ export async function initEventShellPage() {
   pageState.errorMessage = '';
   pageState.lastCheckin = null;
   pageState.financingAlertSent = false;
+  pageState.requiredDisclosures = { agency: null, courtesy: null };
   loading('Resolving active event record...');
 
   try {
