@@ -1048,7 +1048,7 @@ Endpoint and cron:
 
 `[NEEDS VERIFICATION]` Cron execution, service-role env state, and RLS behavior still need live verification before treating the pipeline as fully operational. The additive Supabase schema migration was applied and anon zero-row schema probes passed on 2026-05-09.
 
-`[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` is marked with `manual_price_override = 1399900`, `source_price = 1399998`, and `freshness_status = manual_override_active` so the live demo display stays at the requested `$1,399,900` while preserving the current OneKey source price. A privileged SQL check confirmed a matching `open_house_price_history` audit row from old `$1,450,000` to display `$1,399,900`.
+`[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
 
 ## Twilio And SMS Logic
 

@@ -153,7 +153,7 @@ Recent repo state includes:
 - `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
 - `[IMPLEMENTED]` OneKey listing freshness worker, API route, cron config, migration, npm scripts, and live-verification contract entries were added so stale prices can be checked against current OneKey source data.
-- `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` is marked with `manual_price_override = 1399900`, `source_price = 1399998`, and `freshness_status = manual_override_active` so the live demo display stays at the requested `$1,399,900` while preserving the current OneKey source price. A privileged SQL check confirmed a matching `open_house_price_history` audit row from old `$1,450,000` to display `$1,399,900`.
+- `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.
 
 ## [INTENDED] Build Next
