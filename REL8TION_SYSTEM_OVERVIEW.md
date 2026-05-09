@@ -14,10 +14,10 @@ Status labels used in this file:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy was made from `modular-claim-test` commit `51d2d1a`, tagged `production-51d2d1a-2026-05-08`.
-- `[PARTIAL]` Branch reconciliation is moving toward `main` as production and `staging` as pre-production. Vercel API inspection confirms the project Git `productionBranch` is already `main`; the merge still needs to be pushed before `main` fully contains the current live source.
-- `[INTENDED]` The intended clean Git state is `main` for production, `staging` for preview/staging, and historical feature branches such as `modular-claim-test` kept only as reference.
-- `[IMPLEMENTED]` Vercel API inspection confirmed project Git `productionBranch = main`. The latest production deployment metadata still points to a direct/dirty deploy from `modular-claim-test`, so pushing reconciled `main` is required to restore clean Git-to-production alignment.
+- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `5ad4f25` (`Reconcile live app source into main`), deployed through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `5ad4f250070e0ee982a5523a5dede58f4b1fb26f`.
+- `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
+- `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 
 ## Product Purpose
 
@@ -1055,7 +1055,8 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
-- `[PARTIAL]` Vercel CLI/API inspection confirmed a ready production deployment aliased to `app.rel8tion.me`, deployed serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`, and project Git `productionBranch = main`. The latest production deployment metadata still points to a direct/dirty deploy from `modular-claim-test`.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@5ad4f25`, and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.

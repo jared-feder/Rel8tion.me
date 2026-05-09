@@ -14,9 +14,10 @@ Status labels:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy was made from `modular-claim-test` commit `51d2d1a`, tagged `production-51d2d1a-2026-05-08`.
-- `[PARTIAL]` Branch reconciliation is being moved toward `main` as the production branch and `staging` as the pre-production branch. Vercel API inspection confirms the project Git `productionBranch` is already `main`; the merge still needs to be pushed before `main` fully contains the current live source.
-- `[INTENDED]` `main` should be the production source of truth after reconciliation, with the live production commit preserved by tag. `staging` should be the preview/staging branch for work before it reaches `main`.
+- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `5ad4f25` (`Reconcile live app source into main`), deployed through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `5ad4f250070e0ee982a5523a5dede58f4b1fb26f`.
+- `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
+- `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 - `[RISK]` Do not force-push `main` and do not reset either branch. Preserve production tags and use normal merge/PR history.
 
 ## [IMPLEMENTED] Repo Code Present Today
@@ -78,8 +79,9 @@ Status labels:
 - `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its local Edge Function source was not found, and the verification script intentionally does not call SMS functions.
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
 - `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
-- `[PARTIAL]` Vercel CLI/API inspection confirmed a ready production deployment aliased to `app.rel8tion.me`, serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`, and project Git `productionBranch = main`. The latest production deployment metadata still shows it came from `modular-claim-test` with a dirty direct deploy, so pushing reconciled `main` is the step that restores clean branch-to-production alignment.
-- `[PARTIAL]` Live route smoke check on 2026-05-09 returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@5ad4f25`, and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[PARTIAL]` Live route smoke check after the `main@5ad4f25` deployment returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
+- `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Final NYS disclosure legal/form-version review remains unverified. The app points to a REL8TION-hosted Supabase Storage copy, while the official DOS form page remains the source-of-truth reference.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF storage depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.
 
@@ -98,8 +100,9 @@ Status labels:
 
 Recent repo state includes:
 
-- `[IMPLEMENTED]` Production was deployed from `modular-claim-test` commit `51d2d1a` and tagged `production-51d2d1a-2026-05-08`.
-- `[PARTIAL]` Branch strategy cleanup started: `main` is being reconciled to contain the live app source, and `staging` was created from the current live branch as the staging/pre-production branch.
+- `[IMPLEMENTED]` Production now deploys from `main` and is live at commit `5ad4f25`.
+- `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.
+- `[IMPLEMENTED]` The older production deploy from `modular-claim-test` commit `51d2d1a` remains tagged as `production-51d2d1a-2026-05-08`.
 - `[IMPLEMENTED]` Sign activation now carries forward the open house selected during keychain claim and offers it first for sign binding.
 - `[IMPLEMENTED]` Sign activation now displays agent profile name/brokerage from the agent row instead of showing only a raw slug such as `agent-gwh`.
 - `[IMPLEMENTED]` Root env files were removed from git tracking, `.env*` is ignored, and `.vercelignore` helps keep local/docs artifacts out of deploy uploads.
@@ -161,7 +164,7 @@ Highest-value next work:
 - `[IMPLEMENTED]` Current rear/agent chip routing requires keychain verification before dashboard access.
 - `[INTENDED]` Do not reset live field signs without explicit confirmation.
 - `[RISK]` Treat Elena/Galluzzo sign data as protected unless the user says otherwise.
-- `[PARTIAL]` `main` is being reconciled to become the production source of truth. Vercel Git production branch is verified as `main`, but the reconciled merge still needs to be pushed and deployed before the branch and live app are fully aligned.
+- `[IMPLEMENTED]` `main` is now the production source of truth and Vercel production branch is verified as `main`.
 - `[RISK]` The worktree contains many untracked docs, backup exports, WordPress files, and generated artifacts. Clean them by classifying into commit/ignore/archive groups; do not blindly delete them.
 - `[RISK]` Stale `smart_sign_activation_sessions` rows can break activation flows.
 - `[RISK]` `open_house_events` uses `host_agent_slug`; do not reintroduce `agent_slug` writes for that table.
