@@ -289,7 +289,7 @@
         <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">NMB Sign-In</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Tap Loan Officer Keychain</h1>
         <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">Have the NMB loan officer tap their verified Rel8tionChip now. This dashboard will reopen with loan support marked live.</p>
-        <button onclick="window.location.reload()" class="mt-6 rounded-full bg-white px-6 py-3 font-black text-slate-700 ring-1 ring-slate-200">Cancel</button>
+        <button onclick="window.localStorage.removeItem('rel8tion_loan_officer_pending'); window.location.reload()" class="mt-6 rounded-full bg-white px-6 py-3 font-black text-slate-700 ring-1 ring-slate-200">Cancel</button>
       </div>`;
     };
 

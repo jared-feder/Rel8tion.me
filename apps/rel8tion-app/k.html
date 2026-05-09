@@ -240,6 +240,33 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    async function maybeHandlePendingLoanOfficerSession({ allowProfileActivation = true } = {}) {
+      const pendingLoanOfficer = readLoanOfficerSession();
+      if (!pendingLoanOfficer?.eventId) return false;
+
+      setStatus('Checking NMB Key...', 'Looking up the loan officer profile.');
+      const profile = await loadVerifiedProfile(uid);
+      if (!profile?.uid) {
+        if (!allowProfileActivation) {
+          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+          return false;
+        }
+        setStatus('Activate NMB Profile', 'This chip needs a verified loan officer profile first.');
+        window.location.href = `${window.location.origin}/nmb-activate?uid=${encodeURIComponent(uid)}`;
+        return true;
+      }
+      await activateLoanOfficerSession(pendingLoanOfficer, profile);
+      window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+      setStatus('Loan Officer Live', 'Returning to the agent event dashboard.');
+      goToAgentDashboard({
+        agentSlug: pendingLoanOfficer.agentSlug,
+        eventId: pendingLoanOfficer.eventId,
+        signId: pendingLoanOfficer.signId,
+        publicCode: pendingLoanOfficer.publicCode
+      });
+      return true;
+    }
+
     async function findActiveSignByChipUid(chipUid) {
       const encodedUid = encodeURIComponent(chipUid);
       const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&status=eq.active&select=id,public_code,uid_primary,uid_secondary,owner_agent_slug,active_event_id,primary_device_type,secondary_device_type&limit=1`, {
@@ -279,6 +306,7 @@
       if (activeSign?.public_code) {
         const role = activeSignChipRole(activeSign, uid);
         if (role === 'rear_agent') {
+          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
           saveAgentDashboardSession(activeSign);
           setStatus('Agent Side Found', 'Tap your Rel8tionChip keychain to verify and open the live event dashboard.');
           return;
@@ -288,27 +316,6 @@
           goToLiveSign(activeSign.public_code);
           return;
         }
-      }
-
-      const pendingLoanOfficer = readLoanOfficerSession();
-      if (pendingLoanOfficer?.eventId) {
-        setStatus('Checking NMB Key...', 'Looking up the loan officer profile.');
-        const profile = await loadVerifiedProfile(uid);
-        if (!profile?.uid) {
-          setStatus('Activate NMB Profile', 'This chip needs a verified loan officer profile first.');
-          window.location.href = `${window.location.origin}/nmb-activate?uid=${encodeURIComponent(uid)}`;
-          return;
-        }
-        await activateLoanOfficerSession(pendingLoanOfficer, profile);
-        window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
-        setStatus('Loan Officer Live', 'Returning to the agent event dashboard.');
-        goToAgentDashboard({
-          agentSlug: pendingLoanOfficer.agentSlug,
-          eventId: pendingLoanOfficer.eventId,
-          signId: pendingLoanOfficer.signId,
-          publicCode: pendingLoanOfficer.publicCode
-        });
-        return;
       }
 
       setStatus('Checking Key...', 'Looking up your Rel8tion chip.');
@@ -358,6 +365,10 @@
             uid: remoteSignActivation.agent_key_uid,
             agent: remoteSignActivation.agent_slug
           });
+          return;
+        }
+
+        if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: true })) {
           return;
         }
 
@@ -447,6 +458,10 @@
             code: pendingSignActivation.publicCode,
             sign_id: pendingSignActivation.signId
           });
+          return;
+        }
+
+        if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: false })) {
           return;
         }
 

@@ -55,6 +55,7 @@ Status labels:
 - `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
 - `[IMPLEMENTED]` Buyer preapproval/financing routing asks for pre-approval status on buyer-facing paths, then handles the second-opinion or discreet loan-officer consent inside the guided disclosure modal after disclosures are reviewed. It checks for a live loan officer session first, then falls back to Jared alert. The `buyer_agent` path skips pre-approval and disclosure prompts.
 - `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
+- `[IMPLEMENTED]` Rear sign dashboard verification takes priority over any stale loan-officer sign-in prompt. Tapping the rear sign clears the pending LO browser session before waiting for the agent keychain.
 - `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, each lead card's NYS disclosure signed/missing status, signed PDF link when available, outreach count, relationship status, and loan officer coverage.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
@@ -129,6 +130,7 @@ Recent repo state includes:
 - `[PARTIAL]` Buyer event page now requests signed NYS disclosure PDF generation after check-in and before SMS notification calls continue; failure is logged and does not block buyer/agent SMS.
 - `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
 - `[IMPLEMENTED]` Agent dashboard tightened to show event leads and live loan officer coverage.
+- `[IMPLEMENTED]` `/k` routing now prevents stale LO sign-in state from hijacking rear-sign agent keychain verification, and dashboard cancel clears the pending LO sign-in browser state.
 - `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.

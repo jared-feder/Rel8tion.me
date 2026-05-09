@@ -144,9 +144,11 @@ Important localStorage keys:
 1. If reset mode is armed, route the scanned UID to `/key-reset.html?uid=...`.
 2. If UID matches an active sign front chip, route to the live sign route `/s?code=<publicCode>`.
 3. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
-4. If a loan officer dashboard sign-in is pending, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
+4. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
 5. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
 6. If a claimed keychain exists, resume pending sign activation, satisfy dashboard challenge, or route the agent to `/a?agent=<slug>&uid=<uid>`.
+
+`[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
 ### `/claim`
 
