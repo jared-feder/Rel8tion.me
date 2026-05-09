@@ -14,8 +14,8 @@ Status labels:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `5ad4f25` (`Reconcile live app source into main`), deployed through Vercel Git production branch automation.
-- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `5ad4f250070e0ee982a5523a5dede58f4b1fb26f`.
+- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `1d901ec` (`Document main production branch alignment`), deployed through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `1d901eceb64bf3cc83f8f5f884e06cbbcb278b9d`.
 - `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 - `[RISK]` Do not force-push `main` and do not reset either branch. Preserve production tags and use normal merge/PR history.
@@ -41,6 +41,7 @@ Status labels:
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event` first visible screen is buyer-first: compact host photo/avatar, "Welcome to my open house", agent/brokerage/property context, then name and phone check-in inputs. Host contact/save-contact actions are intentionally shown after successful check-in.
+- `[IMPLEMENTED]` `/event` uses the Rel8tion cloud background layer and opens agency/courtesy disclosure dialogs as fixed viewport overlays, so tapping Review & Sign does not require scrolling to the bottom of the page.
 - `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.
 - `[IMPLEMENTED]` `/event` requires the New York State Agency Disclosure and Rel8tion Courtesy Notice to be reviewed/signed through modal accept/sign actions before check-in submit. Seller representation is the only agency disclosure mode in v1.
 - `[IMPLEMENTED]` `/event` stores agency/courtesy disclosure evidence in `event_checkins.metadata`, including `agency_disclosure_reviewed`, `seller_representation_acknowledged`, `agency_disclosure_signed_at`, `agency_disclosure_pdf_url`, `agency_disclosure_version`, `agency_disclosure_type`, `rel8tion_courtesy_acknowledged`, `rel8tion_courtesy_signed_at`, plus nested `nys_agency_disclosure` and `rel8tion_courtesy_notice` objects.
@@ -79,8 +80,8 @@ Status labels:
 - `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its local Edge Function source was not found, and the verification script intentionally does not call SMS functions.
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
 - `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
-- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@5ad4f25`, and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
-- `[PARTIAL]` Live route smoke check after the `main@5ad4f25` deployment returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@1d901ec`, and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[PARTIAL]` Live route smoke check after the `main@1d901ec` deployment returned 200 for `/claim`, `/onboarding`, `/sign-demo-activate`, `/k`, `/key-reset`, `/event`, and `/agent-dashboard`; `/api/admin/reset-key` returned 401 without token as expected; `/api/compliance/ny-disclosure` returned 400 without an event as expected. `/api/cron/enrich-agents` was intentionally not invoked because it writes/enriches production data.
 - `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Final NYS disclosure legal/form-version review remains unverified. The app points to a REL8TION-hosted Supabase Storage copy, while the official DOS form page remains the source-of-truth reference.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF storage depends on Vercel env vars `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and an existing `SIGNED_DISCLOSURE_BUCKET` bucket or the default `signed-disclosures` bucket.
@@ -100,7 +101,7 @@ Status labels:
 
 Recent repo state includes:
 
-- `[IMPLEMENTED]` Production now deploys from `main` and is live at commit `5ad4f25`.
+- `[IMPLEMENTED]` Production now deploys from `main` and is live at commit `1d901ec`.
 - `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.
 - `[IMPLEMENTED]` The older production deploy from `modular-claim-test` commit `51d2d1a` remains tagged as `production-51d2d1a-2026-05-08`.
 - `[IMPLEMENTED]` Sign activation now carries forward the open house selected during keychain claim and offers it first for sign binding.
@@ -113,6 +114,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Key reset scanner/admin API added.
 - `[IMPLEMENTED]` Buyer event page changed to a low-scroll first screen with hosted-by agent photo/avatar, "Welcome to my open house", property context, and immediate buyer name/phone inputs.
 - `[IMPLEMENTED]` Buyer event page moved host Save Contact/Call/Text/Email actions to the post-check-in success/contact section.
+- `[IMPLEMENTED]` Buyer event page restored the Rel8tion cloud background and moved agency/courtesy disclosure modals into fixed viewport overlays so the Review & Sign actions open immediately on screen.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the New York State Agency Disclosure and Rel8tion Courtesy Notice are accepted/signed, then stores the timestamps and disclosure metadata in `event_checkins.metadata`.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement is complete and the buyer name is available as the prefilled e-signature, then saves DOS-2156 metadata before SMS notifications are called.
 - `[PARTIAL]` Buyer event page now requests signed NYS disclosure PDF generation after check-in and before SMS notification calls continue; failure is logged and does not block buyer/agent SMS.

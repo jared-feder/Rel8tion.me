@@ -14,8 +14,8 @@ Status labels used in this file:
 
 ## [IMPLEMENTED] Current Live Code Anchor
 
-- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `5ad4f25` (`Reconcile live app source into main`), deployed through Vercel Git production branch automation.
-- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `5ad4f250070e0ee982a5523a5dede58f4b1fb26f`.
+- `[IMPLEMENTED]` The latest known live production deploy is from `main` commit `1d901ec` (`Document main production branch alignment`), deployed through Vercel Git production branch automation.
+- `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main`, production ref `main`, and production SHA `1d901eceb64bf3cc83f8f5f884e06cbbcb278b9d`.
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
 
@@ -276,11 +276,13 @@ Inputs:
 - Loads agent profile by `host_agent_slug`.
 - Attempts fallback agent photo lookup from `listing_agents`.
 - Builds a buyer-first welcome screen with host photo/avatar, "Welcome to my open house", agent/brokerage/property context, and immediate name/phone inputs.
+- Uses the Rel8tion cloud background layer from the current app styling.
 - Shows host contact/save-contact actions only after successful check-in.
 - Shows "CHECK IN HERE" with buyer path choices below the primary name/phone inputs so buyers can begin check-in without scrolling through contact controls.
 - Inserts check-ins into `event_checkins`.
 - Requires New York State Agency Disclosure review/sign before check-in submit. V1 explicitly documents that the listing agent may currently represent the seller; it does not expose dual agency or imply buyer representation.
 - Requires Rel8tion Courtesy Notice review/sign before check-in submit. The notice states that Rel8tion does not create buyer-agent, dual-agency, legal, lending, or fiduciary relationships.
+- Opens agency/courtesy disclosure Review & Sign dialogs as fixed viewport overlays instead of leaving the dialogs at the bottom of the long buyer page.
 - Saves agency/courtesy acknowledgement details in `event_checkins.metadata`, including signed timestamps, PDF URL/version/type, root convenience fields, and nested `nys_agency_disclosure` / `rel8tion_courtesy_notice` objects.
 - Requires buyer disclosure completion before check-in submit: official NYS Housing and Anti-Discrimination Disclosure form link is shown, the checkbox acknowledgement is accepted, and the buyer check-in name is available as the prefilled electronic signature.
 - Uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF.
@@ -1055,7 +1057,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
-- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@5ad4f25`, and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
+- `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me`, is sourced from `main@1d901ec`, and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
 - `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
@@ -1088,6 +1090,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
 | `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a compact host welcome/property context before the form and moves host contact/save-contact actions to post-check-in. |
+| `/event` cloud background and disclosure overlay behavior are present. | `[IMPLEMENTED]` | `event.html` defines the cloud background layer; `eventShell/bootstrap.js` portals agency/courtesy dialogs to `document.body` and opens them as fixed viewport overlays. |
 | `/event` requires NYS Agency Disclosure and Rel8tion Courtesy Notice signatures. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates agency/courtesy signed timestamps before creating the check-in. |
 | `/event` stores agency/courtesy disclosure evidence. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes agency/courtesy disclosure metadata into `event_checkins.metadata`. |
 | `/event` requires NYS disclosure acknowledgement before SMS/check-in completion. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before creating the check-in and before notification calls. |

@@ -6,14 +6,103 @@
   <title>Rel8tion Live Event</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      overflow-x: hidden;
+      background: #f0f7ff;
+    }
+
+    body.rel8tion-modal-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .event-page-shell {
+      position: relative;
+      min-height: 100svh;
+      overflow: hidden;
+      background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 58%, #f0f7ff 100%);
+      background-attachment: fixed;
+    }
+
+    .event-moving-clouds {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      width: 200%;
+      height: 500px;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+      background-repeat: repeat-x;
+      background-size: 800px auto;
+      animation: eventCloudDrift 120s linear infinite;
+    }
+
+    .event-cloud-wash {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 20%, rgba(240, 247, 255, 0.86) 100%);
+    }
+
+    .event-app-layer {
+      position: relative;
+      z-index: 2;
+    }
+
+    .rel8tion-disclosure-modal {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 9999 !important;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px 12px;
+      background: rgba(15, 23, 42, 0.54);
+      overscroll-behavior: contain;
+    }
+
+    .rel8tion-disclosure-modal.is-open {
+      display: flex !important;
+    }
+
+    .rel8tion-disclosure-panel {
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    @media (min-width: 768px) {
+      .rel8tion-disclosure-modal {
+        align-items: center;
+        padding: 24px;
+      }
+
+      .rel8tion-disclosure-panel {
+        max-height: min(760px, calc(100dvh - 48px));
+      }
+    }
+
+    @keyframes eventCloudDrift {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+  </style>
 </head>
 <body class="bg-[#f0f7ff]">
-  <main class="min-h-screen flex items-center justify-center px-4 py-8" style="background:linear-gradient(180deg,#38bdf8 0%,#f0f7ff 60%,#f0f7ff 100%);">
-    <div id="app" class="w-full flex items-center justify-center"></div>
+  <main class="event-page-shell flex items-center justify-center px-4 py-8">
+    <div class="event-moving-clouds" aria-hidden="true"></div>
+    <div class="event-cloud-wash" aria-hidden="true"></div>
+    <div id="app" class="event-app-layer w-full flex items-center justify-center"></div>
   </main>
 
   <script type="module">
-    import { initEventShellPage } from '/apps/rel8tion-app/src/modules/eventShell/bootstrap.js?v=20260508-disclosures-v2';
+    import { initEventShellPage } from '/apps/rel8tion-app/src/modules/eventShell/bootstrap.js?v=20260509-cloud-modal-fix';
     initEventShellPage();
   </script>
 </body>

@@ -48,6 +48,8 @@ const pageState = {
   }
 };
 
+let disclosureEscapeHandlerBound = false;
+
 function getEventIdFromUrl() {
   return new URLSearchParams(window.location.search).get('event') || '';
 }
@@ -67,7 +69,15 @@ function render(html) {
   document.getElementById('app').innerHTML = html;
 }
 
+function removeDisclosurePortals() {
+  document.querySelectorAll('.rel8tion-disclosure-modal').forEach((modal) => {
+    if (!document.getElementById('app')?.contains(modal)) modal.remove();
+  });
+  document.body.classList.remove('rel8tion-modal-open');
+}
+
 function shell(content) {
+  removeDisclosurePortals();
   render(`
     <section class="w-full max-w-5xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-6 md:p-10 shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
       <div class="text-center mb-6">
@@ -577,12 +587,12 @@ function renderDisclosureActionCard({ key, title, description }) {
 
 function renderAgencyDisclosureModal() {
   return `
-    <div id="agency-disclosure-modal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/45 px-3 py-4 md:items-center" aria-hidden="true">
-      <div class="w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+    <div id="agency-disclosure-modal" class="rel8tion-disclosure-modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agency-disclosure-title">
+      <div class="rel8tion-disclosure-panel w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]" tabindex="-1">
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Required Disclosure</div>
-            <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">New York State Agency Disclosure</h3>
+            <h3 id="agency-disclosure-title" class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">New York State Agency Disclosure</h3>
           </div>
           <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
         </div>
@@ -612,12 +622,12 @@ function renderAgencyDisclosureModal() {
 
 function renderCourtesyNoticeModal() {
   return `
-    <div id="courtesy-disclosure-modal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/45 px-3 py-4 md:items-center" aria-hidden="true">
-      <div class="w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+    <div id="courtesy-disclosure-modal" class="rel8tion-disclosure-modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="courtesy-disclosure-title">
+      <div class="rel8tion-disclosure-panel w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]" tabindex="-1">
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Courtesy Notice</div>
-            <h3 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Rel8tion Courtesy Notice</h3>
+            <h3 id="courtesy-disclosure-title" class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Rel8tion Courtesy Notice</h3>
           </div>
           <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
         </div>
@@ -977,24 +987,54 @@ function attachEventHandlers() {
   visitorNameInput?.addEventListener('input', syncDisclosureSignature);
   syncDisclosureSignature();
 
+  const prepareDisclosurePortals = () => {
+    document.querySelectorAll('.rel8tion-disclosure-modal').forEach((modal) => {
+      if (modal.parentElement !== document.body) document.body.appendChild(modal);
+    });
+  };
+
+  prepareDisclosurePortals();
+
   const closeDisclosureModals = () => {
-    document.querySelectorAll('[id$="-disclosure-modal"]').forEach((modal) => {
+    document.querySelectorAll('.rel8tion-disclosure-modal').forEach((modal) => {
       modal.classList.add('hidden');
-      modal.classList.remove('flex');
+      modal.classList.remove('flex', 'is-open');
       modal.setAttribute('aria-hidden', 'true');
     });
+    document.body.classList.remove('rel8tion-modal-open');
   };
 
   document.querySelectorAll('[data-disclosure-open]').forEach((button) => {
     button.addEventListener('click', () => {
+      prepareDisclosurePortals();
       const key = button.getAttribute('data-disclosure-open');
       const modal = document.getElementById(`${key}-disclosure-modal`);
       if (!modal) return;
+      closeDisclosureModals();
       modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.classList.add('is-open');
       modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('rel8tion-modal-open');
+      const panel = modal.querySelector('.rel8tion-disclosure-panel');
+      if (panel) {
+        panel.scrollTop = 0;
+        window.requestAnimationFrame(() => panel.focus({ preventScroll: true }));
+      }
     });
   });
+
+  document.querySelectorAll('.rel8tion-disclosure-modal').forEach((modal) => {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeDisclosureModals();
+    });
+  });
+
+  if (!disclosureEscapeHandlerBound) {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeDisclosureModals();
+    });
+    disclosureEscapeHandlerBound = true;
+  }
 
   document.querySelectorAll('[data-disclosure-close]').forEach((button) => {
     button.addEventListener('click', closeDisclosureModals);

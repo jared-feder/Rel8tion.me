@@ -16,9 +16,9 @@ Status labels used in this file:
 
 `[IMPLEMENTED]` This repo is a product workspace with static Vercel pages, Supabase data access, Twilio/SMS integration points, WordPress-side working files, and many historical handoff docs. Treat the current route files and current source code as the source of truth. Older docs are useful context but should not override the current implementation.
 
-`[IMPLEMENTED]` Latest known live production code anchor: `main` commit `5ad4f25`, deployed to `app.rel8tion.me`. The earlier direct deploy from `modular-claim-test` commit `51d2d1a` is preserved as tag `production-51d2d1a-2026-05-08`.
+`[IMPLEMENTED]` Latest known live production code anchor: `main` commit `1d901ec`, deployed to `app.rel8tion.me`. The earlier direct deploy from `modular-claim-test` commit `51d2d1a` is preserved as tag `production-51d2d1a-2026-05-08`.
 
-`[IMPLEMENTED]` Branch cleanup moved production to `main` and created `staging` as the preview/staging branch. Vercel API inspection on 2026-05-09 confirmed project Git `productionBranch = main`, and production was verified live from `main@5ad4f25`. Do not force-push either branch.
+`[IMPLEMENTED]` Branch cleanup moved production to `main` and created `staging` as the preview/staging branch. Vercel API inspection on 2026-05-09 confirmed project Git `productionBranch = main`, and production was verified live from `main@1d901ec`. Do not force-push either branch.
 
 `[INTENDED]` After any production-flow change, update `CURRENT_STATE.md` immediately and update `REL8TION_SYSTEM_OVERVIEW.md` when routes, schema expectations, NFC behavior, SMS behavior, dashboard behavior, compliance behavior, or deployment/source-of-truth status changes.
 
