@@ -68,8 +68,14 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
 
-    async function request(path) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
+    async function request(path, options = {}) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          ...headers,
+          ...(options.headers || {})
+        }
+      });
       const raw = await res.text().catch(() => '');
       if (!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
       return raw ? JSON.parse(raw) : null;
