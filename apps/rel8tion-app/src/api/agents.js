@@ -16,7 +16,7 @@ export async function findListingAgentsByOpenHouse(openHouseId) {
   const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}`, {
     headers: authHeaders(KEY)
   });
-  return Array.isArray(rows) ? rows : [];
+  return Array.isArray(rows) ? rows.map((row) => normalizeListingAgent(row)).filter(Boolean) : [];
 }
 
 export async function findAgentByEmail(email) {
@@ -33,6 +33,108 @@ export async function getAgentBySlug(slug) {
     headers: authHeaders(KEY)
   });
   return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+export function isGenericAgentNameValue(value) {
+  const normalized = cleanText(value).toLowerCase();
+  return !normalized
+    || normalized === 'agent'
+    || normalized === 'listing agent'
+    || normalized === 'unknown agent'
+    || normalized === 'real estate agent';
+}
+
+function nameFromParts(row = {}) {
+  return cleanText([
+    row.first_name,
+    row.middle_name,
+    row.last_name
+  ].filter(Boolean).join(' '));
+}
+
+export function pickAgentDisplayName(...sources) {
+  const candidates = [];
+  sources.forEach((source) => {
+    if (!source) return;
+    if (typeof source === 'string') {
+      candidates.push(source);
+      return;
+    }
+    candidates.push(
+      source.name,
+      source.agent_name,
+      source.full_name,
+      source.display_name,
+      source.member_name,
+      source.listing_agent_name,
+      nameFromParts(source)
+    );
+  });
+
+  return cleanText(candidates.find((candidate) => !isGenericAgentNameValue(candidate)) || '');
+}
+
+export function normalizeListingAgent(row = {}, fallback = {}) {
+  if (!row && !fallback) return null;
+  const name = pickAgentDisplayName(row, fallback);
+  const phone = cleanText(row.phone || row.agent_phone || fallback.phone || fallback.agent_phone || '');
+  const email = cleanText(row.email || row.agent_email || fallback.email || fallback.agent_email || '');
+  const brokerage = cleanText(row.brokerage || row.office_name || row.company || fallback.brokerage || '');
+  const primaryPhoto = row.primary_photo_url || row.photo_url || row.image_url || fallback.primary_photo_url || fallback.image_url || '';
+  const directoryPhoto = row.directory_photo_url || row.profile_photo_url || fallback.directory_photo_url || '';
+
+  return {
+    ...row,
+    name,
+    phone,
+    email,
+    brokerage,
+    primary_photo_url: primaryPhoto || null,
+    directory_photo_url: directoryPhoto || null
+  };
+}
+
+function bestListingAgent(rows, fallback = {}) {
+  const normalized = (Array.isArray(rows) ? rows : [])
+    .map((row) => normalizeListingAgent(row, fallback))
+    .filter((row) => row?.name || row?.phone || row?.email || row?.primary_photo_url || row?.directory_photo_url);
+
+  return normalized.find((row) => row.name && (row.primary_photo_url || row.directory_photo_url))
+    || normalized.find((row) => row.name)
+    || normalized.find((row) => row.primary_photo_url || row.directory_photo_url)
+    || normalized[0]
+    || null;
+}
+
+export async function findListingAgentProfile({ openHouseId = '', name = '', phone = '' } = {}) {
+  const normalizedPhone = String(phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  const fallback = { name, phone };
+  const tryQueries = [];
+
+  if (openHouseId && normalizedPhone) {
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=5`);
+  }
+  if (openHouseId) {
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}&limit=5`);
+  }
+  if (normalizedPhone) {
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=5`);
+  }
+  if (name && !isGenericAgentNameValue(name)) {
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&name=eq.${encodeURIComponent(name)}&limit=5`);
+  }
+
+  for (const url of tryQueries) {
+    const rows = await fetchJson(url, { headers: authHeaders(KEY) });
+    const match = bestListingAgent(rows, fallback);
+    if (match?.name || match?.primary_photo_url || match?.directory_photo_url) return match;
+  }
+
+  return null;
 }
 
 export async function upsertAgent(agent) {
@@ -69,6 +171,11 @@ export async function upsertAgent(agent) {
 }
 
 export async function findListingAgentPhoto({ openHouseId = '', name = '', phone = '' } = {}) {
+  const profile = await findListingAgentProfile({ openHouseId, name, phone }).catch(() => null);
+  if (profile?.primary_photo_url || profile?.directory_photo_url) {
+    return profile.primary_photo_url || profile.directory_photo_url || null;
+  }
+
   const normalizedPhone = String(phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
   const tryQueries = [];
 

@@ -18,10 +18,12 @@ import {
   findAgentByPhoneNormalized,
   getAgentBySlug,
   findListingAgentPhoto,
+  findListingAgentProfile,
   findListingAgentsByOpenHouse,
+  isGenericAgentNameValue,
   upsertAgent,
   uploadFullProfilePhoto
-} from '../../api/agents.js';
+} from '../../api/agents.js?v=20260509-agent-name';
 import { sendActivationSMS } from '../../api/notifications.js';
 import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
 import {
@@ -44,7 +46,7 @@ import {
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js?v=20260505-beta-reset';
+} from './renderer.js?v=20260509-agent-name';
 
 const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
 const BETA_AGENT_SLUG = 'main-beta';
@@ -409,13 +411,31 @@ async function showAgentSelection() {
     const agents = await findListingAgentsByOpenHouse(h.id);
 
     if (!agents.length) {
-      setDetectedAgentPhoto(await findListingAgentPhoto({
+      const listingProfile = await findListingAgentProfile({
         openHouseId: h?.id || '',
         name: h?.agent || '',
         phone: h?.agent_phone || ''
-      }));
+      }).catch(() => null);
+      const profilePhoto = listingProfile?.primary_photo_url
+        || listingProfile?.directory_photo_url
+        || await findListingAgentPhoto({
+          openHouseId: h?.id || '',
+          name: h?.agent || '',
+          phone: h?.agent_phone || ''
+        });
+      setDetectedAgentPhoto(profilePhoto || '');
 
-      if (h?.agent || h?.agent_phone || h?.agent_email) {
+      if (listingProfile?.name || listingProfile?.phone || listingProfile?.email) {
+        setPrefilledAgent({
+          ...(state.prefilledAgent || {}),
+          name: listingProfile.name || (!isGenericAgentName(h?.agent) ? h?.agent : ''),
+          phone: listingProfile.phone || h?.agent_phone || state.prefilledAgent?.phone || '',
+          email: listingProfile.email || h?.agent_email || state.prefilledAgent?.email || '',
+          brokerage: listingProfile.brokerage || h?.brokerage || state.prefilledAgent?.brokerage || '',
+          image_url: profilePhoto || state.prefilledAgent?.image_url || ''
+        });
+        showVerifyAgent();
+      } else if (h?.agent && !isGenericAgentName(h.agent)) {
         showVerifyAgent();
       } else {
         routeUnknownAgentFlow(h?.brokerage || '', 'We did not find an agent record. Complete your profile below.');
@@ -457,7 +477,7 @@ async function showAgentSelection() {
     `;
   } catch (e) {
     debug('AGENT SELECTION FAILED', { message: e?.message || String(e) });
-    if (h?.agent || h?.agent_phone || h?.agent_email) {
+    if (h?.agent && !isGenericAgentName(h.agent)) {
       showVerifyAgent();
     } else {
       routeUnknownAgentFlow(h?.brokerage || '', 'Agent lookup failed. Continue manually.');
@@ -507,9 +527,15 @@ function selectAgent(agent) {
     return;
   }
 
+  const selectedName = !isGenericAgentName(agent.name)
+    ? agent.name
+    : (!isGenericAgentName(state.prefilledAgent?.name)
+      ? state.prefilledAgent.name
+      : (!isGenericAgentName(state.detectedHouse?.agent) ? state.detectedHouse.agent : ''));
+
   setPrefilledAgent({
     ...(state.prefilledAgent || {}),
-    name: agent.name || state.prefilledAgent?.name || '',
+    name: selectedName,
     phone: agent.phone || state.prefilledAgent?.phone || '',
     email: agent.email || state.prefilledAgent?.email || '',
     brokerage: agent.brokerage || state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '',
@@ -527,8 +553,7 @@ function getFullProfileBrokerage() {
 }
 
 function isGenericAgentName(name) {
-  const normalized = String(name || '').trim().toLowerCase();
-  return !normalized || normalized === 'agent' || normalized === 'listing agent';
+  return isGenericAgentNameValue(name);
 }
 
 function isGeneratedGenericAgent(agent) {

@@ -20,6 +20,23 @@ function primaryButtonStyle() {
   return `background:linear-gradient(90deg, ${c.primary}, ${c.accent}); color:white;`;
 }
 
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function isGenericAgentName(value) {
+  const normalized = cleanText(value).toLowerCase();
+  return !normalized
+    || normalized === 'agent'
+    || normalized === 'listing agent'
+    || normalized === 'unknown agent'
+    || normalized === 'real estate agent';
+}
+
+function firstRealAgentName(...values) {
+  return cleanText(values.find((value) => !isGenericAgentName(value)) || '');
+}
+
 function render(content) {
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -269,7 +286,7 @@ export function showOtherListings() {
 export function showVerifyAgent() {
   const h = state.detectedHouse;
   const verifyPhoto = state.prefilledAgent?.image_url || state.detectedAgentPhoto || '';
-  const displayName = state.prefilledAgent?.name || h?.agent || 'Agent';
+  const displayName = firstRealAgentName(state.prefilledAgent?.name, h?.agent) || 'Confirm Profile';
   const displayPhone = state.prefilledAgent?.phone || h?.agent_phone || '';
   const displayEmail = state.prefilledAgent?.email || h?.agent_email || '';
   const displayBrokerage = state.prefilledAgent?.brokerage || h?.brokerage || '';

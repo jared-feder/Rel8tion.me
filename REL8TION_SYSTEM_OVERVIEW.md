@@ -170,6 +170,7 @@ Role: claim a Rel8tionChip/keychain into an agent identity.
 - If key is claimed, routes or displays the claimed agent state.
 - Uses geolocation and `find_nearest_open_house` to find possible listings.
 - Can search/select an open house and infer agent data from `listing_agents` or `open_houses`.
+- Normalizes listing-agent profile data before showing the "Is This You?" confirmation. Placeholder names such as `Agent`, `Listing Agent`, `Unknown Agent`, and `Real Estate Agent` are not treated as real names, and the flow tries to recover the best enriched `listing_agents` profile by open house or phone before asking the user to confirm.
 - Can manually save full profile data.
 - Upserts into `agents`.
 - Updates/inserts `keys` with claimed state and `agent_slug`.
