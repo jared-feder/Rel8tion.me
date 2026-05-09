@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Rel8tion Agent Event Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 44%,#f8fbff 100%);">
+    <section class="mx-auto max-w-5xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Agent Dashboard</div>
+            <div id="agentLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Verifying...</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Dashboard</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading the live event tied to this sign.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260430-agent-dashboard';
+
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      agent: params.get('agent') || '',
+      uid: params.get('uid') || '',
+      eventId: params.get('event') || '',
+      signId: params.get('sign_id') || '',
+      code: params.get('code') || '',
+      sign: null,
+      event: null,
+      house: null,
+      checkins: [],
+      outreach: [],
+      loanOfficer: null,
+      error: ''
+    };
+
+    const app = document.getElementById('app');
+    const agentLabel = document.getElementById('agentLabel');
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const money = (value) => {
+      const number = Number(value || 0);
+      return number ? `$${number.toLocaleString()}` : '';
+    };
+    const fmtDate = (value) => {
+      if (!value) return 'Not scheduled';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Not scheduled';
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    };
+    const labelSlug = (slug) => String(slug || '').split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
+    const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+
+    async function request(path) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
+      const raw = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function loadSign() {
+      if (state.signId) {
+        const rows = await request(`smart_signs?id=eq.${encodeURIComponent(state.signId)}&select=*&limit=1`);
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      if (state.code) {
+        const rows = await request(`smart_signs?public_code=eq.${encodeURIComponent(state.code)}&select=*&limit=1`);
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      return null;
+    }
+
+    async function loadEvent() {
+      if (state.eventId) {
+        const rows = await request(`open_house_events?id=eq.${encodeURIComponent(state.eventId)}&select=*&limit=1`);
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      if (state.sign?.active_event_id) {
+        const rows = await request(`open_house_events?id=eq.${encodeURIComponent(state.sign.active_event_id)}&select=*&limit=1`);
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      if (state.sign?.id) {
+        const rows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(state.sign.id)}&ended_at=is.null&select=*&order=created_at.desc&limit=1`);
+        return Array.isArray(rows) ? rows[0] : null;
+      }
+      return null;
+    }
+
+    async function loadHouse(openHouseId) {
+      if (!openHouseId) return null;
+      const rows = await request(`open_houses?id=eq.${encodeURIComponent(openHouseId)}&select=*&limit=1`);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function loadCheckins(eventId) {
+      if (!eventId) return [];
+      const rows = await request(`event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=*&order=created_at.desc&limit=50`);
+      return Array.isArray(rows) ? rows : [];
+    }
+
+    async function loadOutreach(openHouseId) {
+      if (!openHouseId) return [];
+      const rows = await request(`agent_outreach_queue?open_house_id=eq.${encodeURIComponent(openHouseId)}&select=*&order=created_at.desc&limit=10`);
+      return Array.isArray(rows) ? rows : [];
+    }
+
+    async function loadLoanOfficer(eventId) {
+      if (!eventId) return null;
+      const rows = await request(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(eventId)}&status=eq.live&select=*&order=signed_in_at.desc&limit=1`);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    function stat(label, value, tone = 'slate') {
+      const colors = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-blue-700' : 'text-slate-900';
+      return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-5"><div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-black ${colors}">${esc(value)}</div></div>`;
+    }
+
+    function fmtDisclosureDate(value) {
+      if (!value) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return value;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function disclosureSummary(checkin) {
+      const disclosure = checkin?.metadata?.ny_discrimination_disclosure || {};
+      const signed = disclosure.acknowledged === true
+        && disclosure.reviewed === true
+        && disclosure.esign_consent === true
+        && Boolean(disclosure.e_signature_value);
+      return {
+        signed,
+        date: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || ''),
+        pdfUrl: signed && checkin?.id ? `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1` : ''
+      };
+    }
+
+    function renderLead(checkin) {
+      const meta = checkin.metadata || {};
+      const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
+      const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
+      const email = checkin.visitor_email || checkin.email || meta.email || '';
+      const preApproved = checkin.pre_approved === true ? 'Pre-approved' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
+      const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
+      const disclosure = disclosureSummary(checkin);
+      const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
+      return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-lg font-black">${esc(name)}</div>
+            <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
+          </div>
+          <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(preApproved)}</div>
+        </div>
+        <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">NYS Disclosure</div>
+            <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Signed' : 'Missing'}</div>
+          </div>
+          ${disclosure.signed && disclosure.date ? `<div class="mt-1 text-sm font-bold text-slate-600">${esc(disclosure.date)}</div>` : ''}
+          ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Signed PDF</a>` : ''}
+        </div>
+        ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
+          <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>
+          <a href="${esc(smsHref(phone, introBody))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text Buyer</a>
+          <a href="${esc(telHref(state.loanOfficer.loan_officer_phone))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200">Call Loan Officer</a>
+        </div>` : ''}
+      </div>`;
+    }
+
+    function renderLoanOfficerCard() {
+      const lo = state.loanOfficer;
+      if (!lo) {
+        return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Have the NMB loan officer tap their verified keychain to show live coverage and route financing buyers to them.</p>
+          <button onclick="window.armLoanOfficerSignIn()" class="mt-4 w-full rounded-full bg-amber-500 px-5 py-3 text-sm font-black text-white">Add Loan Officer</button>
+        </div>`;
+      }
+      const name = lo.loan_officer_name || 'Loan Officer';
+      const company = lo.loan_officer_company || 'NMB';
+      const phone = lo.loan_officer_phone || '';
+      const photo = lo.loan_officer_photo_url || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png';
+      return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
+        <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">NMB Coverage Live</div>
+        <div class="mt-4 flex items-center gap-4">
+          <img src="${esc(photo)}" alt="${esc(name)}" class="h-16 w-16 rounded-full object-cover ring-4 ring-white">
+          <div>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(name)}</h2>
+            <p class="text-sm font-bold text-emerald-900">${esc(company)}</p>
+            <p class="text-sm font-bold text-emerald-800">${esc(phone)}</p>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
+          <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
+        </div>
+        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">Replace Loan Officer</button>
+      </div>`;
+    }
+
+    function render() {
+      const hostSlug = state.event?.host_agent_slug || state.sign?.owner_agent_slug || state.agent;
+      const address = state.house?.address || state.event?.setup_context?.address || 'Active Open House';
+      const price = money(state.house?.price || state.event?.setup_context?.price);
+      const beds = state.house?.beds || state.event?.setup_context?.beds || '-';
+      const baths = state.house?.baths || state.event?.setup_context?.baths || '-';
+      const sqft = state.house?.sqft || state.house?.square_feet || state.event?.setup_context?.sqft || '-';
+      const sentCount = state.outreach.filter((row) => row.initial_send_status === 'sent' || row.followup_send_status === 'sent').length;
+      const needsFinancing = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+
+      agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
+      app.innerHTML = `
+        <section class="mb-6">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Live Event</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(address)}</h1>
+          <div class="mt-3 flex flex-wrap gap-3 text-base font-black text-slate-700">
+            ${price ? `<span>${esc(price)}</span>` : ''}
+            <span>${esc(beds)} beds</span>
+            <span>${esc(baths)} baths</span>
+            <span>${esc(sqft)} sq ft</span>
+          </div>
+        </section>
+
+        <section class="grid gap-3 md:grid-cols-4">
+          ${stat('Check-ins', state.checkins.length, 'blue')}
+          ${stat('Needs financing', needsFinancing, needsFinancing ? 'green' : 'slate')}
+          ${stat('Listing outreach', sentCount, 'blue')}
+          ${stat('Rel8tion stage', state.event?.status || state.sign?.status || 'active', 'green')}
+        </section>
+
+        <section class="mt-6 grid gap-4 lg:grid-cols-[1.4fr_.9fr]">
+          <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Leads</h2>
+              <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">${esc(fmtDate(state.event?.start_time))}</span>
+            </div>
+            <div class="grid gap-3">
+              ${state.checkins.length ? state.checkins.map(renderLead).join('') : '<div class="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-5 text-center font-bold text-slate-500">No buyer check-ins yet.</div>'}
+            </div>
+          </div>
+
+          <aside class="grid gap-4">
+            ${renderLoanOfficerCard()}
+            <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Sign Status</div>
+              <div class="mt-2 text-xl font-black">${esc(state.sign?.public_code || state.code || '-')}</div>
+              <div class="mt-2 text-sm font-bold text-slate-500">Front buyer chip opens check-in. Rear agent chip opens this dashboard after keychain verification.</div>
+            </div>
+            <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Listing Outreach</div>
+              <div class="mt-2 text-2xl font-black">${esc(sentCount)} sent</div>
+              <p class="mt-2 text-sm font-bold leading-relaxed text-slate-500">This is separate from buyer check-ins. It tracks automated outreach tied to the listing/open house source.</p>
+            </div>
+          </aside>
+        </section>
+      `;
+    }
+
+    window.armLoanOfficerSignIn = function armLoanOfficerSignIn() {
+      if (!state.event?.id) return;
+      window.localStorage.setItem('rel8tion_loan_officer_pending', JSON.stringify({
+        eventId: state.event.id,
+        signId: state.sign?.id || state.signId || '',
+        publicCode: state.sign?.public_code || state.code || '',
+        agentSlug: state.event.host_agent_slug || state.agent || '',
+        createdAt: new Date().toISOString()
+      }));
+      app.innerHTML = `<div class="py-14 text-center">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">NMB Sign-In</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Tap Loan Officer Keychain</h1>
+        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">Have the NMB loan officer tap their verified Rel8tionChip now. This dashboard will reopen with loan support marked live.</p>
+        <button onclick="window.location.reload()" class="mt-6 rounded-full bg-white px-6 py-3 font-black text-slate-700 ring-1 ring-slate-200">Cancel</button>
+      </div>`;
+    };
+
+    function renderError(message) {
+      agentLabel.textContent = state.agent ? labelSlug(state.agent) : 'Dashboard';
+      app.innerHTML = `<div class="py-12 text-center">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Dashboard Not Ready</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open Dashboard</h1>
+        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">${esc(message)}</p>
+      </div>`;
+    }
+
+    async function init() {
+      if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
+      state.sign = await loadSign();
+      state.event = await loadEvent();
+      if (!state.event?.id) throw new Error('This sign is not attached to a live event yet. Activate it to an open house first.');
+      const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
+      if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
+      state.house = await loadHouse(state.event.open_house_source_id);
+      state.checkins = await loadCheckins(state.event.id).catch(() => []);
+      state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
+      state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
+      render();
+    }
+
+    init().catch((error) => renderError(error.message || 'Something interrupted the dashboard lookup.'));
+  </script>
+</body>
+</html>

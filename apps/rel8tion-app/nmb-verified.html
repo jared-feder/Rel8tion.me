@@ -1,0 +1,415 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    #rel8tion-verified {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        position: relative;
+        isolation: isolate;
+        box-sizing: border-box;
+        background-color: #f0f7ff;
+    }
+
+    #rel8tion-verified *,
+    #rel8tion-verified *::before,
+    #rel8tion-verified *::after {
+        box-sizing: border-box;
+    }
+
+    #rel8tion-verified a,
+    #rel8tion-verified button {
+        pointer-events: auto;
+    }
+
+    #rel8tion-verified .rel8tion-wrapper {
+        font-family: 'Inter', sans-serif;
+        color: #1f2a5a;
+        background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+        background-attachment: fixed;
+        width: 100%;
+        min-height: 100vh;
+        position: relative;
+    }
+
+    #rel8tion-verified .moving-clouds {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 200%;
+        height: 500px;
+        z-index: 1;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+        background-repeat: repeat-x;
+        background-size: 800px auto;
+        animation: rel8tionDriftClouds 120s linear infinite;
+    }
+
+    @keyframes rel8tionDriftClouds {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+
+    #rel8tion-verified .scene-stage {
+        position: fixed;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 1400px;
+        aspect-ratio: 16 / 9;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    #rel8tion-verified .house-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(1.1);
+    }
+
+    #rel8tion-verified .fade-overlay {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 5;
+        pointer-events: none;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
+    }
+
+    #rel8tion-verified .agent-cutout {
+        position: absolute;
+        width: 5.5%;
+        height: auto;
+        z-index: 10;
+        opacity: 0;
+        animation-fill-mode: both !important;
+    }
+
+    @keyframes rel8tionWalk1 { 0% { left: 50%; top: 78%; opacity: 0; } 10% { opacity: 1; } 100% { left:29%; top: 69%; opacity: 1; } }
+    @keyframes rel8tionWalk2 { 0% { left: 51%; top: 48%; opacity: 0; } 10% { opacity: 1; } 100% { left: 17%; top: 61%; opacity: 1; } }
+    @keyframes rel8tionWalk3 { 0% { left: 49%; top: 47%; opacity: 0; } 10% { opacity: 1; } 100% { left:15%; top: 68%; opacity: 1; } }
+    @keyframes rel8tionWalk4 { 0% { left: 18%; top: 60%; opacity: 0; } 10% { opacity: 1; } 100% { left: 75%; top: 88%; opacity: 1; } }
+    @keyframes rel8tionWalk5 { 0% { left: 20%; top: 42%; opacity: 0; } 10% { opacity: 1; } 100% { left: 69%; top: 80%; opacity: 1; } }
+    @keyframes rel8tionWalk6 { 0% { left: 70%; top: 60%; opacity: 0; } 10% { opacity: 1; } 100% { left: 37%; top: 88%; opacity: 1; } }
+
+    #rel8tion-verified .agent-1 { animation: rel8tionWalk1 50s infinite linear; }
+    #rel8tion-verified .agent-2 { animation: rel8tionWalk2 28s infinite linear; animation-delay: 3s; }
+    #rel8tion-verified .agent-3 { animation: rel8tionWalk3 24s infinite linear; animation-delay: 1s; }
+    #rel8tion-verified .agent-4 { animation: rel8tionWalk4 50s infinite linear; animation-delay: 1s; }
+    #rel8tion-verified .agent-5 { animation: rel8tionWalk5 55s infinite linear; animation-delay: 3s; }
+    #rel8tion-verified .agent-6 { animation: rel8tionWalk6 30s infinite linear; animation-delay: 0s; }
+
+    @media (max-width: 1024px) {
+        #rel8tion-verified .scene-stage {
+            width: 180vw;
+            top: 70%;
+        }
+    }
+
+    @media (max-width: 768px) {
+        #rel8tion-verified .scene-stage {
+            width: 280vw;
+            top: 45%;
+        }
+    }
+
+    #rel8tion-verified .glass-card {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(5px) saturate(160%);
+        -webkit-backdrop-filter: blur(5px) saturate(160%);
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+    }
+
+    #rel8tion-verified .brand-button {
+        background-color: #1f2a5a !important;
+        color: #ffffff !important;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 20px rgba(31, 42, 90, 0.2) !important;
+        cursor: pointer;
+        border: none;
+        text-decoration: none;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #rel8tion-verified .brand-button:hover {
+        background-color: #161e40 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 15px 30px rgba(31, 42, 90, 0.3) !important;
+    }
+
+    #rel8tion-verified .secondary-button {
+        background: rgba(255,255,255,0.38);
+        color: #1f2a5a !important;
+        border: 1px solid rgba(255,255,255,0.7);
+        box-shadow: 0 8px 20px rgba(31, 42, 90, 0.08);
+    }
+
+    #rel8tion-verified .secondary-button:hover {
+        background: rgba(255,255,255,0.62);
+    }
+
+    #rel8tion-verified .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.35);
+        border: 1px solid rgba(255,255,255,0.55);
+        font-size: 12px;
+        font-weight: 800;
+        color: #1f2a5a;
+    }
+</style>
+
+<div id="rel8tion-verified">
+<div class="rel8tion-wrapper">
+    <div class="moving-clouds"></div>
+
+    <div class="scene-stage">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/websitehouse.png" class="house-img" alt="House Background">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent6.png" class="agent-cutout agent-6" alt="Agent">
+    </div>
+
+    <div class="fade-overlay"></div>
+
+    <header class="w-full absolute top-0 left-0 z-50 px-4 pt-3 md:px-8 md:pt-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="glass-card rounded-[28px] px-4 py-3 md:px-6 md:py-4">
+      <div class="grid grid-cols-3 items-center gap-3">
+        <div class="flex items-center justify-start">
+          <img
+            src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png"
+            alt="Rel8tion Logo"
+            class="h-5 md:h-10 w-auto"
+          >
+        </div>
+        <div class="flex items-center justify-center text-center">
+          <div class="font-['Plus_Jakarta_Sans'] text-[15px] leading-tight md:text-[28px] font-extrabold tracking-tight text-slate-900">
+            Welcome NMB Loan Officers
+          </div>
+        </div>
+        <div class="flex items-center justify-end">
+          <img
+            src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png"
+            alt="Nationwide Mortgage Bankers"
+            class="h-6 md:h-10 w-auto object-contain"
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+    <main id="verifiedApp" class="relative z-20 w-full px-4 md:px-6 pt-36 pb-10 md:pt-40"></main>
+</div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pY2FucXJmcWxibmxtbm9lcm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjEwNzcsImV4cCI6MjA3NjczNzA3N30.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function esc(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatPhone(p){
+  const digits = String(p || "").replace(/\D/g, "");
+  if (digits.length === 10) return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits[0] === "1") return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+  return p || "";
+}
+
+function getSlugFromUrl(){
+  const qs = new URLSearchParams(window.location.search);
+  return qs.get("slug") || "";
+}
+
+function buildVCard(profile){
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${profile.full_name || ""}`,
+    `ORG:${profile.company_name || ""}`,
+    `TITLE:${profile.title || ""}`,
+    profile.phone ? `TEL;TYPE=CELL:${profile.phone}` : "",
+    profile.email ? `EMAIL:${profile.email}` : "",
+    profile.cta_url ? `URL:${profile.cta_url}` : "",
+    "END:VCARD"
+  ].filter(Boolean);
+
+  return "data:text/vcard;charset=utf-8," + encodeURIComponent(lines.join("\\n"));
+}
+
+function render(html){
+  document.getElementById("verifiedApp").innerHTML = html;
+}
+
+(async function(){
+  const slug = getSlugFromUrl();
+
+  if (!slug) {
+    render(`
+      <div class="max-w-4xl mx-auto">
+        <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+          <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+            Missing slug
+          </h1>
+          <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto leading-normal">
+            This verified page is missing its profile link.
+          </p>
+        </section>
+      </div>
+    `);
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("verified_profiles")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    render(`
+      <div class="max-w-4xl mx-auto">
+        <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+          <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+            Verified page not found
+          </h1>
+          <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto leading-normal">
+            This professional page is unavailable.
+          </p>
+        </section>
+      </div>
+    `);
+    return;
+  }
+
+  const phoneDisplay = formatPhone(data.phone);
+  const photo = data.photo_url || "https://via.placeholder.com/280x280.png?text=Profile";
+  const logoUrl = data.logo_url || "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png";
+  const saveContact = buildVCard(data);
+  const areas = Array.isArray(data.areas) ? data.areas : [];
+
+  render(`
+    <div class="max-w-5xl mx-auto space-y-8">
+      <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
+        <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
+          Rel8tion Verified Loan Officers & Industry Professionals
+        </div>
+
+        <div class="mx-auto w-[128px] h-[128px] rounded-full p-[4px] bg-white/45 border border-white/55 shadow-lg mb-6 overflow-hidden">
+          <img src="${esc(photo)}" alt="${esc(data.full_name || "")}" class="w-full h-full rounded-full object-cover">
+        </div>
+
+        <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-4">
+          ${esc(data.full_name || "")}
+        </h1>
+
+        <div class="text-slate-700 text-lg md:text-2xl font-bold mb-6">
+          ${esc(data.title || "")}
+        </div>
+
+        <div class="glass-card rounded-[38px] p-8 max-w-md mx-auto mb-6">
+          <img src="${esc(logoUrl)}" alt="${esc(data.company_name || "Company")}" class="max-h-[44px] w-auto max-w-full object-contain mx-auto mb-3">
+          <div class="text-slate-800 text-sm md:text-base font-bold">
+            ${esc(data.company_name || "")}
+          </div>
+        </div>
+
+        <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-8 leading-normal">
+          ${esc(data.bio || "")}
+        </p>
+
+        ${areas.length ? `
+          <div class="flex flex-wrap items-center justify-center gap-2 mb-8">
+            ${areas.map(area => `<span class="pill">${esc(area)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
+          <a href="tel:${esc(data.phone || "")}" class="brand-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+            Call Now
+          </a>
+          <a href="sms:${esc(data.phone || "")}" class="secondary-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide inline-flex justify-center">
+            Text Me
+          </a>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-8">
+          <a href="${saveContact}" download="${esc((data.slug || 'contact') + '.vcf')}" class="brand-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+            Save Contact
+          </a>
+
+          ${data.cta_url ? `
+            <a href="${esc(data.cta_url)}" target="_blank" rel="noopener" class="secondary-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide inline-flex justify-center">
+              Start Pre-Approval
+            </a>
+          ` : ""}
+
+          ${data.calendar_url ? `
+            <a href="${esc(data.calendar_url)}" target="_blank" rel="noopener" class="secondary-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide inline-flex justify-center">
+              Book a Call
+            </a>
+          ` : ""}
+        </div>
+
+        <div class="text-slate-700 text-sm md:text-base font-bold space-y-1">
+          <div>${esc(phoneDisplay)}</div>
+          <div class="break-all">${esc(data.email || "")}</div>
+        </div>
+      </section>
+
+      <section class="glass-card rounded-[44px] p-10 md:p-16">
+        <div class="text-center mb-10">
+          <h2 class="text-[32px] md:text-[48px] font-extrabold text-slate-900">A Network Built on Real Interactions</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+            <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Real Professionals</h3>
+            <p class="text-slate-700 font-medium">No fake profiles. No bots pretending to be real people. No AI-generated users filling the network.</p>
+          </article>
+          <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+            <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Activated by Rel8tionchip</h3>
+            <p class="text-slate-700 font-medium">Profiles are activated through real-world interaction using a physical Rel8tionchip, not anonymous signup forms.</p>
+          </article>
+          <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+            <h3 class="text-2xl font-extrabold text-slate-900 mb-3">No Fake Reviews</h3>
+            <p class="text-slate-700 font-medium">Rel8tion is built on trusted contact and verified identity, not inflated ratings, review farms, or directory spam.</p>
+          </article>
+          <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+            <h3 class="text-2xl font-extrabold text-slate-900 mb-3">One Tap at a Time</h3>
+            <p class="text-slate-700 font-medium">Every verified page starts with a real in-person interaction happening in real time, one tap at a time.</p>
+          </article>
+        </div>
+      </section>
+    </div>
+  `);
+})();
+</script>

@@ -32,6 +32,8 @@ const uid = new URLSearchParams(location.search).get("uid");
 let detectedHouse = null;
 let agentData = null;
 let formOpen = false;
+let lastLeadId = null;
+let lastLeadForm = null;
 
 function esc(str){
   return String(str || "")
@@ -61,6 +63,20 @@ function displayPhone(p){
   return p || "";
 }
 
+function buildBuyerConfirmationMessage(form){
+  return [
+    `Thanks${form.name ? ` ${form.name}` : ""}, your open house request was received.`,
+    detectedHouse?.address ? `Property: ${detectedHouse.address}` : "",
+    form.areas ? `Preferred areas: ${form.areas}` : "",
+    form.price ? `Price range: ${form.price}` : "",
+    agentData?.name ? `Hosted by: ${agentData.name}` : "",
+    agentData?.brokerage ? `Brokerage: ${agentData.brokerage}` : "",
+    agentData?.phone ? `Agent phone: ${displayPhone(agentData.phone)}` : "",
+    `${agentData?.name || "Your agent"} will keep an eye out for homes that match what you shared.`,
+    "Reply or call the agent directly for next steps."
+  ].filter(Boolean).join("\\n");
+}
+
 function money(v){
   const n = Number(v || 0);
   return n ? "$" + n.toLocaleString() : "";
@@ -87,6 +103,106 @@ function setPre(v){
   document.getElementById("noBtn").classList.remove("active-pre");
   if(v === "yes") document.getElementById("yesBtn").classList.add("active-pre");
   if(v === "no") document.getElementById("noBtn").classList.add("active-pre");
+}
+
+function getSelectedAreas(){
+  return Array.from(document.querySelectorAll('input[name="areaChoice"]:checked')).map((el) => el.value);
+}
+
+function getPreferenceHomes(areas = []){
+  const areaText = areas.length ? areas.slice(0, 2).join(" / ") : "your target area";
+  return [
+    {
+      id: "move-in",
+      title: "Move-In Ready",
+      summary: `Updated layout near ${areaText}`,
+      image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      id: "classic",
+      title: "Classic Colonial",
+      summary: `More space and curb appeal around ${areaText}`,
+      image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      id: "modern",
+      title: "Modern Open Concept",
+      summary: `Clean finishes with a brighter feel near ${areaText}`,
+      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=80"
+    }
+  ];
+}
+
+function showPreferencePopup(form){
+  const homes = getPreferenceHomes((form.areas || "").split(",").map((area) => area.trim()).filter(Boolean));
+  const agentName = agentData?.name || "your agent";
+  const modal = document.createElement("div");
+  modal.id = "preferenceModal";
+  modal.className = "preference-modal";
+  modal.innerHTML = `
+    <div class="preference-panel">
+      <button type="button" onclick="closePreferencePopup()" class="preference-close" aria-label="Close">×</button>
+      <div class="text-center mb-5">
+        <div class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-black uppercase tracking-[0.22em] text-blue-600 mb-3">
+          Smart Match Saved
+        </div>
+        <h2 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3">
+          Congratulations
+        </h2>
+        <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-semibold max-w-2xl mx-auto">
+          ${esc(agentName)} knows what to keep an eye out for. Which one of these properties interests you the most?
+        </p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4">
+        ${homes.map((home) => `
+          <button type="button" onclick="choosePreferredHome('${esc(home.id)}')" class="preference-card">
+            <img src="${esc(home.image)}" alt="${esc(home.title)}">
+            <span class="preference-card-title">${esc(home.title)}</span>
+            <span class="preference-card-summary">${esc(home.summary)}</span>
+          </button>
+        `).join("")}
+      </div>
+      <p id="preferenceStatus" class="text-center text-slate-500 text-sm font-bold mt-5">
+        Tap the closest match so your agent can understand your style faster.
+      </p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function closePreferencePopup(){
+  const modal = document.getElementById("preferenceModal");
+  if(modal) modal.remove();
+}
+
+async function choosePreferredHome(homeId){
+  const homes = getPreferenceHomes((lastLeadForm?.areas || "").split(",").map((area) => area.trim()).filter(Boolean));
+  const selected = homes.find((home) => home.id === homeId);
+  const status = document.getElementById("preferenceStatus");
+  if(!selected) return;
+
+  if(status) status.innerText = "Saving preference...";
+  const noteLine = `Preferred example home: ${selected.title} - ${selected.summary}`;
+
+  if(lastLeadId){
+    try{
+      await fetchJson(`${SUPABASE_URL}/rest/v1/leads?id=eq.${encodeURIComponent(lastLeadId)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": KEY,
+          "Authorization": "Bearer " + KEY
+        },
+        body: JSON.stringify({
+          notes: [lastLeadForm?.notes || "", noteLine].filter(Boolean).join("\\n\\n")
+        })
+      });
+    } catch(e){
+      console.log("Preference note update skipped", e);
+    }
+  }
+
+  if(status) status.innerText = `${selected.title} saved. ${agentData?.name || "Your agent"} can use this to match you more precisely.`;
 }
 
 function saveContact(name, phone, email){
@@ -142,6 +258,67 @@ async function fetchJson(url, options = {}){
   }catch(e){
     throw new Error("Invalid JSON response: " + raw);
   }
+}
+
+async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" } = {}) {
+  try {
+    let normalizedPhone = String(phone || "").replace(/\D/g, "");
+    if (normalizedPhone.length === 11 && normalizedPhone.startsWith("1")) {
+      normalizedPhone = normalizedPhone.slice(1);
+    }
+
+    const tryQueries = [];
+
+    if (openHouseId && normalizedPhone) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`
+      );
+    }
+
+    if (openHouseId && name) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&limit=1`
+      );
+    }
+
+    if (normalizedPhone) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`
+      );
+    }
+
+    if (name) {
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=eq.${encodeURIComponent(name)}&limit=1`
+      );
+    }
+
+    for (const url of tryQueries) {
+      const rows = await fetchJson(url, {
+        headers: {
+          "apikey": KEY,
+          "Authorization": "Bearer " + KEY
+        }
+      });
+
+      if (Array.isArray(rows) && rows.length && (rows[0].primary_photo_url || rows[0].directory_photo_url)) {
+        return rows[0].primary_photo_url || rows[0].directory_photo_url;
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.log("listing_agents photo lookup skipped", e);
+    return null;
+  }
+}
+
+function firstPresent(...values){
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "") || "";
+}
+
+function agentImageUrl(agent){
+  return firstPresent(agent?.image_url, agent?.primary_photo_url, agent?.directory_photo_url, agent?.photo_url);
 }
 
 function glassShell(inner){
@@ -242,6 +419,18 @@ async function init(){
       });
     } catch(e){}
 
+    if(agentData && !agentImageUrl(agentData)){
+      const fallbackPhoto = await fetchListingAgentPhoto({
+        openHouseId: detectedHouse?.id || "",
+        name: agentData.name || "",
+        phone: agentData.phone || ""
+      });
+
+      if(fallbackPhoto){
+        agentData.image_url = fallbackPhoto;
+      }
+    }
+
     renderBuyer();
 
   }catch(e){
@@ -252,7 +441,7 @@ async function init(){
 
 function renderBuyer(){
   const houseImage = detectedHouse?.image || "https://rel8tion.me/wp-content/uploads/2026/04/trythisbackround.png";
-  const agentImage = agentData?.image_url || DEFAULT_AGENT_IMAGE;
+  const agentImage = agentImageUrl(agentData) || DEFAULT_AGENT_IMAGE;
   const propertyHeadline = detectedHouse
     ? "You’re In The Right Place"
     : "Start The Search The Right Way";
@@ -281,6 +470,7 @@ function renderBuyer(){
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
           <img
             src="${agentImage}"
+            onerror="this.onerror=null;this.src='${DEFAULT_AGENT_IMAGE}';"
             class="w-32 h-32 md:w-36 md:h-36 rounded-full object-cover shadow-[0_18px_40px_rgba(31,42,90,0.16)] shrink-0 bg-white"
             alt="${esc(agentData.name)}"
           >
@@ -347,7 +537,7 @@ function renderBuyer(){
             Private Buyer Matching
           </div>
           <p class="text-slate-500 text-[15px] md:text-[17px] leading-relaxed font-medium max-w-2xl mx-auto">
-            This form helps the agent respond with the right homes, the right strategy, and the right next step instead of wasting your time.
+            This form helps ${esc(agentData.name || "your agent")} get to know your preferences and keep an eye out for the perfect property automatically.
           </p>
         </div>
 
@@ -368,25 +558,27 @@ function renderBuyer(){
 
             <input id="email" placeholder="Email Address" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
 
-            <select id="areas" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
-              <option value="">Preferred Area</option>
-              <option>Queens</option>
-              <option>Nassau</option>
-              <option>Suffolk</option>
-              <option>Brooklyn</option>
-              <option>NYC</option>
-              <option>Staten Island</option>
-              <option>Upstate</option>
-              <option>Anywhere</option>
-            </select>
+            <div class="rounded-[24px] border border-slate-200 bg-white/85 px-5 py-4">
+              <div class="text-slate-900 text-[16px] font-black tracking-[-0.02em] mb-3">
+                Preferred Areas
+              </div>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${["Queens", "Nassau", "Suffolk", "Brooklyn", "NYC", "Staten Island", "Upstate", "Anywhere"].map((area) => `
+                  <label class="area-choice">
+                    <input type="checkbox" name="areaChoice" value="${esc(area)}">
+                    <span>${esc(area)}</span>
+                  </label>
+                `).join("")}
+              </div>
+            </div>
 
             <select id="price" class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
               <option value="">Price Range</option>
-              <option>500 and under</option>
-              <option>500-750</option>
-              <option>750-850</option>
-              <option>850-950</option>
-              <option>1M+</option>
+              <option>500K and under</option>
+              <option>500K-750K</option>
+              <option>750K-1M</option>
+              <option>1M-2M</option>
+              <option>2M+</option>
             </select>
 
             <textarea id="notes" placeholder="What are you looking for? Tell us what matters most." class="w-full rounded-[20px] border border-slate-200 bg-white/85 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y"></textarea>
@@ -436,7 +628,7 @@ async function submitLead(){
     name: document.getElementById("name").value.trim(),
     phone: formatPhone(document.getElementById("phone").value),
     email: document.getElementById("email").value.trim(),
-    areas: document.getElementById("areas").value,
+    areas: getSelectedAreas().join(", "),
     price: document.getElementById("price").value,
     notes: document.getElementById("notes").value.trim(),
     preapproved: document.getElementById("pre").value,
@@ -457,6 +649,11 @@ async function submitLead(){
     return;
   }
 
+  if(!form.areas){
+    status.innerText = "Please select at least one preferred area.";
+    return;
+  }
+
   if(!form.consent){
     status.innerText = "Please check the consent box to continue.";
     return;
@@ -472,7 +669,8 @@ async function submitLead(){
       headers: {
         "Content-Type": "application/json",
         "apikey": KEY,
-        "Authorization": "Bearer " + KEY
+        "Authorization": "Bearer " + KEY,
+        "Prefer": "return=representation"
       },
       body: JSON.stringify(form)
     });
@@ -481,6 +679,10 @@ async function submitLead(){
       const raw = await leadRes.text().catch(() => "");
       throw new Error(raw || "Failed saving lead");
     }
+
+    const savedLead = await leadRes.json().catch(() => []);
+    lastLeadId = Array.isArray(savedLead) && savedLead.length ? savedLead[0].id : null;
+    lastLeadForm = form;
 
     const smsRes = await fetch(SMS_FUNCTION_URL, {
       method: "POST",
@@ -504,8 +706,29 @@ async function submitLead(){
       console.log("SMS warning:", raw);
     }
 
+    const buyerSmsRes = await fetch(SMS_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": KEY,
+        "Authorization": "Bearer " + KEY
+      },
+      body: JSON.stringify({
+        agent_phone: form.phone,
+        buyer_phone: form.phone,
+        buyer_name: form.name,
+        message: buildBuyerConfirmationMessage(form)
+      })
+    });
+
+    if(!buyerSmsRes.ok){
+      const raw = await buyerSmsRes.text().catch(() => "");
+      console.log("Buyer confirmation SMS warning:", raw);
+    }
+
     btn.innerText = "Submitted ✓";
-    status.innerText = "Perfect. You're in. We’ll be in touch shortly with next steps and matching homes.";
+    status.innerText = "Perfect. You're in. Choose an example home so your agent can match you more precisely.";
+    showPreferencePopup(form);
   } catch(e){
     console.log(e);
     btn.disabled = false;
@@ -609,6 +832,109 @@ html, body {
   color:#fff!important;
   border-color:transparent!important;
   box-shadow:0 18px 40px rgba(59,130,246,0.28);
+}
+
+.area-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(203,213,225,0.9);
+  background: rgba(255,255,255,0.75);
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.area-choice input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.preference-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15,23,42,0.42);
+  backdrop-filter: blur(8px);
+}
+
+.preference-panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  border-radius: 34px;
+  border: 1px solid rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.94);
+  padding: 24px;
+  box-shadow: 0 28px 80px rgba(15,23,42,0.28);
+}
+
+.preference-close {
+  position: absolute;
+  right: 18px;
+  top: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: rgba(241,245,249,0.9);
+  color: #1f2a5a;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.preference-card {
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(203,213,225,0.85);
+  background: white;
+  text-align: left;
+  box-shadow: 0 14px 34px rgba(31,42,90,0.10);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.preference-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px rgba(31,42,90,0.16);
+}
+
+.preference-card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.preference-card-title,
+.preference-card-summary {
+  display: block;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.preference-card-title {
+  padding-top: 16px;
+  color: #1f2a5a;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.preference-card-summary {
+  padding-top: 6px;
+  padding-bottom: 16px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 @media (max-width: 768px) {

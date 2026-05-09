@@ -337,5 +337,73 @@
   const thankYouUrl = "https://rel8tion.info/thank-you";
   window.rel8tionThankYouRedirect = thankYouUrl;
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const params = new URLSearchParams(window.location.search);
+  const kerror = params.get("kerror");
+  if (!kerror) return;
+
+  const modal = document.createElement("div");
+  modal.innerHTML = `
+    <div style="
+      position:fixed; inset:0; background:rgba(15,23,42,.55);
+      display:flex; align-items:center; justify-content:center;
+      z-index:99999; padding:20px;
+    ">
+      <div style="
+        max-width:560px; width:100%;
+        background:white; border-radius:28px; padding:28px;
+        box-shadow:0 30px 80px rgba(0,0,0,.22);
+        text-align:center; font-family:Inter, sans-serif;
+      ">
+        <h2 style="
+          font-size:30px; line-height:1; margin:0 0 14px;
+          font-weight:900; color:#0f172a;
+        ">
+          Having Trouble?
+        </h2>
+
+        <p style="
+          font-size:17px; line-height:1.6; color:#64748b; margin:0 0 22px;
+        ">
+          Sorry — we couldn’t detect a valid Rel8tion activation link.
+          If your Smart Sign or Rel8tionchip is not working correctly,
+          contact us for help or order your Smart Sign / Rel8tionchip now.
+        </p>
+
+        <div style="display:flex; gap:12px; flex-direction:column;">
+          <a href="/contact" style="
+            display:block; padding:16px 20px; border-radius:999px;
+            text-decoration:none; font-weight:800; color:white;
+            background:linear-gradient(90deg,#38bdf8,#2563eb);
+          ">Contact Us</a>
+
+          <a href="/pricing" style="
+            display:block; padding:16px 20px; border-radius:999px;
+            text-decoration:none; font-weight:800; color:#0f172a;
+            border:1px solid #cbd5e1; background:#fff;
+          ">Order Your Smart Sign / Rel8tionchip</a>
+
+          <button id="closeKErrorModal" style="
+            border:none; background:none; color:#64748b;
+            font-weight:800; margin-top:6px; cursor:pointer;
+          ">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  document.getElementById("closeKErrorModal").onclick = function () {
+    modal.remove();
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("kerror");
+    window.history.replaceState({}, "", clean.pathname + clean.search);
+  };
+});
+</script>
+
 </body>
 </html>

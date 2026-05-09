@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rel8tion Open House Demo Shell</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg1:#38bdf8;
+      --bg2:#f0f7ff;
+      --text:#1f2a5a;
+      --muted:#64748b;
+      --card:rgba(255,255,255,.18);
+      --border:rgba(255,255,255,.58);
+      --shadow:0 24px 60px rgba(31,42,90,.10), inset 0 1px 1px rgba(255,255,255,.28);
+      --primary:#1f2a5a;
+      --primaryHover:#162046;
+      --secondaryBg:rgba(255,255,255,.42);
+      --secondaryBorder:rgba(255,255,255,.72);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:#f0f7ff;font-family:Inter,sans-serif;color:var(--text)}
+    body{
+      min-height:100vh;
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 60%,var(--bg2) 100%);
+      background-attachment:fixed;
+      overflow-x:hidden;
+    }
+    .moving-clouds{
+      position:fixed;top:0;left:0;width:200%;height:420px;z-index:1;pointer-events:none;
+      background-image:url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
+      background-repeat:repeat-x;background-size:800px auto;animation:driftClouds 120s linear infinite;
+    }
+    @keyframes driftClouds{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .fade-overlay{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 10%, rgba(240,247,255,.92) 100%)}
+    .wrap{position:relative;z-index:3;max-width:1160px;margin:0 auto;padding:24px 16px 48px}
+    .glass{background:var(--card);backdrop-filter:blur(10px) saturate(160%);-webkit-backdrop-filter:blur(10px) saturate(160%);border:1px solid var(--border);box-shadow:var(--shadow)}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-radius:28px;margin-bottom:18px}
+    .topbar .title{font-family:Poppins,sans-serif;font-weight:900;font-size:clamp(18px,2.2vw,32px);text-align:center;line-height:1.05;letter-spacing:-.03em}
+    .logo{height:34px;width:auto;object-fit:contain}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:20px;align-items:stretch}
+    .hero-card,.side-card,.section,.status-card{border-radius:34px;padding:24px}
+    .hero-card{min-height:520px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
+    .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg, rgba(7,20,45,.10) 0%, rgba(7,20,45,.62) 68%, rgba(7,20,45,.82) 100%)}
+    .hero-body{position:relative;z-index:2;color:white}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.34);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .hero h1{font-family:Poppins,sans-serif;font-size:clamp(34px,4.2vw,64px);line-height:.96;letter-spacing:-.05em;margin:16px 0 10px;font-weight:900}
+    .hero-sub{font-size:17px;line-height:1.55;max-width:760px;color:rgba(255,255,255,.92);font-weight:500}
+    .price{font-size:28px;font-weight:900;margin:18px 0 8px}
+    .facts{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    .fact{padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);font-weight:800;font-size:13px}
+    .stack{display:grid;gap:18px}
+    .side-card h2,.section h2{font-family:Poppins,sans-serif;font-size:clamp(24px,2.3vw,36px);line-height:1;letter-spacing:-.04em;margin:0 0 12px;font-weight:900}
+    .copy{color:var(--muted);font-size:15px;line-height:1.6;font-weight:600}
+    .button{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:18px 22px;border-radius:999px;text-decoration:none;font-weight:900;letter-spacing:-.02em;font-size:17px;border:none;cursor:pointer;transition:.25s ease}
+    .button.primary{background:var(--primary);color:white;box-shadow:0 14px 28px rgba(31,42,90,.18)}
+    .button.primary:hover{background:var(--primaryHover);transform:translateY(-2px)}
+    .button.secondary{background:var(--secondaryBg);color:var(--text);border:1px solid var(--secondaryBorder)}
+    .button.secondary:hover{background:rgba(255,255,255,.62)}
+    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+    .meta-box{padding:16px;border-radius:20px;background:rgba(255,255,255,.34);border:1px solid rgba(255,255,255,.58)}
+    .label{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:6px}
+    .value{font-size:16px;font-weight:800;color:var(--text);line-height:1.35}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+    .section p,.section li{font-size:15px;line-height:1.6;color:var(--muted);font-weight:600}
+    .bullet{display:flex;gap:10px;align-items:flex-start;margin:10px 0}
+    .status-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}
+    .status-card .big{font-size:25px;font-weight:900;line-height:1.05;margin-top:4px}
+    .footer-note{text-align:center;font-size:12px;color:#64748b;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-top:22px}
+    @media (max-width: 960px){
+      .hero{grid-template-columns:1fr}
+      .grid{grid-template-columns:1fr}
+      .status-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .topbar{padding:14px 14px}
+      .topbar .title{font-size:18px}
+      .logo{height:26px}
+    }
+    @media (max-width: 640px){
+      .meta,.status-strip{grid-template-columns:1fr}
+      .hero-card,.side-card,.section,.status-card{padding:20px}
+      .wrap{padding:16px 12px 32px}
+      .hero-card{min-height:430px}
+    }
+  </style>
+</head>
+<body>
+  <div class="moving-clouds"></div>
+  <div class="fade-overlay"></div>
+
+  <div class="wrap">
+    <div class="glass topbar">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="logo">
+      <div class="title">Open House Demo Shell</div>
+      <img src="https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png" alt="Nationwide" class="logo">
+    </div>
+
+    <div class="hero">
+      <section class="glass hero-card">
+        <img id="heroImage" class="hero-image" src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1600&q=80" alt="Open House">
+        <div class="hero-scrim"></div>
+        <div class="hero-body">
+          <div class="pill">🏠 Live Open House Demo</div>
+          <h1 id="heroAddress">33 Manor Dr, Shirley, NY 11967</h1>
+          <div class="hero-sub" id="heroSub">Welcome in. This demo shell shows how a guest would land from a Rel8tion sign or QR at tomorrow’s open house.</div>
+          <div class="price" id="heroPrice">$599,000</div>
+          <div class="facts">
+            <div class="fact" id="factBeds">3 Beds</div>
+            <div class="fact" id="factBaths">1 Bath</div>
+            <div class="fact" id="factTime">Tomorrow · 1:00 PM – 3:00 PM</div>
+            <div class="fact" id="factBroker">PRO Links Realty</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="glass side-card">
+          <h2>Welcome In</h2>
+          <p class="copy">This is the polished shell a buyer would see first. It is built to feel premium, immediate, and easy to act on without forcing them into a confusing form wall.</p>
+          <div class="meta">
+            <div class="meta-box">
+              <div class="label">Event Status</div>
+              <div class="value" id="metaStatus">Demo / Preview</div>
+            </div>
+            <div class="meta-box">
+              <div class="label">Showing Window</div>
+              <div class="value" id="metaWindow">Tomorrow · 1 PM – 3 PM</div>
+            </div>
+            <div class="meta-box">
+              <div class="label">Hosted By</div>
+              <div class="value" id="metaHost">Rel8tion Demo Host</div>
+            </div>
+            <div class="meta-box">
+              <div class="label">Flow Type</div>
+              <div class="value">Buyer Check-In + Represented Buyer</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass side-card">
+          <h2>Primary Actions</h2>
+          <p class="copy">For tomorrow, this can work as a demo shell page even before the final live event workflow is fully wired.</p>
+          <div style="display:grid;gap:12px;margin-top:16px;">
+            <a class="button primary" href="#checkin">Start Buyer Check-In</a>
+            <a class="button secondary" href="#represented">I’m Working With An Agent</a>
+            <a class="button secondary" href="#loan">Need Pre-Approval Help</a>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="status-strip">
+      <section class="glass status-card">
+        <div class="label">Shell Purpose</div>
+        <div class="big">Demo-Ready</div>
+      </section>
+      <section class="glass status-card">
+        <div class="label">Traffic Source</div>
+        <div class="big">QR / NFC / Link</div>
+      </section>
+      <section class="glass status-card">
+        <div class="label">Buyer Experience</div>
+        <div class="big">Clean + Fast</div>
+      </section>
+      <section class="glass status-card">
+        <div class="label">Tomorrow Goal</div>
+        <div class="big">Working Sign Demo</div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="glass section" id="checkin">
+        <h2>Buyer Check-In</h2>
+        <p>This section is where the guest confirms they are visiting the property and can start the open house flow without friction.</p>
+        <div class="bullet"><div>✅</div><div>Collect buyer name, mobile number, and simple visit intent.</div></div>
+        <div class="bullet"><div>✅</div><div>Optional save-contact and text confirmation can slot in here.</div></div>
+        <div class="bullet"><div>✅</div><div>Keep it fast enough that agents actually use it in the field.</div></div>
+      </section>
+
+      <section class="glass section" id="represented">
+        <h2>Represented Buyer</h2>
+        <p>This is the strategic section for Rel8tion: verify whether the buyer is represented and protect the buyer-agent relationship while keeping the check-in professional.</p>
+        <div class="bullet"><div>✅</div><div>Ask if the buyer is already working with an agent.</div></div>
+        <div class="bullet"><div>✅</div><div>Capture agent name, brokerage, and optional contact details.</div></div>
+        <div class="bullet"><div>✅</div><div>Broker-to-broker info request workflow can branch out from here.</div></div>
+      </section>
+
+      <section class="glass section" id="loan">
+        <h2>Pre-Approval Help</h2>
+        <p>For tomorrow’s demo, this section can softly route unapproved buyers toward financing help without disrupting the main experience.</p>
+        <div class="bullet"><div>✅</div><div>Quick yes / no / need help pre-approval question.</div></div>
+        <div class="bullet"><div>✅</div><div>Optional Nationwide / NMB handoff CTA can sit here.</div></div>
+        <div class="bullet"><div>✅</div><div>Can stay lightweight in the demo and deepen later.</div></div>
+      </section>
+    </div>
+
+    <section class="glass section" style="margin-top:18px;">
+      <h2>Suggested Tomorrow Demo Script</h2>
+      <p>Use this shell as the visual endpoint while you prove the sign itself.</p>
+      <div class="bullet"><div>1.</div><div>Guest scans the sign or QR and lands here instantly.</div></div>
+      <div class="bullet"><div>2.</div><div>You explain that this shell will become the live buyer check-in and represented-buyer hub.</div></div>
+      <div class="bullet"><div>3.</div><div>You show the buyer actions, represented-buyer branch, and pre-approval help branch without needing the full final workflow complete yet.</div></div>
+      <div class="bullet"><div>4.</div><div>You position it as the front door for the whole Rel8tion open-house experience.</div></div>
+    </section>
+
+    <div class="footer-note">Rel8tion Demo Shell • Built for tomorrow’s open house proof</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const text = (key, fallback) => params.get(key) || fallback;
+
+    const address = text('address', '33 Manor Dr, Shirley, NY 11967');
+    const price = text('price', '$599,000');
+    const beds = text('beds', '3 Beds');
+    const baths = text('baths', '1 Bath');
+    const time = text('time', 'Tomorrow · 1:00 PM – 3:00 PM');
+    const broker = text('broker', 'PRO Links Realty');
+    const host = text('host', 'Rel8tion Demo Host');
+    const image = text('image', 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1600&q=80');
+    const sub = text('sub', 'Welcome in. This demo shell shows how a guest would land from a Rel8tion sign or QR at tomorrow’s open house.');
+
+    document.getElementById('heroAddress').textContent = address;
+    document.getElementById('heroPrice').textContent = price;
+    document.getElementById('factBeds').textContent = beds;
+    document.getElementById('factBaths').textContent = baths;
+    document.getElementById('factTime').textContent = time;
+    document.getElementById('factBroker').textContent = broker;
+    document.getElementById('metaWindow').textContent = time;
+    document.getElementById('metaHost').textContent = host;
+    document.getElementById('heroSub').textContent = sub;
+    document.getElementById('heroImage').src = image;
+  </script>
+</body>
+</html>

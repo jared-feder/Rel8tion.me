@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Claim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/apps/rel8tion-app/src/modules/claimStyled/styles.css?v=20260426-1108">
+</head>
+<body>
+  <div id="claimShell" class="rel8tion-wrapper">
+    <div class="moving-clouds"></div>
+    <div class="agent-stage">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
+    </div>
+    <div class="fade-overlay"></div>
+    <div id="app" class="claim-app-layer"></div>
+  </div>
+
+  <script type="module">
+    import { initClaimStyledPage } from '/apps/rel8tion-app/src/modules/claimStyled/bootstrap.js?v=20260505-beta-reset';
+    initClaimStyledPage();
+  </script>
+</body>
+</html>

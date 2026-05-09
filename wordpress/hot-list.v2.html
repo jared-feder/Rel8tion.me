@@ -1,0 +1,685 @@
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div id="app" class="min-h-screen"></div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://nicanqrfqlbnlmnoernb.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+
+let rows = [];
+let repliesByQueueId = {};
+
+function esc(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return "No date";
+  const d = new Date(dateStr);
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function shortMoney(n) {
+  if (!n) return "";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0
+  }).format(n);
+}
+
+function badgeClass(status) {
+  switch (status) {
+    case "sent":
+    case "rendered":
+    case "generated":
+    case "approved":
+      return "bg-emerald-50 text-emerald-700";
+    case "pending":
+      return "bg-amber-50 text-amber-700";
+    case "failed":
+      return "bg-rose-50 text-rose-700";
+    case "blocked_duplicate":
+      return "bg-violet-50 text-violet-700";
+    case "replied":
+    case "blocked_replied":
+      return "bg-sky-50 text-sky-700";
+    case "opted_out":
+    case "blocked_opt_out":
+    case "blocked_opted_out":
+      return "bg-rose-50 text-rose-700";
+    case "skipped_started":
+    case "skipped_expired":
+    case "not_scheduled":
+    case "archived":
+      return "bg-slate-100 text-slate-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
+function getFollowupSms(id) {
+  const box = document.querySelector(`.followupSmsBox[data-id="${id}"]`);
+  return box ? box.value.trim() : "";
+}
+
+function renderCardImage(row) {
+  if (row.mockup_image_url) {
+    return `
+      <div class="relative w-full h-[320px] rounded-2xl overflow-hidden bg-slate-100">
+        <img src="${esc(row.mockup_image_url)}" class="absolute inset-0 w-full h-full object-cover" alt="Mockup">
+      </div>
+    `;
+  }
+
+  return `
+    <div class="relative w-full h-[320px] rounded-2xl overflow-hidden bg-[radial-gradient(circle_at_top_left,_#f3f5ff,_#eef2ff_35%,_#ffffff_75%)] border border-slate-200">
+      <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+        <div class="text-sm font-semibold text-slate-900">Mockup Not Ready</div>
+        <div class="text-xs text-slate-500 mt-2">Mockup Status: ${esc(row.mockup_status || "pending")}</div>
+        <div class="text-xs text-slate-500 mt-1">Generation: ${esc(row.generation_status || "pending")}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentPhoto(row) {
+  if (row.agent_photo_url) {
+    return `<img src="${esc(row.agent_photo_url)}" alt="Agent photo" class="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm bg-white">`;
+  }
+
+  return `
+    <div class="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[11px] text-slate-400 font-semibold">
+      No Photo
+    </div>
+  `;
+}
+
+function renderReasonBox(title, value) {
+  if (!value) return "";
+  return `
+    <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+      <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">${esc(title)}</div>
+      <div class="text-sm text-slate-700 break-words">${esc(value)}</div>
+    </div>
+  `;
+}
+
+function renderReplies(row) {
+  const replies = repliesByQueueId[row.id] || [];
+
+  if (!replies.length) {
+    return `
+      <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+        <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Replies</div>
+        <div class="text-sm text-slate-500">No replies yet.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="rounded-2xl bg-sky-50/70 border border-sky-200 p-3">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="text-xs uppercase tracking-[0.18em] text-sky-700 font-bold">Replies</div>
+        <div class="text-xs text-sky-700 font-semibold">${replies.length} message${replies.length === 1 ? "" : "s"}</div>
+      </div>
+      <div class="grid gap-2">
+        ${replies.map((reply) => `
+          <div class="rounded-xl bg-white/80 border border-sky-100 p-3">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="text-xs font-semibold ${
+                reply.direction === "outbound"
+                  ? "text-emerald-700"
+                  : reply.opt_out
+                    ? "text-rose-600"
+                    : "text-slate-700"
+              }">${
+                reply.direction === "outbound"
+                  ? "Sent Reply"
+                  : reply.opt_out
+                    ? "Opt-Out Reply"
+                    : "Inbound Reply"
+              }</div>
+              <div class="text-xs text-slate-500">${esc(fmtDate(reply.received_at))}</div>
+            </div>
+            <div class="text-sm text-slate-700 break-words">${esc(reply.body || "(empty message)")}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function getLatestReply(row) {
+  const replies = repliesByQueueId[row.id] || [];
+  return replies.length ? replies[0] : null;
+}
+
+function getLatestInboundReply(row) {
+  const replies = repliesByQueueId[row.id] || [];
+  return replies.find((reply) => reply.direction !== "outbound") || null;
+}
+
+function getRowById(id) {
+  return rows.find((row) => String(row.id) === String(id)) || null;
+}
+
+function canRestoreAuto(row) {
+  if (!row) return false;
+  if (row.review_status === "opted_out") return false;
+  if (row.initial_send_status === "blocked_opted_out") return false;
+  if (row.followup_send_status === "blocked_opted_out") return false;
+  if (row.initial_block_reason === "twilio_stop") return false;
+  if (row.followup_block_reason === "twilio_stop") return false;
+
+  return row.send_mode === "manual" || row.review_status === "replied" || row.followup_send_status === "blocked_replied";
+}
+
+function isAttentionRow(row) {
+  return (
+    row.review_status === "replied" ||
+    row.review_status === "opted_out" ||
+    row.review_status === "needs_review" ||
+    !!row.last_error ||
+    !!row.send_error ||
+    !!row.mockup_error ||
+    row.initial_send_status === "blocked_opted_out" ||
+    row.followup_send_status === "blocked_opted_out"
+  );
+}
+
+function partitionRows() {
+  const attention = [];
+  const pipeline = [];
+
+  for (const row of rows) {
+    if (isAttentionRow(row)) {
+      attention.push(row);
+    } else {
+      pipeline.push(row);
+    }
+  }
+
+  attention.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+  pipeline.sort((a, b) => new Date(a.open_start || 0) - new Date(b.open_start || 0));
+
+  return { attention, pipeline };
+}
+
+function renderRow(row) {
+  const latestInboundReply = getLatestInboundReply(row);
+  const replyDraft = row.followup_sms || "";
+  const showRestoreAuto = canRestoreAuto(row);
+
+  return `
+    <div class="rounded-3xl bg-white/90 backdrop-blur border border-slate-200 shadow-xl overflow-hidden">
+      <div class="grid md:grid-cols-[340px_1fr] gap-0">
+        <div class="bg-slate-100 p-3">
+          ${renderCardImage(row)}
+        </div>
+
+        <div class="p-4 md:p-5">
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="shrink-0">${renderAgentPhoto(row)}</div>
+
+              <div class="min-w-0">
+                <div class="text-xs uppercase tracking-[0.2em] text-indigo-600 font-bold">${esc(row.brokerage || "No Brokerage")}</div>
+                <h2 class="text-2xl font-[Poppins] font-black leading-tight">${esc(row.agent_name || "Unknown Agent")}</h2>
+                <div class="text-slate-600 mt-1">${esc(row.address || "No Address")}</div>
+                <div class="text-slate-500 text-sm mt-1">${fmtDate(row.open_start)}</div>
+
+                <div class="flex flex-wrap gap-2 mt-3 text-sm">
+                  ${row.price ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${shortMoney(row.price)}</span>` : ""}
+                  ${row.beds ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${row.beds} bd</span>` : ""}
+                  ${row.baths ? `<span class="px-3 py-1 rounded-full bg-slate-100 font-semibold">${row.baths} ba</span>` : ""}
+                  ${row.agent_phone ? `<span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-semibold">${esc(row.agent_phone)}</span>` : ""}
+                </div>
+
+                <div class="flex flex-wrap gap-2 mt-3 text-sm">
+                  <span class="px-3 py-1 rounded-full ${badgeClass(row.generation_status)} font-semibold">Copy: ${esc(row.generation_status || "pending")}</span>
+                  <span class="px-3 py-1 rounded-full ${badgeClass(row.mockup_status)} font-semibold">Mockup: ${esc(row.mockup_status || "pending")}</span>
+                  <span class="px-3 py-1 rounded-full ${badgeClass(row.initial_send_status)} font-semibold">Initial: ${esc(row.initial_send_status || "pending")}</span>
+                  <span class="px-3 py-1 rounded-full ${badgeClass(row.followup_send_status)} font-semibold">Follow-Up: ${esc(row.followup_send_status || "pending")}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <span class="px-3 py-1 rounded-full ${badgeClass(row.review_status)} text-sm font-semibold">${esc(row.review_status || "pending")}</span>
+              <span class="px-3 py-1 rounded-full ${badgeClass(row.send_mode)} text-sm font-semibold">${esc(row.send_mode || "manual")}</span>
+              <span class="px-3 py-1 rounded-full ${badgeClass(row.send_status)} text-sm font-semibold">${esc(row.send_status || "not_sent")}</span>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <label class="block text-sm font-semibold">Custom Reply Draft</label>
+              ${latestInboundReply ? `<span class="text-xs text-slate-500">Replying to message from ${esc(fmtDate(latestInboundReply.received_at))}</span>` : `<span class="text-xs text-slate-500">No inbound reply yet</span>`}
+            </div>
+            ${latestInboundReply ? `
+              <div class="rounded-2xl bg-sky-50 border border-sky-200 px-4 py-3 text-sm text-slate-700 mb-3">
+                <div class="text-[11px] uppercase tracking-[0.18em] text-sky-700 font-bold mb-1">Latest Inbound</div>
+                <div class="break-words">${esc(latestInboundReply.body || "(empty message)")}</div>
+              </div>
+            ` : ""}
+            <textarea data-id="${row.id}" class="followupSmsBox w-full rounded-2xl border border-slate-300 px-4 py-3 min-h-[145px] text-[15px] leading-6" placeholder="Write the reply you want queued for this contact...">${esc(replyDraft)}</textarea>
+            <div class="text-xs text-slate-500 mt-2">Save keeps your draft. Send Now texts it immediately from Twilio.</div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button data-id="${row.id}" class="saveBtn px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold">Save Reply Draft</button>
+            <button data-id="${row.id}" class="sendNowBtn px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold">Send Now</button>
+            ${showRestoreAuto ? `<button data-id="${row.id}" class="restoreAutoBtn px-4 py-3 rounded-2xl bg-sky-600 text-white font-semibold">Return To Auto</button>` : ""}
+            <button data-id="${row.id}" class="rerenderBtn px-4 py-3 rounded-2xl bg-fuchsia-600 text-white font-semibold">Rerender Mockup</button>
+            <button data-id="${row.id}" class="archiveBtn px-4 py-3 rounded-2xl bg-white border border-slate-300 text-slate-900 font-semibold">Archive</button>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-3">
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+              <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Initial Send At</div>
+              <div class="text-sm text-slate-700">${esc(fmtDate(row.initial_send_at))}</div>
+              ${row.initial_sent_at ? `<div class="text-xs text-slate-500 mt-2">Sent: ${esc(fmtDate(row.initial_sent_at))}</div>` : ""}
+              ${row.twilio_sid_initial ? `<div class="text-xs text-slate-500 mt-2 break-all">SID: ${esc(row.twilio_sid_initial)}</div>` : ""}
+            </div>
+
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+              <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold mb-1">Follow-Up Send At</div>
+              <div class="text-sm text-slate-700">${esc(fmtDate(row.followup_send_at))}</div>
+              ${row.followup_sent_at ? `<div class="text-xs text-slate-500 mt-2">Sent: ${esc(fmtDate(row.followup_sent_at))}</div>` : ""}
+              ${row.twilio_sid_followup ? `<div class="text-xs text-slate-500 mt-2 break-all">SID: ${esc(row.twilio_sid_followup)}</div>` : ""}
+            </div>
+          </div>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-3">
+            ${renderReasonBox("Initial Block Reason", row.initial_block_reason)}
+            ${renderReasonBox("Follow-Up Block Reason", row.followup_block_reason)}
+          </div>
+
+          <div class="mt-4">
+            ${renderReplies(row)}
+          </div>
+
+          ${row.last_error ? `<div class="mt-3 text-sm text-rose-600 font-medium">Error: ${esc(row.last_error)}</div>` : ""}
+          ${row.mockup_error ? `<div class="mt-3 text-sm text-rose-600 font-medium">Mockup Error: ${esc(row.mockup_error)}</div>` : ""}
+          ${row.send_error ? `<div class="mt-3 text-sm text-rose-600 font-medium">Send Error: ${esc(row.send_error)}</div>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSection(title, subtitle, items) {
+  if (!items.length) return "";
+
+  return `
+    <section class="grid gap-4">
+      <div class="flex items-end justify-between gap-3">
+        <div>
+          <h2 class="font-[Poppins] text-2xl font-black">${esc(title)}</h2>
+          <p class="text-slate-600 text-sm mt-1">${esc(subtitle)}</p>
+        </div>
+        <div class="px-3 py-2 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700">${items.length} rows</div>
+      </div>
+      ${items.map(renderRow).join("")}
+    </section>
+  `;
+}
+
+function render() {
+  const { attention, pipeline } = partitionRows();
+
+  app.innerHTML = `
+    <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f3f5ff,_#eef2ff_35%,_#ffffff_75%)] text-slate-900 p-4 md:p-6 font-[Inter]">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <div class="text-sm font-semibold tracking-[0.2em] uppercase text-indigo-600">Rel8tion</div>
+            <h1 class="font-[Poppins] text-3xl md:text-4xl font-black leading-tight">Open House Outreach Hot List</h1>
+            <p class="text-slate-600 mt-1">Replies, opt-outs, live outreach status, and message edits in one place.</p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button id="refreshBtn" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-semibold shadow-lg">Refresh</button>
+            <button id="generateBtn" class="px-4 py-3 rounded-2xl bg-indigo-600 text-white font-semibold shadow-lg">Generate + Render Pending</button>
+            <button id="rerenderAllBtn" class="px-4 py-3 rounded-2xl bg-fuchsia-600 text-white font-semibold shadow-lg">Rerender Loaded</button>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-3 mb-6">
+          <div class="rounded-3xl bg-white/90 border border-slate-200 shadow-sm p-4">
+            <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Needs Attention</div>
+            <div class="text-3xl font-[Poppins] font-black mt-2">${attention.length}</div>
+          </div>
+          <div class="rounded-3xl bg-white/90 border border-slate-200 shadow-sm p-4">
+            <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Active Pipeline</div>
+            <div class="text-3xl font-[Poppins] font-black mt-2">${pipeline.length}</div>
+          </div>
+          <div class="rounded-3xl bg-white/90 border border-slate-200 shadow-sm p-4">
+            <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-bold">Loaded Replies</div>
+            <div class="text-3xl font-[Poppins] font-black mt-2">${Object.values(repliesByQueueId).reduce((sum, items) => sum + items.length, 0)}</div>
+          </div>
+        </div>
+
+        <div class="grid gap-8">
+          ${!rows.length ? `
+            <div class="rounded-3xl bg-white/80 backdrop-blur border border-slate-200 p-8 shadow-xl text-center">
+              <div class="text-xl font-bold">No outreach rows found</div>
+              <div class="text-slate-500 mt-2">Queue some enriched open houses first.</div>
+            </div>
+          ` : ""}
+
+          ${renderSection("Replies + Needs Attention", "Recent replies, opt-outs, and anything that needs a human glance.", attention)}
+          ${renderSection("Upcoming Outreach", "Queued rows still moving through generation, rendering, and sending.", pipeline)}
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindEvents();
+}
+
+async function loadRows() {
+  const nowIso = new Date().toISOString();
+
+  const [activeResult, attentionResult] = await Promise.all([
+    supabase
+      .from("agent_outreach_queue")
+      .select("*")
+      .eq("enrichment_status", "ready")
+      .neq("send_status", "sent")
+      .neq("send_status", "archived")
+      .neq("review_status", "skipped")
+      .or(`open_end.gte.${nowIso},and(open_end.is.null,open_start.gte.${nowIso})`)
+      .order("open_start", { ascending: true })
+      .limit(500),
+
+    supabase
+      .from("agent_outreach_queue")
+      .select("*")
+      .neq("send_status", "archived")
+      .neq("review_status", "skipped")
+      .or("review_status.eq.replied,review_status.eq.opted_out,review_status.eq.needs_review,initial_send_status.eq.blocked_opted_out,followup_send_status.eq.blocked_opted_out")
+      .order("updated_at", { ascending: false })
+      .limit(250)
+  ]);
+
+  if (activeResult.error) {
+    console.error(activeResult.error);
+    alert(activeResult.error.message);
+    return;
+  }
+
+  if (attentionResult.error) {
+    console.error(attentionResult.error);
+    alert(attentionResult.error.message);
+    return;
+  }
+
+  const merged = new Map();
+
+  for (const row of attentionResult.data || []) merged.set(row.id, row);
+  for (const row of activeResult.data || []) merged.set(row.id, row);
+
+  rows = Array.from(merged.values());
+  repliesByQueueId = {};
+
+  const ids = rows.map((row) => row.id).filter(Boolean);
+
+  if (ids.length) {
+    const { data: replies, error: repliesError } = await supabase
+      .from("agent_outreach_replies")
+      .select("id, queue_row_id, body, direction, opt_out, received_at")
+      .in("queue_row_id", ids)
+      .order("received_at", { ascending: false })
+      .limit(500);
+
+    if (repliesError) {
+      console.error(repliesError);
+    } else {
+      for (const reply of replies || []) {
+        const key = reply.queue_row_id;
+        if (!key) continue;
+        if (!repliesByQueueId[key]) repliesByQueueId[key] = [];
+        if (repliesByQueueId[key].length < 5) repliesByQueueId[key].push(reply);
+      }
+    }
+  }
+
+  render();
+}
+
+async function saveEdits(id) {
+  const followupText = getFollowupSms(id);
+
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      followup_sms: followupText,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function sendNow(id) {
+  const messageBody = getFollowupSms(id);
+
+  if (!messageBody) {
+    alert("Write a message first.");
+    return;
+  }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/send-agent-manual-reply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ id, body: messageBody })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to send manual reply.");
+  }
+
+  await loadRows();
+}
+
+async function restoreAuto(id) {
+  const row = getRowById(id);
+
+  if (!row) {
+    alert("Row not found.");
+    return;
+  }
+
+  if (!canRestoreAuto(row)) {
+    alert("This contact cannot be returned to automatic outreach.");
+    return;
+  }
+
+  const update = {
+    send_mode: "automatic",
+    review_status: "pending",
+    approved_for_send: false,
+    send_error: null,
+    last_error: null,
+    updated_at: new Date().toISOString()
+  };
+
+  if (row.followup_send_status === "blocked_replied" && !row.followup_sent_at) {
+    update.followup_send_status = "pending";
+    update.followup_block_reason = null;
+  }
+
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update(update)
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function archiveRow(id) {
+  const { error } = await supabase
+    .from("agent_outreach_queue")
+    .update({
+      review_status: "skipped",
+      send_status: "archived",
+      skipped_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadRows();
+}
+
+async function triggerGenerate(limit = 200) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-agent-outreach`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ limit })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to generate outreach.");
+  return data;
+}
+
+async function triggerRender(payload = { limit: 200 }) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/trigger-agent-mockups`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to render mockups.");
+  return data;
+}
+
+async function rerenderLoadedRows() {
+  const ids = rows.map((row) => row.id).filter(Boolean);
+  if (!ids.length) {
+    alert("No rows loaded.");
+    return;
+  }
+
+  const chunkSize = 50;
+
+  try {
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      await triggerRender({ ids: chunk, force: true, limit: chunk.length });
+    }
+
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function generatePending() {
+  try {
+    await triggerGenerate(200);
+    await triggerRender({ limit: 200 });
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function rerenderRow(id) {
+  try {
+    await triggerRender({ ids: [id], force: true });
+    await loadRows();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function bindEvents() {
+  document.getElementById("refreshBtn")?.addEventListener("click", loadRows);
+  document.getElementById("generateBtn")?.addEventListener("click", generatePending);
+  document.getElementById("rerenderAllBtn")?.addEventListener("click", rerenderLoadedRows);
+
+  document.querySelectorAll(".saveBtn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      await saveEdits(e.target.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".sendNowBtn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      try {
+        await sendNow(e.target.dataset.id);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : String(error));
+      }
+    });
+  });
+
+  document.querySelectorAll(".restoreAutoBtn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      await restoreAuto(e.target.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".rerenderBtn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      await rerenderRow(e.target.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".archiveBtn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      await archiveRow(e.target.dataset.id);
+    });
+  });
+}
+
+loadRows();
+</script>

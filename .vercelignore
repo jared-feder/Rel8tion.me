@@ -1,0 +1,12 @@
+.git
+.github
+.env*
+.vercel-*
+.vercel-*.zip
+.supabase-deploy
+supabase/.temp
+node_modules
+docs
+wordpress
+output
+claim2.html

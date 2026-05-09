@@ -1,0 +1,69 @@
+{
+  "snapshot_date": "2026-04-25",
+  "production_url": "https://app.rel8tion.me",
+  "latest_deployed_commit": "0e617c3",
+  "latest_deployed_commit_message": "Add demo smart sign reset action",
+  "demo_reset_action": {
+    "available": true,
+    "location": "Smart Sign activation success screen",
+    "button_label": "Reset This Demo Sign",
+    "confirmation_required": "Type the exact sign public code",
+    "current_demo_confirmation_code": "38e8d6eb579c",
+    "default_behavior": [
+      "delete open_house_events rows tied to the sign smart_sign_id",
+      "clear smart_sign_inventory.smart_sign_id",
+      "clear smart_sign_inventory.claimed_at",
+      "delete the smart_signs row for the confirmed public code",
+      "clear browser local Smart Sign activation session",
+      "leave agent keychain keys claimed"
+    ],
+    "optional_behavior": [
+      "if selected, unclaim the current keychain UID only"
+    ],
+    "normal_demo_instruction": "Leave the keychain reset checkbox unchecked when reusing the sign for another demo."
+  },
+  "smart_sign": {
+    "id": "2b0f9786-6476-4b99-99fc-13bdee0e90a9",
+    "public_code": "38e8d6eb579c",
+    "uid_primary": "8ce0364c-411e-45f8-a9eb-2eb8954b0ca0",
+    "uid_secondary": "987fb582-6ca3-4d8a-8dc2-54b6af6e2962",
+    "owner_agent_slug": "jared-u0j",
+    "status": "active",
+    "active_event_id": "e19e02a8-f898-4859-8110-a8ee472d20a9",
+    "activation_uid_primary": "5e3f69cb-4e00-40c7-ac75-67faaae156fa",
+    "activation_uid_secondary": "987fb582-6ca3-4d8a-8dc2-54b6af6e2962",
+    "activation_method": "sign_demo_claimed_chip",
+    "setup_confirmed_at": "2026-04-25T03:05:29.983-04:00"
+  },
+  "smart_sign_inventory": {
+    "id": "00bd6326-bac9-48e7-8b39-61ba7f115980",
+    "public_code": "38e8d6eb579c",
+    "qr_url": "https://app.rel8tion.me/s.html?code=38e8d6eb579c",
+    "is_printed": true,
+    "claimed_at": "2026-04-25T02:47:49.655-04:00",
+    "smart_sign_id": "2b0f9786-6476-4b99-99fc-13bdee0e90a9"
+  },
+  "open_house_event": {
+    "id": "e19e02a8-f898-4859-8110-a8ee472d20a9",
+    "host_agent_slug": "jared-u0j",
+    "smart_sign_id": "2b0f9786-6476-4b99-99fc-13bdee0e90a9",
+    "open_house_source_id": "M00000489-972883",
+    "status": "active",
+    "address": "3727 Oceanside Rd E, Oceanside, NY 11572",
+    "activation_method": "sign_demo_claimed_chip",
+    "setup_context": {
+      "flow": "sign-demo",
+      "source": "claimed-chip-bridge",
+      "address": "3727 Oceanside Rd E, Oceanside, NY 11572",
+      "agent_slug": "jared-u0j",
+      "sign_chip_primary": "8ce0364c-411e-45f8-a9eb-2eb8954b0ca0",
+      "sign_chip_secondary": "987fb582-6ca3-4d8a-8dc2-54b6af6e2962",
+      "detected_brokerage": "Coldwell Banker American Homes"
+    }
+  },
+  "do_not_delete_without_intent": [
+    "smart_signs.id=2b0f9786-6476-4b99-99fc-13bdee0e90a9",
+    "smart_sign_inventory.id=00bd6326-bac9-48e7-8b39-61ba7f115980",
+    "open_house_events.id=e19e02a8-f898-4859-8110-a8ee472d20a9"
+  ]
+}

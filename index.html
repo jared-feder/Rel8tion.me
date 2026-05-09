@@ -166,7 +166,8 @@
         </p>
 
         <div class="actions">
-          <a class="button primary" href="/smart-sign-event.html">Open Smart Sign Event Test</a>
+          <a class="button primary" href="/claim">Open Claim Flow</a>
+          <a class="button secondary" href="/nmb-activate">Open NMB Activate</a>
           <a class="button secondary" href="https://rel8tion.info" target="_blank" rel="noreferrer">Open WordPress Site</a>
         </div>
 
@@ -180,17 +181,21 @@
         <section>
           <p>Useful routes to test from this deployment:</p>
           <div class="links">
-            <a href="/smart-sign-event.html">
-              <strong>Smart Sign Event</strong>
-              <span>Loads the current app entry point for the smart sign flow.</span>
+            <a href="/claim">
+              <strong>Claim Flow</strong>
+              <span>Tests the agent activation flow that should be opened from a chip or claim link.</span>
             </a>
-            <a href="/smart-sign/main.js">
-              <strong>JS Module Check</strong>
-              <span>Confirms the deployed static asset path for the smart sign bundle.</span>
+            <a href="/sign">
+              <strong>Smart Sign Resolver</strong>
+              <span>Needs a real public sign code like <code>?code=YOUR_PUBLIC_CODE</code>.</span>
             </a>
-            <a href="/sql/migrations/20260409_smart_sign_phase_1_1_cleanup.sql">
-              <strong>Migration File</strong>
-              <span>Verifies Vercel can serve nested repo files when needed for quick inspection.</span>
+            <a href="/event">
+              <strong>Live Event Shell</strong>
+              <span>Needs a real live event id like <code>?event=YOUR_EVENT_ID</code>.</span>
+            </a>
+            <a href="/nmb-activate">
+              <strong>NMB Activate</strong>
+              <span>Tests the loan-officer/service activation flow.</span>
             </a>
           </div>
         </section>

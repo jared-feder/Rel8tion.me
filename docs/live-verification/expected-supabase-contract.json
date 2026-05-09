@@ -1,0 +1,303 @@
+{
+  "version": "2026-05-06",
+  "description": "Read-only expected contract for comparing repo assumptions against live Supabase and Vercel state.",
+  "statusLabels": [
+    "PASS",
+    "WARN",
+    "NEEDS_VERIFICATION",
+    "FAIL"
+  ],
+  "supabase": {
+    "tables": {
+      "agents": {
+        "required": true,
+        "columns": []
+      },
+      "keys": {
+        "required": true,
+        "columns": [
+          "uid",
+          "agent_slug",
+          "claimed",
+          "device_role",
+          "assigned_slot"
+        ]
+      },
+      "open_houses": {
+        "required": true,
+        "columns": []
+      },
+      "listing_agents": {
+        "required": true,
+        "columns": []
+      },
+      "smart_sign_inventory": {
+        "required": true,
+        "columns": [
+          "public_code",
+          "smart_sign_id"
+        ]
+      },
+      "smart_signs": {
+        "required": true,
+        "columns": [
+          "public_code",
+          "uid_primary",
+          "uid_secondary",
+          "primary_device_type",
+          "secondary_device_type",
+          "owner_agent_slug",
+          "assigned_agent_slug",
+          "active_event_id"
+        ]
+      },
+      "smart_sign_activation_sessions": {
+        "required": true,
+        "columns": []
+      },
+      "open_house_events": {
+        "required": true,
+        "columns": [
+          "smart_sign_id",
+          "host_agent_slug",
+          "open_house_source_id",
+          "status",
+          "ended_at"
+        ]
+      },
+      "event_checkins": {
+        "required": true,
+        "columns": [
+          "open_house_event_id",
+          "visitor_name",
+          "visitor_phone",
+          "pre_approved",
+          "metadata"
+        ]
+      },
+      "event_loan_officer_sessions": {
+        "required": true,
+        "columns": [
+          "open_house_event_id",
+          "loan_officer_slug",
+          "loan_officer_phone",
+          "status"
+        ]
+      },
+      "verified_profiles": {
+        "required": true,
+        "columns": [
+          "uid",
+          "slug",
+          "is_active"
+        ]
+      },
+      "leads": {
+        "required": true,
+        "columns": [
+          "agent_slug",
+          "phone",
+          "preapproved"
+        ]
+      },
+      "agent_outreach_queue": {
+        "required": true,
+        "columns": []
+      },
+      "agent_outreach_replies": {
+        "required": true,
+        "columns": []
+      }
+    },
+    "relationships": [
+      {
+        "name": "keys.agent_slug_to_agents.slug",
+        "from": "keys.agent_slug",
+        "to": "agents.slug",
+        "verification": "Dashboard/database inspection required for formal FK. Repo code treats this as a convention."
+      },
+      {
+        "name": "smart_signs.active_event_id_to_open_house_events.id",
+        "from": "smart_signs.active_event_id",
+        "to": "open_house_events.id",
+        "verification": "Dashboard/database inspection required for formal FK."
+      },
+      {
+        "name": "smart_sign_inventory.smart_sign_id_to_smart_signs.id",
+        "from": "smart_sign_inventory.smart_sign_id",
+        "to": "smart_signs.id",
+        "verification": "Dashboard/database inspection required for formal FK."
+      },
+      {
+        "name": "open_house_events.smart_sign_id_to_smart_signs.id",
+        "from": "open_house_events.smart_sign_id",
+        "to": "smart_signs.id",
+        "verification": "Dashboard/database inspection required for formal FK."
+      },
+      {
+        "name": "event_checkins.open_house_event_id_to_open_house_events.id",
+        "from": "event_checkins.open_house_event_id",
+        "to": "open_house_events.id",
+        "verification": "Dashboard/database inspection required for formal FK."
+      },
+      {
+        "name": "event_loan_officer_sessions.open_house_event_id_to_open_house_events.id",
+        "from": "event_loan_officer_sessions.open_house_event_id",
+        "to": "open_house_events.id",
+        "verification": "Dashboard/database inspection required for formal FK."
+      }
+    ],
+    "rpcs": [
+      "find_nearest_open_house",
+      "queue_recent_outreach_candidates",
+      "verified_profiles_lookup",
+      "verified_profiles_activate_or_create"
+    ],
+    "edgeFunctions": [
+      {
+        "name": "send-lead-sms",
+        "safeToCall": false,
+        "reasonNotCalled": "Could send real SMS or mutate logs."
+      },
+      {
+        "name": "twilio-inbound-router",
+        "safeToCall": false,
+        "reasonNotCalled": "Inbound webhook can mutate reply/queue state."
+      },
+      {
+        "name": "twilio-inbound-reply",
+        "safeToCall": false,
+        "reasonNotCalled": "Inbound webhook can mutate reply/queue state."
+      },
+      {
+        "name": "sync-openhouses",
+        "safeToCall": false,
+        "reasonNotCalled": "Can fetch and write listing/open house data."
+      },
+      {
+        "name": "generate-agent-outreach",
+        "safeToCall": false,
+        "reasonNotCalled": "Can enqueue outreach records."
+      },
+      {
+        "name": "send-agent-outreach",
+        "safeToCall": false,
+        "reasonNotCalled": "Can send real SMS."
+      },
+      {
+        "name": "send-agent-manual-reply",
+        "safeToCall": false,
+        "reasonNotCalled": "Can send real SMS."
+      }
+    ],
+    "securityChecks": [
+      {
+        "name": "anon_zero_row_schema_probe",
+        "canVerifyFromAnon": true,
+        "notes": "A zero-row PostgREST select can confirm some table/column exposure but cannot prove RLS correctness."
+      },
+      {
+        "name": "service_role_schema_probe",
+        "canVerifyFromAnon": false,
+        "requiresServiceRole": true,
+        "notes": "Optional read-only service-role probes can distinguish missing schema from anon/RLS blockage."
+      },
+      {
+        "name": "rls_policy_review",
+        "canVerifyFromAnon": false,
+        "requiresDashboard": true,
+        "notes": "Full policy definitions require Supabase dashboard, SQL editor, or privileged metadata access. This script does not write test rows."
+      },
+      {
+        "name": "edge_function_deployment_state",
+        "canVerifyFromAnon": false,
+        "requiresDashboard": true,
+        "notes": "The script checks local function source only. It does not call functions that could send SMS or mutate data."
+      }
+    ]
+  },
+  "vercel": {
+    "productRoutes": [
+      {
+        "path": "/k",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/k.html"
+      },
+      {
+        "path": "/claim",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/claim.html"
+      },
+      {
+        "path": "/onboarding",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/onboarding.html"
+      },
+      {
+        "path": "/sign-demo-activate",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/sign-demo-activate.html"
+      },
+      {
+        "path": "/s",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/sign.html"
+      },
+      {
+        "path": "/sign",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/sign.html"
+      },
+      {
+        "path": "/event",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/event.html"
+      },
+      {
+        "path": "/agent-dashboard",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/agent-dashboard.html"
+      },
+      {
+        "path": "/admin",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/admin.html"
+      },
+      {
+        "path": "/key-reset",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/key-reset.html"
+      },
+      {
+        "path": "/nmb-activate",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/nmb-activate.html"
+      },
+      {
+        "path": "/nmb-verified",
+        "type": "rewrite",
+        "destination": "/apps/rel8tion-app/nmb-verified.html"
+      },
+      {
+        "path": "/a",
+        "type": "cleanHtml",
+        "file": "a.html"
+      },
+      {
+        "path": "/b",
+        "type": "cleanHtml",
+        "file": "b.html"
+      }
+    ],
+    "apiRoutes": [
+      {
+        "path": "/api/admin/reset-key",
+        "file": "api/admin/reset-key.js"
+      },
+      {
+        "path": "/api/cron/enrich-agents",
+        "file": "api/cron/enrich-agents.js"
+      }
+    ]
+  }
+}
