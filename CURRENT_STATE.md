@@ -30,8 +30,10 @@ Status labels:
 - `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
-- `[IMPLEMENTED]` `/event` shows property details, host agent, contact/save-contact actions, and check-in form.
+- `[IMPLEMENTED]` `/event` first visible screen is buyer-first: compact host photo/avatar, "Welcome to my open house", agent/brokerage/property context, then name and phone check-in inputs. Host contact/save-contact actions are intentionally shown after successful check-in.
 - `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.
+- `[IMPLEMENTED]` `/event` requires the New York State Agency Disclosure and Rel8tion Courtesy Notice to be reviewed/signed through modal accept/sign actions before check-in submit. Seller representation is the only agency disclosure mode in v1.
+- `[IMPLEMENTED]` `/event` stores agency/courtesy disclosure evidence in `event_checkins.metadata`, including `agency_disclosure_reviewed`, `seller_representation_acknowledged`, `agency_disclosure_signed_at`, `agency_disclosure_pdf_url`, `agency_disclosure_version`, `agency_disclosure_type`, `rel8tion_courtesy_acknowledged`, `rel8tion_courtesy_signed_at`, plus nested `nys_agency_disclosure` and `rel8tion_courtesy_notice` objects.
 - `[IMPLEMENTED]` `/event` requires a NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement before check-in submit. The buyer check-in name auto-fills as the electronic signature, and the acknowledgement is stored in `event_checkins.metadata.ny_discrimination_disclosure`.
 - `[IMPLEMENTED]` `/event` uses configurable `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL`, defaulting to the REL8TION-hosted Supabase Storage copy of the NYS Housing and Anti-Discrimination Disclosure PDF. The official DOS form page remains the source-of-truth reference.
 - `[IMPLEMENTED]` `/event` opens a server-generated prefilled NYS disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
@@ -89,7 +91,9 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
 - `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.
 - `[IMPLEMENTED]` Key reset scanner/admin API added.
-- `[IMPLEMENTED]` Buyer event page polished with hosted-by agent block, property facts, save contact, and check-in section.
+- `[IMPLEMENTED]` Buyer event page changed to a low-scroll first screen with hosted-by agent photo/avatar, "Welcome to my open house", property context, and immediate buyer name/phone inputs.
+- `[IMPLEMENTED]` Buyer event page moved host Save Contact/Call/Text/Email actions to the post-check-in success/contact section.
+- `[IMPLEMENTED]` Buyer event page now blocks final check-in until the New York State Agency Disclosure and Rel8tion Courtesy Notice are accepted/signed, then stores the timestamps and disclosure metadata in `event_checkins.metadata`.
 - `[IMPLEMENTED]` Buyer event page now blocks final check-in until the NYS Housing and Anti-Discrimination Disclosure checkbox acknowledgement is complete and the buyer name is available as the prefilled e-signature, then saves DOS-2156 metadata before SMS notifications are called.
 - `[PARTIAL]` Buyer event page now requests signed NYS disclosure PDF generation after check-in and before SMS notification calls continue; failure is logged and does not block buyer/agent SMS.
 - `[IMPLEMENTED]` Buyer preference selection added after check-in/profile lead submit.
@@ -165,7 +169,10 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Rear sign scan must be followed by agent keychain scan. | `[IMPLEMENTED]` | `k.html` writes `rel8tion_agent_dashboard_pending` and waits. |
 | Sign activation can bind a sign to an event. | `[IMPLEMENTED]` | `createOrLockEvent` writes `open_house_events` and patches `smart_signs`. |
 | Buyer event check-in exists at `/event`. | `[IMPLEMENTED]` | Route rewrites plus `eventShell/bootstrap.js`. |
+| `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders host photo/avatar, welcome copy, property context, then immediate name/phone inputs; contact/save-contact actions render after successful check-in. |
 | Buyer check-in saves to `event_checkins`. | `[IMPLEMENTED]` | `createCheckin` posts to `event_checkins`. |
+| `/event` requires NYS Agency Disclosure and Rel8tion Courtesy Notice signatures. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders modal review/sign actions and validates signed timestamps before building the check-in payload. |
+| Agency/courtesy disclosure evidence is saved with event check-ins. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `metadata.nys_agency_disclosure`, `metadata.rel8tion_courtesy_notice`, and root metadata convenience fields for signed timestamps/version/type. |
 | `/event` requires NYS disclosure acknowledgement before check-in submit. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` validates buyer name, checkbox acknowledgement, and prefilled signature before building the check-in payload and before SMS calls. |
 | NYS disclosure acknowledgement is saved with event check-ins. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` writes `metadata.ny_discrimination_disclosure` with DOS-2156 `11/25` form metadata, provided-by agent/brokerage, consumer role, checkbox/prefilled-name signature, timestamp, date, and user agent. |
 | `/event` uses a configurable REL8TION-hosted disclosure PDF. | `[IMPLEMENTED]` | `src/core/config.js` defaults `NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL` to the Supabase Storage PDF and keeps an official DOS source URL constant for reference. |
