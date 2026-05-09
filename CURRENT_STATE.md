@@ -71,15 +71,18 @@ Status labels:
 - `[IMPLEMENTED]` The dedicated beta keychain route now expires stale local sign-activation browser sessions and opens the beta claim/reset menu before stale remote `smart_sign_activation_sessions` can hijack the scan. Fresh local sign activation handshakes still continue when the same browser is actively in that flow.
 - `[IMPLEMENTED]` In the beta keychain claim flow, once a real typed profile is saved, that profile identity is locked for the activation run. Selecting an open house can still attach the listing/property context, but stale `listing_agents` or `open_houses.agent` data should not overwrite the typed keychain profile name/phone/brokerage.
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
+- `[IMPLEMENTED]` OneKey listing freshness worker exists at `onekey-freshness-worker.cjs` with API route `api/cron/refresh-open-house-data.js`. It checks current OneKey listing records by tight lat/lng search, matches by `UniqueListingId`, updates listing facts/prices, records price-history rows when the migration is applied, and refreshes active event price snapshots.
+- `[PARTIAL]` OneKey freshness schema is represented by migration `sql/migrations/20260509_open_house_freshness.sql`, adding `open_houses` verification/override fields and `open_house_price_history`. The migration was applied live on 2026-05-09 and anon zero-row schema verification passed; privileged RLS/service-role behavior remains `[NEEDS VERIFICATION]`.
+- `[IMPLEMENTED]` Root `vercel.json` now includes a Vercel Cron entry for `/api/cron/refresh-open-house-data` every 30 minutes. Deployment/dashboard cron state remains `[NEEDS VERIFICATION]` until Vercel reports it live.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment implementation was found during the 2026-05-09 repo audit. Current tracked enrichment is the Estately + Cheerio worker. If Browserless/Trulia enrichment is intended, it needs implementation or source recovery.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
 - `[IMPLEMENTED]` A read-only live verification system exists under `docs/live-verification/` with `npm run verify:live`.
-- `[PARTIAL]` Latest live verification anon run on 2026-05-09 succeeded with summary `PASS 79`, `WARN 6`, `NEEDS_VERIFICATION 11`, `FAIL 0`. Core tables and expected columns passed anon zero-row schema probes. This confirms live schema exposure through the anon PostgREST access path, not full RLS correctness, write behavior, deployment health, or production data quality.
+- `[PARTIAL]` Latest live verification anon run on 2026-05-09 succeeded with summary `PASS 108`, `WARN 6`, `NEEDS_VERIFICATION 10`, `FAIL 0`. Core tables and expected columns, including OneKey freshness fields and `open_house_price_history`, passed anon zero-row schema probes. This confirms live schema exposure through the anon PostgREST access path, not full RLS correctness, write behavior, deployment health, or production data quality.
 
 ## [PARTIAL] And [NEEDS VERIFICATION]
 
-- `[NEEDS VERIFICATION]` Root `api/cron/enrich-agents.js` exists, but root `vercel.json` currently has no `crons` block. Cron scheduling is not proven by the repo.
+- `[PARTIAL]` Root `vercel.json` now has a cron for OneKey freshness. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
 - `[PARTIAL]` The Estately worker can enrich `listing_agents`, but quality depends on Estately parsing and phone validation.
 - `[NEEDS VERIFICATION]` Outreach generation/sending source exists mostly under `docs/supabase-functions`; deployment state is not confirmed from repo files.
 - `[PARTIAL]` `/admin` is only a placeholder page, not a full admin dashboard.
@@ -148,6 +151,8 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Agent dashboard End/Move event controls now send PATCH requests through the shared dashboard request helper. This prevents an ended open house from leaving `smart_signs.active_event_id` live and blocking the agent from binding the same sign to the next open house.
 - `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
+- `[IMPLEMENTED]` OneKey listing freshness worker, API route, cron config, migration, npm scripts, and live-verification contract entries were added so stale prices can be checked against current OneKey source data.
+- `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` is marked with `manual_price_override = 1399900`, `source_price = 1399998`, and `freshness_status = manual_override_active` so the live demo display stays at the requested `$1,399,900` while preserving the current OneKey source price. A privileged SQL check confirmed a matching `open_house_price_history` audit row from old `$1,450,000` to display `$1,399,900`.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.
 
 ## [INTENDED] Build Next
@@ -155,10 +160,11 @@ Recent repo state includes:
 Highest-value next work:
 
 1. Run privileged/dashboard verification for RLS policies, service-role schema checks, deployed Edge Functions, RPC definitions, and Vercel Cron state.
-2. Confirm the currently configured Vercel routes and whether the enrichment cron is intentionally disabled or missing.
-3. Re-run `npm run verify:live` after schema, route, or function changes and review the generated report without committing it.
-4. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.
-5. Build formal remote LO coverage management:
+2. Verify the deployed `/api/cron/refresh-open-house-data` route and Vercel Cron dashboard state after deploy; the live schema exists, but scheduled execution has not been proven.
+3. Confirm the currently configured Vercel routes and whether the Estately enrichment cron is intentionally disabled or missing.
+4. Re-run `npm run verify:live` after schema, route, or function changes and review the generated report without committing it.
+5. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.
+6. Build formal remote LO coverage management:
    - loan officer profiles
    - agent/loan officer relationships
    - event invites
@@ -168,8 +174,8 @@ Highest-value next work:
    - event start prompt
    - live coverage session
    - buyer financing alert and contact modal
-6. Replace placeholder `/admin` with a protected operational dashboard.
-7. Add a small E2E/runbook suite for:
+7. Replace placeholder `/admin` with a protected operational dashboard.
+8. Add a small E2E/runbook suite for:
    - claim keychain
    - activate sign QR
    - pair front/rear chips
@@ -178,8 +184,8 @@ Highest-value next work:
    - rear dashboard challenge
    - loan officer sign-in
    - reset beta sign/key
-8. Unify `/b` profile leads and `/event` check-ins by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record.
-9. Harden outreach phone validation and queue rules before re-enabling broad automation.
+9. Unify `/b` profile leads and `/event` check-ins by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record.
+10. Harden outreach phone validation and queue rules before re-enabling broad automation.
 
 ## [PARTIAL] Data Model Warning
 

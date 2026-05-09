@@ -554,6 +554,29 @@ Important fields used in code:
 - `open_start`
 - `open_end`
 - photo/link fields such as `image`, `image_url`, `listing_photo_url`, `primary_photo_url`, `onekey_url`
+- `[PARTIAL]` listing freshness fields from `sql/migrations/20260509_open_house_freshness.sql`: `last_verified_at`, `last_verified_source`, `source_price`, `source_price_verified_at`, `price_last_changed_at`, `manual_price_override`, `manual_price_override_at`, `manual_price_override_by`, `freshness_status`, and `freshness_notes`. Code support exists and anon zero-row schema verification passed live on 2026-05-09; privileged RLS/service-role behavior remains `[NEEDS VERIFICATION]`.
+
+### `open_house_price_history`
+
+`[PARTIAL]` Migration and worker support exist. Live anon zero-row schema verification passed on 2026-05-09; privileged RLS/service-role behavior remains `[NEEDS VERIFICATION]`.
+
+Used for:
+
+- append-only audit of detected listing price changes
+- proving old price, source price, displayed price, source, and detection timestamp
+- preserving a source snapshot when OneKey changes are detected
+
+Important fields:
+
+- `open_house_id`
+- `old_price`
+- `new_price`
+- `source_price`
+- `displayed_price`
+- `source`
+- `change_reason`
+- `source_snapshot`
+- `detected_at`
 
 ### `listing_agents`
 
@@ -994,7 +1017,37 @@ Endpoint:
 
 Important current config note:
 
-- `[NEEDS VERIFICATION]` Root `vercel.json` has no `crons` block. The endpoint exists, but cron scheduling from this repo config is not confirmed.
+- `[PARTIAL]` Root `vercel.json` schedules the OneKey freshness endpoint, but does not schedule the Estately enrichment endpoint. Vercel dashboard/deployed cron state remains `[NEEDS VERIFICATION]`.
+
+## OneKey Listing Freshness Pipeline
+
+Files:
+
+- `onekey-freshness-worker.cjs`
+- `api/cron/refresh-open-house-data.js`
+- `sql/migrations/20260509_open_house_freshness.sql`
+
+`[IMPLEMENTED]` Confirmed worker behavior:
+
+- Uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` for writes.
+- Dry runs may use `SUPABASE_ANON_KEY` and do not write to Supabase.
+- Prioritizes active sign event listings, then upcoming OneKey open houses.
+- Looks up current OneKey listing data by a tight lat/lng search box.
+- Matches the source row by exact `UniqueListingId`; address match is a fallback.
+- Updates listing facts including price, beds, baths, square feet, brokerage, image, and coordinates.
+- Does not overwrite `open_start` / `open_end` from the source freshness pass, because active demo/event windows may be manually corrected.
+- Supports `manual_price_override`; when present, source price is recorded but the display price is preserved.
+- Inserts `open_house_price_history` rows for detected price changes when the migration exists.
+- Refreshes active `open_house_events.setup_context.price` so live sign pages and dashboards do not disagree with the linked `open_houses` row.
+
+Endpoint and cron:
+
+- `api/cron/refresh-open-house-data.js` imports the worker and returns JSON.
+- Root `vercel.json` schedules `/api/cron/refresh-open-house-data` every 30 minutes.
+
+`[NEEDS VERIFICATION]` Live deployment, cron execution, service-role env state, and RLS behavior still need live verification before treating the pipeline as fully operational. The additive Supabase schema migration was applied and anon zero-row schema probes passed on 2026-05-09.
+
+`[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` is marked with `manual_price_override = 1399900`, `source_price = 1399998`, and `freshness_status = manual_override_active` so the live demo display stays at the requested `$1,399,900` while preserving the current OneKey source price. A privileged SQL check confirmed a matching `open_house_price_history` audit row from old `$1,450,000` to display `$1,399,900`.
 
 ## Twilio And SMS Logic
 

@@ -15,7 +15,7 @@ Then review `latest-live-verification-report.md`.
 - [ ] `vercel.json` exists at repo root.
 - [ ] `cleanUrls` is enabled if `/a` and `/b` depend on root `a.html` and `b.html`.
 - [ ] `rewrites` includes current product routes.
-- [ ] `crons` state is intentional. If no `crons` block exists, confirm whether enrichment cron is disabled somewhere else or missing.
+- [ ] `crons` state is intentional. Root config should schedule OneKey freshness; Estately enrichment scheduling still needs separate confirmation if expected.
 
 ## Product Routes
 
@@ -42,6 +42,7 @@ Then review `latest-live-verification-report.md`.
 | --- | --- | --- | --- |
 | `/api/admin/reset-key` | `api/admin/reset-key.js` | Do not call casually; destructive reset behavior is expected behind token checks. | [ ] |
 | `/api/cron/enrich-agents` | `api/cron/enrich-agents.js` | Do not call casually if it can enrich production data. | [ ] |
+| `/api/cron/refresh-open-house-data` | `api/cron/refresh-open-house-data.js` | Do not call casually if it can update production listing prices and active event snapshots. | [ ] |
 
 ## Deployment Verification
 

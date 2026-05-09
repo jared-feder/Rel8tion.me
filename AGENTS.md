@@ -37,7 +37,9 @@ Before making changes, inspect:
 - `b.html` and `a.html`
 - `api/admin/reset-key.js`
 - `api/cron/enrich-agents.js`
+- `api/cron/refresh-open-house-data.js`
 - `estately-enrichment-worker.cjs`
+- `onekey-freshness-worker.cjs`
 - `supabase/functions/*`
 - `sql/*.sql` and `sql/migrations/*.sql`
 - `wordpress/README.md`
@@ -93,6 +95,7 @@ These rules matter more than code style.
 - `[RISK]` Smart sign QR activation currently resolves `smart_sign_inventory.public_code` first. The older `smart-sign-qr-export.sql` exports from `smart_signs.public_code`; reconcile this before batch printing.
 - `[RISK]` Outreach and auto-reply behavior can spend money and affect real agent conversations. Do not deploy or enable new outbound behavior without checking filters, quiet hours, opt-out handling, and owner approval.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment source was found in the 2026-05-09 audit. The tracked enrichment worker is Estately + Cheerio.
+- `[PARTIAL]` OneKey listing freshness is implemented in repo code and root cron config, but live schema migration and deployed cron execution need verification before relying on the audit trail.
 
 ## [PARTIAL] Data Model Warning
 
@@ -160,9 +163,11 @@ Treat these as live Supabase dependencies that need verification before refactor
 
 ## Vercel Boundaries
 
-`[IMPLEMENTED]` Root `vercel.json` is the route map for this repo deployment. It currently has rewrites but no root `crons` block.
+`[IMPLEMENTED]` Root `vercel.json` is the route map for this repo deployment. It currently has rewrites and a root cron for `/api/cron/refresh-open-house-data`.
 
 `[NEEDS VERIFICATION]` `api/cron/enrich-agents.js` exists and imports `estately-enrichment-worker.cjs`, but the root Vercel cron schedule is not present in the inspected root config. If the endpoint is running in production, it is either triggered externally, deployed from another config, or needs verification.
+
+`[NEEDS VERIFICATION]` `api/cron/refresh-open-house-data.js` exists and imports `onekey-freshness-worker.cjs`. Root `vercel.json` schedules it every 30 minutes, but deployed Vercel Cron state still needs dashboard/API verification after deploy.
 
 `[IMPLEMENTED]` `apps/mockup-renderer` is a separate Vercel-style app with its own `vercel.json`, API routes, cron endpoints, and tests.
 
@@ -210,6 +215,12 @@ Root dependency install when needed:
 npm install
 ```
 
+OneKey freshness dry-run:
+
+```powershell
+npm run refresh:onekey:dry-run -- --id=M00000489-971018
+```
+
 There is no confirmed full automated test suite for the main static REL8TION app. For NFC/sign work, verification is usually a manual route/state test plus targeted Supabase row inspection.
 
 ## [RISK] High-Risk Areas
@@ -221,6 +232,7 @@ There is no confirmed full automated test suite for the main static REL8TION app
 - `smart_sign_inventory` to `smart_signs` linking. QR code binding depends on this relationship.
 - Root `/b` buyer profile and `/event` smart sign check-in are different experiences.
 - Estately enrichment. It can populate bad office numbers if parsing/validation is loose.
+- OneKey freshness. It can update live listing prices and active event snapshots; run dry-runs and verify `manual_price_override` behavior before broad deployment.
 - Outreach functions. Bad queue filters can send or suppress real messages.
 - RLS/schema cache errors. If a browser insert fails with `PGRST204` or `42501`, inspect live schema/policies before changing frontend assumptions.
 

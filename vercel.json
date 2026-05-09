@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/cron/refresh-open-house-data",
+      "schedule": "*/30 * * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim.html", "destination": "/apps/rel8tion-app/claim.html" },

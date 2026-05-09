@@ -1,7 +1,9 @@
 {
   "private": true,
   "scripts": {
-    "verify:live": "node docs/live-verification/verify-supabase-live.mjs"
+    "verify:live": "node docs/live-verification/verify-supabase-live.mjs",
+    "refresh:onekey": "node onekey-freshness-worker.cjs",
+    "refresh:onekey:dry-run": "node onekey-freshness-worker.cjs --dry-run"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

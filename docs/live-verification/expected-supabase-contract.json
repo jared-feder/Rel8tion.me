@@ -25,7 +25,32 @@
       },
       "open_houses": {
         "required": true,
-        "columns": []
+        "columns": [
+          "last_verified_at",
+          "last_verified_source",
+          "source_price",
+          "source_price_verified_at",
+          "price_last_changed_at",
+          "manual_price_override",
+          "manual_price_override_at",
+          "manual_price_override_by",
+          "freshness_status",
+          "freshness_notes"
+        ]
+      },
+      "open_house_price_history": {
+        "required": true,
+        "columns": [
+          "open_house_id",
+          "old_price",
+          "new_price",
+          "source_price",
+          "displayed_price",
+          "source",
+          "change_reason",
+          "source_snapshot",
+          "detected_at"
+        ]
       },
       "listing_agents": {
         "required": true,
@@ -314,6 +339,10 @@
       {
         "path": "/api/cron/enrich-agents",
         "file": "api/cron/enrich-agents.js"
+      },
+      {
+        "path": "/api/cron/refresh-open-house-data",
+        "file": "api/cron/refresh-open-house-data.js"
       }
     ]
   }
