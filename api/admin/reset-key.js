@@ -292,6 +292,10 @@ async function resetBetaLane() {
     method: 'DELETE'
   }).catch(() => null);
 
+  await supabaseRequest(`smart_sign_activation_sessions?agent_key_uid=eq.${encodeURIComponent(BETA_KEYCHAIN_UID)}`, {
+    method: 'DELETE'
+  }).catch(() => null);
+
   await supabaseRequest(`smart_sign_inventory?public_code=eq.${encodeURIComponent(BETA_SIGN_PUBLIC_CODE)}`, {
     method: 'PATCH',
     body: JSON.stringify({
