@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-09.
+Last inspected: 2026-05-10.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -16,7 +16,7 @@ Status labels:
 
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
-- `[IMPLEMENTED]` Latest inspected production deployment is `main` commit `9fa417d` (`Add OneKey listing freshness checks`). Vercel inspect shows `api/cron/refresh-open-house-data` included as a serverless function and aliased to `app.rel8tion.me`.
+- `[IMPLEMENTED]` Latest inspected production deployment is `main` commit `65a48d3` (`Keep beta sign activation tied to scanned keychain`). Vercel reports the deployment ready and aliased to `app.rel8tion.me`.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
@@ -70,6 +70,7 @@ Status labels:
 - `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
 - `[IMPLEMENTED]` Beta fresh-claim cleanup clears stale browser host/sign activation sessions and inactive sign QR scans preserve the current host session, so a newly claimed demo keychain profile can carry forward into sign activation instead of falling back to stale `agent-*` context.
 - `[IMPLEMENTED]` The dedicated beta keychain route now expires stale local sign-activation browser sessions and opens the beta claim/reset menu before stale remote `smart_sign_activation_sessions` can hijack the scan. Fresh local sign activation handshakes still continue when the same browser is actively in that flow.
+- `[IMPLEMENTED]` Beta sign QR resolution and `/sign-demo-activate` now treat the live scanned keychain row (`keys.uid -> keys.agent_slug`) as authoritative over stale URL `agent` parameters, stale `rel8tion_host_session`, or stale local `rel8tion_sign_demo_session` data. The beta sign code `0e4b015f3782` will ignore a remembered host session unless it belongs to the beta keychain UID.
 - `[IMPLEMENTED]` In the beta keychain claim flow, once a real typed profile is saved, that profile identity is locked for the activation run. Selecting an open house can still attach the listing/property context, but stale `listing_agents` or `open_houses.agent` data should not overwrite the typed keychain profile name/phone/brokerage.
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[IMPLEMENTED]` OneKey listing freshness worker exists at `onekey-freshness-worker.cjs` with API route `api/cron/refresh-open-house-data.js`. It checks current OneKey listing records by tight lat/lng search, matches by `UniqueListingId`, updates listing facts/prices, records price-history rows when the migration is applied, and refreshes active event price snapshots.
@@ -127,6 +128,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Beta keychain/sign lane for `main-beta`.
 - `[IMPLEMENTED]` Beta reset/restore helpers in the claim flow.
 - `[IMPLEMENTED]` Beta fresh-claim flow now clears stale host session state and blocks auto-activation from generating a generic `Agent` slug when no real agent name is available.
+- `[IMPLEMENTED]` Beta sign activation identity now follows the current live beta keychain mapping and cannot be overridden by an old Jared or other stale browser/URL agent value.
 - `[IMPLEMENTED]` Beta claim now protects the typed keychain profile from being replaced by stale listing-agent enrichment when a listing is selected for sign/event context.
 - `[IMPLEMENTED]` Sign setup labels changed toward front buyer chip and rear agent chip.
 - `[IMPLEMENTED]` Remote `smart_sign_activation_sessions` added for scan handoff/session recovery.

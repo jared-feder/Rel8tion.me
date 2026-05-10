@@ -186,6 +186,7 @@ Beta support:
 - The protected beta sign lane is keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`.
 - Beta fresh-claim cleanup clears stale browser host/sign activation sessions. Inactive sign QR scans preserve the current host session so the just-claimed keychain profile carries into sign activation instead of falling back to stale `agent-*` context.
 - The beta keychain router expires stale local sign-activation state and sends standalone beta keychain scans to the beta claim/reset menu before consulting remote pending activation sessions. Fresh local sign handshakes still continue when the browser is actively in that setup flow.
+- Beta sign QR resolution and `/sign-demo-activate` treat the live scanned keychain row (`keys.uid -> keys.agent_slug`) as the source of truth over stale URL `agent` parameters, stale host sessions, or stale local sign-demo browser sessions. The beta sign public code ignores a remembered host session unless it belongs to the protected beta keychain UID.
 - Once a real typed beta keychain profile is saved, the claim flow treats that profile as the locked identity for the activation run. Listing selection can still provide property/event context, but stale `listing_agents` or `open_houses.agent` values should not replace the typed profile.
 
 ### `/onboarding`
@@ -272,6 +273,7 @@ Role: public smart sign resolver.
 - If sign exists but has no active event, renders "Sign Found" and activation options.
 - If no host session exists, it stores pending sign activation and prompts the agent to tap their Rel8tionChip/keychain.
 - If host session exists, it can activate the sign to a nearby/listed house.
+- For the beta sign lane, stale host/session identity is not trusted. The resolver either uses the beta keychain's current live `keys.agent_slug` or asks for the keychain scan again.
 
 ### `/event`
 
