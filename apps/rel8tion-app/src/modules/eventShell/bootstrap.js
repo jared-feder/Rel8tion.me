@@ -1,4 +1,4 @@
-import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL } from '../../core/config.js';
+import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUCKET, SUPABASE_URL } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
 import { applyBranding } from '../../api/brokerages.js';
 import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent } from '../../api/events.js?v=20260508-nys-pdf';
@@ -240,6 +240,25 @@ function agentPhotoUrl(agent) {
     agent?.photo,
     agent?.image
   );
+}
+
+async function publicImageExists(url) {
+  try {
+    const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function findStoredAgentPhoto(slug) {
+  const safeSlug = String(slug || '').trim();
+  if (!safeSlug) return '';
+  for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'heic']) {
+    const url = `${SUPABASE_URL}/storage/v1/object/public/${PROFILE_BUCKET}/${encodeURIComponent(safeSlug)}.${ext}`;
+    if (await publicImageExists(url)) return url;
+  }
+  return '';
 }
 
 function propertyAddressParts(address) {
@@ -1665,6 +1684,10 @@ export async function initEventShellPage() {
             name: pageState.agent.name || '',
             phone: pageState.agent.phone || ''
           });
+          if (photo) pageState.agent.image_url = photo;
+        }
+        if (pageState.agent && !agentPhotoUrl(pageState.agent)) {
+          const photo = await findStoredAgentPhoto(pageState.agent.slug);
           if (photo) pageState.agent.image_url = photo;
         }
       } catch (error) {

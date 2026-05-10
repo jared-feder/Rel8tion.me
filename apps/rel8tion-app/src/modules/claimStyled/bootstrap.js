@@ -1,4 +1,4 @@
-import { bindPublicHandlers, init } from './flow.js?v=20260509-agent-name';
+import { bindPublicHandlers, init } from './flow.js?v=20260510-photo-fix';
 
 export function initClaimStyledPage() {
   bindPublicHandlers();

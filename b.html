@@ -321,6 +321,26 @@ function agentImageUrl(agent){
   return firstPresent(agent?.image_url, agent?.primary_photo_url, agent?.directory_photo_url, agent?.photo_url);
 }
 
+async function publicImageExists(url){
+  try{
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return response.ok;
+  }catch(e){
+    return false;
+  }
+}
+
+async function findStoredAgentPhoto(slug){
+  const safeSlug = String(slug || "").trim();
+  if(!safeSlug) return "";
+  const extensions = ["jpg", "jpeg", "png", "webp", "heic"];
+  for(const ext of extensions){
+    const url = `${SUPABASE_URL}/storage/v1/object/public/agent-images/${encodeURIComponent(safeSlug)}.${ext}`;
+    if(await publicImageExists(url)) return url;
+  }
+  return "";
+}
+
 function glassShell(inner){
   return `
     <div class="max-w-4xl mx-auto">
@@ -428,6 +448,13 @@ async function init(){
 
       if(fallbackPhoto){
         agentData.image_url = fallbackPhoto;
+      }
+    }
+
+    if(agentData && !agentImageUrl(agentData)){
+      const storedPhoto = await findStoredAgentPhoto(agentData.slug);
+      if(storedPhoto){
+        agentData.image_url = storedPhoto;
       }
     }
 

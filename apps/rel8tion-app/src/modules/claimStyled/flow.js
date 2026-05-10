@@ -646,6 +646,7 @@ export async function saveFullProfile() {
     if (!existingAgent && email) existingAgent = await findAgentByEmail(email);
 
     const slug = existingAgent?.slug || reusablePrefilledSlug || `${slugify(name) || 'agent'}-${randSuffix()}`;
+    const existingImageUrl = existingAgent?.image_url || state.prefilledAgent?.image_url || '';
     const imageUrl = await uploadFullProfilePhoto(slug);
     const agent = {
       name,
@@ -654,7 +655,7 @@ export async function saveFullProfile() {
       email: email || null,
       brokerage: brokerage || null,
       slug,
-      image_url: imageUrl || state.detectedAgentPhoto || null,
+      image_url: imageUrl || existingImageUrl || state.detectedAgentPhoto || null,
       bio: bio || null
     };
 
