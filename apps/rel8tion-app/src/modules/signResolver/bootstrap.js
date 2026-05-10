@@ -21,6 +21,9 @@ const pageState = {
 };
 
 const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
+const SIGN_DEMO_SESSION_MAX_AGE_MS = 45 * 60 * 1000;
+const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
+const BETA_SIGN_PUBLIC_CODE = '0e4b015f3782';
 
 function milesBetween(a, b, c, d) {
   const toRad = (value) => Number(value) * Math.PI / 180;
@@ -150,7 +153,17 @@ function propertyImageUrl(house) {
 function readSignActivationSession() {
   try {
     const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed) return null;
+
+    const stamp = parsed.updatedAt || parsed.qrArmedAt || parsed.createdAt || '';
+    const ageMs = stamp ? Date.now() - new Date(stamp).getTime() : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(ageMs) || ageMs > SIGN_DEMO_SESSION_MAX_AGE_MS) {
+      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+      return null;
+    }
+
+    return parsed;
   } catch (_) {
     return null;
   }
@@ -174,9 +187,42 @@ function saveSignActivationKeychainRequest(sign) {
   }
 }
 
+async function fetchKeyByUid(uid) {
+  if (!uid) return null;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/keys?uid=eq.${encodeURIComponent(uid)}&select=uid,agent_slug,claimed&limit=1`, {
+    headers: authHeaders(KEY)
+  });
+  if (!res.ok) return null;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function resolveHostSessionForCode(code) {
+  const session = getHostSession();
+  if (!session) return null;
+
+  if (code === BETA_SIGN_PUBLIC_CODE && session.uid !== BETA_KEYCHAIN_UID) {
+    return null;
+  }
+
+  if (!session.uid) return session;
+
+  const keyRow = await fetchKeyByUid(session.uid).catch(() => null);
+  if (!keyRow?.agent_slug) return session;
+
+  return {
+    ...session,
+    agentSlug: keyRow.agent_slug
+  };
+}
+
 function continueSignActivationFromQr(code) {
   const pending = readSignActivationSession();
   if (!pending?.uid || !pending?.agentSlug) return false;
+  if (code === BETA_SIGN_PUBLIC_CODE && pending.uid !== BETA_KEYCHAIN_UID) {
+    window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+    return false;
+  }
   if (pending.publicCode && pending.publicCode !== code) return false;
   if (!pending.publicCode && !pending.qrArmedAt) return false;
   if (pending.stage !== 'waiting_for_sign_code') return false;
@@ -541,7 +587,7 @@ export async function initSignResolverPage() {
   loading('Looking up sign identity...');
 
   try {
-    pageState.hostSession = getHostSession();
+    pageState.hostSession = await resolveHostSessionForCode(code);
     const sign = await getSmartSignByPublicCode(code);
     if (!sign) {
       window.location.replace(`/sign-demo-activate.html?code=${encodeURIComponent(code)}&fresh_qr=1`);
