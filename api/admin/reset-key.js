@@ -6,10 +6,10 @@ const BETA_AGENT_SLUG = 'main-beta';
 const BETA_SIGN_PUBLIC_CODE = '0e4b015f3782';
 const BETA_SIGN_FRONT_UID = 'f005e166-70b3-407c-ba24-b91464a3d22a';
 const BETA_SIGN_REAR_UID = 'b70d2bde-d185-43ee-8962-083b64fa4347';
+const BETA_SIGN_CHIP_UIDS = [BETA_SIGN_FRONT_UID, BETA_SIGN_REAR_UID];
 const BETA_ALLOWED_UIDS = new Set([
   BETA_KEYCHAIN_UID,
-  BETA_SIGN_FRONT_UID,
-  BETA_SIGN_REAR_UID
+  ...BETA_SIGN_CHIP_UIDS
 ]);
 
 function send(res, status, payload) {
@@ -212,6 +212,34 @@ async function restoreBetaKeychain() {
   return Array.isArray(inserted) ? inserted[0] || null : null;
 }
 
+async function deleteBetaSignChipKeyRows() {
+  const deleted = [];
+  for (const signChipUid of BETA_SIGN_CHIP_UIDS) {
+    const rows = await supabaseRequest(`keys?uid=eq.${encodeURIComponent(signChipUid)}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=representation' }
+    }).catch(() => []);
+    if (Array.isArray(rows)) {
+      deleted.push(...rows);
+    }
+  }
+  return deleted;
+}
+
+async function deleteBetaSignChipAliasRows() {
+  const deleted = [];
+  for (const signChipUid of BETA_SIGN_CHIP_UIDS) {
+    const rows = await supabaseRequest(`smart_sign_chip_aliases?uid=eq.${encodeURIComponent(signChipUid)}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=representation' }
+    }).catch(() => []);
+    if (Array.isArray(rows)) {
+      deleted.push(...rows);
+    }
+  }
+  return deleted;
+}
+
 function betaSignMatchFilter() {
   const code = encodeURIComponent(BETA_SIGN_PUBLIC_CODE);
   const front = encodeURIComponent(BETA_SIGN_FRONT_UID);
@@ -246,6 +274,8 @@ async function resetBetaLane() {
     restoredKey: null,
     deletedEventIds: [],
     deletedSignIds: [],
+    deletedSignChipKeyRows: [],
+    deletedSignChipAliasRows: [],
     inventoryReset: false
   };
 
@@ -295,6 +325,15 @@ async function resetBetaLane() {
   await supabaseRequest(`smart_sign_activation_sessions?agent_key_uid=eq.${encodeURIComponent(BETA_KEYCHAIN_UID)}`, {
     method: 'DELETE'
   }).catch(() => null);
+
+  for (const signChipUid of BETA_SIGN_CHIP_UIDS) {
+    await supabaseRequest(`smart_sign_activation_sessions?agent_key_uid=eq.${encodeURIComponent(signChipUid)}`, {
+      method: 'DELETE'
+    }).catch(() => null);
+  }
+
+  changed.deletedSignChipKeyRows = await deleteBetaSignChipKeyRows();
+  changed.deletedSignChipAliasRows = await deleteBetaSignChipAliasRows();
 
   await supabaseRequest(`smart_sign_inventory?public_code=eq.${encodeURIComponent(BETA_SIGN_PUBLIC_CODE)}`, {
     method: 'PATCH',
