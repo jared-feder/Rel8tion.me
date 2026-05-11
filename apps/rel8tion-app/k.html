@@ -270,6 +270,22 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    async function findRemoteSignActivationSessionForSign(sign, stages = []) {
+      if (!sign?.id && !sign?.public_code) return null;
+      const now = new Date().toISOString();
+      const stageFilter = stages.length
+        ? `&stage=in.(${stages.map((stage) => encodeURIComponent(stage)).join(',')})`
+        : '';
+      const filters = [];
+      if (sign.id) filters.push(`sign_id.eq.${encodeURIComponent(sign.id)}`);
+      if (sign.public_code) filters.push(`public_code.eq.${encodeURIComponent(sign.public_code)}`);
+      const signFilter = filters.length ? `&or=(${filters.join(',')})` : '';
+      const rows = await request(
+        `smart_sign_activation_sessions?status=eq.pending&expires_at=gt.${encodeURIComponent(now)}${stageFilter}${signFilter}&select=*&order=updated_at.desc&limit=1`
+      ).catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
     async function updateRemoteSignActivationSession(id, patch = {}) {
       if (!id) return null;
       const payload = {
@@ -397,6 +413,54 @@
       }
       if (sign.uid_primary === chipUid) return 'front_buyer';
       return '';
+    }
+
+    function signActivationStageNeedsSignChip(session) {
+      return Boolean(
+        session?.publicCode
+        && (session.stage === 'waiting_for_sign_chip_1' || session.stage === 'waiting_for_second_sign_chip')
+      );
+    }
+
+    function pendingSignMatchesActiveSign(pending, sign) {
+      if (!pending || !sign) return false;
+      return Boolean(
+        (pending.signId && sign.id && pending.signId === sign.id)
+        || (pending.publicCode && sign.public_code && pending.publicCode === sign.public_code)
+      );
+    }
+
+    async function maybeContinuePendingSignChipActivation(activeSign) {
+      const pending = readSignActivationSession();
+      if (signActivationStageNeedsSignChip(pending) && pendingSignMatchesActiveSign(pending, activeSign)) {
+        setStatus('Smart Sign Chip', 'Continuing sign activation.');
+        continueSignActivation({
+          sign_uid: uid,
+          code: pending.publicCode,
+          sign_id: pending.signId
+        });
+        return true;
+      }
+
+      const remoteSignActivation = await findRemoteSignActivationSessionForSign(activeSign, [
+        'waiting_for_sign_chip_1',
+        'waiting_for_second_sign_chip'
+      ]);
+
+      if (remoteSignActivation?.public_code) {
+        setStatus('Smart Sign Chip', 'Continuing sign activation.');
+        continueSignActivation({
+          sign_uid: uid,
+          code: remoteSignActivation.public_code,
+          sign_id: remoteSignActivation.sign_id,
+          inventory_id: remoteSignActivation.inventory_id,
+          uid: remoteSignActivation.agent_key_uid,
+          agent: remoteSignActivation.agent_slug
+        });
+        return true;
+      }
+
+      return false;
     }
 
     function isKeychainLike(row) {
@@ -574,6 +638,10 @@
 
       const activeSign = await findActiveSignByChipUid(uid);
       if (activeSign?.public_code) {
+        if (await maybeContinuePendingSignChipActivation(activeSign)) {
+          return;
+        }
+
         const role = activeSignChipRole(activeSign, uid);
         if (role === 'rear_agent') {
           window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
