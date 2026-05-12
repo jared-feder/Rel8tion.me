@@ -41,6 +41,7 @@
       role: params.get('role') || '',
       profile: null,
       visits: [],
+      outreachCandidates: [],
       buyerRequests: {},
       conversations: {},
       messages: {},
@@ -209,6 +210,20 @@
       state.messages = nextMessages;
     }
 
+    async function loadOutreachCandidates() {
+      if (!state.profile?.uid && !state.uid && !state.slug) return [];
+      const payload = await api('/api/field-demo/outreach-candidates', {
+        uid: state.profile?.uid || state.uid || '',
+        slug: state.profile?.slug || state.slug || '',
+        days: 10,
+        limit: 50
+      }).catch((error) => {
+        console.log('outreach candidates load skipped', error);
+        return { candidates: [] };
+      });
+      return payload.candidates || [];
+    }
+
     function visitStats() {
       const now = new Date();
       const today = now.toDateString();
@@ -223,6 +238,12 @@
         buyers: allRequests.length,
         financing: allRequests.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length
       };
+    }
+
+    function formatMoney(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return '';
+      return number.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
     }
 
     function stat(label, value, tone = 'slate') {
@@ -512,6 +533,58 @@
       `;
     }
 
+    function outreachStatus(row) {
+      if (row.field_visit?.id) return `Scheduled ${fmtTime(row.field_visit.scheduled_start)}`;
+      if (row.initial_send_status === 'sent' || row.followup_send_status === 'sent') return 'Outreach sent';
+      if (row.mockup_status === 'rendered' && row.generation_status === 'generated') return 'Ready to send';
+      if (row.generation_status === 'generated') return 'Needs mockup';
+      if (row.enrichment_status === 'ready') return 'Needs message';
+      return 'Needs enrichment';
+    }
+
+    function renderOutreachPanel() {
+      const rows = state.outreachCandidates || [];
+      const unscheduled = rows.filter((row) => !row.field_visit?.id);
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-emerald-700">Outreach Coverage</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Upcoming Outreach Visits</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Pull upcoming outreach rows into scheduled field visits so tomorrow's outreach has real coverage behind it.</p>
+            </div>
+            <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Reload</button>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            ${rows.length ? rows.slice(0, 12).map((row) => {
+              const alreadyScheduled = !!row.field_visit?.id;
+              const details = [formatMoney(row.price), row.beds ? `${row.beds} bd` : '', row.baths ? `${row.baths} ba` : ''].filter(Boolean).join(' - ');
+              return `
+                <article class="rounded-[24px] bg-white/85 p-4 ring-1 ring-slate-100">
+                  <div class="flex items-start gap-3">
+                    ${row.listing_photo_url ? `<img src="${esc(row.listing_photo_url)}" alt="" class="h-20 w-24 rounded-2xl object-cover">` : `<div class="h-20 w-24 rounded-2xl bg-slate-100"></div>`}
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black uppercase tracking-[.12em] ${alreadyScheduled ? 'text-emerald-700' : 'text-sky-700'}">${esc(outreachStatus(row))}</div>
+                      <h3 class="mt-1 text-lg font-black leading-tight">${esc(row.agent_name || row.agent_first_name || 'Agent')}</h3>
+                      <p class="mt-1 text-sm font-bold text-slate-500">${esc(row.address || row.open_house_id || 'Open house')}</p>
+                      <p class="mt-1 text-xs font-bold text-slate-400">${esc([row.brokerage, details].filter(Boolean).join(' - '))}</p>
+                      <p class="mt-1 text-xs font-black text-slate-500">${esc(fmtTime(row.open_start))} - ${esc(fmtTime(row.open_end))}</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <a href="${esc(telHref(row.agent_phone))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${row.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                    <a href="${esc(smsHref(row.agent_phone, row.selected_sms || ''))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${row.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                    <button type="button" onclick="window.scheduleFromOutreach('${esc(row.id)}')" class="rounded-full ${alreadyScheduled ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-emerald-600 text-white'} px-3 py-2 text-xs font-black" ${alreadyScheduled ? 'disabled' : ''}>${alreadyScheduled ? 'Scheduled' : 'Schedule Coverage'}</button>
+                  </div>
+                </article>
+              `;
+            }).join('') : `<div class="lg:col-span-2 rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No upcoming outreach rows found in the next 10 days. That usually means the queue/generation pipeline has no ready future open houses yet.</div>`}
+          </div>
+          ${unscheduled.length ? `<p class="mt-3 text-xs font-black uppercase tracking-[.12em] text-slate-500">${unscheduled.length} outreach row${unscheduled.length === 1 ? '' : 's'} still need scheduled coverage.</p>` : ''}
+        </section>
+      `;
+    }
+
     function render() {
       const profileName = state.profile?.full_name || state.uid || state.slug || 'Field Team';
       const stats = visitStats();
@@ -543,6 +616,8 @@
         </section>
 
         ${renderSchedulePanel()}
+
+        ${renderOutreachPanel()}
 
         <section class="grid gap-4">
           ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
@@ -631,6 +706,7 @@
       state.message = message;
       state.error = '';
       state.profile = await loadProfile();
+      state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows();
       state.visits = groupVisits(rows);
       await loadBuyerRequestsForVisits(state.visits);
@@ -644,6 +720,39 @@
     };
 
     window.refreshDashboard = () => refresh('Dashboard refreshed.');
+
+    window.scheduleFromOutreach = async (queueId) => {
+      try {
+        const row = (state.outreachCandidates || []).find((candidate) => candidate.id === queueId);
+        if (!row?.id) throw new Error('Outreach row not found.');
+        const scheduledStart = row.open_start ? new Date(row.open_start) : new Date();
+        const scheduledEnd = row.open_end ? new Date(row.open_end) : new Date(scheduledStart.getTime() + 2 * 60 * 60 * 1000);
+        if (Number.isNaN(scheduledStart.getTime()) || Number.isNaN(scheduledEnd.getTime())) {
+          throw new Error('This outreach row does not have a usable open house time.');
+        }
+        const responsibilitiesSelected = ['financing_support', 'product_demo', 'sign_setup', 'agent_onboarding'];
+        const participants = responsibilitiesSelected.map((responsibility, index) => currentParticipantPayload(responsibility, index === 0));
+        await api('/api/field-demo/create', {
+          outreach_queue_id: row.id,
+          agent_name: row.agent_name || row.agent_first_name || null,
+          agent_phone: row.agent_phone || null,
+          agent_email: row.agent_email || null,
+          brokerage: row.brokerage || null,
+          open_house_id: row.open_house_id || null,
+          coverage_mode: 'physical_demo',
+          demo_type: 'agent_onboarding',
+          scheduled_start: scheduledStart.toISOString(),
+          scheduled_end: scheduledEnd.toISOString(),
+          source: 'agent_outreach',
+          notes: `Scheduled from outreach queue for ${row.address || row.open_house_id || 'open house'}.`,
+          participants
+        });
+        await refresh('Outreach visit scheduled.');
+      } catch (error) {
+        state.error = error.message || 'Could not schedule outreach visit.';
+        render();
+      }
+    };
 
     window.selectConversation = (visitId, conversationId) => {
       state.activeConversationByVisit[visitId] = conversationId;

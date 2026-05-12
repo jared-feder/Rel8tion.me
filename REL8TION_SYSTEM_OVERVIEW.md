@@ -385,6 +385,7 @@ Role: field operations dashboard for scheduled REL8TION demo and support visits.
 - Groups by visit id so one person with multiple responsibilities on the same visit does not see duplicate visits.
 - Shows next-7-days summary cards, including today's visits, tomorrow's visits, live visits, buyer requests, and financing requests.
 - Includes a scheduler form for creating tomorrow/future field visits through `/api/field-demo/create`, assigning the current verified profile to financing support, product demo, sign setup, and/or agent onboarding responsibilities.
+- Loads upcoming `agent_outreach_queue` rows through `/api/field-demo/outreach-candidates`, displays schedule/readiness cards, and can create a linked `field_demo_visits.outreach_queue_id` visit directly from an outreach row.
 - Shows financing-support actions: Go Live for Financing, buyer request cards, call/text actions, event chat open/reply controls, and Mark Financing Complete.
 - Shows product-demo/sign-setup/agent-onboarding actions: Mark En Route, Mark On Site, Activate Demo Sign, Demo REL8TION, Onboard Agent, Convert Agent to Virtual Support, and End Demo.
 - Calls `/api/field-demo/start` when a visit goes live. If the visit has an `open_house_event_id` and a financing-support participant, the API creates/updates `event_loan_officer_sessions` while preserving the existing local tag-scan flow.
@@ -1097,7 +1098,7 @@ Still not confirmed:
 - RPC definitions for `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
 - `send-lead-sms`; local source is present, but the verifier intentionally does not call SMS functions.
 - Edge Function deployment for source under `docs/supabase-functions`.
-- Vercel Cron state; root `vercel.json` has no `crons` block, so dashboard verification is still required.
+- Vercel Cron state; root `vercel.json` now contains OneKey freshness and outreach generate/render/send cron definitions, but dashboard/API execution still requires verification after deployment.
 - Full production data quality and write-path health.
 - Vercel dashboard Git production-branch setting.
 
@@ -1158,6 +1159,25 @@ Observed behavior in reference source:
 - `generate-agent-outreach` queues and generates outreach rows.
 - `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, and expiration rules.
 - `send-agent-manual-reply` sends manual replies from outreach UI.
+
+### Root Vercel Outreach Cron Wrappers
+
+Files:
+
+- `api/cron/generate-agent-outreach.js`
+- `api/cron/render-agent-mockups.js`
+- `api/cron/send-agent-outreach.js`
+- `lib/outreach-cron-shared.js`
+
+`[IMPLEMENTED]` Repo behavior:
+
+- The cron wrappers require `CRON_SECRET`; they refuse to run without it so public URLs do not become open SMS triggers.
+- `generate-agent-outreach` calls the Supabase Edge Function, using `GENERATE_FUNCTION_URL` when present or the default Supabase function URL.
+- `render-agent-mockups` calls the mockup renderer service and requires `CRON_SHARED_SECRET`.
+- `send-agent-outreach` calls the Supabase Edge Function, using `TWILIO_SEND_FUNCTION_URL` when present or the default Supabase function URL.
+- Root `vercel.json` schedules the generate/render/send chain.
+
+`[NEEDS VERIFICATION]` These routes can send or prepare real outreach if deployed with working env vars. Vercel Cron dashboard state, Edge Function deployment/version, mockup renderer availability, and Twilio behavior must be verified before relying on this for production outreach.
 
 ### RPCs Used By Current Code
 
@@ -1348,9 +1368,9 @@ Confirmed or needs-verification gaps:
 - `[PARTIAL]` Admin dashboard is placeholder only.
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
-- `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
+- `[PARTIAL]` Root Vercel Cron now includes OneKey freshness and outreach generate/render/send routes. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
-- `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
+- `[NEEDS VERIFICATION]` Vercel Cron dashboard/API state needs to be rechecked after deploying the branch with updated `vercel.json`; previous production inspections predate the outreach cron definitions.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
@@ -1426,7 +1446,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Formal remote LO coverage management is desired but only partially represented by field-demo visits. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
 | Chat/video support is desired but not built. | `[PARTIAL]` | Event conversation logging exists; realtime chat UX, SMS/push relay, and video support are not built. |
 | Full admin dashboard is desired but not built. | `[INTENDED]` | `apps/rel8tion-app/admin.html` is a placeholder. |
-| Root Estately endpoint is scheduled by Vercel Cron. | `[NEEDS VERIFICATION]` | `api/cron/enrich-agents.js` exists; root `vercel.json` has no `crons` block. |
+| Root outreach cron wrappers exist. | `[PARTIAL]` | `api/cron/generate-agent-outreach.js`, `api/cron/render-agent-mockups.js`, `api/cron/send-agent-outreach.js`, and `vercel.json` cron definitions exist; deployment/env/Twilio behavior still need verification. |
 | `send-lead-sms` implementation is checked in. | `[IMPLEMENTED]` | Source exists at `supabase/functions/send-lead-sms/index.ts`; deployed source/version matching and Twilio behavior still need verification. |
 | Outreach generation/send functions under `docs/supabase-functions` are deployed. | `[NEEDS VERIFICATION]` | Source exists under docs, not under deployable `supabase/functions`. |
 | Supabase RPC definitions are present in repo SQL. | `[NEEDS VERIFICATION]` | RPCs are called but definitions were not found in checked-in SQL. |
