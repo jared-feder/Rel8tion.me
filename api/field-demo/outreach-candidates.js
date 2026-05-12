@@ -45,6 +45,7 @@ module.exports = async function handler(req, res) {
       'agent_email',
       'brokerage',
       'address',
+      'zip',
       'selected_sms',
       'open_start',
       'open_end',

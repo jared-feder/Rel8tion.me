@@ -102,6 +102,9 @@ It uses:
 - `api/field-demo/update-participant-status.js`
 - `api/field-demo/start.js`
 - `api/field-demo/convert-agent.js`
+- `api/field-demo/outreach-candidates.js`
+- `api/field-demo/availability.js`
+- `api/field-demo/available-support.js`
 - `api/event-chat/list.js`
 - `api/event-chat/send.js`
 
@@ -386,6 +389,8 @@ Role: field operations dashboard for scheduled REL8TION demo and support visits.
 - Shows next-7-days summary cards, including today's visits, tomorrow's visits, live visits, buyer requests, and financing requests.
 - Includes a scheduler form for creating tomorrow/future field visits through `/api/field-demo/create`, assigning the current verified profile to financing support, product demo, sign setup, and/or agent onboarding responsibilities.
 - Loads upcoming `agent_outreach_queue` rows through `/api/field-demo/outreach-candidates`, displays schedule/readiness cards, and can create a linked `field_demo_visits.outreach_queue_id` visit directly from an outreach row.
+- Lets verified field/loan profiles publish availability slots with service ZIP/radius, role, responsibility, and time window through `/api/field-demo/availability`.
+- When scheduling from an outreach row, calls `/api/field-demo/available-support` to rank open financing-support slots by matching time window and closest service ZIP, assigning the best available loan officer when possible and falling back to the scheduler profile when no match exists.
 - Shows financing-support actions: Go Live for Financing, buyer request cards, call/text actions, event chat open/reply controls, and Mark Financing Complete.
 - Shows product-demo/sign-setup/agent-onboarding actions: Mark En Route, Mark On Site, Activate Demo Sign, Demo REL8TION, Onboard Agent, Convert Agent to Virtual Support, and End Demo.
 - Calls `/api/field-demo/start` when a visit goes live. If the visit has an `open_house_event_id` and a financing-support participant, the API creates/updates `event_loan_officer_sessions` while preserving the existing local tag-scan flow.
@@ -1011,6 +1016,34 @@ Responsibility values:
 - `follow_up_owner`
 
 `[NEEDS VERIFICATION]` Live Supabase migration/RLS state is not confirmed from repo files alone.
+
+### `field_coverage_availability`
+
+`[IMPLEMENTED]` Migration source exists at `sql/migrations/20260512_field_coverage_availability.sql`.
+
+Used for:
+
+- availability calendar/queue for loan officers and field specialists
+- service ZIP/radius based assignment for outreach/open-house visits
+- ranking available financing support before a `field_demo_visit_participants` row is created
+
+Important fields:
+
+- `participant_profile_id`
+- `participant_uid`
+- `participant_slug`
+- `participant_name`
+- `participant_phone`
+- `role`
+- `responsibility`
+- `available_start`
+- `available_end`
+- `service_zip`
+- `service_radius_miles`
+- `status`
+- `linked_visit_id`
+
+`[PARTIAL]` Exact geographic distance only works when lat/lng is available. Otherwise assignment uses exact/same-prefix ZIP proximity as an MVP fallback.
 
 ### `verified_profiles`
 

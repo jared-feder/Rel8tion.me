@@ -40,6 +40,7 @@
       slug: params.get('slug') || '',
       role: params.get('role') || '',
       profile: null,
+      availability: [],
       visits: [],
       outreachCandidates: [],
       buyerRequests: {},
@@ -62,6 +63,13 @@
     const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
     const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const extractZip = (...values) => {
+      for (const value of values) {
+        const match = String(value || '').match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (match) return match[1];
+      }
+      return '';
+    };
 
     const fmtTime = (value) => {
       if (!value) return 'Not scheduled';
@@ -222,6 +230,20 @@
         return { candidates: [] };
       });
       return payload.candidates || [];
+    }
+
+    async function loadAvailability() {
+      if (!state.profile?.uid && !state.uid && !state.slug) return [];
+      const payload = await api('/api/field-demo/availability', {
+        action: 'list',
+        uid: state.profile?.uid || state.uid || '',
+        slug: state.profile?.slug || state.slug || '',
+        days: 14
+      }).catch((error) => {
+        console.log('availability load skipped', error);
+        return { availability: [] };
+      });
+      return payload.availability || [];
     }
 
     function visitStats() {
@@ -533,6 +555,74 @@
       `;
     }
 
+    function renderAvailabilityPanel() {
+      const contactName = state.profile?.full_name || 'this profile';
+      const defaultZip = extractZip(state.profile?.areas?.join?.(', '), state.profile?.areas, state.availability[0]?.service_zip);
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-violet-700">Availability Queue</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Set Coverage Availability</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Add the times and ZIPs where ${esc(contactName)} can support open houses. Scheduling ranks open slots by time match first, then ZIP proximity.</p>
+            </div>
+          </div>
+          <form id="availability-form" class="mt-5 grid gap-3 md:grid-cols-6">
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Date
+              <input name="date" type="date" required value="${defaultScheduleDate(1)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Start
+              <input name="start_time" type="time" required value="10:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">End
+              <input name="end_time" type="time" required value="16:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Service ZIP
+              <input name="service_zip" required inputmode="numeric" maxlength="5" value="${esc(defaultZip)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="11572">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Miles
+              <input name="service_radius_miles" type="number" min="1" max="250" value="15" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Role
+              <select name="role" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                <option value="loan_officer">Loan officer</option>
+                <option value="field_sales_rep">Field sales rep</option>
+                <option value="demo_presenter">Demo presenter</option>
+                <option value="onboarding_specialist">Onboarding specialist</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Responsibility
+              <select name="responsibility" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                <option value="financing_support">Financing support</option>
+                <option value="product_demo">Product demo</option>
+                <option value="sign_setup">Sign setup</option>
+                <option value="agent_onboarding">Agent onboarding</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Notes
+              <input name="notes" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional">
+            </label>
+            <button type="submit" class="md:col-span-6 rounded-full bg-violet-600 px-5 py-4 text-base font-black text-white">Add Availability Slot</button>
+          </form>
+          <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            ${state.availability.length ? state.availability.slice(0, 12).map((slot) => `
+              <article class="rounded-2xl bg-white/85 p-4 ring-1 ring-slate-100">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="text-xs font-black uppercase tracking-[.12em] ${slot.status === 'open' ? 'text-emerald-700' : slot.status === 'booked' ? 'text-sky-700' : 'text-slate-500'}">${esc(titleize(slot.status))}</div>
+                    <div class="mt-1 text-lg font-black">${esc(slot.service_zip)} · ${esc(slot.service_radius_miles)} mi</div>
+                    <div class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(slot.available_start))} - ${esc(fmtTime(slot.available_end))}</div>
+                    <div class="mt-1 text-xs font-black uppercase tracking-[.1em] text-slate-400">${esc(titleize(slot.role))} / ${esc(titleize(slot.responsibility))}</div>
+                  </div>
+                  ${slot.status === 'open' ? `<button type="button" onclick="window.cancelAvailability('${esc(slot.id)}')" class="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-700 ring-1 ring-rose-100">Cancel</button>` : ''}
+                </div>
+              </article>
+            `).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 md:col-span-2 xl:col-span-3">No availability slots yet. Add tomorrow's coverage window so assignment can find this profile.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
     function outreachStatus(row) {
       if (row.field_visit?.id) return `Scheduled ${fmtTime(row.field_visit.scheduled_start)}`;
       if (row.initial_send_status === 'sent' || row.followup_send_status === 'sent') return 'Outreach sent';
@@ -617,6 +707,8 @@
 
         ${renderSchedulePanel()}
 
+        ${renderAvailabilityPanel()}
+
         ${renderOutreachPanel()}
 
         <section class="grid gap-4">
@@ -627,13 +719,14 @@
         </section>
       `;
       document.getElementById('schedule-form')?.addEventListener('submit', handleScheduleSubmit);
+      document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
     }
 
     function selectedVisit(visitId) {
       return state.visits.find((visit) => visit.id === visitId);
     }
 
-    function currentParticipantPayload(responsibility, isPrimary = false) {
+    function currentParticipantPayload(responsibility, isPrimary = false, overrides = {}) {
       const profileUid = state.profile?.uid || '';
       const participantUid = profileUid || state.uid || '';
       const roleByResponsibility = {
@@ -651,7 +744,8 @@
         participant_company: state.profile?.company_name || document.querySelector('[name="participant_company"]')?.value || 'Nationwide Mortgage Bankers',
         role: roleByResponsibility[responsibility],
         responsibility,
-        is_primary: isPrimary
+        is_primary: isPrimary,
+        ...overrides
       };
     }
 
@@ -702,10 +796,43 @@
       }
     }
 
+    async function handleAvailabilitySubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const availableStart = new Date(`${data.get('date')}T${data.get('start_time')}`);
+      const availableEnd = new Date(`${data.get('date')}T${data.get('end_time')}`);
+      if (Number.isNaN(availableStart.getTime()) || Number.isNaN(availableEnd.getTime()) || availableEnd <= availableStart) {
+        state.error = 'Use a valid availability start and end time.';
+        render();
+        return;
+      }
+      try {
+        state.error = '';
+        await api('/api/field-demo/availability', {
+          action: 'upsert',
+          uid: state.profile?.uid || state.uid || '',
+          slug: state.profile?.slug || state.slug || '',
+          role: data.get('role') || 'loan_officer',
+          responsibility: data.get('responsibility') || 'financing_support',
+          service_zip: data.get('service_zip') || '',
+          service_radius_miles: data.get('service_radius_miles') || 15,
+          available_start: availableStart.toISOString(),
+          available_end: availableEnd.toISOString(),
+          notes: data.get('notes') || null
+        });
+        await refresh('Availability slot added.');
+      } catch (error) {
+        state.error = error.message || 'Could not save availability.';
+        render();
+      }
+    }
+
     async function refresh(message = '') {
       state.message = message;
       state.error = '';
       state.profile = await loadProfile();
+      state.availability = await loadAvailability();
       state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows();
       state.visits = groupVisits(rows);
@@ -721,6 +848,38 @@
 
     window.refreshDashboard = () => refresh('Dashboard refreshed.');
 
+    window.cancelAvailability = async (availabilityId) => {
+      try {
+        await api('/api/field-demo/availability', {
+          action: 'cancel',
+          uid: state.profile?.uid || state.uid || '',
+          slug: state.profile?.slug || state.slug || '',
+          id: availabilityId
+        });
+        await refresh('Availability slot cancelled.');
+      } catch (error) {
+        state.error = error.message || 'Could not cancel availability.';
+        render();
+      }
+    };
+
+    function participantFromAvailability(candidate, isPrimary = true) {
+      return {
+        participant_profile_id: candidate.participant_profile_id || null,
+        participant_uid: candidate.participant_uid || candidate.participant_profile_id || null,
+        participant_name: candidate.participant_name || 'Available Field Support',
+        participant_phone: candidate.participant_phone || null,
+        participant_email: candidate.participant_email || null,
+        participant_company: candidate.participant_company || 'Nationwide Mortgage Bankers',
+        role: candidate.role || 'loan_officer',
+        responsibility: candidate.responsibility || 'financing_support',
+        availability_id: candidate.id,
+        assignment_score: candidate.assignment_score,
+        assignment_reason: candidate.assignment_reason,
+        is_primary: isPrimary
+      };
+    }
+
     window.scheduleFromOutreach = async (queueId) => {
       try {
         const row = (state.outreachCandidates || []).find((candidate) => candidate.id === queueId);
@@ -730,8 +889,28 @@
         if (Number.isNaN(scheduledStart.getTime()) || Number.isNaN(scheduledEnd.getTime())) {
           throw new Error('This outreach row does not have a usable open house time.');
         }
-        const responsibilitiesSelected = ['financing_support', 'product_demo', 'sign_setup', 'agent_onboarding'];
-        const participants = responsibilitiesSelected.map((responsibility, index) => currentParticipantPayload(responsibility, index === 0));
+        const zip = row.zip || extractZip(row.address);
+        const support = await api('/api/field-demo/available-support', {
+          responsibility: 'financing_support',
+          open_house_id: row.open_house_id || null,
+          address: row.address || '',
+          property_zip: zip,
+          scheduled_start: scheduledStart.toISOString(),
+          scheduled_end: scheduledEnd.toISOString(),
+          limit: 1
+        }).catch(() => ({ candidates: [] }));
+        const bestFinancing = support.candidates?.[0] || null;
+        const participants = [];
+        if (bestFinancing) {
+          participants.push(participantFromAvailability(bestFinancing, true));
+        } else {
+          participants.push(currentParticipantPayload('financing_support', true, {
+            assignment_reason: 'No matching open availability found; assigned to scheduler profile.'
+          }));
+        }
+        participants.push(currentParticipantPayload('product_demo', false));
+        participants.push(currentParticipantPayload('sign_setup', false));
+        participants.push(currentParticipantPayload('agent_onboarding', false));
         await api('/api/field-demo/create', {
           outreach_queue_id: row.id,
           agent_name: row.agent_name || row.agent_first_name || null,
@@ -739,6 +918,9 @@
           agent_email: row.agent_email || null,
           brokerage: row.brokerage || null,
           open_house_id: row.open_house_id || null,
+          property_zip: zip || null,
+          assignment_source: bestFinancing ? 'availability_zip_match' : 'scheduler_fallback',
+          assigned_by_availability_id: bestFinancing?.id || null,
           coverage_mode: 'physical_demo',
           demo_type: 'agent_onboarding',
           scheduled_start: scheduledStart.toISOString(),
@@ -747,7 +929,7 @@
           notes: `Scheduled from outreach queue for ${row.address || row.open_house_id || 'open house'}.`,
           participants
         });
-        await refresh('Outreach visit scheduled.');
+        await refresh(bestFinancing ? `Outreach visit scheduled with ${bestFinancing.participant_name || 'available support'}.` : 'Outreach visit scheduled with scheduler fallback.');
       } catch (error) {
         state.error = error.message || 'Could not schedule outreach visit.';
         render();
