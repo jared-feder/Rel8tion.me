@@ -206,6 +206,55 @@ function mailtoHref(email, subject = '') {
   return email ? `mailto:${email}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}` : '#';
 }
 
+async function sendEventChatMessage(payload) {
+  const response = await fetch('/api/event-chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {})
+  });
+  const raw = await response.text().catch(() => '');
+  const data = raw ? JSON.parse(raw) : null;
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || raw || 'Could not send event chat message.');
+  }
+  return data;
+}
+
+async function sendBuyerEventChatMessage() {
+  const textarea = document.getElementById('buyer-chat-message');
+  const status = document.getElementById('buyer-chat-status');
+  const body = normalizeValue(textarea?.value || '');
+  const checkin = pageState.lastCheckin || {};
+  if (!body) {
+    if (status) status.textContent = 'Type a message first.';
+    return;
+  }
+  if (!pageState.eventRow?.id || !checkin.id) {
+    if (status) status.textContent = 'Check-in must be saved before chat can start.';
+    return;
+  }
+
+  if (status) status.textContent = 'Sending...';
+  await sendEventChatMessage({
+    open_house_event_id: pageState.eventRow.id,
+    buyer_checkin_id: checkin.id,
+    buyer_name: checkin.visitor_name || checkin.name || '',
+    buyer_phone: checkin.visitor_phone || checkin.phone || '',
+    agent_slug: hostAgentSlug(pageState.eventRow),
+    agent_name: pageState.agent?.name || '',
+    agent_phone: pageState.agent?.phone || '',
+    loan_officer_slug: pageState.loanOfficer?.loan_officer_slug || '',
+    loan_officer_name: pageState.loanOfficer?.loan_officer_name || '',
+    loan_officer_phone: pageState.loanOfficer?.loan_officer_phone || '',
+    sender_role: 'buyer',
+    sender_name: checkin.visitor_name || checkin.name || 'Buyer',
+    sender_phone: checkin.visitor_phone || checkin.phone || '',
+    body
+  });
+  textarea.value = '';
+  if (status) status.textContent = 'Message sent. The event team can see it now.';
+}
+
 function vcardHref(agent) {
   if (!agent?.name && !agent?.phone && !agent?.email) return '#';
   const lines = [
@@ -1055,6 +1104,28 @@ function buildCheckinPayload(formData) {
   };
 }
 
+function renderBuyerChatCard(subjectAddress) {
+  const checkin = pageState.lastCheckin || {};
+  const loanOfficerName = pageState.loanOfficer?.loan_officer_name || 'NMB financing support';
+  const canSend = Boolean(pageState.eventRow?.id && checkin.id);
+  return `
+    <div class="mt-4 rounded-[22px] border border-sky-200 bg-sky-50/85 p-5">
+      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 mb-2">Event Chat</div>
+      <h3 class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold text-slate-900">Ask the open house team</h3>
+      <p class="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
+        Send a question to the REL8TION event thread for ${esc(subjectAddress || 'this open house')}. ${esc(loanOfficerName)} and the host team can see financing questions here.
+      </p>
+      <div class="mt-3 grid gap-2">
+        <textarea id="buyer-chat-message" rows="3" class="w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-sky-400" placeholder="Ask a question or request financing help..." ${canSend ? '' : 'disabled'}></textarea>
+        <button type="button" id="buyer-chat-send" class="rounded-full px-5 py-4 text-sm font-black text-white ${canSend ? '' : 'opacity-50'}" style="background:var(--event-gradient);" ${canSend ? '' : 'disabled'}>
+          Send Message
+        </button>
+        <div id="buyer-chat-status" class="min-h-[20px] text-sm font-bold text-slate-500">${canSend ? '' : 'Complete check-in first to start chat.'}</div>
+      </div>
+    </div>
+  `;
+}
+
 function nextStepCards() {
   const house = pageState.house || {
     address: pageState.eventRow?.setup_context?.address || '',
@@ -1124,6 +1195,7 @@ function nextStepCards() {
           <a href="${esc(mailtoHref(agent?.email || '', `Question about ${subjectAddress}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
           <a href="${esc(smsHref(TEMP_FINANCING_SUPPORT_PHONE, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)]" style="background:var(--event-gradient);">Start Financing Chat</a>
         </div>
+        ${renderBuyerChatCard(subjectAddress)}
       </article>
     </section>
   `;
@@ -1146,6 +1218,13 @@ function attachEventHandlers() {
   });
 
   const form = document.getElementById('checkin-form');
+  document.getElementById('buyer-chat-send')?.addEventListener('click', () => {
+    sendBuyerEventChatMessage().catch((error) => {
+      const status = document.getElementById('buyer-chat-status');
+      if (status) status.textContent = error.message || 'Could not send message.';
+    });
+  });
+
   const visitorNameInput = form?.querySelector('[name="visitor_name"]');
   const preApprovalSelect = form?.querySelector('[name="pre_approved"]');
   const signatureInput = document.getElementById('ny-disclosure-signature-value');

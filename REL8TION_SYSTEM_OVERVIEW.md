@@ -35,6 +35,7 @@ The current product connects:
 - `[PARTIAL]` SMS follow-up through Twilio/Supabase functions; `send-lead-sms` source is checked in and user-reported active, but deployed source/version matching and SMS behavior still need live verification
 - `[PARTIAL]` local/present NMB loan officer tag scan and live event coverage
 - `[IMPLEMENTED]` role-based field demo coverage MVP with scheduled visits and participants; one NMB loan officer can cover all responsibilities today, and separate field sales reps, demo presenters, onboarding specialists, dispatchers, admins, and loan officers can be assigned later
+- `[PARTIAL]` in-app event conversation logging for buyer, agent, and loan officer/field support through serverless APIs and dashboard UI; realtime/push/SMS relay/video are not built yet
 - `[PARTIAL]` agent outreach/enrichment data for booking demos and appointments
 - `[PARTIAL]` Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
 - `[NEEDS VERIFICATION]` Browserless/Trulia enrichment was not found in tracked source during the 2026-05-09 audit. The current tracked enrichment implementation is Estately + Cheerio.
@@ -101,6 +102,8 @@ It uses:
 - `api/field-demo/update-participant-status.js`
 - `api/field-demo/start.js`
 - `api/field-demo/convert-agent.js`
+- `api/event-chat/list.js`
+- `api/event-chat/send.js`
 
 ### Supabase Edge Functions
 
@@ -322,7 +325,7 @@ Inputs:
 - Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes.
 - Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt when the buyer selected `yes`; when the buyer selected `no`, the financing follow-up checkbox is optional. Selecting "not pre-approved" alone does not trigger financing SMS.
 - When financing help is requested, the code routes to a live loan officer if assigned or alerts Jared. The current buyer UI hides unfinished loan-officer support cards and uses a temporary post-check-in financing SMS prompt to `347-775-8059`.
-- After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, and neighborhood/financing prompts. It no longer shows OneKey listing links, internal buyer status cards, loan-officer support cards, a second check-in button, or the one-of-three preferred property examples.
+- After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, a buyer event-chat composer, and neighborhood/financing prompts. It no longer shows OneKey listing links, internal buyer status cards, loan-officer support cards, a second check-in button, or the one-of-three preferred property examples.
 - `[INTENDED]` A richer buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent buyer-agent-loan-officer chat is not built. Current implementation uses available stored listing data plus call/SMS links.
 
 Check-in paths:
@@ -358,6 +361,7 @@ Inputs:
 - Loads live `event_loan_officer_sessions`.
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
 - Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
+- Shows lead-card event chat controls backed by `event_conversations` / `event_conversation_messages`.
 - Shows loan officer coverage card.
 - Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, and setting the sign inactive.
 - The dashboard request helper supports PATCH/POST/DELETE options, so End/Move controls perform live Supabase writes instead of read-only requests.
@@ -377,12 +381,15 @@ Role: field operations dashboard for scheduled REL8TION demo and support visits.
 `[IMPLEMENTED]` Confirmed repo behavior:
 
 - Loads the current verified profile from `verified_profiles` when `uid` or `slug` is present.
-- Loads today's assigned `field_demo_visit_participants` and embedded `field_demo_visits` by `participant_profile_id` or `participant_uid`.
+- Loads assigned `field_demo_visit_participants` and embedded `field_demo_visits` for the next 7 days by `participant_profile_id` or `participant_uid`.
 - Groups by visit id so one person with multiple responsibilities on the same visit does not see duplicate visits.
-- Shows financing-support actions: Go Live for Financing, View Buyer Requests, Message Agent, and Mark Financing Complete.
+- Shows next-7-days summary cards, including today's visits, tomorrow's visits, live visits, buyer requests, and financing requests.
+- Includes a scheduler form for creating tomorrow/future field visits through `/api/field-demo/create`, assigning the current verified profile to financing support, product demo, sign setup, and/or agent onboarding responsibilities.
+- Shows financing-support actions: Go Live for Financing, buyer request cards, call/text actions, event chat open/reply controls, and Mark Financing Complete.
 - Shows product-demo/sign-setup/agent-onboarding actions: Mark En Route, Mark On Site, Activate Demo Sign, Demo REL8TION, Onboard Agent, Convert Agent to Virtual Support, and End Demo.
 - Calls `/api/field-demo/start` when a visit goes live. If the visit has an `open_house_event_id` and a financing-support participant, the API creates/updates `event_loan_officer_sessions` while preserving the existing local tag-scan flow.
 - Calls `/api/field-demo/convert-agent` to mark a visit converted to virtual support. The code records conversion state on `field_demo_visits`; it does not create a persistent agent/LO relationship table because no compatible table exists in the current repo.
+- Calls `/api/event-chat/list` and `/api/event-chat/send` for in-app event conversation logging.
 
 `[NEEDS VERIFICATION]` Live Supabase migration, RLS policies, service-role Vercel env, and deployed route behavior must be verified before relying on this dashboard in production demos.
 
@@ -823,6 +830,58 @@ Important fields:
 Expected relationship:
 
 - `event_checkins.open_house_event_id` references `open_house_events.id`.
+
+### `event_conversations`
+
+`[IMPLEMENTED]` Migration source exists at `sql/migrations/20260512_event_conversations.sql`.
+
+Used for:
+
+- in-app conversation headers connecting an event, buyer check-in, host agent, and loan officer/field support
+- allowing `/event`, `/agent-dashboard`, and `/field-dashboard` to reference the same buyer/event thread
+
+Important fields:
+
+- `open_house_event_id`
+- `field_demo_visit_id`
+- `buyer_checkin_id`
+- `buyer_name`
+- `buyer_phone`
+- `agent_slug`
+- `agent_name`
+- `agent_phone`
+- `loan_officer_slug`
+- `loan_officer_name`
+- `loan_officer_phone`
+- `status`
+- `metadata`
+
+`[PARTIAL]` This is in-app conversation logging only. Realtime delivery, push notifications, SMS relay, video, and hardened participant authorization are not built.
+
+### `event_conversation_messages`
+
+`[IMPLEMENTED]` Migration source exists at `sql/migrations/20260512_event_conversations.sql`.
+
+Used for:
+
+- message rows inside an `event_conversations` thread
+- sender role/name/phone/UID/slug attribution for buyer, agent, loan officer, field specialist, system, or admin messages
+
+Important fields:
+
+- `conversation_id`
+- `open_house_event_id`
+- `sender_role`
+- `sender_name`
+- `sender_phone`
+- `sender_uid`
+- `sender_slug`
+- `body`
+- `delivery_channel`
+- `metadata`
+- `created_at`
+
+`[NEEDS VERIFICATION]` Live RLS and deployed API behavior need verification even though the migration was applied during local implementation.
 
 ### `event_loan_officer_sessions`
 
@@ -1285,7 +1344,7 @@ Confirmed or needs-verification gaps:
 
 - `[INTENDED]` Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
 - `[INTENDED]` Agent-to-loan-officer relationship tables are not present in current app code.
-- `[INTENDED]` Chat/modal/video support between buyer, agent, and loan officer is not implemented.
+- `[PARTIAL]` In-app event conversation logging between buyer, agent, and loan officer/field support is implemented, but realtime chat, push notifications, SMS relay, and video support are not implemented.
 - `[PARTIAL]` Admin dashboard is placeholder only.
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
@@ -1340,6 +1399,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |
 | `/nmb-activate` and `/nmb-verified` are loan officer profile routes. | `[PARTIAL]` | `apps/rel8tion-app/nmb-activate.html` and `nmb-verified.html`; scheduled field-demo coverage now exists, but formal remote LO invite/request/accept, remote availability queue, and persistent agent-LO relationship management are still not built. |
 | Role-based field demo coverage MVP exists in repo code. | `[IMPLEMENTED]` | `sql/migrations/20260512_field_demo_visits.sql`, `apps/rel8tion-app/field-dashboard.html`, `apps/rel8tion-app/lo-field-dashboard.html`, `api/field-demo/*`, agent-dashboard support display, and event financing copy hooks. |
+| Event conversation MVP exists in repo code. | `[PARTIAL]` | `sql/migrations/20260512_event_conversations.sql`, `api/event-chat/*`, `/field-dashboard`, `/agent-dashboard`, and `/event` support in-app conversation logging; realtime/push/SMS relay/video are not built. |
 | Field demo coverage is live and RLS-safe. | `[NEEDS VERIFICATION]` | Migration and route code exist, but live Supabase tables/policies, Vercel env vars, and deployed route behavior have not been verified. |
 | `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |
 | Admin key reset exists as a beta/admin utility. | `[PARTIAL]` | `apps/rel8tion-app/key-reset.html` and `api/admin/reset-key.js`; full admin dashboard is not built. |
@@ -1357,14 +1417,14 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | WordPress should remain marketing/presentation. | `[INTENDED]` | WordPress README frames files as local tracking. No product state is stored there in checked code. |
 | Supabase sensitive writes should move through Edge Functions/serverless APIs. | `[INTENDED]` | Current browser code directly writes several public tables. This is not current implementation. |
 | Formal remote LO coverage management should support agents remotely by invite/request/accept. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
-| Buyer, agent, and loan officer should be able to communicate in a richer live modal. | `[INTENDED]` | Current implementation has SMS/call/text links only. |
+| Buyer, agent, and loan officer should be able to communicate in a richer live modal. | `[PARTIAL]` | In-app event conversation logging exists; richer realtime/modal/chat/video experience remains intended future work. |
 
 ### [PARTIAL], [NEEDS VERIFICATION], And [RISK]
 
 | Major claim | Status | Evidence |
 | --- | --- | --- |
 | Formal remote LO coverage management is desired but only partially represented by field-demo visits. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
-| Chat/video support is desired but not built. | `[INTENDED]` | No chat/video modules/routes found. |
+| Chat/video support is desired but not built. | `[PARTIAL]` | Event conversation logging exists; realtime chat UX, SMS/push relay, and video support are not built. |
 | Full admin dashboard is desired but not built. | `[INTENDED]` | `apps/rel8tion-app/admin.html` is a placeholder. |
 | Root Estately endpoint is scheduled by Vercel Cron. | `[NEEDS VERIFICATION]` | `api/cron/enrich-agents.js` exists; root `vercel.json` has no `crons` block. |
 | `send-lead-sms` implementation is checked in. | `[IMPLEMENTED]` | Source exists at `supabase/functions/send-lead-sms/index.ts`; deployed source/version matching and Twilio behavior still need verification. |
