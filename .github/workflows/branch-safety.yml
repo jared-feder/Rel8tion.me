@@ -1,0 +1,72 @@
+name: Branch Safety
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+permissions:
+  contents: read
+
+jobs:
+  branch-safety:
+    name: Validate merge path
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source and target branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base="${{ github.base_ref }}"
+          head="${{ github.head_ref }}"
+
+          echo "Pull request source branch: ${head}"
+          echo "Pull request target branch: ${base}"
+          echo ""
+          echo "Allowed paths:"
+          echo "- feature/* -> staging"
+          echo "- hotfix/* -> main"
+          echo "- hotfix/* -> staging"
+          echo "- staging -> main"
+          echo "- older legacy/dev branches -> staging temporarily, with warning"
+          echo ""
+
+          if [[ "${base}" == "main" ]]; then
+            if [[ "${head}" == "staging" ]]; then
+              echo "OK: staging may promote tested work into main."
+              exit 0
+            fi
+
+            if [[ "${head}" == hotfix/* ]]; then
+              echo "OK: hotfix branches may target main for emergency production fixes."
+              exit 0
+            fi
+
+            echo "::error::Blocked. PRs into main may only come from staging or hotfix/* branches."
+            echo "::error::Create a PR into staging first, test there, then promote staging to main."
+            exit 1
+          fi
+
+          if [[ "${base}" == "staging" ]]; then
+            if [[ "${head}" == feature/* ]]; then
+              echo "OK: feature branches should merge into staging first."
+              exit 0
+            fi
+
+            if [[ "${head}" == hotfix/* ]]; then
+              echo "OK: hotfix branches may also merge back into staging to keep pre-production current."
+              exit 0
+            fi
+
+            if [[ "${head}" == sync/* || "${head}" == staging-sync/* || "${head}" == chore/sync-* ]]; then
+              echo "OK: staging sync branch accepted."
+              exit 0
+            fi
+
+            echo "::warning::Legacy/dev branch '${head}' is targeting staging. This is temporarily allowed for cleanup, but new work should use feature/*."
+            exit 0
+          fi
+
+          echo "No branch safety rule needed for target '${base}'."

@@ -57,7 +57,7 @@ Status labels:
 - `[IMPLEMENTED]` `/event` opens a server-generated prefilled NYS disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - `[PARTIAL]` After buyer check-in, `/event` attempts to generate a signed REL8TION disclosure packet PDF through `/api/compliance/ny-disclosure`, store it in Supabase Storage, and attach the storage/download details to `event_checkins.metadata.ny_discrimination_disclosure.signed_pdf`. Storage bucket/env availability needs live verification.
 - `[IMPLEMENTED]` New signed disclosure packet PDFs include the NYS Agency Disclosure evidence, NYS Housing and Anti-Discrimination acknowledgement evidence, Rel8tion Courtesy Notice evidence, and source form pages when available. They are stored with broker-readable event paths and filenames, and metadata includes document hash, event/check-in IDs, property address, buyer name, generated timestamp, packet version, and source form references for audit evidence.
-- `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. The SMS function implementation itself is not in this repo.
+- `[IMPLEMENTED]` Buyer check-in calls `send-lead-sms` for buyer and agent SMS. Local source is now checked in at `supabase/functions/send-lead-sms/index.ts`; the function is user-reported as active and working in Supabase, while deployed source/version matching still needs dashboard verification.
 - `[IMPLEMENTED]` Buyer preapproval/financing routing asks for pre-approval status on buyer-facing paths, then handles optional second-opinion or discreet financing consent inside the guided disclosure modal after disclosures are reviewed. Financing outreach is opt-in: selecting "not pre-approved" alone does not trigger financing SMS. If financing help is requested, the code checks for a live loan officer session first, then falls back to Jared alert. The `buyer_agent` path skips pre-approval and disclosure prompts.
 - `[IMPLEMENTED]` Post-check-in buyer UI no longer shows OneKey listing links, internal check-in status cards, the unfinished loan-officer support card, or a second check-in button. It shows a cleaner confirmation, next-step copy, property snapshot, host bio/contact actions, neighborhood SMS prompt, and a temporary financing SMS prompt to `347-775-8059`.
 - `[IMPLEMENTED]` Rear sign chip flow challenges the agent to tap their keychain before opening `/agent-dashboard`.
@@ -94,7 +94,7 @@ Status labels:
 - `[NEEDS VERIFICATION]` Live RLS state is not fully knowable from checked-in files or the latest anon zero-row schema probes.
 - `[RISK]` `event_loan_officer_sessions` SQL grants anon/auth select, insert, and update; live RLS state needs verification.
 - `[NEEDS VERIFICATION]` `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create` are still unverified after the latest anon run.
-- `[NEEDS VERIFICATION]` `send-lead-sms` is called by the app but its local Edge Function source was not found, and the verification script intentionally does not call SMS functions.
+- `[PARTIAL]` `send-lead-sms` local source is checked in at `supabase/functions/send-lead-sms/index.ts`. The function is user-reported as active and working in Supabase; the verification script intentionally does not call SMS functions, so deployed source/version and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
 - `[NEEDS VERIFICATION]` Service role was not used in the latest run, so privileged schema checks and RLS policy checks remain unverified.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and includes serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
@@ -267,7 +267,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Buyer-agent-LO chat/video is desired but not built. | `[INTENDED]` | Current code only has SMS/call/text links. |
 | Full admin dashboard is built. | `[INTENDED]` | `/admin` is placeholder. |
 | Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |
-| `send-lead-sms` source is present. | `[NEEDS VERIFICATION]` | The app calls it, but function source was not found. |
+| `send-lead-sms` source is present. | `[IMPLEMENTED]` | Source now exists at `supabase/functions/send-lead-sms/index.ts`; live deployment/source matching and Twilio behavior still need verification because the verifier does not send SMS. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
 | Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
 | QR inventory/export process is unified. | `[RISK]` | Activation uses `smart_sign_inventory`, but export SQL uses `smart_signs`. |

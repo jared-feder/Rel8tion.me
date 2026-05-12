@@ -32,7 +32,7 @@ The current product connects:
 - `[IMPLEMENTED]` rear NFC agent dashboard challenge chip
 - `[IMPLEMENTED]` live open house event records
 - `[IMPLEMENTED]` buyer check-ins and preapproval routing
-- `[PARTIAL]` SMS follow-up through Twilio/Supabase functions; `send-lead-sms` source is not checked in
+- `[PARTIAL]` SMS follow-up through Twilio/Supabase functions; `send-lead-sms` source is checked in and user-reported active, but deployed source/version matching and SMS behavior still need live verification
 - `[PARTIAL]` local/present NMB loan officer tag scan and live event coverage
 - `[PARTIAL]` agent outreach/enrichment data for booking demos and appointments
 - `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
@@ -908,7 +908,7 @@ Still not confirmed:
 - Full RLS correctness or write behavior.
 - Privileged schema checks; service role was not used.
 - RPC definitions for `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
-- `send-lead-sms`; local source is missing and the verifier intentionally does not call SMS functions.
+- `send-lead-sms`; local source is present, but the verifier intentionally does not call SMS functions.
 - Edge Function deployment for source under `docs/supabase-functions`.
 - Vercel Cron state; root `vercel.json` has no `crons` block, so dashboard verification is still required.
 - Full production data quality and write-path health.
@@ -932,13 +932,12 @@ Still not confirmed:
 - Blocks follow-up after reply/opt-out.
 - Sends owner alert through Twilio for new non-negative replies.
 
-### Referenced But Not Present Under `supabase/functions`
-
-`send-lead-sms`
+### `send-lead-sms`
 
 - Called by browser code for activation SMS, buyer/agent check-in SMS, loan officer alerts, and `/b` profile SMS.
-- Source was not found under `supabase/functions`.
-- `[NEEDS VERIFICATION]` Needs verification before changing SMS payload contract.
+- `[IMPLEMENTED]` Local source is checked in at `supabase/functions/send-lead-sms/index.ts`.
+- `[PARTIAL]` User reports the deployed function has been active and working for months.
+- `[NEEDS VERIFICATION]` Supabase dashboard/source matching and Twilio payload behavior should be verified before changing the SMS contract.
 
 ### `/api/compliance/ny-disclosure`
 
@@ -1121,7 +1120,7 @@ Important gaps/risks:
 - `[RISK]` Some client pages have direct anon insert/update behavior that depends on live policies.
 - `[INTENDED]` Sensitive writes and security-critical state transitions should move toward Edge Functions or serverless APIs. Current implementation still includes direct browser REST writes.
 - `[RISK]` `event_loan_officer_sessions` SQL grants broad anon/auth access; RLS state needs verification.
-- `[NEEDS VERIFICATION]` `send-lead-sms` source is missing from the repo, so its exact validation and auth model are unconfirmed.
+- `[PARTIAL]` `send-lead-sms` source is checked into the repo. Its live deployed source/version, validation behavior, and auth model still need verification before SMS contract changes.
 
 ## Admin Dashboard Structure
 
@@ -1160,7 +1159,7 @@ Confirmed or needs-verification gaps:
 - `[INTENDED]` Agent-to-loan-officer relationship tables are not present in current app code.
 - `[INTENDED]` Chat/modal/video support between buyer, agent, and loan officer is not implemented.
 - `[PARTIAL]` Admin dashboard is placeholder only.
-- `[NEEDS VERIFICATION]` `send-lead-sms` implementation is missing from checked-in Supabase functions.
+- `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
@@ -1238,7 +1237,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Chat/video support is desired but not built. | `[INTENDED]` | No chat/video modules/routes found. |
 | Full admin dashboard is desired but not built. | `[INTENDED]` | `apps/rel8tion-app/admin.html` is a placeholder. |
 | Root Estately endpoint is scheduled by Vercel Cron. | `[NEEDS VERIFICATION]` | `api/cron/enrich-agents.js` exists; root `vercel.json` has no `crons` block. |
-| `send-lead-sms` implementation is checked in. | `[NEEDS VERIFICATION]` | Calls exist, function source does not. |
+| `send-lead-sms` implementation is checked in. | `[IMPLEMENTED]` | Source exists at `supabase/functions/send-lead-sms/index.ts`; deployed source/version matching and Twilio behavior still need verification. |
 | Outreach generation/send functions under `docs/supabase-functions` are deployed. | `[NEEDS VERIFICATION]` | Source exists under docs, not under deployable `supabase/functions`. |
 | Supabase RPC definitions are present in repo SQL. | `[NEEDS VERIFICATION]` | RPCs are called but definitions were not found in checked-in SQL. |
 | Live production schema/RLS exactly matches repo assumptions. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |

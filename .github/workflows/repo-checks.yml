@@ -1,0 +1,75 @@
+name: Repo Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repo-checks:
+    name: Lightweight repository checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lightweight secret scan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          echo "Scanning added lines in this PR."
+          echo "Base: ${base}"
+          echo "Head: ${head}"
+
+          git fetch --no-tags --prune --depth=1 origin "${base}" "${head}" || true
+
+          mapfile -t files < <(git diff --name-only "${base}" "${head}")
+
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "No changed files detected."
+            exit 0
+          fi
+
+          # Split sensitive marker strings so this workflow can scan itself
+          # without failing on the scanner's own pattern definitions.
+          sr_name="SUPABASE_SERVICE_ROLE""_KEY"
+          sr_token="service""_role"
+          tw_name="TWILIO_AUTH""_TOKEN"
+          oa_name="OPENAI_API""_KEY"
+          stripe_prefix="s""k-"
+          slack_prefix="x""oxb-"
+          pattern="(${sr_name}|${sr_token}|${tw_name}|${oa_name}|${stripe_prefix}[A-Za-z0-9_-]{8,}|${slack_prefix}[A-Za-z0-9-]{8,})"
+
+          found=0
+
+          for file in "${files[@]}"; do
+            if [[ ! -f "${file}" ]]; then
+              continue
+            fi
+
+            matches="$(git diff -U0 "${base}" "${head}" -- "${file}" \
+              | grep -E '^\+' \
+              | grep -Ev '^\+\+\+' \
+              | grep -E "${pattern}" || true)"
+
+            if [[ -n "${matches}" ]]; then
+              echo "::error file=${file}::Potential secret or private credential marker found in added lines."
+              echo "${matches}" | sed 's/./*/g'
+              found=1
+            fi
+          done
+
+          if [[ "${found}" -ne 0 ]]; then
+            echo "::error::Repo Checks failed. Remove private credentials or secret markers before merging."
+            echo "Note: the public Supabase anon key is allowed when intentionally used as a public browser key. Private service credentials are not allowed."
+            exit 1
+          fi
+
+          echo "No obvious committed secrets found in added PR lines."
