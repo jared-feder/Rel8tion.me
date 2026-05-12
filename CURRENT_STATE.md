@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-10.
+Last inspected: 2026-05-12.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -64,7 +64,9 @@ Status labels:
 - `[IMPLEMENTED]` Rear sign dashboard verification takes priority over any stale loan-officer sign-in prompt. Tapping the rear sign clears the pending LO browser session before waiting for the agent keychain.
 - `[IMPLEMENTED]` Agent dashboard shows live event stats, leads, each lead card's agency/housing/courtesy disclosure signed/missing status, signed disclosure packet PDF link when available, outreach count, relationship status, and loan officer coverage.
 - `[IMPLEMENTED]` Agent dashboard has end/move controls for the current open house. Ending marks `open_house_events.status = ended`, stamps `ended_at`, clears `smart_signs.active_event_id`, and sets the sign back to inactive without deleting captured check-ins. Moving performs the same closeout and opens sign activation for the next listing.
-- `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[IMPLEMENTED]` Role-based field demo coverage MVP code exists through `field_demo_visits`, `field_demo_visit_participants`, `/field-dashboard`, `/lo-field-dashboard`, and `/api/field-demo/*` write helpers. One NMB loan officer can hold financing support, product demo, sign setup, and agent onboarding responsibilities today, while the model also supports separate field sales reps, demo presenters, onboarding specialists, dispatchers, admins, and loan officers later.
+- `[PARTIAL]` Field demo start can mark a scheduled visit live and, when a financing-support participant is attached to an `open_house_event_id`, create/update `event_loan_officer_sessions` without removing the existing local loan-officer tag scan flow. Live Supabase migration, service-role env, RLS, and Vercel route deployment still need verification.
+- `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
 - `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
@@ -93,6 +95,7 @@ Status labels:
 - `[RISK]` Several root/static pages are legacy or test artifacts. Use `vercel.json` before assuming a page is live.
 - `[NEEDS VERIFICATION]` Live RLS state is not fully knowable from checked-in files or the latest anon zero-row schema probes.
 - `[RISK]` `event_loan_officer_sessions` SQL grants anon/auth select, insert, and update; live RLS state needs verification.
+- `[NEEDS VERIFICATION]` New `field_demo_visits` / `field_demo_visit_participants` tables and `/api/field-demo/*` service-role write helpers have not been verified against live Supabase RLS/policies, Vercel env vars, or deployed route behavior.
 - `[NEEDS VERIFICATION]` `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create` are still unverified after the latest anon run.
 - `[PARTIAL]` `send-lead-sms` local source is checked in at `supabase/functions/send-lead-sms/index.ts`. The function is user-reported as active and working in Supabase; the verification script intentionally does not call SMS functions, so deployed source/version and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` Edge functions under `docs/supabase-functions` still need deployment verification.
@@ -105,7 +108,7 @@ Status labels:
 
 ## [INTENDED] Not Built Yet
 
-- `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[INTENDED]` Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
 - `[PARTIAL]` Loan officer support is currently scan/session based through a local tag verification flow.
 - `[INTENDED]` Buyer-agent-loan-officer chat modal is not built.
 - `[INTENDED]` Rich buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent chat is not built. Current `/event` post-check-in experience shows available property/agent/LO context and uses SMS/call links for messaging.
@@ -152,7 +155,8 @@ Recent repo state includes:
 - `[IMPLEMENTED]` Open house listing ranking for keychain claim and sign activation is location-first again. The client now recomputes miles from listing lat/lng, compares open-house days in `America/New_York`, uses a tight local fallback window, and only uses active/upcoming time as a tie-breaker so farther Brooklyn/Queens rows do not outrank closer Oceanside-area rows.
 - `[IMPLEMENTED]` The claim "Is This You?" screen now treats `Agent`, `Listing Agent`, `Unknown Agent`, and `Real Estate Agent` as placeholder names. It normalizes `listing_agents` rows before display and looks up the best enriched listing-agent profile by open house or phone so stale/generic source names do not hide real agent names, photos, phone numbers, or brokerages.
 - `[IMPLEMENTED]` Agent dashboard End/Move event controls now send PATCH requests through the shared dashboard request helper. This prevents an ended open house from leaving `smart_signs.active_event_id` live and blocking the agent from binding the same sign to the next open house.
-- `[PARTIAL]` Loan officer local sign-in support added through verified profiles and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[IMPLEMENTED]` Role-based field demo coverage files were added: SQL migration for `field_demo_visits` / `field_demo_visit_participants`, serverless `/api/field-demo/*` helpers, `/field-dashboard`, `/lo-field-dashboard`, agent-dashboard support status, and buyer financing copy based on physical/remote coverage mode.
+- `[PARTIAL]` Loan officer local sign-in support remains scan/session based through verified profiles and `event_loan_officer_sessions`; scheduled field-demo coverage now exists in repo code, but formal invite/request/accept, remote availability queue, and persistent agent-LO relationship management are still not built.
 - `[IMPLEMENTED]` Estately enrichment worker changed to batch size 20 and upcoming-first/backlog-later prioritization.
 - `[IMPLEMENTED]` OneKey listing freshness worker, API route, cron config, migration, npm scripts, and live-verification contract entries were added so stale prices can be checked against current OneKey source data.
 - `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
@@ -167,13 +171,13 @@ Highest-value next work:
 3. Confirm the currently configured Vercel routes and whether the Estately enrichment cron is intentionally disabled or missing.
 4. Re-run `npm run verify:live` after schema, route, or function changes and review the generated report without committing it.
 5. Reconcile smart sign QR source so printed QR codes, inventory rows, and sign rows use one consistent process.
-6. Build formal remote LO coverage management:
+6. Build formal remote LO coverage management beyond the new field-demo visit MVP:
    - loan officer profiles
    - agent/loan officer relationships
    - event invites
    - accept/decline flow
    - remote availability queue
-   - scheduled coverage assignment
+   - scheduled coverage assignment UI and workflow
    - event start prompt
    - live coverage session
    - buyer financing alert and contact modal
@@ -257,13 +261,13 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Rear sign side should be dashboard challenge only. | `[IMPLEMENTED]` | Current rear route requires keychain scan before dashboard. |
 | WordPress is marketing/presentation, not product brain. | `[INTENDED]` | App state and flows live in Vercel/Supabase; WordPress folder is local tracking. |
 | Supabase sensitive writes should move through Edge Functions. | `[INTENDED]` | Current browser pages still write directly with anon key, so this is not implemented. |
-| Formal remote LO coverage management should let agents and LOs request/link/accept coverage. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
+| Formal remote LO coverage management should let agents and LOs request/link/accept coverage. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
 
 ### [PARTIAL], [NEEDS VERIFICATION], And [RISK]
 
 | Major claim | Status | Evidence |
 | --- | --- | --- |
-| Formal remote LO coverage management is desired but not built. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
+| Formal remote LO coverage management is desired but only partially represented by field-demo visits. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
 | Buyer-agent-LO chat/video is desired but not built. | `[INTENDED]` | Current code only has SMS/call/text links. |
 | Full admin dashboard is built. | `[INTENDED]` | `/admin` is placeholder. |
 | Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |

@@ -127,6 +127,15 @@ export async function getLiveLoanOfficerSession(eventId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
+export async function getFieldDemoCoverage(eventId) {
+  if (!eventId) return [];
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/field_demo_visits?open_house_event_id=eq.${encodeURIComponent(eventId)}&status=in.(scheduled,confirmed,en_route,on_site,live,converted)&select=*,field_demo_visit_participants(*)&order=scheduled_start.asc&limit=10`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
 export async function upsertLiveLoanOfficerSession(eventId, profile, uid) {
   if (!eventId || !profile?.uid) return null;
 

@@ -47,6 +47,7 @@
       checkins: [],
       outreach: [],
       loanOfficer: null,
+      fieldSupport: [],
       error: ''
     };
 
@@ -139,6 +140,12 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    async function loadFieldSupport(eventId) {
+      if (!eventId) return [];
+      const rows = await request(`field_demo_visits?open_house_event_id=eq.${encodeURIComponent(eventId)}&status=in.(scheduled,confirmed,en_route,on_site,live,converted)&select=*,field_demo_visit_participants(*)&order=scheduled_start.asc&limit=20`);
+      return Array.isArray(rows) ? rows : [];
+    }
+
     function stat(label, value, tone = 'slate') {
       const colors = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-blue-700' : 'text-slate-900';
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-5"><div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-black ${colors}">${esc(value)}</div></div>`;
@@ -224,14 +231,88 @@
       </div>`;
     }
 
+    function fieldSupportParticipants() {
+      return (state.fieldSupport || []).flatMap((visit) => {
+        return (visit.field_demo_visit_participants || []).map((participant) => ({
+          visit,
+          participant
+        }));
+      });
+    }
+
+    function participantName(row) {
+      return row?.participant?.participant_name || row?.participant?.participant_company || row?.participant?.participant_uid || '';
+    }
+
+    function fieldSupportSummary() {
+      const support = fieldSupportParticipants().filter(({ participant }) => participant?.status !== 'cancelled');
+      const financing = support.filter(({ participant }) => participant.responsibility === 'financing_support' || participant.role === 'loan_officer');
+      const field = support.filter(({ participant }) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(participant.responsibility)
+        || ['field_sales_rep', 'demo_presenter', 'onboarding_specialist'].includes(participant.role));
+
+      const liveRemote = financing.find(({ visit, participant }) => visit.coverage_mode === 'remote_support' && (visit.status === 'live' || participant.status === 'live'));
+      if (liveRemote) {
+        return {
+          status: 'NMB loan officer live remotely',
+          title: participantName(liveRemote) || 'Remote NMB Support',
+          body: 'A verified NMB loan officer is live remotely for this open house.',
+          tone: 'emerald'
+        };
+      }
+
+      const onSite = financing.find(({ visit, participant }) => ['live', 'on_site'].includes(visit.status) || ['live', 'on_site'].includes(participant.status));
+      if (onSite) {
+        return {
+          status: 'NMB loan officer on site',
+          title: participantName(onSite) || 'NMB Coverage',
+          body: 'A verified NMB loan officer is on site and available for buyer financing questions.',
+          tone: 'emerald'
+        };
+      }
+
+      const scheduledLoanOfficer = financing.find(({ visit, participant }) => ['scheduled', 'confirmed', 'en_route'].includes(visit.status) || ['assigned', 'confirmed', 'en_route'].includes(participant.status));
+      if (scheduledLoanOfficer) {
+        return {
+          status: 'NMB loan officer scheduled',
+          title: participantName(scheduledLoanOfficer) || 'NMB Coverage Scheduled',
+          body: `${fmtDate(scheduledLoanOfficer.visit.scheduled_start)} field coverage is assigned for this event.`,
+          tone: 'sky'
+        };
+      }
+
+      const scheduledField = field.find(({ visit, participant }) => ['scheduled', 'confirmed', 'en_route', 'on_site', 'live'].includes(visit.status) || ['assigned', 'confirmed', 'en_route', 'on_site', 'live'].includes(participant.status));
+      if (scheduledField) {
+        return {
+          status: 'REL8TION field specialist scheduled',
+          title: participantName(scheduledField) || 'REL8TION Field Support',
+          body: `${fmtDate(scheduledField.visit.scheduled_start)} field demo or onboarding support is assigned for this event.`,
+          tone: 'sky'
+        };
+      }
+
+      return {
+        status: 'No support assigned',
+        title: 'No support assigned',
+        body: 'Add a loan officer by scan, or schedule field/demo coverage before the event.',
+        tone: 'amber'
+      };
+    }
+
     function renderLoanOfficerCard() {
       const lo = state.loanOfficer;
       if (!lo) {
-        return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
-          <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
-          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Have the NMB loan officer tap their verified keychain to show live coverage and route financing buyers to them.</p>
-          <button onclick="window.armLoanOfficerSignIn()" class="mt-4 w-full rounded-full bg-amber-500 px-5 py-3 text-sm font-black text-white">Add Loan Officer</button>
+        const summary = fieldSupportSummary();
+        const styles = summary.tone === 'emerald'
+          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
+          : summary.tone === 'sky'
+            ? 'border-sky-200 bg-sky-50/90 text-sky-700'
+            : 'border-amber-200 bg-amber-50/85 text-amber-700';
+        const bodyColor = summary.tone === 'amber' ? 'text-amber-900' : summary.tone === 'emerald' ? 'text-emerald-900' : 'text-sky-900';
+        return `<div class="rounded-[28px] border p-5 ${styles}">
+          <div class="text-xs font-black uppercase tracking-[.16em]">${esc(summary.status)}</div>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-slate-900">${esc(summary.title)}</h2>
+          <p class="mt-2 font-semibold leading-relaxed ${bodyColor}">${esc(summary.body)}</p>
+          <button onclick="window.armLoanOfficerSignIn()" class="mt-4 w-full rounded-full ${summary.tone === 'amber' ? 'bg-amber-500' : 'bg-white'} px-5 py-3 text-sm font-black ${summary.tone === 'amber' ? 'text-white' : 'text-slate-700 ring-1 ring-slate-200'}">Add Loan Officer</button>
         </div>`;
       }
       const name = lo.loan_officer_name || 'Loan Officer';
@@ -410,6 +491,7 @@
       state.checkins = await loadCheckins(state.event.id).catch(() => []);
       state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
       state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
+      state.fieldSupport = await loadFieldSupport(state.event.id).catch(() => []);
       render();
     }
 

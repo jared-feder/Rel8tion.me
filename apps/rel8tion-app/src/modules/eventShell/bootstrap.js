@@ -1,7 +1,7 @@
 import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUCKET, SUPABASE_URL } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
 import { applyBranding } from '../../api/brokerages.js';
-import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent } from '../../api/events.js?v=20260508-nys-pdf';
+import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getFieldDemoCoverage, getLiveLoanOfficerSession, touchEvent } from '../../api/events.js?v=20260512-field-demo';
 import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260503-lo-live';
 import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { state as appState } from '../../core/state.js';
@@ -37,6 +37,7 @@ const pageState = {
   agent: null,
   brand: null,
   loanOfficer: null,
+  fieldDemoCoverage: [],
   selectedPath: CHECKIN_PATHS.BUYER,
   mode: 'checkin',
   submitting: false,
@@ -678,10 +679,41 @@ function renderCourtesyNoticeModal() {
   `;
 }
 
+function getFinancingFieldCoverage() {
+  const visits = Array.isArray(pageState.fieldDemoCoverage) ? pageState.fieldDemoCoverage : [];
+  const usableStatuses = new Set(['scheduled', 'confirmed', 'en_route', 'on_site', 'live', 'converted']);
+  return visits.find((visit) => {
+    if (!usableStatuses.has(visit?.status)) return false;
+    return (visit.field_demo_visit_participants || []).some((participant) => {
+      return participant?.responsibility === 'financing_support' && participant?.status !== 'cancelled';
+    });
+  }) || null;
+}
+
+function fieldCoverageFinancingCopy(coverage) {
+  if (!coverage) return '';
+  if (coverage.coverage_mode === 'physical_demo' || coverage.coverage_mode === 'physical_support') {
+    return 'A verified NMB loan officer is on site and available to help.';
+  }
+  if (coverage.coverage_mode === 'remote_support') {
+    return 'A verified NMB loan officer is live remotely and available to help.';
+  }
+  return '';
+}
+
 function renderLendingDisclosureStep() {
   const liveLoanOfficer = pageState.loanOfficer;
+  const fieldCoverage = getFinancingFieldCoverage();
+  const fieldCoverageCopy = fieldCoverageFinancingCopy(fieldCoverage);
   const officerName = firstPresent(liveLoanOfficer?.loan_officer_name, liveLoanOfficer?.name, 'a live loan officer');
   const hasLiveLoanOfficer = Boolean(liveLoanOfficer?.loan_officer_slug || liveLoanOfficer?.loan_officer_phone);
+  const supportLabel = fieldCoverageCopy
+    ? 'Verified NMB Support Available'
+    : hasLiveLoanOfficer ? 'Live Loan Officer Available' : 'Lending Specialist Available';
+  const supportCopy = fieldCoverageCopy
+    || (hasLiveLoanOfficer
+      ? `${esc(officerName)} is assisting this open house and can be with you shortly after check-in.`
+      : 'A lending specialist can follow up discreetly after check-in.');
 
   return `
     <div data-guided-disclosure-panel="lending" class="guided-disclosure-panel hidden space-y-4">
@@ -713,12 +745,10 @@ function renderLendingDisclosureStep() {
 
       <div data-lending-mode="no" class="hidden rounded-[18px] border border-emerald-200 bg-emerald-50/90 p-4">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-2">
-          ${hasLiveLoanOfficer ? 'Live Loan Officer Available' : 'Lending Specialist Available'}
+          ${supportLabel}
         </div>
         <p class="text-emerald-950 font-semibold leading-relaxed">
-          ${hasLiveLoanOfficer
-            ? `${esc(officerName)} is assisting this open house and can be with you shortly after check-in.`
-            : 'A lending specialist can follow up discreetly after check-in.'}
+          ${supportCopy}
         </p>
         <label class="mt-3 flex items-start gap-3 text-emerald-950 font-black">
           <input form="checkin-form" type="checkbox" name="loan_officer_contact_ok" value="true" class="mt-1 h-4 w-4 rounded border-emerald-300">
@@ -1643,6 +1673,7 @@ export async function initEventShellPage() {
   pageState.errorMessage = '';
   pageState.lastCheckin = null;
   pageState.financingAlertSent = false;
+  pageState.fieldDemoCoverage = [];
   pageState.requiredDisclosures = { agency: null, housing: null, courtesy: null };
   loading('Resolving active event record...');
 
@@ -1668,6 +1699,7 @@ export async function initEventShellPage() {
 
     pageState.agent = null;
     pageState.loanOfficer = await getLiveLoanOfficerSession(eventId).catch(() => null);
+    pageState.fieldDemoCoverage = await getFieldDemoCoverage(eventId).catch(() => []);
     const agentSlug = hostAgentSlug(eventRow);
     if (agentSlug) {
       try {

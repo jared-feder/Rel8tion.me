@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>REL8TION Field Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 42%,#f8fbff 100%);">
+    <section class="mx-auto max-w-6xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Field Operations</div>
+            <div id="profileLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Loading...</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Field Dashboard</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading today’s assigned REL8TION demo visits.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260512-field-demo';
+
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      uid: params.get('uid') || params.get('participant_uid') || '',
+      slug: params.get('slug') || '',
+      role: params.get('role') || '',
+      profile: null,
+      visits: [],
+      busy: false,
+      message: '',
+      error: ''
+    };
+
+    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    const app = document.getElementById('app');
+    const profileLabel = document.getElementById('profileLabel');
+
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const fmtTime = (value) => {
+      if (!value) return 'Not scheduled';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Not scheduled';
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    };
+    const fmtPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
+    const smsHref = (phone, body = '') => phone ? `sms:${fmtPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const telHref = (phone) => phone ? `tel:${fmtPhone(phone)}` : '#';
+    const titleize = (value) => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
+    async function request(path, options = {}) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: { ...headers, ...(options.headers || {}) }
+      });
+      const raw = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      const raw = await res.text().catch(() => '');
+      const payload = raw ? JSON.parse(raw) : null;
+      if (!res.ok || payload?.ok === false) throw new Error(payload?.error || raw || `Request failed: ${res.status}`);
+      return payload;
+    }
+
+    function todayRange() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return { start: start.toISOString(), end: end.toISOString() };
+    }
+
+    async function loadProfile() {
+      if (state.uid) {
+        const rows = await request(`verified_profiles?uid=eq.${encodeURIComponent(state.uid)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(rows) && rows[0]) return rows[0];
+      }
+      if (state.slug) {
+        const rows = await request(`verified_profiles?slug=eq.${encodeURIComponent(state.slug)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(rows) && rows[0]) return rows[0];
+      }
+      return null;
+    }
+
+    async function loadParticipantRows() {
+      const { start, end } = todayRange();
+      const queries = [];
+      if (state.profile?.uid) {
+        queries.push(`participant_profile_id=eq.${encodeURIComponent(state.profile.uid)}`);
+        queries.push(`participant_uid=eq.${encodeURIComponent(state.profile.uid)}`);
+      }
+      if (state.uid && state.uid !== state.profile?.uid) {
+        queries.push(`participant_uid=eq.${encodeURIComponent(state.uid)}`);
+      }
+
+      if (!queries.length) return [];
+
+      const seen = new Map();
+      for (const filter of queries) {
+        const rows = await request(
+          `field_demo_visit_participants?${filter}&select=*,field_demo_visits(*)&order=created_at.asc&limit=100`
+        ).catch((error) => {
+          console.log('field demo participant load skipped', error);
+          return [];
+        });
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+          const visit = row.field_demo_visits;
+          if (!visit?.id) return;
+          const scheduled = new Date(visit.scheduled_start || '');
+          if (!Number.isNaN(scheduled.getTime()) && (scheduled.toISOString() < start || scheduled.toISOString() >= end)) return;
+          seen.set(row.id, row);
+        });
+      }
+      return [...seen.values()];
+    }
+
+    function groupVisits(participantRows) {
+      const visits = new Map();
+      participantRows.forEach((participant) => {
+        const visit = participant.field_demo_visits;
+        if (!visit?.id) return;
+        if (!visits.has(visit.id)) {
+          visits.set(visit.id, { ...visit, participants: [] });
+        }
+        visits.get(visit.id).participants.push({
+          ...participant,
+          field_demo_visits: undefined
+        });
+      });
+      return [...visits.values()].sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
+    }
+
+    function responsibilities(visit) {
+      return [...new Set((visit.participants || []).map((row) => row.responsibility).filter(Boolean))];
+    }
+
+    function hasFinance(visit) {
+      return responsibilities(visit).includes('financing_support');
+    }
+
+    function hasDemoWork(visit) {
+      return responsibilities(visit).some((item) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(item));
+    }
+
+    function actionButton(label, onclick, tone = 'blue') {
+      const palette = tone === 'green'
+        ? 'bg-emerald-600 text-white'
+        : tone === 'white'
+          ? 'bg-white text-slate-700 ring-1 ring-slate-200'
+          : 'bg-sky-600 text-white';
+      return `<button type="button" onclick="${onclick}" class="rounded-full px-4 py-3 text-sm font-black ${palette}">${esc(label)}</button>`;
+    }
+
+    function visitStatusPill(status) {
+      const color = status === 'live' ? 'bg-emerald-100 text-emerald-700'
+        : status === 'completed' || status === 'converted' ? 'bg-slate-100 text-slate-700'
+          : status === 'cancelled' ? 'bg-rose-100 text-rose-700'
+            : 'bg-sky-100 text-sky-700';
+      return `<span class="rounded-full px-3 py-1 text-xs font-black uppercase tracking-[.12em] ${color}">${esc(status || 'scheduled')}</span>`;
+    }
+
+    function renderVisit(visit) {
+      const visitResponsibilities = responsibilities(visit);
+      const primary = (visit.participants || []).find((row) => row.is_primary) || visit.participants?.[0] || {};
+      const financeParticipant = (visit.participants || []).find((row) => row.responsibility === 'financing_support' && row.is_primary)
+        || (visit.participants || []).find((row) => row.responsibility === 'financing_support')
+        || primary;
+      const demoParticipant = (visit.participants || []).find((row) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(row.responsibility) && row.is_primary)
+        || (visit.participants || []).find((row) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(row.responsibility))
+        || primary;
+      const financeParticipantId = financeParticipant?.id || '';
+      const demoParticipantId = demoParticipant?.id || '';
+      const agentLine = [visit.agent_name, visit.brokerage].filter(Boolean).join(' • ');
+      const address = visit.open_house_id || visit.open_house_event_id || 'Field visit';
+      const agentMessage = `Hi${visit.agent_name ? ` ${visit.agent_name}` : ''}, this is ${state.profile?.full_name || primary.participant_name || 'your REL8TION field specialist'}. I am assigned to your REL8TION field demo today.`;
+      return `
+        <article class="rounded-[30px] border border-white/80 bg-white/78 p-5 shadow-[0_18px_50px_rgba(15,23,42,.10)]">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                ${visitStatusPill(visit.status)}
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 ring-1 ring-slate-200">${esc(titleize(visit.coverage_mode))}</span>
+              </div>
+              <h2 class="mt-3 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold leading-tight">${esc(agentLine || visit.agent_slug || 'Assigned Field Visit')}</h2>
+              <p class="mt-2 text-sm font-bold text-slate-500">${esc(address)}</p>
+              <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
+            </div>
+            <div class="text-right">
+              <div class="text-xs font-black uppercase tracking-[.14em] text-slate-400">Demo Type</div>
+              <div class="mt-1 font-black">${esc(titleize(visit.demo_type))}</div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            ${visitResponsibilities.map((item) => `<span class="rounded-full bg-slate-50 px-3 py-2 text-xs font-black uppercase tracking-[.1em] text-slate-600 ring-1 ring-slate-200">${esc(titleize(item))}</span>`).join('')}
+          </div>
+
+          <div class="mt-5 grid gap-3 md:grid-cols-2">
+            ${hasFinance(visit) ? `
+              <section class="rounded-[24px] border border-emerald-200 bg-emerald-50/85 p-4">
+                <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">Financing Support</div>
+                <div class="mt-3 grid gap-2">
+                  ${actionButton('Go Live For Financing', `window.startVisit('${visit.id}', '${financeParticipantId}')`, 'green')}
+                  ${visit.open_house_event_id ? `<a href="/agent-dashboard?event=${encodeURIComponent(visit.open_house_event_id)}&agent=${encodeURIComponent(visit.agent_slug || '')}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200">View Buyer Requests</a>` : actionButton('View Buyer Requests', `window.notice('Attach this visit to an open house event first.')`, 'white')}
+                  <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-50'}">Message Agent</a>
+                  ${actionButton('Mark Financing Complete', `window.updateParticipant('${financeParticipantId}', 'completed')`, 'white')}
+                </div>
+              </section>
+            ` : ''}
+
+            ${hasDemoWork(visit) ? `
+              <section class="rounded-[24px] border border-sky-200 bg-sky-50/85 p-4">
+                <div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Field Demo + Agent Onboarding</div>
+                <div class="mt-3 grid gap-2">
+                  ${actionButton('Mark En Route', `window.updateVisitAndParticipant('${visit.id}', '${demoParticipantId}', 'en_route')`)}
+                  ${actionButton('Mark On Site', `window.updateVisitAndParticipant('${visit.id}', '${demoParticipantId}', 'on_site')`)}
+                  <a href="/sign-demo-activate${visit.demo_public_code ? `?code=${encodeURIComponent(visit.demo_public_code)}` : ''}${visit.agent_slug ? `${visit.demo_public_code ? '&' : '?'}agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Activate Demo Sign</a>
+                  <a href="/event${visit.open_house_event_id ? `?event=${encodeURIComponent(visit.open_house_event_id)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Demo REL8TION</a>
+                  <a href="/onboarding${visit.agent_slug ? `?agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Onboard Agent</a>
+                  ${actionButton('Convert Agent To Virtual Support', `window.convertVisit('${visit.id}')`, 'green')}
+                  ${actionButton('End Demo', `window.updateVisit('${visit.id}', 'completed')`, 'white')}
+                </div>
+              </section>
+            ` : ''}
+          </div>
+        </article>
+      `;
+    }
+
+    function render() {
+      const profileName = state.profile?.full_name || state.uid || state.slug || 'Field Team';
+      profileLabel.textContent = profileName;
+      app.innerHTML = `
+        <section class="mb-6">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Today</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">Field Demo Coverage</h1>
+          <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">
+            One visit can include financing support, product demo, sign setup, and agent onboarding. A loan officer can do all of it today, or separate roles can cover it later.
+          </p>
+          ${state.message ? `<div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
+          ${state.error ? `<div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
+        </section>
+
+        ${!state.profile && !state.uid ? `
+          <section class="rounded-[28px] border border-amber-200 bg-amber-50/90 p-5">
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Profile Not Identified</h2>
+            <p class="mt-2 font-semibold leading-relaxed text-amber-900">Open this dashboard from a verified NMB/field profile link using <code>uid</code> or <code>slug</code>, or tap a verified field/loan officer chip once that router path is added.</p>
+          </section>
+        ` : ''}
+
+        <section class="grid gap-4">
+          ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No Assigned Visits Today</h2>
+            <p class="mt-2 font-semibold text-slate-500">Scheduled field demo visits will appear here when your UID/profile is added as a participant.</p>
+          </div>`}
+        </section>
+      `;
+    }
+
+    async function refresh(message = '') {
+      state.message = message;
+      state.error = '';
+      state.profile = await loadProfile();
+      const rows = await loadParticipantRows();
+      state.visits = groupVisits(rows);
+      render();
+    }
+
+    window.notice = (message) => {
+      state.message = message;
+      state.error = '';
+      render();
+    };
+
+    window.updateVisit = async (visitId, status) => {
+      try {
+        await api('/api/field-demo/update-status', { visit_id: visitId, status });
+        await refresh(`Visit marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update visit.';
+        render();
+      }
+    };
+
+    window.updateParticipant = async (participantId, status) => {
+      try {
+        if (!participantId) throw new Error('No participant id was available for this action.');
+        await api('/api/field-demo/update-participant-status', { participant_id: participantId, status });
+        await refresh(`Participant marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update participant.';
+        render();
+      }
+    };
+
+    window.updateVisitAndParticipant = async (visitId, participantId, status) => {
+      try {
+        await api('/api/field-demo/update-status', { visit_id: visitId, status });
+        if (participantId) await api('/api/field-demo/update-participant-status', { participant_id: participantId, status });
+        await refresh(`Visit marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update visit.';
+        render();
+      }
+    };
+
+    window.startVisit = async (visitId, participantId) => {
+      try {
+        await api('/api/field-demo/start', { visit_id: visitId, participant_id: participantId || null });
+        await refresh('Field demo is live. Financing coverage is linked when this visit has an event and financing participant.');
+      } catch (error) {
+        state.error = error.message || 'Could not start field demo.';
+        render();
+      }
+    };
+
+    window.convertVisit = async (visitId) => {
+      try {
+        await api('/api/field-demo/convert-agent', { visit_id: visitId, agent_onboarded: true });
+        await refresh('Agent converted to virtual support.');
+      } catch (error) {
+        state.error = error.message || 'Could not convert agent.';
+        render();
+      }
+    };
+
+    refresh().catch((error) => {
+      state.error = error.message || 'Could not load field dashboard.';
+      render();
+    });
+  </script>
+</body>
+</html>
