@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REL8TION Loan Officer Field Dashboard</title>
+  <meta http-equiv="refresh" content="0; url=/field-dashboard?role=loan_officer">
+  <script>
+    const target = new URL('/field-dashboard', window.location.origin);
+    target.search = window.location.search;
+    target.searchParams.set('role', target.searchParams.get('role') || 'loan_officer');
+    window.location.replace(`${target.pathname}${target.search}${window.location.hash}`);
+  </script>
+</head>
+<body>
+  Redirecting to the field dashboard...
+</body>
+</html>
