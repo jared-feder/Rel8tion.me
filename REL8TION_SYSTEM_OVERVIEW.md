@@ -1043,7 +1043,7 @@ Important fields:
 - `status`
 - `linked_visit_id`
 
-`[PARTIAL]` Exact geographic distance only works when lat/lng is available. Otherwise assignment uses exact/same-prefix ZIP proximity as an MVP fallback.
+`[PARTIAL]` The migration was applied to linked Supabase and table/column existence was verified by SQL query on 2026-05-12. RLS policy posture, API route deployment, and browser behavior still need verification. Exact geographic distance only works when lat/lng is available; otherwise assignment uses exact/same-prefix ZIP proximity as an MVP fallback.
 
 ### `verified_profiles`
 
