@@ -41,6 +41,7 @@
       role: params.get('role') || '',
       profile: null,
       visits: [],
+      buyerRequests: {},
       busy: false,
       message: '',
       error: ''
@@ -164,6 +165,67 @@
       return responsibilities(visit).some((item) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(item));
     }
 
+    async function loadBuyerRequestsForVisits(visits = []) {
+      const next = {};
+      for (const visit of visits) {
+        if (!visit.open_house_event_id) continue;
+        const eventId = visit.open_house_event_id;
+        next[eventId] = await request(
+          `event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=id,open_house_event_id,visitor_name,visitor_phone,pre_approved,metadata,created_at&order=created_at.desc&limit=50`
+        ).catch((error) => {
+          console.log('buyer request load skipped', eventId, error);
+          return [];
+        });
+      }
+      state.buyerRequests = next;
+    }
+
+    function renderBuyerRequests(visit) {
+      if (!visit.open_house_event_id) {
+        return `<div class="mt-4 rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-emerald-100">Attach this visit to an open house event before buyer requests can appear here.</div>`;
+      }
+      const rows = state.buyerRequests[visit.open_house_event_id] || [];
+      const needsHelp = rows.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true);
+      return `
+        <div id="buyer-requests-${esc(visit.id)}" class="mt-4 rounded-[22px] bg-white/80 p-4 ring-1 ring-emerald-100">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.14em] text-emerald-700">Buyer Requests</div>
+              <div class="mt-1 text-sm font-extrabold text-slate-600">${rows.length} check-ins • ${needsHelp.length} financing follow-up</div>
+            </div>
+            <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">Refresh</button>
+          </div>
+          <div class="mt-3 grid gap-2">
+            ${rows.length ? rows.map((row) => {
+              const meta = row.metadata || {};
+              const name = row.visitor_name || meta.name || 'Buyer';
+              const phone = row.visitor_phone || meta.phone || '';
+              const preApproved = row.pre_approved === true ? 'Pre-approved'
+                : row.pre_approved === false ? 'Needs financing'
+                  : 'Not shared';
+              const financingRequested = row.pre_approved === false || meta.financing_requested === true;
+              const textBody = `Hi ${name}, this is ${state.profile?.full_name || 'your NMB loan officer'} with REL8TION. I am live for this open house and can help with financing questions.`;
+              return `
+                <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div class="text-base font-black text-slate-900">${esc(name)}</div>
+                      <div class="mt-1 text-xs font-black uppercase tracking-[.1em] ${financingRequested ? 'text-rose-600' : 'text-slate-500'}">${esc(preApproved)}</div>
+                      <div class="mt-1 text-xs font-bold text-slate-400">${esc(fmtTime(row.created_at))}</div>
+                    </div>
+                    <div class="flex gap-2">
+                      <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white ${phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                      <a href="${esc(smsHref(phone, textBody))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('') : `<div class="rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No buyer check-ins yet. New financing opt-ins will appear here without opening the agent dashboard.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
     function actionButton(label, onclick, tone = 'blue') {
       const palette = tone === 'green'
         ? 'bg-emerald-600 text-white'
@@ -223,10 +285,10 @@
                 <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">Financing Support</div>
                 <div class="mt-3 grid gap-2">
                   ${actionButton('Go Live For Financing', `window.startVisit('${visit.id}', '${financeParticipantId}')`, 'green')}
-                  ${visit.open_house_event_id ? `<a href="/agent-dashboard?event=${encodeURIComponent(visit.open_house_event_id)}&agent=${encodeURIComponent(visit.agent_slug || '')}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200">View Buyer Requests</a>` : actionButton('View Buyer Requests', `window.notice('Attach this visit to an open house event first.')`, 'white')}
                   <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-50'}">Message Agent</a>
                   ${actionButton('Mark Financing Complete', `window.updateParticipant('${financeParticipantId}', 'completed')`, 'white')}
                 </div>
+                ${renderBuyerRequests(visit)}
               </section>
             ` : ''}
 
@@ -285,8 +347,11 @@
       state.profile = await loadProfile();
       const rows = await loadParticipantRows();
       state.visits = groupVisits(rows);
+      await loadBuyerRequestsForVisits(state.visits);
       render();
     }
+
+    window.refreshDashboard = () => refresh('Buyer requests refreshed.');
 
     window.notice = (message) => {
       state.message = message;
