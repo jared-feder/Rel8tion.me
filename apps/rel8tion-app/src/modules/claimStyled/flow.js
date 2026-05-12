@@ -23,7 +23,7 @@ import {
   isGenericAgentNameValue,
   upsertAgent,
   uploadFullProfilePhoto
-} from '../../api/agents.js?v=20260509-agent-name';
+} from '../../api/agents.js?v=20260511-agent-labels';
 import { sendActivationSMS } from '../../api/notifications.js';
 import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
 import {

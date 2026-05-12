@@ -45,7 +45,14 @@ export function isGenericAgentNameValue(value) {
     || normalized === 'agent'
     || normalized === 'listing agent'
     || normalized === 'unknown agent'
-    || normalized === 'real estate agent';
+    || normalized === 'real estate agent'
+    || normalized === 'agent phone'
+    || normalized === 'agent phone:'
+    || normalized === 'agent email'
+    || normalized === 'agent email:'
+    || normalized === 'agent name'
+    || normalized === 'agent name:'
+    || /^agent\s+(phone|email|name)\s*:?\s*$/i.test(normalized);
 }
 
 function nameFromParts(row = {}) {
