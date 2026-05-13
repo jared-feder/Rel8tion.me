@@ -96,6 +96,7 @@ It uses:
 `[IMPLEMENTED]` Confirmed root Vercel serverless routes:
 
 - `api/admin/reset-key.js`
+- `api/admin/field-ops.js`
 - `api/cron/enrich-agents.js`
 - `api/field-demo/create.js`
 - `api/field-demo/update-status.js`
@@ -446,6 +447,27 @@ Role: temporary admin/beta tool for scanning and resetting keys/sign pairings. T
 - Uses service role on server.
 - Refuses protected Elena/Galluzzo signs unless code is changed.
 - Refuses active sign reset unless `forceActive = true`.
+
+### `/admin`
+
+Files:
+
+- `apps/rel8tion-app/admin.html`
+- `api/admin/field-ops.js`
+
+Role: protected Field Ops Command Center for the outreach-to-coverage workflow.
+
+`[PARTIAL]` Confirmed repo behavior:
+
+- Uses `ADMIN_DASHBOARD_TOKEN` or `KEY_RESET_ADMIN_TOKEN` through the server-side `/api/admin/field-ops` route.
+- Shows verified LO/field profiles from `verified_profiles`.
+- Shows whether LOs have open availability or are currently on.
+- Lets an operator add LO availability slots with ZIP/radius, date/time, and financing-support responsibility.
+- Lists upcoming `agent_outreach_queue` rows/open houses.
+- Lets an operator manually assign a selected LO to an outreach/open-house row, creating or reusing a `field_demo_visits` row and adding a `field_demo_visit_participants` financing-support participant.
+- Shows scheduled field-demo visits and assigned participants.
+
+`[PARTIAL]` This is not yet the full admin dashboard for smart sign repair, event repair, outreach replies, analytics, billing, permissions, or audit logs.
 
 ### `/a` And `/b`
 
@@ -1366,9 +1388,9 @@ Important gaps/risks:
 
 `[PARTIAL]` Confirmed:
 
-- `[PARTIAL]` `apps/rel8tion-app/admin.html` is a placeholder shell.
-- `[INTENDED]` It states that protected admin tools for signs, live events, outreach, replies, and analytics are reserved for future work.
-- `[PARTIAL]` Practical admin tooling currently exists through `/key-reset` and `api/admin/reset-key.js`.
+- `[PARTIAL]` `apps/rel8tion-app/admin.html` is now a protected Field Ops Command Center for LO availability and manual open-house assignment.
+- `[INTENDED]` Protected admin tools for signs, live event repair, outreach replies, analytics, billing, permissions, and audit logs remain future work.
+- `[PARTIAL]` Practical admin tooling currently exists through `/admin`, `/key-reset`, `api/admin/field-ops.js`, and `api/admin/reset-key.js`.
 - `[PARTIAL]` WordPress hot-list files provide outreach visibility/admin-style UI outside the app, but are not auto-synced to production.
 
 ## Scaling And Stability Concerns
@@ -1398,7 +1420,7 @@ Confirmed or needs-verification gaps:
 - `[INTENDED]` Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
 - `[INTENDED]` Agent-to-loan-officer relationship tables are not present in current app code.
 - `[PARTIAL]` In-app event conversation logging between buyer, agent, and loan officer/field support is implemented, but realtime chat, push notifications, SMS relay, and video support are not implemented.
-- `[PARTIAL]` Admin dashboard is placeholder only.
+- `[PARTIAL]` Admin dashboard now covers field ops/LO assignment, but full product admin is not built.
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[PARTIAL]` Root Vercel Cron now includes OneKey freshness and outreach generate/render/send routes. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
@@ -1455,7 +1477,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Event conversation MVP exists in repo code. | `[PARTIAL]` | `sql/migrations/20260512_event_conversations.sql`, `api/event-chat/*`, `/field-dashboard`, `/agent-dashboard`, and `/event` support in-app conversation logging; realtime/push/SMS relay/video are not built. |
 | Field demo coverage is live and RLS-safe. | `[NEEDS VERIFICATION]` | Migration and route code exist, but live Supabase tables/policies, Vercel env vars, and deployed route behavior have not been verified. |
 | `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |
-| Admin key reset exists as a beta/admin utility. | `[PARTIAL]` | `apps/rel8tion-app/key-reset.html` and `api/admin/reset-key.js`; full admin dashboard is not built. |
+| Admin key reset exists as a beta/admin utility. | `[PARTIAL]` | `apps/rel8tion-app/key-reset.html` and `api/admin/reset-key.js`; `/admin` field ops exists, but full admin is not built. |
 | Twilio inbound reply handling is checked into deployed function structure. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
 | WordPress is not the product brain. | `[PARTIAL]` | `wordpress/README.md` says files are local tracking and not auto-synced. Product state/routes live in Vercel app files and Supabase calls. |
 | Estately enrichment worker exists and updates listing agent data. | `[PARTIAL]` | `estately-enrichment-worker.cjs` and `api/cron/enrich-agents.js`; scheduling and live data quality need verification. |
@@ -1478,7 +1500,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | --- | --- | --- |
 | Formal remote LO coverage management is desired but only partially represented by field-demo visits. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
 | Chat/video support is desired but not built. | `[PARTIAL]` | Event conversation logging exists; realtime chat UX, SMS/push relay, and video support are not built. |
-| Full admin dashboard is desired but not built. | `[INTENDED]` | `apps/rel8tion-app/admin.html` is a placeholder. |
+| Full admin dashboard is desired but not built. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` now handles field ops/LO availability/manual assignments; signs/events/replies/analytics/billing/audit are still not built. |
 | Root outreach cron wrappers exist. | `[PARTIAL]` | `api/cron/generate-agent-outreach.js`, `api/cron/render-agent-mockups.js`, `api/cron/send-agent-outreach.js`, and `vercel.json` cron definitions exist; deployment/env/Twilio behavior still need verification. |
 | `send-lead-sms` implementation is checked in. | `[IMPLEMENTED]` | Source exists at `supabase/functions/send-lead-sms/index.ts`; deployed source/version matching and Twilio behavior still need verification. |
 | Outreach generation/send functions under `docs/supabase-functions` are deployed. | `[NEEDS VERIFICATION]` | Source exists under docs, not under deployable `supabase/functions`. |

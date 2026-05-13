@@ -67,6 +67,7 @@ Status labels:
 - `[IMPLEMENTED]` Role-based field demo coverage MVP code exists through `field_demo_visits`, `field_demo_visit_participants`, `/field-dashboard`, `/lo-field-dashboard`, and `/api/field-demo/*` write helpers. One NMB loan officer can hold financing support, product demo, sign setup, and agent onboarding responsibilities today, while the model also supports separate field sales reps, demo presenters, onboarding specialists, dispatchers, admins, and loan officers later.
 - `[IMPLEMENTED]` `/field-dashboard` now acts as the loan officer/field work surface: next-7-days visit stats, tomorrow scheduling form, upcoming outreach coverage cards, richer visit cards, go-live financing action, buyer request cards, and event chat controls.
 - `[IMPLEMENTED]` `/field-dashboard` includes a field availability MVP: a verified loan officer/field profile can add availability slots with role, responsibility, service ZIP, service radius, and time window. Outreach scheduling can ask `/api/field-demo/available-support` for the best open financing-support slot and falls back to the scheduler profile if no availability match exists.
+- `[PARTIAL]` `/admin` is now a protected Field Ops Command Center for LO roster visibility, availability slots, upcoming outreach/open-house rows, manual LO assignment, and scheduled visit review. It uses `/api/admin/field-ops` with `ADMIN_DASHBOARD_TOKEN` or `KEY_RESET_ADMIN_TOKEN`. It is not yet the full admin dashboard for signs, event repair, replies, analytics, or billing.
 - `[PARTIAL]` Buyer-agent-loan-officer event chat MVP exists through `event_conversations`, `event_conversation_messages`, `/api/event-chat/list`, `/api/event-chat/send`, `/field-dashboard`, `/agent-dashboard` lead cards, and the `/event` post-check-in buyer chat composer. It is in-app conversation logging only: no realtime subscriptions, push alerts, Twilio relay, video, or full authentication/authorization model yet.
 - `[PARTIAL]` Field demo start can mark a scheduled visit live and, when a financing-support participant is attached to an `open_house_event_id`, create/update `event_loan_officer_sessions` without removing the existing local loan-officer tag scan flow. Live Supabase migration, service-role env, RLS, and Vercel route deployment still need verification.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is only partially represented by scheduled field-demo visits: no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet.
@@ -92,7 +93,7 @@ Status labels:
 - `[PARTIAL]` Root `vercel.json` now has cron entries for OneKey freshness and the outreach generate/render/send chain. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
 - `[PARTIAL]` The Estately worker can enrich `listing_agents`, but quality depends on Estately parsing and phone validation.
 - `[PARTIAL]` Outreach generation/sending source exists mostly under `docs/supabase-functions`, and root cron wrapper APIs now call `generate-agent-outreach`, the mockup renderer, and `send-agent-outreach`. Deployment state, env vars, Vercel Cron execution, and live SMS behavior remain `[NEEDS VERIFICATION]`.
-- `[PARTIAL]` `/admin` is only a placeholder page, not a full admin dashboard.
+- `[PARTIAL]` `/admin` is a field-ops admin dashboard, but not a full all-product admin dashboard.
 - `[PARTIAL]` WordPress hot-list files exist locally, but they are not automatically synced to WordPress.
 - `[PARTIAL]` `/b` buyer profile and `/event` smart sign check-in are both active concepts but save into different tables.
 - `[RISK]` Several root/static pages are legacy or test artifacts. Use `vercel.json` before assuming a page is live.
@@ -118,7 +119,7 @@ Status labels:
 - `[PARTIAL]` Buyer-agent-loan-officer chat is now represented by the event conversation MVP, but it is not a realtime chat/video product yet.
 - `[INTENDED]` Rich buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent chat is not built. Current `/event` post-check-in experience shows available property/agent/LO context and uses SMS/call links for messaging.
 - `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
-- `[INTENDED]` Full admin dashboard for signs, events, outreach, replies, and analytics is not built.
+- `[INTENDED]` Full admin dashboard for signs, event repair, outreach replies, analytics, billing, and operator audit trails is not built.
 - `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
 - `[RISK]` QR export needs cleanup: current activation expects `smart_sign_inventory.public_code`, while `smart-sign-qr-export.sql` exports from `smart_signs`.
 - `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
@@ -188,7 +189,7 @@ Highest-value next work:
    - event start prompt
    - live coverage session
    - buyer financing alert and contact modal
-7. Replace placeholder `/admin` with a protected operational dashboard.
+7. Expand `/admin` from Field Ops Command Center into a full protected operational dashboard.
 8. Add a small E2E/runbook suite for:
    - claim keychain
    - activate sign QR
@@ -254,7 +255,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Buyer financing opt-in falls back to Jared if no live LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert`; the post-check-in temporary financing chat button opens SMS to `347-775-8059`. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Agent dashboard arms pending LO session; `/k` verifies `verified_profiles` and writes `event_loan_officer_sessions`. |
 | NMB activation/profile pages exist. | `[IMPLEMENTED]` | `nmb-activate.html` and `nmb-verified.html`. |
-| Admin key/sign reset exists. | `[PARTIAL]` | `key-reset.html` plus `api/admin/reset-key.js`; full admin dashboard is not built. |
+| Admin key/sign reset exists. | `[PARTIAL]` | `key-reset.html` plus `api/admin/reset-key.js`; broader field-ops admin now exists, but full admin is not built. |
 | Estately enrichment worker exists at batch size 20. | `[IMPLEMENTED]` | `estately-enrichment-worker.cjs`. |
 | Browserless/Trulia enrichment exists. | `[NEEDS VERIFICATION]` | No tracked Browserless/Trulia enrichment source was found in the repo audit; current tracked enrichment is Estately/Cheerio. |
 | Twilio inbound reply Edge Functions are present. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
@@ -276,7 +277,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | --- | --- | --- |
 | Formal remote LO coverage management is desired but only partially represented by field-demo visits. | `[INTENDED]` | Scheduled field-demo visits exist in repo code, but no invite/request/accept workflow, no remote availability queue, and no persistent agent-LO relationship management are built yet. |
 | Buyer-agent-LO chat/video is desired but not built. | `[PARTIAL]` | In-app event conversation logging exists through `event_conversations`, `event_conversation_messages`, `/api/event-chat/*`, `/field-dashboard`, `/agent-dashboard`, and `/event`; realtime delivery, push/SMS relay, video, and hardened auth are not built. |
-| Full admin dashboard is built. | `[INTENDED]` | `/admin` is placeholder. |
+| Full admin dashboard is built. | `[PARTIAL]` | `/admin` now covers field ops, LO availability, outreach assignment, and scheduled visits; signs/events/replies/analytics/admin audit remain future work. |
 | Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |
 | `send-lead-sms` source is present. | `[IMPLEMENTED]` | Source now exists at `supabase/functions/send-lead-sms/index.ts`; live deployment/source matching and Twilio behavior still need verification because the verifier does not send SMS. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |

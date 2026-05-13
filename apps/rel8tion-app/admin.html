@@ -3,19 +3,378 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rel8tion Admin</title>
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>REL8TION Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body class="bg-[#f0f7ff]">
-  <main class="min-h-screen flex items-center justify-center px-4" style="background:linear-gradient(180deg,#38bdf8 0%,#f0f7ff 60%,#f0f7ff 100%);">
-    <section class="w-full max-w-3xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-10 text-center shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
-      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Admin</div>
-      <h1 class="font-['Plus_Jakarta_Sans'] text-5xl font-extrabold tracking-tight text-slate-900 mb-4">Operator Dashboard Placeholder</h1>
-      <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto">
-        This route is reserved for the protected admin dashboard for signs, events, outreach, replies, and analytics.
-      </p>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#38bdf8 0%,#e9f8ff 44%,#f8fbff 100%);">
+    <section class="mx-auto max-w-7xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Admin</div>
+            <div class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Field Ops Command</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/58 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Admin</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading field operations.</p>
+        </div>
+      </div>
     </section>
   </main>
+
+  <script>
+    const TOKEN_KEY = 'rel8tion_admin_dashboard_token';
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      token: params.get('token') || window.localStorage.getItem(TOKEN_KEY) || '',
+      data: null,
+      message: '',
+      error: '',
+      selectedProfileUid: ''
+    };
+
+    const app = document.getElementById('app');
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
+    const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
+    const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const money = (value) => {
+      const number = Number(value);
+      return Number.isFinite(number) && number > 0 ? number.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '';
+    };
+    const fmt = (value) => {
+      if (!value) return 'Not set';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Not set';
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    };
+    const defaultDate = (offset = 1) => {
+      const date = new Date();
+      date.setDate(date.getDate() + offset);
+      return date.toISOString().slice(0, 10);
+    };
+    const titleize = (value) => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
+    async function api(body) {
+      const res = await fetch('/api/admin/field-ops', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': state.token
+        },
+        body: JSON.stringify(body || {})
+      });
+      const raw = await res.text().catch(() => '');
+      const payload = raw ? JSON.parse(raw) : null;
+      if (!res.ok || payload?.ok === false) throw new Error(payload?.error || raw || `Request failed: ${res.status}`);
+      return payload;
+    }
+
+    function profileName(profile) {
+      return profile?.full_name || profile?.slug || 'LO';
+    }
+
+    function availabilityFor(uid) {
+      return (state.data?.availability || []).filter((slot) => slot.participant_uid === uid || slot.participant_profile_id === uid);
+    }
+
+    function openAvailabilityFor(uid) {
+      const now = new Date().toISOString();
+      return availabilityFor(uid).filter((slot) => slot.status === 'open' && slot.available_end >= now);
+    }
+
+    function isOnNow(uid) {
+      const now = new Date().toISOString();
+      return openAvailabilityFor(uid).some((slot) => slot.available_start <= now && slot.available_end >= now);
+    }
+
+    function profileOptions(selected = '') {
+      return (state.data?.profiles || []).map((profile) => `
+        <option value="${esc(profile.uid)}" ${profile.uid === selected ? 'selected' : ''}>${esc(profileName(profile))} · ${esc(profile.company_name || 'NMB')}</option>
+      `).join('');
+    }
+
+    function renderTokenGate() {
+      app.innerHTML = `
+        <section class="mx-auto max-w-xl rounded-[32px] border border-white/80 bg-white/80 p-6 shadow-sm">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Protected Admin</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Enter Admin Token</h1>
+          <p class="mt-2 text-sm font-semibold leading-relaxed text-slate-500">Use the existing key reset/admin token or set <code>ADMIN_DASHBOARD_TOKEN</code> in Vercel.</p>
+          <form id="token-form" class="mt-5 grid gap-3">
+            <input name="token" type="password" required class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold outline-none" placeholder="Admin token">
+            <button class="rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white">Open Admin</button>
+          </form>
+        </section>
+      `;
+      document.getElementById('token-form')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        state.token = new FormData(event.currentTarget).get('token') || '';
+        window.localStorage.setItem(TOKEN_KEY, state.token);
+        await refresh();
+      });
+    }
+
+    function stat(label, value, tone = 'slate') {
+      const color = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-sky-700' : tone === 'rose' ? 'text-rose-700' : 'text-slate-900';
+      return `<div class="rounded-[24px] bg-white/80 p-5 ring-1 ring-white">
+        <div class="text-xs font-black uppercase tracking-[.14em] text-slate-500">${esc(label)}</div>
+        <div class="mt-2 text-4xl font-black ${color}">${esc(value)}</div>
+      </div>`;
+    }
+
+    function renderLoRoster() {
+      const profiles = state.data?.profiles || [];
+      return `
+        <section class="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-emerald-700">LO Queue</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Loan Officers On Deck</h2>
+            </div>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            ${profiles.map((profile) => {
+              const openSlots = openAvailabilityFor(profile.uid);
+              const onNow = isOnNow(profile.uid);
+              return `
+                <article class="rounded-[24px] bg-white/88 p-4 ring-1 ring-slate-100">
+                  <div class="flex items-start gap-3">
+                    ${profile.photo_url ? `<img src="${esc(profile.photo_url)}" class="h-14 w-14 rounded-2xl object-cover" alt="">` : `<div class="grid h-14 w-14 place-items-center rounded-2xl bg-sky-100 text-lg font-black text-sky-700">${esc(profileName(profile).slice(0, 1))}</div>`}
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] ${onNow ? 'bg-emerald-100 text-emerald-700' : openSlots.length ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}">${onNow ? 'On Now' : openSlots.length ? 'Available Soon' : 'No Slots'}</span>
+                      </div>
+                      <h3 class="mt-2 text-xl font-black leading-tight">${esc(profileName(profile))}</h3>
+                      <p class="mt-1 text-sm font-bold text-slate-500">${esc([profile.title, profile.company_name].filter(Boolean).join(' · ') || 'Verified profile')}</p>
+                      <p class="mt-1 text-xs font-bold text-slate-400">${esc([profile.phone, profile.email].filter(Boolean).join(' · '))}</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-2">
+                    ${openSlots.slice(0, 3).map((slot) => `<div class="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-600">${esc(slot.service_zip)} · ${esc(slot.service_radius_miles)} mi · ${esc(fmt(slot.available_start))}</div>`).join('') || `<div class="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-400">No open coverage windows</div>`}
+                  </div>
+                  <div class="mt-3 flex gap-2">
+                    <a href="${esc(telHref(profile.phone))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${profile.phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                    <a href="${esc(smsHref(profile.phone, 'Can you cover an open house for REL8TION?'))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${profile.phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                  </div>
+                </article>
+              `;
+            }).join('') || `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500">No verified profiles found.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderAvailabilityForm() {
+      const selected = state.selectedProfileUid || state.data?.profiles?.[0]?.uid || '';
+      return `
+        <section class="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-violet-700">Calendar</div>
+          <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Add LO Availability</h2>
+          <form id="availability-form" class="mt-5 grid gap-3 md:grid-cols-6">
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Loan Officer
+              <select name="participant_uid" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none">${profileOptions(selected)}</select>
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Date
+              <input name="date" type="date" required value="${defaultDate(1)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Start
+              <input name="start_time" type="time" required value="10:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">End
+              <input name="end_time" type="time" required value="16:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">ZIP
+              <input name="service_zip" required maxlength="5" inputmode="numeric" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none" placeholder="11572">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Miles
+              <input name="service_radius_miles" type="number" min="1" max="250" value="15" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal outline-none">
+            </label>
+            <button class="rounded-full bg-violet-600 px-5 py-4 text-base font-black text-white md:col-span-6">Save Availability</button>
+          </form>
+        </section>
+      `;
+    }
+
+    function renderOutreachQueue() {
+      const rows = state.data?.outreach || [];
+      return `
+        <section class="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Assignments</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Upcoming Open Houses</h2>
+              <p class="mt-1 text-sm font-semibold text-slate-500">Manual assignment now. Automation can later choose the best available LO automatically.</p>
+            </div>
+            <button onclick="window.refreshAdmin()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Refresh</button>
+          </div>
+          <div class="mt-4 grid gap-3">
+            ${rows.map((row) => {
+              const assigned = !!row.field_visit?.id;
+              const details = [money(row.price), row.beds ? `${row.beds} bd` : '', row.baths ? `${row.baths} ba` : ''].filter(Boolean).join(' · ');
+              return `
+                <article class="rounded-[24px] bg-white/88 p-4 ring-1 ring-slate-100">
+                  <div class="grid gap-4 lg:grid-cols-[1fr_340px]">
+                    <div class="flex items-start gap-3">
+                      ${row.listing_photo_url ? `<img src="${esc(row.listing_photo_url)}" class="h-24 w-28 rounded-2xl object-cover" alt="">` : `<div class="h-24 w-28 rounded-2xl bg-slate-100"></div>`}
+                      <div class="min-w-0">
+                        <div class="text-xs font-black uppercase tracking-[.12em] ${assigned ? 'text-emerald-700' : 'text-sky-700'}">${assigned ? 'Assigned' : 'Needs LO'}</div>
+                        <h3 class="mt-1 text-xl font-black leading-tight">${esc(row.address || row.open_house_id || 'Open house')}</h3>
+                        <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmt(row.open_start))} - ${esc(fmt(row.open_end))}</p>
+                        <p class="mt-1 text-sm font-bold text-slate-500">${esc([row.agent_name || row.agent_first_name, row.brokerage].filter(Boolean).join(' · '))}</p>
+                        <p class="mt-1 text-xs font-bold text-slate-400">${esc([row.agent_phone, details].filter(Boolean).join(' · '))}</p>
+                      </div>
+                    </div>
+                    <form class="assign-form grid gap-2" data-queue-id="${esc(row.id)}">
+                      <select name="participant_uid" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black outline-none">${profileOptions('')}</select>
+                      <div class="grid grid-cols-2 gap-2">
+                        <select name="coverage_mode" class="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-black outline-none">
+                          <option value="physical_support">Physical support</option>
+                          <option value="physical_demo">Physical demo</option>
+                          <option value="remote_support">Remote support</option>
+                        </select>
+                        <select name="demo_type" class="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-black outline-none">
+                          <option value="buyer_financing_support">Financing support</option>
+                          <option value="agent_onboarding">Agent onboarding</option>
+                          <option value="brokerage_demo">Brokerage demo</option>
+                        </select>
+                      </div>
+                      <button class="rounded-full bg-emerald-600 px-4 py-3 text-sm font-black text-white">${assigned ? 'Add / Replace LO' : 'Assign LO'}</button>
+                    </form>
+                  </div>
+                </article>
+              `;
+            }).join('') || `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500">No upcoming outreach rows found.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderVisits() {
+      const visits = state.data?.visits || [];
+      return `
+        <section class="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-slate-500">Scheduled</div>
+          <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Assigned Visits</h2>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            ${visits.map((visit) => {
+              const participants = visit.field_demo_visit_participants || [];
+              return `<article class="rounded-2xl bg-white/85 p-4 ring-1 ring-slate-100">
+                <div class="text-xs font-black uppercase tracking-[.12em] text-sky-700">${esc(titleize(visit.status))} · ${esc(titleize(visit.coverage_mode))}</div>
+                <h3 class="mt-1 text-lg font-black">${esc(visit.agent_name || visit.open_house_id || visit.id)}</h3>
+                <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmt(visit.scheduled_start))} - ${esc(fmt(visit.scheduled_end))}</p>
+                <p class="mt-2 text-xs font-black uppercase tracking-[.1em] text-slate-400">${esc(participants.map((p) => `${p.participant_name || p.participant_uid} / ${titleize(p.responsibility)}`).join(' · ') || 'No participants')}</p>
+              </article>`;
+            }).join('') || `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500">No visits scheduled in this range.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderDashboard() {
+      const data = state.data || {};
+      app.innerHTML = `
+        <section class="mb-6">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Field Ops</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">Admin Command Center</h1>
+          <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">Keep LOs on, build coverage windows, and manually assign open houses while outreach automation runs underneath.</p>
+          ${state.message ? `<div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
+          ${state.error ? `<div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
+        </section>
+        <section class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          ${stat('LO profiles', data.stats?.profiles || 0, 'blue')}
+          ${stat('On now', data.stats?.on_now || 0, 'green')}
+          ${stat('Open slots', data.stats?.availability_open || 0, 'green')}
+          ${stat('Visits', data.stats?.visits || 0, 'blue')}
+          ${stat('Open houses', data.stats?.outreach || 0, 'slate')}
+          ${stat('Need LO', data.stats?.outreach_unscheduled || 0, data.stats?.outreach_unscheduled ? 'rose' : 'slate')}
+        </section>
+        <div class="grid gap-6">
+          ${renderAvailabilityForm()}
+          ${renderLoRoster()}
+          ${renderOutreachQueue()}
+          ${renderVisits()}
+        </div>
+      `;
+      document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
+      document.querySelectorAll('.assign-form').forEach((form) => form.addEventListener('submit', handleAssignSubmit));
+    }
+
+    async function refresh(message = '') {
+      if (!state.token) {
+        renderTokenGate();
+        return;
+      }
+      try {
+        state.error = '';
+        state.message = message;
+        state.data = await api({ action: 'list', days: 14 });
+        renderDashboard();
+      } catch (error) {
+        if (/Unauthorized/i.test(error.message)) {
+          window.localStorage.removeItem(TOKEN_KEY);
+          state.token = '';
+          renderTokenGate();
+          return;
+        }
+        state.error = error.message || 'Could not load admin.';
+        renderDashboard();
+      }
+    }
+
+    async function handleAvailabilitySubmit(event) {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      const availableStart = new Date(`${data.get('date')}T${data.get('start_time')}`);
+      const availableEnd = new Date(`${data.get('date')}T${data.get('end_time')}`);
+      try {
+        state.selectedProfileUid = data.get('participant_uid') || '';
+        await api({
+          action: 'save_availability',
+          participant_uid: data.get('participant_uid'),
+          available_start: availableStart.toISOString(),
+          available_end: availableEnd.toISOString(),
+          service_zip: data.get('service_zip'),
+          service_radius_miles: data.get('service_radius_miles'),
+          role: 'loan_officer',
+          responsibility: 'financing_support'
+        });
+        await refresh('Availability saved.');
+      } catch (error) {
+        state.error = error.message || 'Could not save availability.';
+        renderDashboard();
+      }
+    }
+
+    async function handleAssignSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      try {
+        await api({
+          action: 'assign_visit',
+          outreach_queue_id: form.dataset.queueId,
+          participant_uid: data.get('participant_uid'),
+          coverage_mode: data.get('coverage_mode'),
+          demo_type: data.get('demo_type')
+        });
+        await refresh('Loan officer assigned to open house.');
+      } catch (error) {
+        state.error = error.message || 'Could not assign loan officer.';
+        renderDashboard();
+      }
+    }
+
+    window.refreshAdmin = () => refresh('Admin refreshed.');
+    refresh();
+  </script>
 </body>
 </html>
