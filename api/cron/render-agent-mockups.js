@@ -14,8 +14,8 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const sharedSecret = process.env.CRON_SHARED_SECRET;
-    if (!sharedSecret) throw new Error('Missing CRON_SHARED_SECRET.');
+    const sharedSecret = process.env.CRON_SHARED_SECRET || process.env.CRON_SECRET;
+    if (!sharedSecret) throw new Error('Missing CRON_SHARED_SECRET or CRON_SECRET.');
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
     const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 10), 50));
@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'x-cron-secret': sharedSecret,
-        Authorization: req.headers.authorization || ''
+        Authorization: `Bearer ${sharedSecret}`
       },
       body: JSON.stringify({ limit })
     });
