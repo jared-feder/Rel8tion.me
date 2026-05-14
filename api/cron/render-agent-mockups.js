@@ -14,19 +14,18 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const sharedSecret = process.env.CRON_SHARED_SECRET;
-    if (!sharedSecret) throw new Error('Missing CRON_SHARED_SECRET.');
-
     const body = req.method === 'POST' ? readJsonBody(req) : {};
     const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 10), 50));
     const base = (process.env.RENDERER_BASE_URL || 'https://mockup-renderer-psi.vercel.app').replace(/\/$/, '');
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: req.headers.authorization || ''
+    };
+    if (process.env.CRON_SHARED_SECRET) headers['x-cron-secret'] = process.env.CRON_SHARED_SECRET;
+
     const response = await fetch(`${base}/api/render-agent-mockup`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-cron-secret': sharedSecret,
-        Authorization: req.headers.authorization || ''
-      },
+      headers,
       body: JSON.stringify({ limit })
     });
 
