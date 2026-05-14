@@ -52,6 +52,20 @@ function isBlockedReviewStatus(reviewStatus: string | null): boolean {
   return reviewStatus === "opted_out";
 }
 
+function getTerminalTwilioBlock(message: string): { status: string; reason: string; reviewStatus?: string } | null {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("not a mobile number")) {
+    return { status: "blocked_invalid_mobile", reason: "twilio_not_mobile" };
+  }
+
+  if (normalized.includes("unsubscribed recipient") || normalized.includes("21610")) {
+    return { status: "blocked_opted_out", reason: "twilio_unsubscribed", reviewStatus: "opted_out" };
+  }
+
+  return null;
+}
+
 async function sendTwilioMessage(opts: {
   accountSid: string;
   authToken: string;
@@ -173,6 +187,8 @@ serve(async (req) => {
 
     for (const row of rows || []) {
       if (sendAttempts >= limit) break;
+
+      let attemptedStep: "initial" | "followup" | null = null;
 
       try {
         const phoneNormalized = row.agent_phone_normalized || normalizePhone(row.agent_phone);
@@ -325,6 +341,7 @@ serve(async (req) => {
           }
 
           sendAttempts += 1;
+          attemptedStep = "initial";
           const twilioRes = await sendTwilioMessage({
             accountSid: twilioSid,
             authToken: twilioToken,
@@ -361,6 +378,7 @@ serve(async (req) => {
 
         if (followupDue) {
           sendAttempts += 1;
+          attemptedStep = "followup";
           const twilioRes = await sendTwilioMessage({
             accountSid: twilioSid,
             authToken: twilioToken,
@@ -394,17 +412,33 @@ serve(async (req) => {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        const terminalBlock = getTerminalTwilioBlock(message);
+        const update: Record<string, unknown> = { send_error: message };
+
+        if (terminalBlock && attemptedStep === "initial") {
+          update.initial_send_status = terminalBlock.status;
+          update.initial_block_reason = terminalBlock.reason;
+        }
+
+        if (terminalBlock && attemptedStep === "followup") {
+          update.followup_send_status = terminalBlock.status;
+          update.followup_block_reason = terminalBlock.reason;
+        }
+
+        if (terminalBlock?.reviewStatus) {
+          update.review_status = terminalBlock.reviewStatus;
+        }
 
         await supabase
           .from("agent_outreach_queue")
-          .update({
-            send_error: message,
-          })
+          .update(update)
           .eq("id", row.id);
 
         results.push({
           id: row.id,
           agent_name: row.agent_name,
+          step: attemptedStep,
+          blocked: Boolean(terminalBlock),
           ok: false,
           error: message,
         });
