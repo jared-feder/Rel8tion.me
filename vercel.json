@@ -5,6 +5,18 @@
     {
       "path": "/api/cron/refresh-open-house-data",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/generate-agent-outreach",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/render-agent-mockups",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/send-agent-outreach",
+      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [
