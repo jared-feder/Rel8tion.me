@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-10.
+Last inspected: 2026-05-14.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -75,7 +75,7 @@ Status labels:
 - `[IMPLEMENTED]` Estately enrichment worker exists and is configured for batch size 20.
 - `[IMPLEMENTED]` OneKey listing freshness worker exists at `onekey-freshness-worker.cjs` with API route `api/cron/refresh-open-house-data.js`. It checks current OneKey listing records by tight lat/lng search, matches by `UniqueListingId`, updates listing facts/prices, records price-history rows when the migration is applied, and refreshes active event price snapshots.
 - `[PARTIAL]` OneKey freshness schema is represented by migration `sql/migrations/20260509_open_house_freshness.sql`, adding `open_houses` verification/override fields and `open_house_price_history`. The migration was applied live on 2026-05-09 and anon zero-row schema verification passed; privileged RLS/service-role behavior remains `[NEEDS VERIFICATION]`.
-- `[PARTIAL]` Root `vercel.json` now includes a Vercel Cron entry for `/api/cron/refresh-open-house-data` every 30 minutes. Production deployment includes the function and a safe `HEAD` request returned `405` without invoking writes; Vercel Cron dashboard/execution state remains `[NEEDS VERIFICATION]`.
+- `[PARTIAL]` Root `vercel.json` now includes Vercel Cron entries for `/api/cron/refresh-open-house-data`, `/api/cron/generate-agent-outreach`, `/api/cron/render-agent-mockups`, and `/api/cron/send-agent-outreach`. Production deploy `dpl_6GUMir1borqRcUrVAby1G5Qiu4sk` includes the outreach cron functions, and unauthenticated smoke checks returned `401`, confirming `CRON_SECRET` is present. Actual scheduled execution and outbound Twilio sends still need verification after the next cron run.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment implementation was found during the 2026-05-09 repo audit. Current tracked enrichment is the Estately + Cheerio worker. If Browserless/Trulia enrichment is intended, it needs implementation or source recovery.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
