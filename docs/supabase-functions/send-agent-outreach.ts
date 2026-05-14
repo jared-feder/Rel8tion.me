@@ -157,20 +157,22 @@ serve(async (req) => {
         send_mode,
         generation_status,
         review_status,
-        mockup_status
+        mockup_status,
+        template_key
       `)
       .eq("send_mode", "automatic")
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
       .order("created_at", { ascending: true })
-      .limit(limit * 5);
+      .limit(limit * 20);
 
     if (error) throw error;
 
     const results: Array<Record<string, unknown>> = [];
+    let sendAttempts = 0;
 
     for (const row of rows || []) {
-      if (results.length >= limit) break;
+      if (sendAttempts >= limit) break;
 
       try {
         const phoneNormalized = row.agent_phone_normalized || normalizePhone(row.agent_phone);
@@ -209,7 +211,8 @@ serve(async (req) => {
         const openStart = row.open_start ? new Date(row.open_start) : null;
         const openEnd = row.open_end ? new Date(row.open_end) : null;
 
-        const initialStale = !!openEnd && openEnd <= now;
+        const isMissedOpenHouseCampaign = row.template_key === "missed_open_house";
+        const initialStale = !isMissedOpenHouseCampaign && !!openEnd && openEnd <= now;
         const followupStale = !!openStart && openStart <= now;
 
         if (row.initial_send_status === "pending" && initialStale) {
@@ -259,7 +262,7 @@ serve(async (req) => {
           row.initial_send_at &&
           row.initial_send_at <= nowIso &&
           row.selected_sms &&
-          (!openEnd || openEnd > now);
+          (isMissedOpenHouseCampaign || !openEnd || openEnd > now);
 
         const followupDue =
           row.followup_send_status === "pending" &&
@@ -310,6 +313,7 @@ serve(async (req) => {
             continue;
           }
 
+          sendAttempts += 1;
           const twilioRes = await sendTwilioMessage({
             accountSid: twilioSid,
             authToken: twilioToken,
@@ -345,6 +349,7 @@ serve(async (req) => {
         }
 
         if (followupDue) {
+          sendAttempts += 1;
           const twilioRes = await sendTwilioMessage({
             accountSid: twilioSid,
             authToken: twilioToken,
