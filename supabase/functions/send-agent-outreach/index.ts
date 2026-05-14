@@ -164,7 +164,7 @@ serve(async (req) => {
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
       .order("created_at", { ascending: true })
-      .limit(limit * 20);
+      .limit(Math.max(limit * 200, 250));
 
     if (error) throw error;
 
@@ -193,17 +193,6 @@ serve(async (req) => {
             agent_name: row.agent_name,
             ok: false,
             error: "Missing or invalid phone",
-          });
-          continue;
-        }
-
-        if (isBlockedReviewStatus(row.review_status)) {
-          results.push({
-            id: row.id,
-            agent_name: row.agent_name,
-            ok: true,
-            skipped: true,
-            reason: "Contact opted out",
           });
           continue;
         }
@@ -275,6 +264,28 @@ serve(async (req) => {
           (!openStart || openStart > now);
 
         if (!initialDue && !followupDue) {
+          continue;
+        }
+
+        if (isBlockedReviewStatus(row.review_status)) {
+          await supabase
+            .from("agent_outreach_queue")
+            .update({
+              initial_send_status: initialDue ? "blocked_opted_out" : row.initial_send_status,
+              followup_send_status: followupDue ? "blocked_opted_out" : row.followup_send_status,
+              initial_block_reason: initialDue ? "contact_opted_out" : row.initial_block_reason,
+              followup_block_reason: followupDue ? "contact_opted_out" : row.followup_block_reason,
+              send_error: null,
+            })
+            .eq("id", row.id);
+
+          results.push({
+            id: row.id,
+            agent_name: row.agent_name,
+            ok: true,
+            skipped: true,
+            reason: "Contact opted out",
+          });
           continue;
         }
 
