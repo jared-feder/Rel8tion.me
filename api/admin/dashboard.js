@@ -95,13 +95,22 @@ function buildSigns({ signs, inventory, events }) {
 function buildEvents({ events, checkins, loanSessions }) {
   const checkinCounts = countBy(checkins, (row) => row.open_house_event_id);
   const financingCounts = countBy(checkins.filter((row) => row.pre_approved === false), (row) => row.open_house_event_id);
-  const loanCounts = countBy(loanSessions.filter((row) => row.status === 'live'), (row) => row.open_house_event_id);
+  const liveLoanSessions = loanSessions.filter((row) => row.status === 'live');
+  const loanCounts = countBy(liveLoanSessions, (row) => row.open_house_event_id);
+  const loanByEvent = new Map();
+  for (const session of liveLoanSessions) {
+    const existing = loanByEvent.get(session.open_house_event_id);
+    if (!existing || new Date(session.signed_in_at || session.created_at || 0) > new Date(existing.signed_in_at || existing.created_at || 0)) {
+      loanByEvent.set(session.open_house_event_id, session);
+    }
+  }
 
   return events.map((event) => ({
     ...event,
     checkin_count: checkinCounts[event.id] || 0,
     financing_need_count: financingCounts[event.id] || 0,
-    live_loan_officer_count: loanCounts[event.id] || 0
+    live_loan_officer_count: loanCounts[event.id] || 0,
+    live_loan_officer: loanByEvent.get(event.id) || null
   }));
 }
 
@@ -158,7 +167,7 @@ module.exports = async function handler(req, res) {
       safeRest('open_house_events?select=id,host_agent_slug,smart_sign_id,open_house_source_id,status,start_time,end_time,ended_at,last_activity_at,created_at,updated_at,setup_context&order=created_at.desc&limit=250', [], warnings, 'open_house_events'),
       safeRest('event_checkins?select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,created_at,metadata&order=created_at.desc&limit=800', [], warnings, 'event_checkins'),
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
-      safeRest('verified_profiles?select=uid,industry,slug,full_name,title,company_name,phone,email,calendar_url,is_active,activated_at,updated_at,created_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
+      safeRest('verified_profiles?select=uid,industry,slug,full_name,title,company_name,phone,email,photo_url,cta_url,calendar_url,is_active,activated_at,updated_at,created_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
       safeRest('agent_outreach_queue?select=id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,open_start,open_end,template_key,review_status,initial_send_status,followup_send_status,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
       safeRest('agent_outreach_inbox?select=thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status&order=last_reply_at.desc&limit=250', [], warnings, 'agent_outreach_inbox')
@@ -181,6 +190,7 @@ module.exports = async function handler(req, res) {
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,
         live_loan_officers: loanSessions.filter((row) => row.status === 'live').length,
+        open_events_without_lo: eventRows.filter((row) => row.status === 'active' && !row.ended_at && !row.live_loan_officer).length,
         incoming_threads: inbox.length,
         needs_reply: inbox.filter((row) => row.direction !== 'outbound' && !row.any_opt_out).length,
         payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length

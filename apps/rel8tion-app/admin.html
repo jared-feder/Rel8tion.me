@@ -173,7 +173,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -487,6 +487,39 @@
       gap: 12px;
     }
 
+    .assignment-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .assignment-card {
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background: rgba(255,255,255,.70);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 16px 42px rgba(23,32,51,.08);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .assignment-title {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .assignment-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
     .bar-row {
       display: grid;
       grid-template-columns: 150px minmax(0, 1fr) 48px;
@@ -572,6 +605,8 @@
       .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
       .data-row { grid-template-columns: 1fr; }
       .report-grid { grid-template-columns: 1fr; }
+      .assignment-grid { grid-template-columns: 1fr; }
+      .assignment-actions { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 1fr; }
     }
   </style>
@@ -599,6 +634,7 @@
       verified: false,
       loading: false,
       sendingKey: '',
+      actionKey: '',
       error: '',
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       outreachFilter: 'needs_reply',
@@ -841,6 +877,72 @@
       }
     }
 
+    function eventAddress(event) {
+      const context = event?.setup_context || {};
+      return context.address || context.property_address || context.listing_address || context.open_house_address || event?.open_house_source_id || event?.id || 'Open house';
+    }
+
+    function eventWindow(event) {
+      return [fmtDate(event?.start_time), fmtDate(event?.end_time)].filter(Boolean).join(' - ');
+    }
+
+    function loanOfficerLabel(profile) {
+      return [profile?.full_name || profile?.slug || 'Loan Officer', profile?.company_name, fmtPhone(profile?.phone)]
+        .filter(Boolean)
+        .join(' | ');
+    }
+
+    async function updateLoanOfficerAssignment(action, body = {}) {
+      const actionKey = body.event_id ? `${action}:${body.event_id}` : action;
+      state.actionKey = actionKey;
+      render();
+      try {
+        const result = await api('/api/admin/loan-officer-assignment', {
+          method: 'POST',
+          body: JSON.stringify({ action, ...body })
+        });
+        state.actionKey = '';
+        showToast(action === 'auto_assign'
+          ? `Auto assigned ${result.assignments?.length || 0} open houses.`
+          : action === 'end'
+            ? 'Loan officer coverage ended.'
+            : 'Loan officer assigned live.'
+        );
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to update loan officer assignment.');
+        render();
+      }
+    }
+
+    function assignLoanOfficer(eventId) {
+      const select = document.getElementById(`lo_${domId(eventId)}`);
+      const loanOfficerUid = select?.value || '';
+      if (!loanOfficerUid) {
+        showToast('Choose a loan officer first.');
+        return;
+      }
+      const profile = (state.command?.loan_officers || []).find((item) => item.uid === loanOfficerUid);
+      const event = (state.command?.events || []).find((item) => item.id === eventId);
+      if (!window.confirm(`Assign ${loanOfficerLabel(profile)} live to ${eventAddress(event)}?`)) return;
+      updateLoanOfficerAssignment('assign', {
+        event_id: eventId,
+        loan_officer_uid: loanOfficerUid
+      });
+    }
+
+    function endLoanOfficer(eventId) {
+      const event = (state.command?.events || []).find((item) => item.id === eventId);
+      if (!window.confirm(`End live loan officer coverage for ${eventAddress(event)}?`)) return;
+      updateLoanOfficerAssignment('end', { event_id: eventId });
+    }
+
+    function autoAssignLoanOfficers() {
+      if (!window.confirm('Auto assign active loan officers to active open houses without live coverage?')) return;
+      updateLoanOfficerAssignment('auto_assign');
+    }
+
     function signOut() {
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -935,6 +1037,13 @@
       document.querySelectorAll('[data-send-key]').forEach((button) => {
         button.addEventListener('click', () => sendReply(button.dataset.sendKey));
       });
+      document.querySelectorAll('[data-assign-lo]').forEach((button) => {
+        button.addEventListener('click', () => assignLoanOfficer(button.dataset.assignLo));
+      });
+      document.querySelectorAll('[data-end-lo]').forEach((button) => {
+        button.addEventListener('click', () => endLoanOfficer(button.dataset.endLo));
+      });
+      document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
       window.lucide?.createIcons();
     }
 
@@ -943,8 +1052,9 @@
       const stats = [
         ['Needs reply', state.counts.needs_reply || o.needs_reply || 0],
         ['Inbound', state.counts.inbound || o.incoming_threads || 0],
-        ['Agents', o.agents || 0],
         ['Active signs', o.active_signs || 0],
+        ['Open events', o.open_events || 0],
+        ['Needs LO', o.open_events_without_lo || 0],
         ['Check-ins', o.checkins || 0],
         ['Pay setup', o.payments_needing_setup || 0]
       ];
@@ -1115,7 +1225,23 @@
     function renderLoanOfficers() {
       const profiles = state.command?.loan_officers || [];
       const sessions = state.command?.loan_sessions || [];
+      const activeProfiles = profiles.filter((row) => row.is_active !== false);
+      const events = (state.command?.events || [])
+        .filter((row) => row.status === 'active' && !row.ended_at)
+        .sort((a, b) => new Date(a.start_time || a.created_at || 0) - new Date(b.start_time || b.created_at || 0));
       return `
+        <div class="section-head">
+          <div>
+            <h2>LO assignments</h2>
+            <div class="sub">${events.length} active open houses, ${activeProfiles.length} active loan officers</div>
+          </div>
+          <button class="btn primary" id="autoAssignLo" ${activeProfiles.length && events.length ? '' : 'disabled'}>
+            <i data-lucide="wand-sparkles"></i><span>${state.actionKey === 'auto_assign' ? 'Assigning...' : 'Auto assign open houses'}</span>
+          </button>
+        </div>
+        <div class="assignment-grid">
+          ${events.length ? events.map((event) => renderLoanOfficerAssignment(event, activeProfiles)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No active open house events are ready for LO assignment.</div>'}
+        </div>
         ${renderRows('Loan officers', `${profiles.length} verified profiles`, profiles.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.full_name || row.slug || 'Unknown LO')}</div>
@@ -1136,6 +1262,41 @@
           <div>${badge(row.loan_officer_uid || 'no uid', 'info')}</div>
           <div>${badge(row.open_house_event_id ? 'event linked' : 'no event', row.open_house_event_id ? 'ok' : 'warn')}</div>
         `)}
+      `;
+    }
+
+    function renderLoanOfficerAssignment(event, profiles) {
+      const live = event.live_loan_officer || null;
+      const actionKey = state.actionKey;
+      const assigning = actionKey === `assign:${event.id}`;
+      const ending = actionKey === `end:${event.id}`;
+      const address = eventAddress(event);
+      const selectedUid = live?.verified_profile_uid || live?.loan_officer_uid || profiles[0]?.uid || '';
+      return `
+        <article class="assignment-card">
+          <div>
+            <div class="assignment-title">${esc(address)}</div>
+            <div class="secondary">${esc([event.host_agent_slug, eventWindow(event)].filter(Boolean).join(' | ') || event.id)}</div>
+          </div>
+          <div class="badges">
+            ${live ? badge(`Live: ${live.loan_officer_name || live.loan_officer_slug || 'Loan Officer'}`, 'ok') : badge('No LO assigned', 'warn')}
+            ${event.financing_need_count ? badge(`${event.financing_need_count} financing`, 'warn') : badge(`${event.checkin_count || 0} check-ins`, 'info')}
+          </div>
+          <div class="assignment-actions">
+            <select id="lo_${domId(event.id)}" class="select" ${profiles.length ? '' : 'disabled'}>
+              ${profiles.length ? profiles.map((profile) => `
+                <option value="${esc(profile.uid)}"${profile.uid === selectedUid ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>
+              `).join('') : '<option>No active loan officers</option>'}
+            </select>
+            <button class="btn primary" data-assign-lo="${esc(event.id)}" ${profiles.length && !assigning && !ending ? '' : 'disabled'}>
+              <i data-lucide="user-check"></i><span>${assigning ? 'Assigning...' : live ? 'Reassign' : 'Assign live'}</span>
+            </button>
+            <button class="btn bad" data-end-lo="${esc(event.id)}" ${live && !assigning && !ending ? '' : 'disabled'}>
+              <i data-lucide="circle-x"></i><span>${ending ? 'Ending...' : 'End'}</span>
+            </button>
+          </div>
+          ${live?.loan_officer_calendar_url ? `<a class="small" href="${esc(live.loan_officer_calendar_url)}" target="_blank" rel="noopener">Open assigned LO calendar</a>` : ''}
+        </article>
       `;
     }
 
