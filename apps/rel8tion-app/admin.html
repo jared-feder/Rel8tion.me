@@ -2064,6 +2064,37 @@
       }
     }
 
+    async function detachSign(signId) {
+      const sign = (state.command?.signs || []).find((row) => row.id === signId) || null;
+      const code = sign?.public_code || signId;
+      const assignment = sign ? signAssignmentLabel(sign) : 'Current assignment';
+      const typed = window.prompt(
+        `Detach smart sign ${code}?\n${assignment}\n\nThis will end any live open house event, end live LO coverage, and clear the assigned agent. The physical chips and QR stay tied to this sign.\n\nType REL8TION to continue.`
+      );
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Detach cancelled.');
+        return;
+      }
+
+      state.actionKey = `detach_sign:${signId}`;
+      render();
+      try {
+        const result = await api('/api/admin/sign-action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'detach_sign', sign_id: signId, confirmation: typed.trim() })
+        });
+        state.actionKey = '';
+        const endedCount = Array.isArray(result.ended_events) ? result.ended_events.length : 0;
+        showToast(endedCount ? `Sign detached. Ended ${endedCount} event${endedCount === 1 ? '' : 's'}.` : 'Sign detached and ready to reuse.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to detach smart sign.');
+        render();
+      }
+    }
+
     function signOut() {
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -2363,6 +2394,9 @@
       document.querySelectorAll('[data-end-event]').forEach((button) => {
         button.addEventListener('click', () => endEvent(button.dataset.endEvent));
       });
+      document.querySelectorAll('[data-detach-sign]').forEach((button) => {
+        button.addEventListener('click', () => detachSign(button.dataset.detachSign));
+      });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
       document.getElementById('reportWindow')?.addEventListener('change', (event) => {
         state.reportWindow = event.target.value;
@@ -2648,6 +2682,28 @@
       `);
     }
 
+    function signAssignmentLabel(row) {
+      const owner = row.owner_agent_slug || '';
+      const assigned = row.assigned_agent_slug || '';
+      if (owner && assigned && owner !== assigned) return `Owner: ${owner} | Assigned: ${assigned}`;
+      if (owner) return `Assigned to ${owner}`;
+      if (assigned) return `Assigned to ${assigned}`;
+      return 'Fresh / unassigned';
+    }
+
+    function renderSignActions(row) {
+      const endKey = `end_event:${row.active_event_id}`;
+      const detachKey = `detach_sign:${row.id}`;
+      return `
+        <div class="row-actions">
+          ${row.active_event_id ? `<button class="btn bad" data-end-event="${esc(row.active_event_id)}" ${state.actionKey === endKey ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === endKey ? 'Ending...' : 'End event'}</span></button>` : badge(row.primary_device_type || 'front', 'info')}
+          <button class="btn bad" data-detach-sign="${esc(row.id)}" ${state.actionKey === detachKey ? 'disabled' : ''}>
+            <i data-lucide="unlink"></i><span>${state.actionKey === detachKey ? 'Detaching...' : 'Detach sign'}</span>
+          </button>
+        </div>
+      `;
+    }
+
     function renderSigns() {
       const signs = filterByQuery(state.command?.signs || []);
       const events = filterByQuery(state.command?.events || []);
@@ -2655,14 +2711,12 @@
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>
-            <div class="secondary">${esc(row.owner_agent_slug || row.assigned_agent_slug || 'Unassigned')}</div>
+            <div class="secondary">${esc(signAssignmentLabel(row))}</div>
           </div>
           <div>${badge(row.status || 'unknown', row.status === 'active' ? 'ok' : 'info')}</div>
           <div>${badge(`${row.inventory_alias_count || 0} QR`, 'info')}</div>
           <div>${badge(row.active_event_host || 'No event', row.active_event_host ? 'ok' : 'info')}</div>
-          <div>
-            ${row.active_event_id ? `<button class="btn bad" data-end-event="${esc(row.active_event_id)}" ${state.actionKey === `end_event:${row.active_event_id}` ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === `end_event:${row.active_event_id}` ? 'Ending...' : 'End event'}</span></button>` : badge(row.primary_device_type || 'front', 'info')}
-          </div>
+          <div>${renderSignActions(row)}</div>
         `)}
         ${renderRows('Live and recent events', `${events.length} events`, events.slice(0, 80), (row) => `
           <div>
