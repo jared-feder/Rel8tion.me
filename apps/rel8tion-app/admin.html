@@ -1029,6 +1029,114 @@
 
     .toast.show { display: block; }
 
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 27, 47, .34);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .coverage-modal {
+      width: min(700px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.78);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.93), rgba(239,249,255,.88)),
+        url("https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png");
+      background-size: cover;
+      background-position: center bottom;
+      box-shadow: 0 28px 70px rgba(31,42,90,.22);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .coverage-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .coverage-head h2 {
+      margin: 3px 0 4px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .coverage-choice-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+    }
+
+    .coverage-choice {
+      min-height: 78px;
+      display: grid;
+      align-content: center;
+      justify-content: start;
+      gap: 5px;
+      text-align: left;
+      line-height: 1.2;
+      background: rgba(255,255,255,.74);
+    }
+
+    .coverage-choice strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .coverage-choice span {
+      display: block;
+      color: #526a7b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .coverage-form {
+      border: 1px solid rgba(136,164,190,.28);
+      border-radius: 8px;
+      background: rgba(255,255,255,.68);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .coverage-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .coverage-field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .coverage-field label {
+      color: #456173;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .coverage-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 1120px) {
       .command-shell { grid-template-columns: 1fr; }
       .command-sidebar {
@@ -1076,6 +1184,7 @@
       .bar-row { grid-template-columns: 1fr; }
       .report-toolbar { justify-content: flex-start; }
       .report-detail-grid { grid-template-columns: 1fr; }
+      .coverage-form-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1110,6 +1219,7 @@
       outreachFilter: 'needs_reply',
       reportWindow: 'upcoming',
       reportSort: 'auto',
+      coveragePickerKey: '',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
@@ -1161,7 +1271,7 @@
     function isCommandEditing() {
       const active = editableControl(document.activeElement);
       if (!active || active.disabled || active.readOnly) return false;
-      return Boolean(active.closest('.command-shell'));
+      return Boolean(active.closest('.command-shell, .coverage-modal'));
     }
 
     function captureUiState() {
@@ -1494,6 +1604,32 @@
       return local.toISOString().slice(0, 10);
     }
 
+    function timeInputValue(date, fallback = '13:00') {
+      const d = new Date(date || '');
+      if (!Number.isFinite(d.getTime())) return fallback;
+      const pad = (number) => String(number).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function dateTimeFromParts(dateText, timeText, fallbackHour = 13) {
+      const dateMatch = String(dateText || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!dateMatch) return null;
+      const timeMatch = String(timeText || '').trim().match(/^(\d{2}):(\d{2})$/);
+      const hour = timeMatch ? Number(timeMatch[1]) : fallbackHour;
+      const minute = timeMatch ? Number(timeMatch[2]) : 0;
+      if (hour > 23 || minute > 59) return null;
+      const year = Number(dateMatch[1]);
+      const month = Number(dateMatch[2]) - 1;
+      const day = Number(dateMatch[3]);
+      const date = new Date(year, month, day, hour, minute, 0, 0);
+      if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month ||
+        date.getDate() !== day
+      ) return null;
+      return date;
+    }
+
     function dateAtTime(dateText, timeSource, fallbackHour = 13) {
       const match = String(dateText || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (!match) return null;
@@ -1542,46 +1678,6 @@
         days.push(normalizeCoverageWindow(start, end, `All listed days: ${fmtDate(start)} - ${fmtDate(end)}`));
       }
       return days.filter(Boolean);
-    }
-
-    function customCoverageWindow(thread, answer) {
-      const parts = String(answer || '')
-        .split(/(?:,|\band\b|\bto\b|&|\+)/i)
-        .map((part) => part.trim())
-        .filter(Boolean);
-      const dateParts = parts.filter((part) => /^\d{4}-\d{2}-\d{2}$/.test(part));
-      if (!dateParts.length) return null;
-      const startSource = thread?.open_start || '';
-      const endSource = thread?.open_end || thread?.open_start || '';
-      const start = dateAtTime(dateParts[0], startSource);
-      const end = dateAtTime(dateParts[dateParts.length - 1], endSource, 15);
-      const label = dateParts.length > 1
-        ? `Selected days: ${dateParts.join(', ')}`
-        : `Selected day: ${dateParts[0]}`;
-      return normalizeCoverageWindow(start, end, label);
-    }
-
-    function chooseCoverageWindow(thread) {
-      const choices = coverageChoices(thread);
-      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
-      const lines = [
-        `Which day are you covering for ${target}?`,
-        '',
-        ...choices.map((choice, index) => `${index + 1} = ${choice.coverage_label}`)
-      ];
-      if (choices.length > 1) lines.push('both = all listed days');
-      lines.push('', 'You can also type a date like 2026-05-16, or two dates like 2026-05-16, 2026-05-17.');
-      const defaultAnswer = choices.length > 1 ? 'both' : choices.length ? '1' : '';
-      const answer = window.prompt(lines.join('\n'), defaultAnswer);
-      if (answer === null) return null;
-      const clean = String(answer || '').trim().toLowerCase();
-      if (!clean) return null;
-      if (clean === 'both' || clean === 'all') return choices[choices.length - 1] || null;
-      if (/^\d+$/.test(clean)) {
-        const index = Number(clean) - 1;
-        return choices[index] || null;
-      }
-      return customCoverageWindow(thread, clean);
     }
 
     function defaultDripSendAt(thread) {
@@ -1703,6 +1799,69 @@
       runOutreachAction(key, 'mark_interested', {}, 'Marked interested.');
     }
 
+    function coveragePickerThread() {
+      return state.coveragePickerKey ? findThread(state.coveragePickerKey) : null;
+    }
+
+    function openCoveragePicker(key) {
+      state.coveragePickerKey = key;
+      render();
+    }
+
+    function closeCoveragePicker() {
+      state.coveragePickerKey = '';
+      render();
+    }
+
+    function confirmCoverageWindow(coverage) {
+      const thread = coveragePickerThread();
+      const key = state.coveragePickerKey;
+      if (!thread || !key || !coverage) return;
+      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
+      if (!window.confirm(`Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`)) return;
+      state.coveragePickerKey = '';
+      runOutreachAction(key, 'confirm_open_house', coverage, 'Open house confirmed for Reports.');
+    }
+
+    function confirmCoverageChoice(index) {
+      const thread = coveragePickerThread();
+      if (!thread) return;
+      const coverage = coverageChoices(thread)[index];
+      if (!coverage) {
+        showToast('Choose a valid coverage day first.');
+        return;
+      }
+      confirmCoverageWindow(coverage);
+    }
+
+    function confirmCustomCoverage() {
+      const thread = coveragePickerThread();
+      if (!thread) return;
+      const startDateText = document.getElementById('coverageStartDate')?.value || '';
+      const endDateText = document.getElementById('coverageEndDate')?.value || startDateText;
+      const startTimeText = document.getElementById('coverageStartTime')?.value || '13:00';
+      const endTimeText = document.getElementById('coverageEndTime')?.value || '15:00';
+      const start = dateTimeFromParts(startDateText, startTimeText, 13);
+      const end = dateTimeFromParts(endDateText, endTimeText, 15);
+      if (!start || !end) {
+        showToast('Pick a date on the calendar first.');
+        return;
+      }
+      if (end <= start) {
+        showToast('Coverage end must be after the start.');
+        return;
+      }
+      const label = dateInputValue(start) === dateInputValue(end)
+        ? `${fmtDate(start)} - ${fmtDate(end)}`
+        : `Custom window: ${fmtDate(start)} - ${fmtDate(end)}`;
+      const coverage = normalizeCoverageWindow(start, end, label);
+      if (!coverage) {
+        showToast('Pick a valid coverage window.');
+        return;
+      }
+      confirmCoverageWindow(coverage);
+    }
+
     function confirmOpenHouse(key) {
       const thread = findThread(key);
       if (!thread) return;
@@ -1710,14 +1869,7 @@
         showToast('This contact is opted out.');
         return;
       }
-      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
-      const coverage = chooseCoverageWindow(thread);
-      if (!coverage) {
-        showToast('Choose a valid coverage day first.');
-        return;
-      }
-      if (!window.confirm(`Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`)) return;
-      runOutreachAction(key, 'confirm_open_house', coverage, 'Open house confirmed for Reports.');
+      openCoveragePicker(key);
     }
 
     function acceptOpenHouse(key) {
@@ -1859,6 +2011,81 @@
       return Math.max(0, Math.min(100, Math.round(((inbound - needs) / inbound) * 100)));
     }
 
+    function renderCoveragePicker() {
+      const thread = coveragePickerThread();
+      if (!thread) return '';
+      const choices = coverageChoices(thread);
+      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
+      const startDate = dateInputValue(thread.open_start || Date.now()) || dateInputValue(Date.now());
+      const endDate = startDate;
+      const endFallback = thread.open_start ? timeInputValue(fallbackCoverageEnd(thread.open_start), '15:00') : '15:00';
+      const startTime = timeInputValue(thread.open_start, '13:00');
+      const endTime = timeInputValue(thread.open_end, endFallback);
+      return `
+        <div class="modal-backdrop" data-coverage-backdrop>
+          <section class="coverage-modal" role="dialog" aria-modal="true" aria-labelledby="coverageTitle">
+            <div class="coverage-head">
+              <div>
+                <div class="mini-title">Confirm open house</div>
+                <h2 id="coverageTitle">Choose coverage date</h2>
+                <div class="small">${esc(target)}</div>
+              </div>
+              <button type="button" class="btn soft" data-coverage-cancel aria-label="Close coverage picker">
+                <i data-lucide="x"></i><span>Close</span>
+              </button>
+            </div>
+
+            ${choices.length ? `
+              <div class="coverage-choice-grid">
+                ${choices.map((choice, index) => `
+                  <button type="button" class="btn coverage-choice" data-coverage-choice="${esc(index)}">
+                    <strong>${esc(choice.coverage_label)}</strong>
+                    <span>Use this date for the Reports record</span>
+                  </button>
+                `).join('')}
+              </div>
+            ` : `
+              <div class="mini-panel">
+                <div class="mini-title">No stored open-house date</div>
+                <div class="small">Pick the coverage date below and it will create the Reports record from that calendar window.</div>
+              </div>
+            `}
+
+            <div class="coverage-form">
+              <div>
+                <div class="mini-title">Calendar override</div>
+                <div class="small">Use this when the agent confirmed only one day, changed the time, or the listing dates are missing.</div>
+              </div>
+              <div class="coverage-form-grid">
+                <div class="coverage-field">
+                  <label for="coverageStartDate">Start date</label>
+                  <input id="coverageStartDate" class="field" type="date" value="${esc(startDate)}">
+                </div>
+                <div class="coverage-field">
+                  <label for="coverageEndDate">End date</label>
+                  <input id="coverageEndDate" class="field" type="date" value="${esc(endDate)}">
+                </div>
+                <div class="coverage-field">
+                  <label for="coverageStartTime">Start time</label>
+                  <input id="coverageStartTime" class="field" type="time" value="${esc(startTime)}">
+                </div>
+                <div class="coverage-field">
+                  <label for="coverageEndTime">End time</label>
+                  <input id="coverageEndTime" class="field" type="time" value="${esc(endTime)}">
+                </div>
+              </div>
+              <div class="coverage-modal-actions">
+                <button type="button" class="btn soft" data-coverage-cancel>Cancel</button>
+                <button type="button" class="btn primary" id="coverageConfirmCustom">
+                  <i data-lucide="calendar-check"></i><span>Confirm selected date</span>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderShell() {
       const areaLabel = AREAS.find(([key]) => key === state.area)?.[1] || 'Outreach command';
       const o = state.command?.overview || {};
@@ -1939,6 +2166,7 @@
             </section>
           </div>
         </main>
+        ${renderCoveragePicker()}
       `;
 
       document.getElementById('refreshBtn')?.addEventListener('click', () => loadAll());
@@ -1981,6 +2209,20 @@
       });
       document.querySelectorAll('[data-confirm-open-house]').forEach((button) => {
         button.addEventListener('click', () => confirmOpenHouse(button.dataset.confirmOpenHouse));
+      });
+      document.querySelectorAll('[data-coverage-choice]').forEach((button) => {
+        button.addEventListener('click', () => confirmCoverageChoice(Number(button.dataset.coverageChoice)));
+      });
+      document.querySelectorAll('[data-coverage-cancel]').forEach((button) => {
+        button.addEventListener('click', closeCoveragePicker);
+      });
+      document.getElementById('coverageStartDate')?.addEventListener('change', (event) => {
+        const endInput = document.getElementById('coverageEndDate');
+        if (endInput && (!endInput.value || endInput.value < event.target.value)) endInput.value = event.target.value;
+      });
+      document.getElementById('coverageConfirmCustom')?.addEventListener('click', confirmCustomCoverage);
+      document.querySelector('[data-coverage-backdrop]')?.addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) closeCoveragePicker();
       });
       document.querySelectorAll('[data-accept-open-house]').forEach((button) => {
         button.addEventListener('click', () => acceptOpenHouse(button.dataset.acceptOpenHouse));
@@ -2659,7 +2901,7 @@
 
     verify();
     window.setInterval(() => {
-      if (state.verified && !state.loading && !state.sendingKey && !state.actionKey && !isCommandEditing()) {
+      if (state.verified && !state.loading && !state.sendingKey && !state.actionKey && !state.coveragePickerKey && !isCommandEditing()) {
         loadAll({ showLoading: false }).catch(() => null);
       }
     }, 45000);
