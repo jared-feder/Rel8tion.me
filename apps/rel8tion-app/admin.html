@@ -2327,8 +2327,7 @@
         state.reportSort = event.target.value;
         refreshAreaContent();
       });
-      document.getElementById('downloadConfirmedCsv')?.addEventListener('click', downloadConfirmedCsv);
-      document.getElementById('printConfirmedReport')?.addEventListener('click', () => window.print());
+      document.getElementById('generateConfirmedPdf')?.addEventListener('click', generateConfirmedPdfReport);
     }
 
     function renderStats() {
@@ -2809,82 +2808,168 @@
         .sort(compareConfirmedRows);
     }
 
-    function csvCell(value) {
-      let text = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      if (/^[=+\-@]/.test(text.trim())) text = `'${text}`;
-      return `"${text.replace(/"/g, '""')}"`;
+    function compactReportDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return '';
+      const hour24 = date.getHours();
+      const hour = hour24 % 12 || 12;
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const ampm = hour24 >= 12 ? 'pm' : 'am';
+      return `${date.getMonth() + 1}/${date.getDate()}${hour}:${minute}${ampm}`;
     }
 
-    function downloadConfirmedCsv() {
+    function compactReportWindow(start, end) {
+      const first = compactReportDate(start);
+      const second = compactReportDate(end);
+      if (first && second && first !== second) return `${first}-${second}`;
+      return first || second || '';
+    }
+
+    function generatedStamp(date = new Date()) {
+      const stamp = new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit'
+      }).format(date).replace(',', '');
+      const offset = -date.getTimezoneOffset();
+      const sign = offset >= 0 ? '+' : '-';
+      const absolute = Math.abs(offset);
+      const hours = String(Math.floor(absolute / 60)).padStart(2, '0');
+      const minutes = String(absolute % 60).padStart(2, '0');
+      return `${stamp} ${sign}${hours}:${minutes}`;
+    }
+
+    function compactReportStatus(row) {
+      return [
+        row.visit_status || 'confirmed',
+        row.review_status || 'confirmed_open_house',
+        row.loan_officer_name ? `LO ${row.loan_officer_name}` : 'LO unassigned'
+      ].filter(Boolean).join('/');
+    }
+
+    function reportOutboundBlocks(row) {
+      const blocks = [];
+      if (row.selected_sms) blocks.push(`<div><b>Initial:</b> ${esc(row.selected_sms)}</div>`);
+      if (row.followup_sms) blocks.push(`<div><b>Follow-up:</b> ${esc(row.followup_sms)}</div>`);
+      const outbound = (Array.isArray(row.messages) ? row.messages : [])
+        .filter((message) => message.direction === 'outbound' && message.body)
+        .filter((message) => message.body !== row.selected_sms && message.body !== row.followup_sms);
+      outbound.forEach((message) => {
+        blocks.push(`<div><b>${esc(compactReportDate(message.received_at || message.created_at))} Sent:</b> ${esc(message.body)}</div>`);
+      });
+      return blocks.length ? blocks.join('') : '<div class="muted">No outbound message text stored.</div>';
+    }
+
+    function reportAgentBlocks(row) {
+      const inbound = (Array.isArray(row.messages) ? row.messages : [])
+        .filter((message) => message.direction !== 'outbound');
+      if (!inbound.length) return '<div class="muted">No inbound body in reply table.</div>';
+      return inbound.map((message) => {
+        const label = [compactReportDate(message.received_at || message.created_at), message.opt_out ? '[OPT OUT]' : '']
+          .filter(Boolean)
+          .join(' ');
+        return `<div><b>${esc(label)} </b>${esc(message.body || '')}</div>`;
+      }).join('');
+    }
+
+    function compactReportHtml(rows) {
+      const title = 'Ultra Compact Confirmed Open Houses Report';
+      const windowLabel = {
+        upcoming: 'upcoming confirmed',
+        past: 'previous confirmed',
+        all: 'all confirmed'
+      }[state.reportWindow] || state.reportWindow;
+      const generated = generatedStamp();
+      const rowsHtml = rows.map((row, index) => {
+        const photo = row.listing_photo_url || row.mockup_image_url || '';
+        const facts = [
+          money(row.price),
+          compactReportWindow(row.scheduled_start, row.scheduled_end),
+          compactReportStatus(row)
+        ].filter(Boolean).join(' | ');
+        const agentMeta = [fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | ');
+        const loMeta = [row.loan_officer_name ? `LO: ${row.loan_officer_name}` : 'LO: unassigned', fmtPhone(row.loan_officer_phone)].filter(Boolean).join(' | ');
+        return `
+          <tr>
+            <td class="n">${esc(index + 1)}</td>
+            <td class="pic">${photo ? `<img src="${esc(photo)}" alt="Listing">` : '<div class="ph">No pic</div>'}</td>
+            <td class="meta">
+              <b>${esc(row.property_address || 'Confirmed open house')}</b><br>
+              ${esc(facts || 'No property facts')}<br>
+              <b>${esc(row.agent_name || 'Unknown agent')}</b><br>
+              ${esc(agentMeta || row.brokerage || 'No agent contact')}<br>
+              <span class="muted">${esc([row.brokerage, loMeta].filter(Boolean).join(' | '))}</span>
+            </td>
+            <td class="me">${reportOutboundBlocks(row)}</td>
+            <td class="agent">${reportAgentBlocks(row)}</td>
+          </tr>
+        `;
+      }).join('');
+      return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+@page { size: landscape; margin: 0.24in; }
+body { font-family: Arial, sans-serif; font-size: 8.35pt; color:#111827; }
+h1 { font-size: 10.5pt; margin:0 0 1px; }
+p { margin:0 0 3px; font-size:7.2pt; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th,td { border:0.5px solid #d1d5db; vertical-align:top; padding:5.4px 5px; page-break-inside:avoid; }
+th { background:#f8fafc; text-align:left; font-weight:bold; }
+.n { width:16px; text-align:center; }
+.pic { width:94px; }
+.pic img,.ph { width:90px; height:65px; object-fit:cover; display:block; }
+.ph { background:#f8fafc; color:#64748b; display:flex; align-items:center; justify-content:center; }
+.meta { width:205px; line-height:1.18; }
+.me { width:420px; line-height:1.18; word-wrap:break-word; }
+.agent { line-height:1.19; word-wrap:break-word; }
+.me div,.agent div { margin-bottom:3px; }
+.muted { color:#64748b; }
+</style></head><body>
+<h1>${esc(title)}</h1>
+<p>${esc(rows.length)} ${esc(windowLabel)} open house records. Generated ${esc(generated)}. Full outbound message text, inbound agent replies, coverage windows, and loan officer assignment are included.</p>
+<table><thead><tr><th class="n">#</th><th class="pic">Pic</th><th class="meta">Property + Agent</th><th class="me">Me</th><th class="agent">Agent</th></tr></thead><tbody>
+${rowsHtml}
+</tbody></table></body></html>`;
+    }
+
+    function downloadPrintableReportHtml(html) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const day = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `rel8tion-confirmed-open-houses-${state.reportWindow}-${day}.html`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function generateConfirmedPdfReport() {
       const rows = confirmedReportRows();
       if (!rows.length) {
         showToast('No confirmed open houses in this report view.');
         return;
       }
-      const headers = [
-        'Confirmed At',
-        'Open Start',
-        'Open End',
-        'Property Address',
-        'City',
-        'State',
-        'Zip',
-        'Price',
-        'Beds',
-        'Baths',
-        'Agent Name',
-        'Agent Phone',
-        'Agent Email',
-        'Brokerage',
-        'Loan Officer',
-        'Loan Officer Phone',
-        'Loan Officer Email',
-        'Visit Status',
-        'Review Status',
-        'Listing Photo URL',
-        'Agent Photo URL',
-        'Mockup Image URL',
-        'Conversation Snapshot'
-      ];
-      const lines = [
-        headers.map(csvCell).join(','),
-        ...rows.map((row) => [
-          row.confirmed_at,
-          row.scheduled_start,
-          row.scheduled_end,
-          row.property_address,
-          row.city,
-          row.state,
-          row.zip,
-          row.price,
-          row.beds,
-          row.baths,
-          row.agent_name,
-          row.agent_phone,
-          row.agent_email,
-          row.brokerage,
-          row.loan_officer_name,
-          row.loan_officer_phone,
-          row.loan_officer_email,
-          row.visit_status,
-          row.review_status,
-          row.listing_photo_url,
-          row.agent_photo_url,
-          row.mockup_image_url,
-          row.conversation_snapshot
-        ].map(csvCell).join(','))
-      ];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const day = new Date().toISOString().slice(0, 10);
-      link.href = url;
-      link.download = `rel8tion-confirmed-open-houses-${state.reportWindow}-${day}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      showToast(`Downloaded ${rows.length} confirmed open houses.`);
+      const html = compactReportHtml(rows);
+      const report = window.open('', '_blank');
+      if (!report) {
+        downloadPrintableReportHtml(html);
+        showToast('Popup blocked. Downloaded the printable report HTML.');
+        return;
+      }
+      report.document.open();
+      report.document.write(html);
+      report.document.close();
+      report.focus();
+      window.setTimeout(() => {
+        try {
+          report.print();
+        } catch (_) {}
+      }, 700);
+      showToast(`Opened PDF-style report for ${rows.length} confirmed open houses.`);
     }
 
     function renderConfirmedReportCard(row) {
@@ -2974,8 +3059,7 @@
               <option value="property"${state.reportSort === 'property' ? ' selected' : ''}>Property A-Z</option>
               <option value="status"${state.reportSort === 'status' ? ' selected' : ''}>Status A-Z</option>
             </select>
-            <button class="btn soft" id="downloadConfirmedCsv"><i data-lucide="file-spreadsheet"></i><span>Export CSV</span></button>
-            <button class="btn soft" id="printConfirmedReport"><i data-lucide="printer"></i><span>Print</span></button>
+            <button class="btn soft" id="generateConfirmedPdf"><i data-lucide="file-text"></i><span>Generate PDF</span></button>
           </div>
         </div>
         <div class="confirmed-report-grid">

@@ -279,6 +279,7 @@ function buildConfirmedOpenHouses({ outreach, visits, participants, messages, op
       loan_officer_uid: firstPresent(primaryParticipant?.participant_uid, liveLoan?.loan_officer_uid, liveLoan?.verified_profile_uid),
       loan_officer_status: firstPresent(primaryParticipant?.status, liveLoan?.status),
       selected_sms: queue.selected_sms || '',
+      followup_sms: queue.followup_sms || '',
       conversation_snapshot: buildConversationSnapshot(queue, rowMessages),
       message_count: rowMessages.length,
       messages: rowMessages
