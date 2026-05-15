@@ -1109,6 +1109,7 @@
       query: '',
       outreachFilter: 'needs_reply',
       reportWindow: 'upcoming',
+      reportSort: 'auto',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
@@ -1899,6 +1900,10 @@
         state.reportWindow = event.target.value;
         refreshAreaContent();
       });
+      document.getElementById('reportSort')?.addEventListener('change', (event) => {
+        state.reportSort = event.target.value;
+        refreshAreaContent();
+      });
       document.getElementById('downloadConfirmedCsv')?.addEventListener('click', downloadConfirmedCsv);
       document.getElementById('printConfirmedReport')?.addEventListener('click', () => window.print());
     }
@@ -2278,6 +2283,51 @@
       return Number.isFinite(date.getTime()) ? date.getTime() : 0;
     }
 
+    function sortDateValue(value, direction) {
+      const time = reportDateMs(value);
+      if (time) return time;
+      return direction === 'desc' ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+    }
+
+    function compareTextSort(a, b) {
+      const left = String(a || '').trim();
+      const right = String(b || '').trim();
+      if (!left && !right) return 0;
+      if (!left) return 1;
+      if (!right) return -1;
+      return left.localeCompare(right, undefined, { sensitivity: 'base' });
+    }
+
+    function compareDateSort(a, b, direction = 'asc') {
+      const left = sortDateValue(a, direction);
+      const right = sortDateValue(b, direction);
+      return direction === 'desc' ? right - left : left - right;
+    }
+
+    function compareConfirmedRows(a, b) {
+      const fallback = () => compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, state.reportWindow === 'past' ? 'desc' : 'asc');
+      switch (state.reportSort) {
+        case 'open_start_asc':
+          return compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, 'asc');
+        case 'open_start_desc':
+          return compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, 'desc');
+        case 'confirmed_desc':
+          return compareDateSort(a.confirmed_at || a.scheduled_start, b.confirmed_at || b.scheduled_start, 'desc');
+        case 'confirmed_asc':
+          return compareDateSort(a.confirmed_at || a.scheduled_start, b.confirmed_at || b.scheduled_start, 'asc');
+        case 'loan_officer':
+          return compareTextSort(a.loan_officer_name || 'Unassigned', b.loan_officer_name || 'Unassigned') || fallback();
+        case 'agent':
+          return compareTextSort(a.agent_name, b.agent_name) || fallback();
+        case 'property':
+          return compareTextSort(a.property_address, b.property_address) || fallback();
+        case 'status':
+          return compareTextSort(a.visit_status || a.review_status, b.visit_status || b.review_status) || fallback();
+        default:
+          return fallback();
+      }
+    }
+
     function confirmedReportRows() {
       const now = Date.now();
       return filterByQuery(state.command?.confirmed_open_houses || [])
@@ -2287,11 +2337,7 @@
           if (state.reportWindow === 'past') return end < now - 2 * 60 * 60 * 1000;
           return true;
         })
-        .sort((a, b) => {
-          const aTime = reportDateMs(a.scheduled_start) || reportDateMs(a.confirmed_at);
-          const bTime = reportDateMs(b.scheduled_start) || reportDateMs(b.confirmed_at);
-          return state.reportWindow === 'past' ? bTime - aTime : aTime - bTime;
-        });
+        .sort(compareConfirmedRows);
     }
 
     function csvCell(value) {
@@ -2443,6 +2489,17 @@
               <option value="upcoming"${state.reportWindow === 'upcoming' ? ' selected' : ''}>Upcoming confirmed</option>
               <option value="past"${state.reportWindow === 'past' ? ' selected' : ''}>Previous confirmed</option>
               <option value="all"${state.reportWindow === 'all' ? ' selected' : ''}>All confirmed</option>
+            </select>
+            <select id="reportSort" class="select" style="max-width:190px;">
+              <option value="auto"${state.reportSort === 'auto' ? ' selected' : ''}>Sort by smart date</option>
+              <option value="open_start_asc"${state.reportSort === 'open_start_asc' ? ' selected' : ''}>Open date soonest</option>
+              <option value="open_start_desc"${state.reportSort === 'open_start_desc' ? ' selected' : ''}>Open date latest</option>
+              <option value="confirmed_desc"${state.reportSort === 'confirmed_desc' ? ' selected' : ''}>Confirmed newest</option>
+              <option value="confirmed_asc"${state.reportSort === 'confirmed_asc' ? ' selected' : ''}>Confirmed oldest</option>
+              <option value="loan_officer"${state.reportSort === 'loan_officer' ? ' selected' : ''}>Loan officer A-Z</option>
+              <option value="agent"${state.reportSort === 'agent' ? ' selected' : ''}>Agent A-Z</option>
+              <option value="property"${state.reportSort === 'property' ? ' selected' : ''}>Property A-Z</option>
+              <option value="status"${state.reportSort === 'status' ? ' selected' : ''}>Status A-Z</option>
             </select>
             <button class="btn soft" id="downloadConfirmedCsv"><i data-lucide="file-spreadsheet"></i><span>Export CSV</span></button>
             <button class="btn soft" id="printConfirmedReport"><i data-lucide="printer"></i><span>Print</span></button>
