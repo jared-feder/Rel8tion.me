@@ -9,16 +9,16 @@
   <style>
     :root {
       color-scheme: light;
-      --sky: #7ec8f5;
-      --sky-strong: #28a8df;
-      --teal: #0f8fbd;
-      --teal-strong: #075e7e;
-      --ink: #102033;
+      --sky: #38bdf8;
+      --sky-strong: #2563eb;
+      --teal: #1f2a5a;
+      --teal-strong: #161e40;
+      --ink: #1f2a5a;
       --muted: #64748b;
-      --soft: #f6fbff;
-      --line: rgba(122, 148, 173, .22);
-      --glass: rgba(255, 255, 255, .70);
-      --glass-strong: rgba(255, 255, 255, .92);
+      --soft: #f0f7ff;
+      --line: rgba(255, 255, 255, .54);
+      --glass: rgba(255, 255, 255, .66);
+      --glass-strong: rgba(255, 255, 255, .88);
       --ok: #0f7b5f;
       --warn: #9a5b00;
       --bad: #b42318;
@@ -35,7 +35,10 @@
       min-height: 100vh;
       color: var(--ink);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #91cbf5 0, #dff5ff 46%, #ecfff0 100%);
+      background:
+        radial-gradient(circle at 50% 52%, rgba(255,255,255,0) 20%, rgba(240,247,255,.86) 74%, rgba(240,247,255,.98) 100%),
+        linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+      background-attachment: fixed;
       overflow-x: hidden;
     }
 
@@ -51,28 +54,27 @@
       z-index: -2;
       background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgyIi8+PHBhdGggZD0iTTQ1MCwxMjAgQzQyMCwxMjAgNDAwLDEwNSA0MDAsODUgQzQwMCw3MCA0MTUsNTUgNDM1LDU1IEM0NDUsMzUgNDY1LDIwIDQ5MCwyMCBDNTI1LDIwIDU0NSw0MCA1NTUsNjAgQzU3NSw2MCA1OTUsNzUgNTk1LDk1IEM1OTUsMTIwIDU3NSwxMjAgNTUwLDEyMCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjU4Ii8+PHBhdGggZD0iTTMwLDE4MCBDMTAsMTgwIDAsMTcwIDAsMTU1IEMwLDE0MCAxNSwxMzAgMzAsMTMwIEMzNSwxMTUgNTAsMTA1IDcwLDEwNSBDOTUsMTA1IDExMCwxMjAgMTE1LDEzNSBDMTMwLDEzNSAxNDUsMTQ1IDE0NSwxNjAgQzE0NSwxNjAgMTMwLDE4MCAxMTUsMTgwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNjgiLz48L3N2Zz4=");
       background-repeat: repeat-x;
-      background-size: 760px auto;
-      background-position: 0 18px;
-      opacity: .84;
-      animation: drift 48s linear infinite;
+      background-size: 800px auto;
+      background-position: 0 8px;
+      opacity: .72;
+      animation: drift 120s linear infinite;
     }
 
     body::after {
-      z-index: -1;
+      z-index: -3;
       top: auto;
-      height: 32vh;
+      height: 70vh;
       background:
-        radial-gradient(circle at 18% 84%, rgba(255, 217, 79, .95) 0 3px, transparent 4px),
-        radial-gradient(circle at 64% 78%, rgba(255, 255, 255, .92) 0 2px, transparent 3px),
-        radial-gradient(circle at 82% 88%, rgba(245, 121, 85, .80) 0 3px, transparent 4px),
-        linear-gradient(180deg, rgba(122, 196, 77, .10), rgba(72, 158, 58, .54));
-      background-size: 120px 80px, 150px 95px, 180px 110px, 100% 100%;
-      border-top: 1px solid rgba(255,255,255,.36);
+        linear-gradient(180deg, rgba(240,247,255,.08), rgba(240,247,255,.92)),
+        url("https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png");
+      background-size: cover;
+      background-position: center bottom;
+      opacity: .44;
     }
 
     @keyframes drift {
       from { background-position-x: 0; }
-      to { background-position-x: 760px; }
+      to { background-position-x: 800px; }
     }
 
     button, input, textarea, select { font: inherit; }
@@ -93,9 +95,10 @@
       overflow: hidden;
       border: 1px solid rgba(255,255,255,.76);
       border-radius: 8px;
-      background: rgba(255,255,255,.60);
-      backdrop-filter: blur(22px);
-      box-shadow: var(--shadow);
+      background: rgba(255,255,255,.26);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      box-shadow: 0 25px 50px rgba(31, 42, 90, .12), inset 0 1px 1px rgba(255,255,255,.28);
     }
 
     .command-sidebar {
@@ -104,7 +107,7 @@
       gap: 18px;
       padding: 20px 12px;
       border-right: 1px solid rgba(122,148,173,.18);
-      background: rgba(255,255,255,.62);
+      background: rgba(255,255,255,.34);
     }
 
     .sidebar-brand {
@@ -203,7 +206,7 @@
       grid-template-rows: auto auto auto minmax(0, 1fr);
       gap: 14px;
       padding: 14px;
-      background: rgba(248,252,255,.45);
+      background: rgba(240,247,255,.24);
     }
 
     .topbar {
@@ -360,7 +363,9 @@
       padding: 9px 12px;
       font-weight: 900;
       line-height: 1;
-      white-space: nowrap;
+      max-width: 100%;
+      white-space: normal;
+      text-align: center;
       box-shadow: 0 8px 20px rgba(23,32,51,.04);
       transition: transform .16s ease, background .16s ease, border-color .16s ease;
     }
@@ -534,24 +539,24 @@
 
     .outreach-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
       align-items: start;
     }
 
     .outreach-card {
-      overflow: hidden;
-      background: rgba(255,255,255,.74);
+      overflow: visible;
+      background: rgba(255,255,255,.70);
     }
 
     .outreach-main {
       display: grid;
-      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
       min-height: 100%;
     }
 
     .media-col {
-      background: rgba(226, 242, 252, .78);
+      background: rgba(255,255,255,.28);
       border-right: 1px solid var(--line);
       padding: 10px;
       display: grid;
@@ -755,21 +760,34 @@
 
     .action-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(220px, 1fr) max-content;
       gap: 8px;
       align-items: center;
+      min-width: 0;
     }
 
     .drip-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 190px auto;
+      grid-template-columns: minmax(220px, 1fr) minmax(210px, 260px) max-content;
       gap: 8px;
       align-items: end;
+      min-width: 0;
     }
 
     .drip-grid textarea {
-      min-height: 72px;
+      grid-column: 1 / -1;
+      min-height: 96px;
       max-height: 160px;
+    }
+
+    .action-grid .select,
+    .drip-grid .field {
+      min-width: 0;
+    }
+
+    .action-grid .btn,
+    .drip-grid .btn {
+      align-self: stretch;
     }
 
     .rows {
@@ -930,6 +948,13 @@
       .outreach-grid { grid-template-columns: 1fr; }
     }
 
+    @media (max-width: 980px) {
+      .outreach-main { grid-template-columns: 1fr; }
+      .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
+      .action-grid,
+      .drip-grid { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 760px) {
       .app { padding: 10px; }
       .command-shell { min-height: calc(100vh - 20px); }
@@ -943,8 +968,6 @@
       .score-panel { grid-template-columns: 1fr; }
       .score-ring { width: 92px; height: 92px; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .outreach-main { grid-template-columns: 1fr; }
-      .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
       .action-grid,
       .drip-grid { grid-template-columns: 1fr; }
       .data-row { grid-template-columns: 1fr; }
@@ -1865,7 +1888,7 @@
               `).join('') : '<option>No active loan officers</option>'}
             </select>
             <button class="btn primary" data-accept-open-house="${esc(key)}" ${disabled || acceptBusy ? 'disabled' : ''}>
-              <i data-lucide="calendar-check"></i><span>${acceptBusy ? 'Accepting...' : profiles.length ? 'Accept OH + assign LO' : 'Accept OH'}</span>
+              <i data-lucide="calendar-check"></i><span>${acceptBusy ? 'Accepting...' : profiles.length ? 'Accept + assign LO' : 'Accept open house'}</span>
             </button>
           </div>
           <div class="drip-grid">
