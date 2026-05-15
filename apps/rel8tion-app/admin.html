@@ -9,19 +9,23 @@
   <style>
     :root {
       color-scheme: light;
-      --sky: #37bdf4;
+      --sky: #7ec8f5;
+      --sky-strong: #28a8df;
       --teal: #0f8fbd;
       --teal-strong: #075e7e;
-      --ink: #172033;
+      --ink: #102033;
       --muted: #64748b;
-      --line: rgba(136, 164, 190, .32);
-      --glass: rgba(255, 255, 255, .68);
-      --glass-strong: rgba(255, 255, 255, .86);
-      --wash: #eef8ff;
+      --soft: #f6fbff;
+      --line: rgba(122, 148, 173, .22);
+      --glass: rgba(255, 255, 255, .70);
+      --glass-strong: rgba(255, 255, 255, .92);
       --ok: #0f7b5f;
       --warn: #9a5b00;
       --bad: #b42318;
-      --shadow: 0 22px 60px rgba(23, 32, 51, .11);
+      --violet: #6657d9;
+      --orange: #f97316;
+      --shadow: 0 24px 70px rgba(23, 32, 51, .14);
+      --soft-shadow: 0 14px 34px rgba(23, 32, 51, .08);
     }
 
     * { box-sizing: border-box; }
@@ -31,10 +35,44 @@
       min-height: 100vh;
       color: var(--ink);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #91cbf5 0, #dff5ff 46%, #ecfff0 100%);
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    body::before {
+      z-index: -2;
+      background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgyIi8+PHBhdGggZD0iTTQ1MCwxMjAgQzQyMCwxMjAgNDAwLDEwNSA0MDAsODUgQzQwMCw3MCA0MTUsNTUgNDM1LDU1IEM0NDUsMzUgNDY1LDIwIDQ5MCwyMCBDNTI1LDIwIDU0NSw0MCA1NTUsNjAgQzU3NSw2MCA1OTUsNzUgNTk1LDk1IEM1OTUsMTIwIDU3NSwxMjAgNTUwLDEyMCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjU4Ii8+PHBhdGggZD0iTTMwLDE4MCBDMTAsMTgwIDAsMTcwIDAsMTU1IEMwLDE0MCAxNSwxMzAgMzAsMTMwIEMzNSwxMTUgNTAsMTA1IDcwLDEwNSBDOTUsMTA1IDExMCwxMjAgMTE1LDEzNSBDMTMwLDEzNSAxNDUsMTQ1IDE0NSwxNjAgQzE0NSwxNjAgMTMwLDE4MCAxMTUsMTgwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNjgiLz48L3N2Zz4=");
+      background-repeat: repeat-x;
+      background-size: 760px auto;
+      background-position: 0 18px;
+      opacity: .84;
+      animation: drift 48s linear infinite;
+    }
+
+    body::after {
+      z-index: -1;
+      top: auto;
+      height: 32vh;
       background:
-        linear-gradient(180deg, rgba(55,189,244,.82) 0, rgba(238,248,255,.92) 250px, #f7fbff 100%),
-        linear-gradient(120deg, rgba(12,104,133,.18), rgba(255,255,255,0) 42%),
-        #f7fbff;
+        radial-gradient(circle at 18% 84%, rgba(255, 217, 79, .95) 0 3px, transparent 4px),
+        radial-gradient(circle at 64% 78%, rgba(255, 255, 255, .92) 0 2px, transparent 3px),
+        radial-gradient(circle at 82% 88%, rgba(245, 121, 85, .80) 0 3px, transparent 4px),
+        linear-gradient(180deg, rgba(122, 196, 77, .10), rgba(72, 158, 58, .54));
+      background-size: 120px 80px, 150px 95px, 180px 110px, 100% 100%;
+      border-top: 1px solid rgba(255,255,255,.36);
+    }
+
+    @keyframes drift {
+      from { background-position-x: 0; }
+      to { background-position-x: 760px; }
     }
 
     button, input, textarea, select { font: inherit; }
@@ -43,28 +81,253 @@
 
     .app {
       min-height: 100vh;
-      padding: 18px;
+      padding: 34px 22px;
     }
 
     .command-shell {
-      width: min(1480px, 100%);
+      width: min(1520px, 100%);
       margin: 0 auto;
       display: grid;
-      gap: 14px;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: calc(100vh - 68px);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.76);
+      border-radius: 8px;
+      background: rgba(255,255,255,.60);
+      backdrop-filter: blur(22px);
+      box-shadow: var(--shadow);
     }
 
-    .command-header {
-      min-height: 92px;
+    .command-sidebar {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 18px;
+      padding: 20px 12px;
+      border-right: 1px solid rgba(122,148,173,.18);
+      background: rgba(255,255,255,.62);
+    }
+
+    .sidebar-brand {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 18px;
-      border: 1px solid rgba(255,255,255,.72);
+      gap: 12px;
+      padding: 0 10px 14px;
+      border-bottom: 1px solid rgba(122,148,173,.16);
+    }
+
+    .sidebar-brand img {
+      width: 64px;
+      height: auto;
+      flex: 0 0 auto;
+    }
+
+    .sidebar-brand strong {
+      display: block;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .sidebar-brand span {
+      display: block;
+      margin-top: 4px;
+      color: #62748a;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+
+    .area-nav {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .nav-button {
+      width: 100%;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid transparent;
       border-radius: 8px;
-      background: rgba(255,255,255,.42);
+      background: transparent;
+      color: #31465f;
+      padding: 10px 11px;
+      text-align: left;
+      font-weight: 900;
+    }
+
+    .nav-button svg {
+      width: 18px;
+      height: 18px;
+      color: #66839e;
+    }
+
+    .nav-button:hover,
+    .nav-button.active {
+      border-color: rgba(91,141,255,.20);
+      background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(236,245,255,.74));
+      color: #2445d8;
+      box-shadow: 0 10px 24px rgba(72, 91, 150, .08);
+    }
+
+    .nav-button.active svg { color: #2445d8; }
+
+    .sidebar-card {
+      margin: 0 6px;
+      border: 1px solid rgba(255,255,255,.82);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.84), rgba(229,246,255,.64)),
+        rgba(255,255,255,.66);
+      box-shadow: var(--soft-shadow);
+      padding: 13px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .sidebar-card .value {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .command-workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+      background: rgba(248,252,255,.45);
+    }
+
+    .topbar {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: minmax(260px, 430px) minmax(190px, 280px) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.76);
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      box-shadow: 0 10px 26px rgba(23,32,51,.05);
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      width: 17px;
+      height: 17px;
+      color: #6b7d92;
+      transform: translateY(-50%);
+    }
+
+    .search-wrap .field {
+      padding-left: 38px;
+      font-weight: 800;
+    }
+
+    .command-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .hero-panel,
+    .score-panel {
+      border: 1px solid rgba(255,255,255,.78);
+      border-radius: 8px;
+      background: rgba(255,255,255,.72);
       backdrop-filter: blur(18px);
-      box-shadow: var(--shadow);
+      box-shadow: var(--soft-shadow);
+      padding: 16px;
+    }
+
+    .hero-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.86), rgba(236,249,255,.68)),
+        rgba(255,255,255,.70);
+    }
+
+    .hero-label {
+      color: #41708d;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+    }
+
+    .hero-title {
+      margin: 5px 0 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(30px, 4vw, 56px);
+      font-weight: 800;
+      line-height: .95;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      margin-top: 9px;
+      color: #4a6075;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .hero-stack {
+      display: grid;
+      gap: 8px;
+      min-width: 190px;
+    }
+
+    .hero-mini {
+      border: 1px solid rgba(122,148,173,.18);
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      padding: 10px;
+    }
+
+    .score-panel {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+    }
+
+    .score-ring {
+      width: 108px;
+      height: 108px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,.92) 0 53%, transparent 54%),
+        conic-gradient(var(--teal) calc(var(--score, 74) * 1%), rgba(207, 222, 235, .62) 0);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.86), 0 14px 32px rgba(23,32,51,.08);
+    }
+
+    .score-ring span {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1;
     }
 
     .brand {
@@ -72,28 +335,6 @@
       align-items: center;
       gap: 14px;
       min-width: 0;
-    }
-
-    .brand img {
-      width: 78px;
-      height: auto;
-      flex: 0 0 auto;
-    }
-
-    .brand h1 {
-      margin: 0;
-      font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: clamp(28px, 4vw, 54px);
-      font-weight: 800;
-      line-height: .94;
-      letter-spacing: 0;
-    }
-
-    .brand .sub {
-      margin-top: 6px;
-      color: #36566b;
-      font-size: 13px;
-      font-weight: 800;
     }
 
     .header-actions,
@@ -121,9 +362,11 @@
       line-height: 1;
       white-space: nowrap;
       box-shadow: 0 8px 20px rgba(23,32,51,.04);
+      transition: transform .16s ease, background .16s ease, border-color .16s ease;
     }
 
     .btn svg { width: 17px; height: 17px; }
+    .btn:hover { transform: translateY(-1px); }
     .btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
     .btn.primary:hover { background: var(--teal-strong); border-color: var(--teal-strong); }
     .btn.soft { background: rgba(255,255,255,.58); }
@@ -158,22 +401,9 @@
       box-shadow: 0 0 0 3px rgba(15,143,189,.16);
     }
 
-    .controls {
-      display: grid;
-      grid-template-columns: minmax(220px, 320px) minmax(220px, 1fr) auto;
-      gap: 10px;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.72);
-      border-radius: 8px;
-      background: rgba(255,255,255,.50);
-      backdrop-filter: blur(18px);
-      box-shadow: 0 14px 34px rgba(23,32,51,.06);
-    }
-
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
       gap: 10px;
     }
 
@@ -188,13 +418,62 @@
     }
 
     .stat-card {
+      position: relative;
+      overflow: hidden;
       padding: 13px;
-      min-height: 92px;
+      min-height: 108px;
       display: grid;
       align-content: space-between;
+      gap: 14px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.92), rgba(246,251,255,.72)),
+        var(--glass);
+    }
+
+    .stat-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -18px -28px auto;
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      background: rgba(15,143,189,.12);
+    }
+
+    .stat-card.sky::after { background: rgba(40,168,223,.16); }
+    .stat-card.violet::after { background: rgba(102,87,217,.14); }
+    .stat-card.green::after { background: rgba(15,123,95,.14); }
+    .stat-card.orange::after { background: rgba(249,115,22,.16); }
+    .stat-card.rose::after { background: rgba(244,63,94,.13); }
+
+    .stat-top {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .stat-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(122,148,173,.18);
+      background: rgba(255,255,255,.72);
+      color: var(--teal);
+    }
+
+    .stat-icon svg {
+      width: 18px;
+      height: 18px;
     }
 
     .stat-card .value {
+      position: relative;
+      z-index: 1;
       font-family: "Plus Jakarta Sans", Inter, sans-serif;
       font-size: 32px;
       line-height: 1;
@@ -202,12 +481,27 @@
     }
 
     .stat-card .label {
-      margin-top: 8px;
       color: #446175;
       font-size: 11px;
       font-weight: 900;
       text-transform: uppercase;
       letter-spacing: .08em;
+    }
+
+    .meter {
+      position: relative;
+      z-index: 1;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(122,148,173,.16);
+      overflow: hidden;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--teal), #13b287);
     }
 
     .main-grid {
@@ -455,7 +749,11 @@
 
     .rows {
       display: grid;
-      gap: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 16px 42px rgba(23,32,51,.07);
     }
 
     .data-row {
@@ -464,10 +762,11 @@
       gap: 8px;
       align-items: center;
       padding: 10px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255,255,255,.68);
+      border-bottom: 1px solid rgba(122,148,173,.17);
+      background: rgba(255,255,255,.58);
     }
+
+    .data-row:last-child { border-bottom: 0; }
 
     .data-row .primary {
       font-weight: 900;
@@ -592,14 +891,32 @@
     .toast.show { display: block; }
 
     @media (max-width: 1120px) {
+      .command-shell { grid-template-columns: 1fr; }
+      .command-sidebar {
+        grid-template-rows: auto;
+        border-right: 0;
+        border-bottom: 1px solid rgba(122,148,173,.18);
+      }
+      .area-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .topbar { grid-template-columns: 1fr auto; }
+      .search-wrap { grid-column: 1 / -1; }
+      .command-hero { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .outreach-grid { grid-template-columns: 1fr; }
-      .controls { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 760px) {
       .app { padding: 10px; }
-      .command-header { align-items: flex-start; flex-direction: column; }
+      .command-shell { min-height: calc(100vh - 20px); }
+      .command-sidebar,
+      .command-workspace { padding: 10px; }
+      .sidebar-brand { padding-inline: 4px; }
+      .area-nav { grid-template-columns: 1fr; }
+      .topbar { grid-template-columns: 1fr; }
+      .header-actions { justify-content: flex-start; }
+      .hero-panel { grid-template-columns: 1fr; }
+      .score-panel { grid-template-columns: 1fr; }
+      .score-ring { width: 92px; height: 92px; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .outreach-main { grid-template-columns: 1fr; }
       .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -637,6 +954,7 @@
       actionKey: '',
       error: '',
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
+      query: '',
       outreachFilter: 'needs_reply',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, opt_out: 0 },
@@ -749,12 +1067,39 @@
     }
 
     function filteredInbox() {
+      const query = state.query.trim().toLowerCase();
       return state.inbox.filter((thread) => {
         if (state.outreachFilter === 'all') return true;
         if (state.outreachFilter === 'inbound') return thread.direction !== 'outbound';
         if (state.outreachFilter === 'needs_reply') return needsReply(thread);
         if (state.outreachFilter === 'opt_out') return isOptOutThread(thread);
         return true;
+      }).filter((thread) => {
+        if (!query) return true;
+        const messages = Array.isArray(thread.messages) ? thread.messages : [];
+        const haystack = [
+          thread.agent_name,
+          thread.brokerage,
+          thread.address,
+          thread.agent_phone,
+          thread.from_phone,
+          thread.selected_sms,
+          thread.latest_reply_body,
+          ...messages.map((message) => message.body)
+        ].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    function filterByQuery(rows) {
+      const query = state.query.trim().toLowerCase();
+      if (!query) return rows || [];
+      return (rows || []).filter((row) => {
+        try {
+          return JSON.stringify(row || {}).toLowerCase().includes(query);
+        } catch (_) {
+          return false;
+        }
       });
     }
 
@@ -987,41 +1332,110 @@
       window.lucide?.createIcons();
     }
 
+    function areaIcon(area) {
+      return {
+        outreach: 'message-square-reply',
+        crm: 'users-round',
+        signs: 'scan-line',
+        lo: 'user-check',
+        payments: 'credit-card',
+        reports: 'bar-chart-3'
+      }[area] || 'layout-dashboard';
+    }
+
+    function renderAreaNav() {
+      return AREAS.map(([key, label]) => `
+        <button type="button" class="nav-button${state.area === key ? ' active' : ''}" data-area-nav="${esc(key)}">
+          <i data-lucide="${areaIcon(key)}"></i><span>${esc(label)}</span>
+        </button>
+      `).join('');
+    }
+
+    function commandScore() {
+      const inbound = Number(state.counts.inbound || state.command?.overview?.incoming_threads || 0);
+      const needs = Number(state.counts.needs_reply || state.command?.overview?.needs_reply || 0);
+      if (!inbound) return 100;
+      return Math.max(0, Math.min(100, Math.round(((inbound - needs) / inbound) * 100)));
+    }
+
     function renderShell() {
       const areaLabel = AREAS.find(([key]) => key === state.area)?.[1] || 'Outreach command';
+      const o = state.command?.overview || {};
+      const score = commandScore();
+      const loadedText = state.loadedAt ? `Live data loaded ${fmtDate(state.loadedAt)}` : 'Live command center';
+      const needsReplyCount = state.counts.needs_reply || o.needs_reply || 0;
       app.innerHTML = `
         <main class="app">
           <div class="command-shell">
-            <header class="command-header">
-              <div class="brand">
-                <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
-                <div>
-                  <h1>REL8TION COMMAND</h1>
-                  <div class="sub">${state.loadedAt ? `Live data loaded ${esc(fmtDate(state.loadedAt))}` : 'Live command center'}</div>
+            <aside class="command-sidebar">
+              <div>
+                <div class="sidebar-brand">
+                  <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+                  <div><strong>REL8TION</strong><span>Command</span></div>
                 </div>
+                <nav class="area-nav" aria-label="Command areas">
+                  ${renderAreaNav()}
+                </nav>
               </div>
-              <div class="header-actions">
-                ${state.loading ? badge('Refreshing', 'info') : badge('Live', 'ok')}
-                <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
-                <button class="btn soft" id="lockBtn"><i data-lucide="log-out"></i><span>Lock</span></button>
-              </div>
-            </header>
 
-            <section class="controls">
-              <select id="areaSelect" class="select">
-                ${AREAS.map(([key, label]) => `<option value="${key}"${state.area === key ? ' selected' : ''}>${esc(label)}</option>`).join('')}
-              </select>
-              <div class="control-row">
-                ${badge(areaLabel, 'info')}
-                ${state.error ? badge(state.error, 'bad') : ''}
+              <div class="sidebar-card">
+                <div class="mini-title">Needs attention</div>
+                <div class="value">${esc(needsReplyCount)}</div>
+                <div class="small">SMS threads waiting for a reply</div>
+                <button class="btn primary" id="outreachJump"><i data-lucide="message-square-reply"></i><span>Open outreach</span></button>
               </div>
-              <div class="row-actions">
-                <button class="btn primary" id="outreachJump"><i data-lucide="message-square-reply"></i><span>Outreach</span></button>
-              </div>
+
+              <button class="btn soft" id="lockBtn"><i data-lucide="log-out"></i><span>Lock command</span></button>
+            </aside>
+
+            <section class="command-workspace">
+              <header class="topbar">
+                <div class="search-wrap">
+                  <i data-lucide="search"></i>
+                  <input id="globalSearch" class="field" value="${esc(state.query)}" autocomplete="off" placeholder="Search agents, signs, open houses, SMS">
+                </div>
+                <select id="areaSelect" class="select" aria-label="Dashboard area">
+                  ${AREAS.map(([key, label]) => `<option value="${key}"${state.area === key ? ' selected' : ''}>${esc(label)}</option>`).join('')}
+                </select>
+                <div class="header-actions">
+                  ${state.loading ? badge('Refreshing', 'info') : badge('Live', 'ok')}
+                  ${state.error ? badge(state.error, 'bad') : badge(areaLabel, 'info')}
+                  <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+                </div>
+              </header>
+
+              <section class="command-hero">
+                <div class="hero-panel">
+                  <div>
+                    <div class="hero-label">${esc(areaLabel)}</div>
+                    <h1 class="hero-title">REL8TION COMMAND</h1>
+                    <div class="hero-copy">Control outreach, agent CRM, smart signs, live loan officer coverage, payments, and reporting from one operational dashboard.</div>
+                  </div>
+                  <div class="hero-stack">
+                    <div class="hero-mini">
+                      <div class="mini-title">Updated</div>
+                      <div class="small">${esc(loadedText)}</div>
+                    </div>
+                    <div class="hero-mini">
+                      <div class="mini-title">Field activity</div>
+                      <div class="small">${esc(o.active_signs || 0)} active signs | ${esc(o.open_events || 0)} open events</div>
+                    </div>
+                  </div>
+                </div>
+
+                <aside class="score-panel" style="--score:${esc(score)}">
+                  <div class="score-ring"><span>${esc(score)}%</span></div>
+                  <div>
+                    <div class="mini-title">Command score</div>
+                    <div class="address">${score >= 85 ? 'Clean' : score >= 60 ? 'Working' : 'Needs focus'}</div>
+                    <div class="small">${esc(needsReplyCount)} open SMS replies, ${esc(o.open_events_without_lo || 0)} open houses need LO coverage.</div>
+                  </div>
+                </aside>
+              </section>
+
+              ${renderStats()}
+              <section class="main-grid">${renderArea()}</section>
             </section>
-
-            ${renderStats()}
-            <section class="main-grid">${renderArea()}</section>
           </div>
         </main>
       `;
@@ -1029,7 +1443,31 @@
       document.getElementById('refreshBtn')?.addEventListener('click', loadAll);
       document.getElementById('lockBtn')?.addEventListener('click', signOut);
       document.getElementById('areaSelect')?.addEventListener('change', (event) => setArea(event.target.value));
+      document.querySelectorAll('[data-area-nav]').forEach((button) => {
+        button.addEventListener('click', () => setArea(button.dataset.areaNav));
+      });
       document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
+      document.getElementById('globalSearch')?.addEventListener('input', (event) => {
+        state.query = event.target.value;
+        window.clearTimeout(renderShell.searchTimer);
+        renderShell.searchTimer = window.setTimeout(refreshAreaContent, 180);
+      });
+      bindAreaActions();
+      window.lucide?.createIcons();
+    }
+
+    function refreshAreaContent() {
+      const main = document.querySelector('.main-grid');
+      if (!main) {
+        render();
+        return;
+      }
+      main.innerHTML = renderArea();
+      bindAreaActions();
+      window.lucide?.createIcons();
+    }
+
+    function bindAreaActions() {
       document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
       document.querySelectorAll('[data-draft-key]').forEach((textarea) => {
         textarea.addEventListener('input', () => updateDraft(textarea.dataset.draftKey, textarea.value));
@@ -1044,24 +1482,31 @@
         button.addEventListener('click', () => endLoanOfficer(button.dataset.endLo));
       });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
-      window.lucide?.createIcons();
     }
 
     function renderStats() {
       const o = state.command?.overview || {};
+      const inbound = state.counts.inbound || o.incoming_threads || 0;
+      const needs = state.counts.needs_reply || o.needs_reply || 0;
       const stats = [
-        ['Needs reply', state.counts.needs_reply || o.needs_reply || 0],
-        ['Inbound', state.counts.inbound || o.incoming_threads || 0],
-        ['Active signs', o.active_signs || 0],
-        ['Open events', o.open_events || 0],
-        ['Needs LO', o.open_events_without_lo || 0],
-        ['Check-ins', o.checkins || 0],
-        ['Pay setup', o.payments_needing_setup || 0]
+        { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4 },
+        { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10 },
+        { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8 },
+        { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8 },
+        { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6 },
+        { label: 'Check-ins', value: o.checkins || 0, icon: 'badge-check', tone: 'sky', meter: o.checkins ? 86 : 12 },
+        { label: 'Pay setup', value: o.payments_needing_setup || 0, icon: 'credit-card', tone: o.payments_needing_setup ? 'orange' : 'green', meter: o.payments_needing_setup ? 62 : 7 }
       ];
-      return `<section class="stats-grid">${stats.map(([label, value]) => `
-        <div class="stat-card">
-          <div class="value">${esc(value)}</div>
-          <div class="label">${esc(label)}</div>
+      return `<section class="stats-grid">${stats.map((stat) => `
+        <div class="stat-card ${esc(stat.tone)}">
+          <div class="stat-top">
+            <div>
+              <div class="value">${esc(stat.value)}</div>
+              <div class="label">${esc(stat.label)}</div>
+            </div>
+            <div class="stat-icon"><i data-lucide="${esc(stat.icon)}"></i></div>
+          </div>
+          <div class="meter"><span style="width:${Math.max(4, Math.min(100, Math.round(stat.meter)))}%"></span></div>
         </div>
       `).join('')}</section>`;
     }
@@ -1182,7 +1627,7 @@
     }
 
     function renderCrm() {
-      const rows = state.command?.crm || [];
+      const rows = filterByQuery(state.command?.crm || []);
       return renderRows('Agent CRM', `${rows.length} agent records and outreach contacts`, rows.slice(0, 80), (row) => `
         <div>
           <div class="primary">${esc(row.name || 'Unknown agent')}</div>
@@ -1196,8 +1641,8 @@
     }
 
     function renderSigns() {
-      const signs = state.command?.signs || [];
-      const events = state.command?.events || [];
+      const signs = filterByQuery(state.command?.signs || []);
+      const events = filterByQuery(state.command?.events || []);
       return `
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
@@ -1223,10 +1668,10 @@
     }
 
     function renderLoanOfficers() {
-      const profiles = state.command?.loan_officers || [];
-      const sessions = state.command?.loan_sessions || [];
+      const profiles = filterByQuery(state.command?.loan_officers || []);
+      const sessions = filterByQuery(state.command?.loan_sessions || []);
       const activeProfiles = profiles.filter((row) => row.is_active !== false);
-      const events = (state.command?.events || [])
+      const events = filterByQuery(state.command?.events || [])
         .filter((row) => row.status === 'active' && !row.ended_at)
         .sort((a, b) => new Date(a.start_time || a.created_at || 0) - new Date(b.start_time || b.created_at || 0));
       return `
@@ -1301,7 +1746,7 @@
     }
 
     function renderPayments() {
-      const rows = state.command?.payments || [];
+      const rows = filterByQuery(state.command?.payments || []);
       return renderRows('Payment control', `${rows.length} billing records to create or reconcile`, rows.slice(0, 100), (row) => `
         <div>
           <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
