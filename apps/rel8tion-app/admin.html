@@ -1278,14 +1278,16 @@
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
+        const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
         render();
-        restoreUiState(uiSnapshot);
+        restoreUiState(restoreSnapshot);
       } catch (error) {
+        const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
         state.error = error.message || 'Unable to load command data.';
         render();
-        restoreUiState(uiSnapshot);
+        restoreUiState(restoreSnapshot);
       }
     }
 
