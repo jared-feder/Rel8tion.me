@@ -238,8 +238,12 @@ function buildConfirmedOpenHouses({ outreach, visits, participants, messages, op
     const liveLoan = event.id ? liveLoanByEvent.get(event.id) || null : null;
     const rowMessages = messagesByQueue.get(queueId) || [];
 
-    const scheduledStart = firstPresent(visit.scheduled_start, queue.open_start, event.start_time, openHouse.open_start, context.open_start);
-    const scheduledEnd = firstPresent(visit.scheduled_end, queue.open_end, event.end_time, openHouse.open_end, context.open_end);
+    const listedOpenStart = firstPresent(queue.open_start, event.start_time, openHouse.open_start, context.open_start);
+    const listedOpenEnd = firstPresent(queue.open_end, event.end_time, openHouse.open_end, context.open_end);
+    const confirmedCoverageStart = firstPresent(visit.scheduled_start);
+    const confirmedCoverageEnd = firstPresent(visit.scheduled_end);
+    const scheduledStart = firstPresent(confirmedCoverageStart, listedOpenStart);
+    const scheduledEnd = firstPresent(confirmedCoverageEnd, listedOpenEnd);
     const address = firstPresent(queue.address, openHouse.address, context.address, context.property_address, eventAddress(event));
     const city = firstPresent(queue.city, openHouse.city, context.city);
     const state = firstPresent(queue.state, openHouse.state, context.state);
@@ -257,6 +261,10 @@ function buildConfirmedOpenHouses({ outreach, visits, participants, messages, op
       confirmed_at: firstPresent(visit.confirmed_at, visit.created_at, queue.initial_sent_at, queue.created_at),
       scheduled_start: scheduledStart,
       scheduled_end: scheduledEnd,
+      listed_open_start: listedOpenStart,
+      listed_open_end: listedOpenEnd,
+      confirmed_coverage_start: confirmedCoverageStart,
+      confirmed_coverage_end: confirmedCoverageEnd,
       property_address: fullAddress,
       address,
       city,

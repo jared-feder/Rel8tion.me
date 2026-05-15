@@ -2853,6 +2853,13 @@
       return first || second || '';
     }
 
+    function reportDisplayWindow(start, end) {
+      return [fmtDate(start), fmtDate(end)]
+        .filter(Boolean)
+        .filter((value, index, values) => index === 0 || value !== values[0])
+        .join(' - ');
+    }
+
     function generatedStamp(date = new Date()) {
       const stamp = new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
@@ -2912,9 +2919,17 @@
       const generated = generatedStamp();
       const rowsHtml = rows.map((row, index) => {
         const photo = row.listing_photo_url || row.mockup_image_url || '';
+        const listedWindow = compactReportWindow(
+          row.listed_open_start || (!row.confirmed_coverage_start ? row.scheduled_start : ''),
+          row.listed_open_end || (!row.confirmed_coverage_end ? row.scheduled_end : '')
+        );
+        const confirmedWindow = compactReportWindow(
+          row.confirmed_coverage_start || row.scheduled_start,
+          row.confirmed_coverage_end || row.scheduled_end
+        );
+        const confirmedOn = compactReportDate(row.confirmed_at);
         const facts = [
           money(row.price),
-          compactReportWindow(row.scheduled_start, row.scheduled_end),
           compactReportStatus(row)
         ].filter(Boolean).join(' | ');
         const agentMeta = [fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | ');
@@ -2931,6 +2946,9 @@
             <td class="meta">
               <b>${esc(row.property_address || 'Confirmed open house')}</b><br>
               ${esc(facts || 'No property facts')}<br>
+              <span class="report-line"><b>Open House Listed:</b> ${esc(listedWindow || 'No listed window')}</span>
+              <span class="report-line confirm-line"><b>Confirmed Coverage:</b> ${esc(confirmedWindow || 'No confirmed coverage window')}</span>
+              <span class="report-line"><b>Confirmed On:</b> ${esc(confirmedOn || 'No confirmed timestamp')}</span>
               <b>${esc(row.agent_name || 'Unknown agent')}</b><br>
               ${esc(agentMeta || row.brokerage || 'No agent contact')}<br>
               ${row.brokerage ? `<span class="muted">${esc(row.brokerage)}</span>` : ''}
@@ -2959,6 +2977,8 @@ th { background:#f8fafc; text-align:left; font-weight:bold; }
 .agent { line-height:1.19; word-wrap:break-word; }
 .me div,.agent div { margin-bottom:3px; }
 .muted { color:#64748b; }
+.report-line { display:block; margin-top:2px; }
+.confirm-line { color:#0f766e; }
 .lo-line { display:block; margin-top:3px; color:#0f172a; }
 </style></head><body>
 <h1>${esc(title)}</h1>
@@ -3010,10 +3030,14 @@ ${rowsHtml}
       const photo = row.listing_photo_url || row.mockup_image_url || '';
       const conversation = row.conversation_snapshot || 'No conversation snapshot loaded.';
       const facts = [money(row.price), row.beds ? `${row.beds} beds` : '', row.baths ? `${row.baths} baths` : ''].filter(Boolean).join(' | ');
-      const openWindow = [fmtDate(row.scheduled_start), fmtDate(row.scheduled_end)]
-        .filter(Boolean)
-        .filter((value, index, values) => index === 0 || value !== values[0])
-        .join(' - ');
+      const listedWindow = reportDisplayWindow(
+        row.listed_open_start || (!row.confirmed_coverage_start ? row.scheduled_start : ''),
+        row.listed_open_end || (!row.confirmed_coverage_end ? row.scheduled_end : '')
+      );
+      const confirmedWindow = reportDisplayWindow(
+        row.confirmed_coverage_start || row.scheduled_start,
+        row.confirmed_coverage_end || row.scheduled_end
+      );
       return `
         <article class="confirmed-card">
           <div class="report-media">
@@ -3023,7 +3047,7 @@ ${rowsHtml}
           <div class="confirmed-body">
             <div>
               <div class="address">${esc(row.property_address || 'Confirmed open house')}</div>
-              <div class="open-time">${esc([openWindow, facts].filter(Boolean).join(' | '))}</div>
+              <div class="open-time">${esc([listedWindow ? `Listed OH: ${listedWindow}` : '', facts].filter(Boolean).join(' | '))}</div>
             </div>
             <div class="badges">
               ${badge(row.visit_status || 'confirmed', row.visit_status === 'cancelled' ? 'bad' : 'ok')}
@@ -3042,9 +3066,9 @@ ${rowsHtml}
                 <div class="secondary">${esc([row.loan_officer_company, fmtPhone(row.loan_officer_phone), row.loan_officer_email].filter(Boolean).join(' | ') || 'No LO coverage recorded')}</div>
               </div>
               <div class="report-detail">
-                <div class="mini-title">Confirmed</div>
-                <div class="primary">${esc(fmtDate(row.confirmed_at) || 'No date')}</div>
-                <div class="secondary">${esc(row.open_house_id || row.queue_row_id || '')}</div>
+                <div class="mini-title">Confirmed coverage</div>
+                <div class="primary">${esc(confirmedWindow || 'No coverage window')}</div>
+                <div class="secondary">${esc(fmtDate(row.confirmed_at) ? `Confirmed on ${fmtDate(row.confirmed_at)}` : 'No confirmed timestamp')}</div>
               </div>
               <div class="report-detail">
                 <div class="mini-title">Photos</div>
