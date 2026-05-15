@@ -217,8 +217,9 @@ serve(async (req) => {
         const openEnd = row.open_end ? new Date(row.open_end) : null;
 
         const isMissedOpenHouseCampaign = row.template_key === "missed_open_house";
+        const isAdminScheduledDrip = row.review_status === "drip_scheduled";
         const initialStale = !isMissedOpenHouseCampaign && !!openEnd && openEnd <= now;
-        const followupStale = !!openStart && openStart <= now;
+        const followupStale = !isAdminScheduledDrip && !!openStart && openStart <= now;
 
         if (row.initial_send_status === "pending" && initialStale) {
           await supabase
@@ -277,7 +278,7 @@ serve(async (req) => {
           row.approved_for_send === true &&
           row.initial_send_status === "sent" &&
           row.initial_sent_at &&
-          (!openStart || openStart > now);
+          (isAdminScheduledDrip || !openStart || openStart > now);
 
         if (!initialDue && !followupDue) {
           continue;

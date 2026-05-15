@@ -17,12 +17,14 @@ function sortCounts(rows) {
     all: rows.length,
     inbound: 0,
     needs_reply: 0,
+    interested: 0,
     opt_out: 0
   };
 
   for (const row of rows) {
     if (row.direction !== 'outbound') counts.inbound += 1;
     if (row.any_opt_out || row.latest_reply_opt_out || row.review_status === 'opted_out') counts.opt_out += 1;
+    if (['interested', 'accepted_open_house', 'drip_scheduled'].includes(row.review_status)) counts.interested += 1;
     if (row.direction !== 'outbound' && !row.any_opt_out && row.review_status !== 'opted_out') counts.needs_reply += 1;
   }
 
@@ -53,7 +55,10 @@ const QUEUE_SELECT = [
   'followup_sms',
   'review_status',
   'initial_send_status',
+  'initial_sent_at',
   'followup_send_status',
+  'followup_send_at',
+  'followup_sent_at',
   'send_mode',
   'last_outreach_at',
   'created_at'

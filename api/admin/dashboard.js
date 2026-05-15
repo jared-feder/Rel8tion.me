@@ -114,6 +114,62 @@ function buildEvents({ events, checkins, loanSessions }) {
   }));
 }
 
+function eventContext(event) {
+  return event?.setup_context && typeof event.setup_context === 'object' ? event.setup_context : {};
+}
+
+function eventAddress(event) {
+  const context = eventContext(event);
+  return context.address || context.property_address || context.listing_address || context.open_house_address || event?.open_house_source_id || event?.id || 'Open house';
+}
+
+function buildLeads({ leads, checkins, events }) {
+  const eventById = new Map((events || []).map((event) => [event.id, event]));
+  const profileLeads = (leads || []).map((lead) => ({
+    ...lead,
+    lead_source: 'profile',
+    lead_name: lead.name || 'Buyer lead',
+    lead_phone: lead.phone || '',
+    lead_email: lead.email || '',
+    property_label: lead.property_address || '',
+    agent_label: lead.agent_slug || lead.agent || '',
+    financing_label: lead.preapproved === true ? 'Pre-approved' : lead.preapproved === false ? 'Needs financing' : 'Unknown',
+    created_at: lead.created_at
+  }));
+
+  const eventLeads = (checkins || []).map((checkin) => {
+    const event = eventById.get(checkin.open_house_event_id) || null;
+    return {
+      ...checkin,
+      lead_source: 'event_checkin',
+      lead_name: checkin.visitor_name || checkin.metadata?.name || 'Buyer check-in',
+      lead_phone: checkin.visitor_phone || checkin.metadata?.phone || '',
+      lead_email: checkin.visitor_email || checkin.metadata?.email || '',
+      property_label: eventAddress(event),
+      agent_label: event?.host_agent_slug || '',
+      financing_label: checkin.pre_approved === true ? 'Pre-approved' : checkin.pre_approved === false ? 'Needs financing' : 'Unknown',
+      event_status: event?.status || '',
+      created_at: checkin.created_at
+    };
+  });
+
+  return recent([...eventLeads, ...profileLeads], 'created_at', 200);
+}
+
+function buildFieldVisits({ visits, participants }) {
+  const grouped = new Map();
+  for (const visit of visits || []) {
+    grouped.set(visit.id, { ...visit, participants: [] });
+  }
+  for (const participant of participants || []) {
+    const visit = grouped.get(participant.field_demo_visit_id);
+    if (visit) visit.participants.push(participant);
+  }
+  return [...grouped.values()]
+    .sort((a, b) => new Date(a.scheduled_start || a.created_at || 0) - new Date(b.scheduled_start || b.created_at || 0))
+    .slice(0, 150);
+}
+
 function buildPayments({ crmRows, signs }) {
   const signCounts = countBy(signs.filter((row) => row.owner_agent_slug || row.assigned_agent_slug), (row) => row.owner_agent_slug || row.assigned_agent_slug);
 
@@ -157,6 +213,8 @@ module.exports = async function handler(req, res) {
       loanSessions,
       verifiedProfiles,
       leads,
+      fieldVisits,
+      fieldParticipants,
       outreach,
       inbox
     ] = await Promise.all([
@@ -169,13 +227,17 @@ module.exports = async function handler(req, res) {
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
       safeRest('verified_profiles?select=uid,industry,slug,full_name,title,company_name,phone,email,photo_url,cta_url,calendar_url,is_active,activated_at,updated_at,created_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
-      safeRest('agent_outreach_queue?select=id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,open_start,open_end,template_key,review_status,initial_send_status,followup_send_status,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
+      safeRest('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc&limit=250', [], warnings, 'field_demo_visits'),
+      safeRest('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc&limit=500', [], warnings, 'field_demo_visit_participants'),
+      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,review_status,initial_send_status,initial_sent_at,followup_send_status,followup_send_at,followup_sent_at,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
       safeRest('agent_outreach_inbox?select=thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status&order=last_reply_at.desc&limit=250', [], warnings, 'agent_outreach_inbox')
     ]);
 
     const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
     const signRows = buildSigns({ signs, inventory, events });
     const eventRows = buildEvents({ events, checkins, loanSessions });
+    const leadRows = buildLeads({ leads, checkins, events });
+    const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
     const paymentRows = buildPayments({ crmRows, signs });
 
     sendJson(res, 200, {
@@ -189,6 +251,7 @@ module.exports = async function handler(req, res) {
         active_signs: signs.filter((row) => row.status === 'active').length,
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,
+        leads: leadRows.length,
         live_loan_officers: loanSessions.filter((row) => row.status === 'live').length,
         open_events_without_lo: eventRows.filter((row) => row.status === 'active' && !row.ended_at && !row.live_loan_officer).length,
         incoming_threads: inbox.length,
@@ -196,10 +259,12 @@ module.exports = async function handler(req, res) {
         payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length
       },
       crm: crmRows,
+      leads: leadRows,
       signs: signRows,
       inventory: inventory.slice(0, 150),
       events: eventRows,
       checkins: recent(checkins, 'created_at', 100),
+      field_visits: fieldVisitRows,
       loan_officers: verifiedProfiles,
       loan_sessions: loanSessions,
       payments: paymentRows,
