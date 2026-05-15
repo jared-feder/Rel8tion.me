@@ -1158,6 +1158,7 @@ Important gaps/risks:
 `[PARTIAL]` Confirmed:
 
 - `[PARTIAL]` `apps/rel8tion-app/admin.html` is the admin-keychain/token-protected REL8TION COMMAND dashboard. It has a command-header layout, area selector, live stats, hot-list-style outreach cards with agent/listing imagery, inline reply composers, interested/yes triage, accepted-open-house controls, drip scheduling, thread history, Leads, Agent CRM, smart signs/events, loan officer assignment/profile/session views, accepted field visits, payments-needed setup, and outreach reports.
+- `[IMPLEMENTED]` The admin dashboard browser auto-refresh skips while a command text field, input, dropdown, or content-editable control is focused. Manual/background reloads also restore the previous scroll position, focused control, field value, and cursor selection to avoid interrupting outreach replies as new SMS data arrives.
 - `[IMPLEMENTED]` `/api/admin/auth` validates `ADMIN_KEYCHAIN_UIDS` or fallback admin token access for the dashboard.
 - `[IMPLEMENTED]` `/api/admin/dashboard` loads aggregate project/CRM/sign/event/LO/payment/reporting data with the server-side Supabase service role.
 - `[IMPLEMENTED]` `/api/admin/event-action` can end an active `open_house_events` row, clear the linked `smart_signs.active_event_id` when the sign is still attached to that event, and end live LO coverage for that event.

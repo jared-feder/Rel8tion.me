@@ -1059,6 +1059,47 @@
       window.localStorage.setItem(DRAFTS_KEY, JSON.stringify(state.drafts));
     }
 
+    function editableControl(element) {
+      if (!element || element === document.body || typeof element.closest !== 'function') return null;
+      return element.closest('textarea, input, select, [contenteditable="true"]');
+    }
+
+    function isCommandEditing() {
+      const active = editableControl(document.activeElement);
+      if (!active || active.disabled || active.readOnly) return false;
+      return Boolean(active.closest('.command-shell'));
+    }
+
+    function captureUiState() {
+      const active = editableControl(document.activeElement);
+      const hasSelection = active && typeof active.selectionStart === 'number';
+      return {
+        scrollX: window.scrollX || 0,
+        scrollY: window.scrollY || 0,
+        activeId: active?.id || '',
+        activeValue: active && 'value' in active ? active.value : undefined,
+        selectionStart: hasSelection ? active.selectionStart : null,
+        selectionEnd: hasSelection ? active.selectionEnd : null
+      };
+    }
+
+    function restoreUiState(snapshot) {
+      if (!snapshot) return;
+      window.requestAnimationFrame(() => {
+        const active = snapshot.activeId ? document.getElementById(snapshot.activeId) : null;
+        if (active && !active.disabled) {
+          if (snapshot.activeValue !== undefined && 'value' in active && active.value !== snapshot.activeValue) {
+            active.value = snapshot.activeValue;
+          }
+          active.focus({ preventScroll: true });
+          if (typeof active.setSelectionRange === 'function' && snapshot.selectionStart !== null) {
+            active.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd ?? snapshot.selectionStart);
+          }
+        }
+        window.scrollTo(snapshot.scrollX || 0, snapshot.scrollY || 0);
+      });
+    }
+
     function esc(value) {
       return String(value ?? '').replace(/[&<>"']/g, (char) => ({
         '&': '&amp;',
@@ -1221,9 +1262,13 @@
       }
     }
 
-    async function loadAll() {
+    async function loadAll(options = {}) {
+      const uiSnapshot = options.preserveUi === false ? null : captureUiState();
       state.loading = true;
-      render();
+      if (options.showLoading !== false) {
+        render();
+        restoreUiState(uiSnapshot);
+      }
       try {
         const [dashboard, inbox] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
@@ -1235,10 +1280,12 @@
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         state.loading = false;
         render();
+        restoreUiState(uiSnapshot);
       } catch (error) {
         state.loading = false;
         state.error = error.message || 'Unable to load command data.';
         render();
+        restoreUiState(uiSnapshot);
       }
     }
 
@@ -1679,7 +1726,7 @@
         </main>
       `;
 
-      document.getElementById('refreshBtn')?.addEventListener('click', loadAll);
+      document.getElementById('refreshBtn')?.addEventListener('click', () => loadAll());
       document.getElementById('lockBtn')?.addEventListener('click', signOut);
       document.getElementById('areaSelect')?.addEventListener('change', (event) => setArea(event.target.value));
       document.querySelectorAll('[data-area-nav]').forEach((button) => {
@@ -2153,8 +2200,8 @@
 
     verify();
     window.setInterval(() => {
-      if (state.verified && !state.loading && !state.sendingKey) {
-        loadAll().catch(() => null);
+      if (state.verified && !state.loading && !state.sendingKey && !state.actionKey && !isCommandEditing()) {
+        loadAll({ showLoading: false }).catch(() => null);
       }
     }, 45000);
   </script>
