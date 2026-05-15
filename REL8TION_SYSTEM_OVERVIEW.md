@@ -956,7 +956,7 @@ File: `api/compliance/ny-disclosure.js`.
 
 ### Reference Function Source Under `docs/supabase-functions`
 
-These files exist as repo reference material, but deployment is not confirmed:
+These files exist as repo reference material. Some now also have deployable source under `supabase/functions`; verify live deployment before relying on behavior:
 
 - `sync-openhouses.ts`
 - `generate-agent-outreach.ts`
@@ -970,7 +970,7 @@ Observed behavior in reference source:
 - `sync-openhouses` pulls OneKey data and restores enriched agent contact data from `listing_agents`.
 - `generate-agent-outreach` queues and generates outreach rows.
 - `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, and expiration rules.
-- `send-agent-manual-reply` sends manual replies from outreach UI.
+- `send-agent-manual-reply` sends manual replies from outreach UI. `[IMPLEMENTED]` Deployable source exists under `supabase/functions/send-agent-manual-reply/index.ts`; the 2026-05-14 version requires service-role authorization and is intended to be called through the protected Vercel admin API, not directly from browser code.
 
 ### RPCs Used By Current Code
 
@@ -1126,10 +1126,14 @@ Important gaps/risks:
 
 `[PARTIAL]` Confirmed:
 
-- `[PARTIAL]` `apps/rel8tion-app/admin.html` is a placeholder shell.
-- `[INTENDED]` It states that protected admin tools for signs, live events, outreach, replies, and analytics are reserved for future work.
-- `[PARTIAL]` Practical admin tooling currently exists through `/key-reset` and `api/admin/reset-key.js`.
-- `[PARTIAL]` WordPress hot-list files provide outreach visibility/admin-style UI outside the app, but are not auto-synced to production.
+- `[PARTIAL]` `apps/rel8tion-app/admin.html` is an admin-keychain/token-protected operator dashboard with an outreach SMS inbox, thread history, and manual reply composer.
+- `[IMPLEMENTED]` `/api/admin/auth` validates `ADMIN_KEYCHAIN_UIDS` or fallback admin token access for the dashboard.
+- `[IMPLEMENTED]` `/api/admin/outreach-inbox` loads `agent_outreach_inbox` and `agent_outreach_replies` using the server-side Supabase service role.
+- `[IMPLEMENTED]` `/api/admin/outreach-reply` calls the protected Supabase `send-agent-manual-reply` function so SMS replies are sent server-side and recorded as outbound replies.
+- `[IMPLEMENTED]` `/k` checks scanned UIDs against the admin auth API before normal keychain routing, so an allowed admin keychain opens `/admin?uid=...`.
+- `[PARTIAL]` Practical reset tooling still exists separately through `/key-reset` and `api/admin/reset-key.js`.
+- `[PARTIAL]` Broader admin controls for signs, live events, CRM, LO coverage, payments, and analytics remain future work.
+- `[PARTIAL]` WordPress hot-list files provide older outreach visibility/admin-style UI outside the app, but are not auto-synced to production.
 
 ## Scaling And Stability Concerns
 

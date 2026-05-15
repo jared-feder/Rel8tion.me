@@ -691,6 +691,16 @@
         return;
       }
 
+      const adminCheck = await fetch(`/api/admin/auth?uid=${encodeURIComponent(uid)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .catch(() => null);
+      if (adminCheck?.ok) {
+        window.localStorage.setItem('rel8tion_admin_uid', uid);
+        setStatus('Admin Keychain', 'Opening the admin dashboard.');
+        window.location.href = `${window.location.origin}/admin?uid=${encodeURIComponent(uid)}`;
+        return;
+      }
+
       const activeSign = await findActiveSignByChipUid(uid);
       if (activeSign?.public_code) {
         if (await maybeContinuePendingSignChipActivation(activeSign)) {

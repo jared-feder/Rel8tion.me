@@ -5,17 +5,814 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rel8tion Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #dbe4ef;
+      --panel: #ffffff;
+      --wash: #f6f9fc;
+      --brand: #0f8fbd;
+      --brand-strong: #075e7e;
+      --ok: #12815f;
+      --warn: #9a5b00;
+      --bad: #b42318;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--wash);
+      color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 72px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand img { width: 76px; height: auto; flex: 0 0 auto; }
+    .brand-title {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: calc(100vh - 72px);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: #fff;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .toolbar {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--line);
+      background: #fbfdff;
+    }
+
+    .stat {
+      padding: 11px 10px;
+      border-right: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .stat:last-child { border-right: 0; }
+    .stat strong { display: block; font-size: 18px; line-height: 1; }
+    .stat span { display: block; margin-top: 5px; font-size: 10px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+
+    .threads {
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .thread {
+      width: 100%;
+      display: grid;
+      gap: 8px;
+      padding: 13px 14px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      text-align: left;
+    }
+
+    .thread:hover { background: #f7fbff; }
+    .thread.active { background: #eaf7fb; box-shadow: inset 3px 0 0 var(--brand); }
+    .thread-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .thread-name { font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+    .thread-time { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .thread-body { color: #334155; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .thread-meta { color: var(--muted); font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
+
+    .content {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+
+    .detail-head {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .detail-title {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-weight: 800;
+      font-size: 26px;
+      line-height: 1.08;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-sub {
+      color: var(--muted);
+      font-weight: 700;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+
+    .messages {
+      overflow: auto;
+      padding: 18px 20px;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      background:
+        linear-gradient(#f6f9fc 0 0) padding-box;
+    }
+
+    .message {
+      width: min(720px, 86%);
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 8px 22px rgba(23,32,51,.05);
+    }
+
+    .message.outbound {
+      justify-self: end;
+      border-color: #b8e4d8;
+      background: #f1fbf7;
+    }
+
+    .message.optout {
+      border-color: #fecaca;
+      background: #fff6f6;
+    }
+
+    .message-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .message-body {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #1f2937;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      background: #fff;
+      padding: 14px 20px 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .composer textarea {
+      width: 100%;
+      min-height: 112px;
+      max-height: 260px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px 13px;
+      line-height: 1.45;
+      outline: none;
+    }
+
+    .composer textarea:focus, .field:focus, .select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15,143,189,.16);
+    }
+
+    .composer-actions, .top-actions, .filter-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 9px 12px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .btn svg { width: 17px; height: 17px; }
+    .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .btn.primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); }
+    .btn.ghost { background: #f8fafc; }
+    .btn.danger { background: #fff7f7; color: var(--bad); border-color: #fecaca; }
+    .btn.icon { width: 40px; padding: 0; }
+
+    .field, .select {
+      min-height: 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: #fff;
+      outline: none;
+      color: var(--ink);
+      font-weight: 700;
+      width: 100%;
+    }
+
+    .select { appearance: auto; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: #334155;
+      white-space: nowrap;
+    }
+
+    .badge.ok { border-color: #b8e4d8; background: #ecfdf5; color: var(--ok); }
+    .badge.warn { border-color: #fed7aa; background: #fff7ed; color: var(--warn); }
+    .badge.bad { border-color: #fecaca; background: #fff1f2; color: var(--bad); }
+    .badge.info { border-color: #bae6fd; background: #f0f9ff; color: var(--brand-strong); }
+
+    .empty, .lock {
+      min-height: calc(100vh - 72px);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .lock-panel {
+      width: min(460px, 100%);
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: 0 18px 45px rgba(23,32,51,.08);
+    }
+
+    .lock-panel h1 {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0 0 14px;
+      letter-spacing: 0;
+    }
+
+    .lock-panel form { display: grid; gap: 10px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; font-weight: 700; }
+    .error { color: var(--bad); font-weight: 800; }
+
+    .toast {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 50;
+      max-width: min(420px, calc(100vw - 32px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(23,32,51,.14);
+      padding: 12px 14px;
+      display: none;
+      font-weight: 800;
+    }
+
+    .toast.show { display: block; }
+
+    @media (max-width: 920px) {
+      .topbar { position: static; }
+      .layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(520px, 1fr); }
+      .sidebar { border-right: 0; border-bottom: 1px solid var(--line); max-height: 48vh; }
+      .content { min-height: 620px; }
+      .detail-head { flex-direction: column; }
+      .message { width: 100%; }
+    }
+  </style>
 </head>
-<body class="bg-[#f0f7ff]">
-  <main class="min-h-screen flex items-center justify-center px-4" style="background:linear-gradient(180deg,#38bdf8 0%,#f0f7ff 60%,#f0f7ff 100%);">
-    <section class="w-full max-w-3xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-10 text-center shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
-      <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Admin</div>
-      <h1 class="font-['Plus_Jakarta_Sans'] text-5xl font-extrabold tracking-tight text-slate-900 mb-4">Operator Dashboard Placeholder</h1>
-      <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto">
-        This route is reserved for the protected admin dashboard for signs, events, outreach, replies, and analytics.
-      </p>
-    </section>
-  </main>
+<body>
+  <div id="app"></div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const ADMIN_UID_KEY = 'rel8tion_admin_uid';
+    const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
+    const DRAFTS_KEY = 'rel8tion_admin_reply_drafts';
+
+    const state = {
+      verified: false,
+      loading: false,
+      sending: false,
+      error: '',
+      filter: 'needs_reply',
+      inbox: [],
+      counts: { all: 0, inbound: 0, needs_reply: 0, opt_out: 0 },
+      selectedKey: '',
+      selectedThread: null,
+      messages: [],
+      loadedAt: '',
+      drafts: readDrafts()
+    };
+
+    const app = document.getElementById('app');
+    const toast = document.getElementById('toast');
+
+    const params = new URLSearchParams(window.location.search);
+    const uidParam = params.get('uid') || params.get('admin_uid') || '';
+    const tokenParam = params.get('token') || params.get('admin_token') || '';
+    if (uidParam) window.localStorage.setItem(ADMIN_UID_KEY, uidParam);
+    if (tokenParam) window.localStorage.setItem(ADMIN_TOKEN_KEY, tokenParam);
+
+    function credential() {
+      return {
+        uid: window.localStorage.getItem(ADMIN_UID_KEY) || '',
+        token: window.localStorage.getItem(ADMIN_TOKEN_KEY) || ''
+      };
+    }
+
+    function authHeaders() {
+      const cred = credential();
+      const headers = { 'Content-Type': 'application/json' };
+      if (cred.uid) headers['x-admin-uid'] = cred.uid;
+      if (cred.token) headers['x-admin-token'] = cred.token;
+      return headers;
+    }
+
+    function readDrafts() {
+      try {
+        return JSON.parse(window.localStorage.getItem(DRAFTS_KEY) || '{}') || {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveDrafts() {
+      window.localStorage.setItem(DRAFTS_KEY, JSON.stringify(state.drafts));
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function fmtDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return '';
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      }).format(date);
+    }
+
+    function fmtPhone(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+      if (ten.length !== 10) return value || '';
+      return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+    }
+
+    function isOptOutThread(thread) {
+      return Boolean(thread?.any_opt_out || thread?.latest_reply_opt_out || thread?.review_status === 'opted_out');
+    }
+
+    function needsReply(thread) {
+      return thread?.direction !== 'outbound' && !isOptOutThread(thread);
+    }
+
+    function threadBadge(thread) {
+      if (isOptOutThread(thread)) return '<span class="badge bad">Opted out</span>';
+      if (needsReply(thread)) return '<span class="badge warn">Needs reply</span>';
+      if (thread.direction === 'outbound') return '<span class="badge ok">Replied</span>';
+      return '<span class="badge info">Inbound</span>';
+    }
+
+    function filteredInbox() {
+      return state.inbox.filter((thread) => {
+        if (state.filter === 'all') return true;
+        if (state.filter === 'inbound') return thread.direction !== 'outbound';
+        if (state.filter === 'needs_reply') return needsReply(thread);
+        if (state.filter === 'opt_out') return isOptOutThread(thread);
+        return true;
+      });
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          ...authHeaders(),
+          ...(options.headers || {})
+        }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `Request failed: ${response.status}`);
+      }
+      return data;
+    }
+
+    async function verify() {
+      const cred = credential();
+      if (!cred.uid && !cred.token) {
+        state.verified = false;
+        render();
+        return;
+      }
+
+      try {
+        await api('/api/admin/auth');
+        state.verified = true;
+        state.error = '';
+        await loadInbox();
+      } catch (error) {
+        state.verified = false;
+        state.error = error.message || 'Unauthorized.';
+        render();
+      }
+    }
+
+    async function loadInbox() {
+      state.loading = true;
+      render();
+      try {
+        const data = await api('/api/admin/outreach-inbox?limit=100');
+        state.inbox = data.inbox || [];
+        state.counts = data.counts || state.counts;
+        state.loadedAt = data.loaded_at || new Date().toISOString();
+        const visible = filteredInbox();
+        if (!state.selectedKey || !state.inbox.some((thread) => thread.thread_key === state.selectedKey)) {
+          state.selectedKey = visible[0]?.thread_key || state.inbox[0]?.thread_key || '';
+        }
+        state.loading = false;
+        render();
+        if (state.selectedKey) await loadThread(state.selectedKey);
+      } catch (error) {
+        state.loading = false;
+        state.error = error.message || 'Unable to load inbox.';
+        render();
+      }
+    }
+
+    async function loadThread(threadKey) {
+      if (!threadKey) return;
+      state.selectedKey = threadKey;
+      render();
+      try {
+        const data = await api(`/api/admin/outreach-inbox?thread_key=${encodeURIComponent(threadKey)}`);
+        state.selectedThread = data.thread || null;
+        state.messages = data.messages || [];
+        state.error = '';
+        render();
+      } catch (error) {
+        state.error = error.message || 'Unable to load thread.';
+        render();
+      }
+    }
+
+    function setFilter(filter) {
+      state.filter = filter;
+      const visible = filteredInbox();
+      if (!visible.some((thread) => thread.thread_key === state.selectedKey)) {
+        state.selectedKey = visible[0]?.thread_key || '';
+        state.selectedThread = null;
+        state.messages = [];
+        if (state.selectedKey) loadThread(state.selectedKey);
+      }
+      render();
+    }
+
+    function updateDraft(value) {
+      if (!state.selectedKey) return;
+      state.drafts[state.selectedKey] = value;
+      saveDrafts();
+      renderComposerOnly(value);
+    }
+
+    function renderComposerOnly(value) {
+      const count = document.getElementById('replyCount');
+      if (count) count.textContent = `${value.length} characters`;
+    }
+
+    async function sendReply() {
+      const thread = state.selectedThread;
+      const textarea = document.getElementById('replyBody');
+      const messageBody = textarea?.value?.trim() || '';
+
+      if (!thread?.queue_row_id) {
+        showToast('No queue row is linked to this thread.');
+        return;
+      }
+      if (isOptOutThread(thread)) {
+        showToast('This contact is opted out.');
+        return;
+      }
+      if (!messageBody) {
+        showToast('Write the reply first.');
+        return;
+      }
+      if (!window.confirm(`Send this SMS to ${thread.agent_name || fmtPhone(thread.agent_phone) || 'this contact'}?`)) {
+        return;
+      }
+
+      state.sending = true;
+      render();
+      try {
+        await api('/api/admin/outreach-reply', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: thread.queue_row_id,
+            body: messageBody
+          })
+        });
+        delete state.drafts[state.selectedKey];
+        saveDrafts();
+        showToast('Reply sent.');
+        await loadInbox();
+      } catch (error) {
+        state.sending = false;
+        state.error = error.message || 'Unable to send reply.';
+        showToast(state.error);
+        render();
+      }
+    }
+
+    function signOut() {
+      window.localStorage.removeItem(ADMIN_UID_KEY);
+      window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+      state.verified = false;
+      state.inbox = [];
+      state.selectedKey = '';
+      state.selectedThread = null;
+      state.messages = [];
+      render();
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    function renderLock() {
+      const cred = credential();
+      app.innerHTML = `
+        <main class="lock">
+          <section class="lock-panel">
+            <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" style="width:88px;margin-bottom:16px;">
+            <h1>Admin Access</h1>
+            <form id="authForm">
+              <input id="uidInput" class="field" value="${esc(cred.uid)}" autocomplete="off" placeholder="Admin UID">
+              <input id="tokenInput" class="field" type="password" value="${esc(cred.token)}" autocomplete="current-password" placeholder="Fallback admin token">
+              ${state.error ? `<div class="error small">${esc(state.error)}</div>` : ''}
+              <button class="btn primary" type="submit"><i data-lucide="lock-keyhole"></i><span>Unlock</span></button>
+            </form>
+          </section>
+        </main>
+      `;
+      document.getElementById('authForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const uid = document.getElementById('uidInput')?.value?.trim() || '';
+        const token = document.getElementById('tokenInput')?.value?.trim() || '';
+        if (uid) window.localStorage.setItem(ADMIN_UID_KEY, uid);
+        if (token) window.localStorage.setItem(ADMIN_TOKEN_KEY, token);
+        state.error = '';
+        await verify();
+      });
+      window.lucide?.createIcons();
+    }
+
+    function renderShell() {
+      const visible = filteredInbox();
+      app.innerHTML = `
+        <main class="shell">
+          <header class="topbar">
+            <div class="brand">
+              <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+              <div>
+                <div class="brand-title">Admin</div>
+                <div class="brand-sub">${state.loadedAt ? `Loaded ${esc(fmtDate(state.loadedAt))}` : 'Outreach inbox'}</div>
+              </div>
+            </div>
+            <div class="top-actions">
+              <button class="btn ghost" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+              <button class="btn" id="signOutBtn"><i data-lucide="log-out"></i><span>Lock</span></button>
+            </div>
+          </header>
+
+          <section class="layout">
+            <aside class="sidebar">
+              <div class="toolbar">
+                <select id="filterSelect" class="select">
+                  <option value="needs_reply"${state.filter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
+                  <option value="inbound"${state.filter === 'inbound' ? ' selected' : ''}>Inbound</option>
+                  <option value="all"${state.filter === 'all' ? ' selected' : ''}>All threads</option>
+                  <option value="opt_out"${state.filter === 'opt_out' ? ' selected' : ''}>Opt-outs</option>
+                </select>
+              </div>
+              <div class="stats">
+                <div class="stat"><strong>${state.counts.needs_reply || 0}</strong><span>Needs</span></div>
+                <div class="stat"><strong>${state.counts.inbound || 0}</strong><span>Inbound</span></div>
+                <div class="stat"><strong>${state.counts.opt_out || 0}</strong><span>Stops</span></div>
+                <div class="stat"><strong>${state.counts.all || 0}</strong><span>All</span></div>
+              </div>
+              <div class="threads">
+                ${state.loading ? '<div class="thread"><div class="thread-name">Loading...</div></div>' : ''}
+                ${!state.loading && visible.length === 0 ? '<div class="thread"><div class="thread-name">No threads</div><div class="thread-meta">Change the filter or refresh.</div></div>' : ''}
+                ${visible.map((thread) => renderThreadButton(thread)).join('')}
+              </div>
+            </aside>
+            ${renderDetail()}
+          </section>
+        </main>
+      `;
+
+      document.getElementById('refreshBtn')?.addEventListener('click', loadInbox);
+      document.getElementById('signOutBtn')?.addEventListener('click', signOut);
+      document.getElementById('filterSelect')?.addEventListener('change', (event) => setFilter(event.target.value));
+      document.querySelectorAll('[data-thread-key]').forEach((button) => {
+        button.addEventListener('click', () => loadThread(button.getAttribute('data-thread-key')));
+      });
+      document.getElementById('replyBody')?.addEventListener('input', (event) => updateDraft(event.target.value));
+      document.getElementById('sendReplyBtn')?.addEventListener('click', sendReply);
+      window.lucide?.createIcons();
+    }
+
+    function renderThreadButton(thread) {
+      const active = thread.thread_key === state.selectedKey ? ' active' : '';
+      return `
+        <button class="thread${active}" data-thread-key="${esc(thread.thread_key)}">
+          <div class="thread-head">
+            <div class="thread-name">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown contact')}</div>
+            <div class="thread-time">${esc(fmtDate(thread.last_reply_at))}</div>
+          </div>
+          <div>${threadBadge(thread)}</div>
+          <div class="thread-body">${esc(thread.latest_reply_body || '')}</div>
+          <div class="thread-meta">${esc(thread.address || thread.brokerage || fmtPhone(thread.from_phone_normalized) || '')}</div>
+        </button>
+      `;
+    }
+
+    function renderDetail() {
+      const thread = state.selectedThread || state.inbox.find((item) => item.thread_key === state.selectedKey);
+      if (!thread) {
+        return `
+          <section class="empty">
+            <div class="muted">No thread selected.</div>
+          </section>
+        `;
+      }
+
+      const disabledReason = isOptOutThread(thread)
+        ? 'Opted out'
+        : !thread.queue_row_id
+          ? 'No linked queue row'
+          : '';
+      const draft = state.drafts[state.selectedKey] || '';
+      const canSend = !disabledReason && !state.sending;
+
+      return `
+        <section class="content">
+          <div class="detail-head">
+            <div>
+              <div class="detail-title">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown contact')}</div>
+              <div class="detail-sub">
+                ${esc([thread.brokerage, thread.address, fmtPhone(thread.agent_phone || thread.from_phone)].filter(Boolean).join(' | '))}
+              </div>
+            </div>
+            <div class="top-actions">
+              ${threadBadge(thread)}
+              ${thread.open_start ? `<span class="badge info">${esc(fmtDate(thread.open_start))}</span>` : ''}
+            </div>
+          </div>
+
+          <div class="messages" id="messages">
+            ${state.error ? `<div class="message optout"><div class="message-body">${esc(state.error)}</div></div>` : ''}
+            ${state.messages.length === 0 ? '<div class="message"><div class="message-body">No messages loaded.</div></div>' : ''}
+            ${state.messages.map((message) => renderMessage(message)).join('')}
+          </div>
+
+          <div class="composer">
+            <textarea id="replyBody" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${disabledReason ? esc(disabledReason) : 'Write SMS reply'}">${esc(draft)}</textarea>
+            <div class="composer-actions">
+              <button id="sendReplyBtn" class="btn primary" ${canSend ? '' : 'disabled'}>
+                <i data-lucide="send"></i><span>${state.sending ? 'Sending...' : 'Send SMS'}</span>
+              </button>
+              <span id="replyCount" class="small muted">${draft.length} characters</span>
+              ${disabledReason ? `<span class="badge bad">${esc(disabledReason)}</span>` : ''}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderMessage(message) {
+      const outbound = message.direction === 'outbound';
+      const optout = message.opt_out ? ' optout' : '';
+      return `
+        <article class="message ${outbound ? 'outbound' : 'inbound'}${optout}">
+          <div class="message-row">
+            <span>${outbound ? 'Sent' : (message.opt_out ? 'Opt-out' : 'Inbound')}</span>
+            <span>${esc(fmtDate(message.received_at))}</span>
+          </div>
+          <div class="message-body">${esc(message.body || '')}</div>
+        </article>
+      `;
+    }
+
+    function render() {
+      if (!state.verified) renderLock();
+      else renderShell();
+    }
+
+    verify();
+  </script>
 </body>
 </html>

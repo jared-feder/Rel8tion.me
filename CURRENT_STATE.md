@@ -66,6 +66,7 @@ Status labels:
 - `[IMPLEMENTED]` Agent dashboard has end/move controls for the current open house. Ending marks `open_house_events.status = ended`, stamps `ended_at`, clears `smart_signs.active_event_id`, and sets the sign back to inactive without deleting captured check-ins. Moving performs the same closeout and opens sign activation for the next listing.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
+- `[PARTIAL]` `/admin` is now an admin-keychain/token-protected operator dashboard with an outreach SMS inbox, thread history, and manual reply composer. It loads via server-side `/api/admin/outreach-inbox` and sends replies through `/api/admin/outreach-reply`, which calls the protected Supabase `send-agent-manual-reply` Edge Function. Broader sign/event/CRM/payment controls are still not built.
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
 - `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
 - `[IMPLEMENTED]` Beta fresh-claim cleanup clears stale browser host/sign activation sessions and inactive sign QR scans preserve the current host session, so a newly claimed demo keychain profile can carry forward into sign activation instead of falling back to stale `agent-*` context.
@@ -79,6 +80,7 @@ Status labels:
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment implementation was found during the 2026-05-09 repo audit. Current tracked enrichment is the Estately + Cheerio worker. If Browserless/Trulia enrichment is intended, it needs implementation or source recovery.
 - `[IMPLEMENTED]` Mockup renderer app exists under `apps/mockup-renderer` with cron wrappers and tests.
 - `[IMPLEMENTED]` Twilio inbound reply Edge Functions are checked in under `supabase/functions`.
+- `[IMPLEMENTED]` `send-agent-manual-reply` is checked in under `supabase/functions` and was deployed on 2026-05-14. The function requires the Supabase service-role bearer token, rejects browser/anon calls, inserts outbound replies into `agent_outreach_replies`, and updates the linked `agent_outreach_queue` row.
 - `[IMPLEMENTED]` A read-only live verification system exists under `docs/live-verification/` with `npm run verify:live`.
 - `[PARTIAL]` Latest live verification anon run on 2026-05-09 succeeded with summary `PASS 108`, `WARN 6`, `NEEDS_VERIFICATION 10`, `FAIL 0`. Core tables and expected columns, including OneKey freshness fields and `open_house_price_history`, passed anon zero-row schema probes. This confirms live schema exposure through the anon PostgREST access path, not full RLS correctness, write behavior, deployment health, or production data quality.
 
@@ -86,8 +88,8 @@ Status labels:
 
 - `[PARTIAL]` Root `vercel.json` now has a cron for OneKey freshness. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
 - `[PARTIAL]` The Estately worker can enrich `listing_agents`, but quality depends on Estately parsing and phone validation.
-- `[NEEDS VERIFICATION]` Outreach generation/sending source exists mostly under `docs/supabase-functions`; deployment state is not confirmed from repo files.
-- `[PARTIAL]` `/admin` is only a placeholder page, not a full admin dashboard.
+- `[PARTIAL]` `/admin` has a live outreach reply inbox, but it is not yet the full admin dashboard for signs, events, CRM, LO coverage, payments, and analytics.
+- `[NEEDS VERIFICATION]` Some outreach source still exists under `docs/supabase-functions`; deployment state for each function should be verified before relying on docs-only source.
 - `[PARTIAL]` WordPress hot-list files exist locally, but they are not automatically synced to WordPress.
 - `[PARTIAL]` `/b` buyer profile and `/event` smart sign check-in are both active concepts but save into different tables.
 - `[RISK]` Several root/static pages are legacy or test artifacts. Use `vercel.json` before assuming a page is live.
@@ -110,7 +112,7 @@ Status labels:
 - `[INTENDED]` Buyer-agent-loan-officer chat modal is not built.
 - `[INTENDED]` Rich buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent chat is not built. Current `/event` post-check-in experience shows available property/agent/LO context and uses SMS/call links for messaging.
 - `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
-- `[INTENDED]` Full admin dashboard for signs, events, outreach, replies, and analytics is not built.
+- `[PARTIAL]` Full admin dashboard for signs, events, CRM, LO coverage, payments, and analytics is not built. Outreach reply inbox/send exists.
 - `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
 - `[RISK]` QR export needs cleanup: current activation expects `smart_sign_inventory.public_code`, while `smart-sign-qr-export.sql` exports from `smart_signs`.
 - `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
