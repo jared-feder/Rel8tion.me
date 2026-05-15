@@ -769,7 +769,7 @@
 
     .action-grid {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) max-content;
+      grid-template-columns: max-content minmax(220px, 1fr) max-content;
       gap: 8px;
       align-items: center;
       min-width: 0;
@@ -836,6 +836,93 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
+    }
+
+    .report-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .confirmed-report-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .confirmed-card {
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.82), rgba(238,249,255,.68)),
+        rgba(255,255,255,.70);
+      box-shadow: 0 16px 42px rgba(23,32,51,.08);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      min-width: 0;
+    }
+
+    .report-media {
+      position: relative;
+      min-height: 220px;
+      background: rgba(225,238,248,.75);
+    }
+
+    .report-media img.report-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .report-agent-photo {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255,255,255,.92);
+      box-shadow: 0 12px 24px rgba(23,32,51,.2);
+    }
+
+    .confirmed-body {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .report-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .report-detail {
+      border: 1px solid rgba(122,148,173,.16);
+      border-radius: 8px;
+      background: rgba(255,255,255,.58);
+      padding: 8px;
+      min-width: 0;
+    }
+
+    .conversation-preview {
+      max-height: 190px;
+      overflow: auto;
+      border: 1px solid rgba(122,148,173,.18);
+      border-radius: 8px;
+      background: rgba(255,255,255,.64);
+      padding: 8px;
+      color: #263545;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .assignment-grid {
@@ -962,6 +1049,9 @@
       .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
       .action-grid,
       .drip-grid { grid-template-columns: 1fr; }
+      .confirmed-report-grid { grid-template-columns: 1fr; }
+      .confirmed-card { grid-template-columns: 1fr; }
+      .report-media { min-height: 240px; }
     }
 
     @media (max-width: 760px) {
@@ -984,6 +1074,8 @@
       .assignment-grid { grid-template-columns: 1fr; }
       .assignment-actions { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 1fr; }
+      .report-toolbar { justify-content: flex-start; }
+      .report-detail-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1016,6 +1108,7 @@
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       query: '',
       outreachFilter: 'needs_reply',
+      reportWindow: 'upcoming',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
@@ -1152,8 +1245,12 @@
       return Boolean(thread?.any_opt_out || thread?.latest_reply_opt_out || thread?.review_status === 'opted_out');
     }
 
+    function isHandledThread(thread) {
+      return ['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled'].includes(thread?.review_status);
+    }
+
     function needsReply(thread) {
-      return thread?.direction !== 'outbound' && !isOptOutThread(thread);
+      return thread?.direction !== 'outbound' && !isOptOutThread(thread) && !isHandledThread(thread);
     }
 
     function threadText(thread) {
@@ -1168,7 +1265,7 @@
 
     function isInterestedThread(thread) {
       if (!thread || isOptOutThread(thread)) return false;
-      if (['interested', 'accepted_open_house', 'drip_scheduled'].includes(thread.review_status)) return true;
+      if (isHandledThread(thread)) return true;
       const text = threadText(thread);
       if (!text) return false;
       if (/\b(no|stop|remove|unsubscribe|wrong number|not interested|do not|don't)\b/i.test(text)) return false;
@@ -1181,6 +1278,7 @@
 
     function statusBadge(thread) {
       if (isOptOutThread(thread)) return badge('Opted out', 'bad');
+      if (thread.review_status === 'confirmed_open_house') return badge('Confirmed OH', 'ok');
       if (thread.review_status === 'accepted_open_house') return badge('Accepted OH', 'ok');
       if (thread.review_status === 'drip_scheduled') return badge('Drip scheduled', 'ok');
       if (thread.review_status === 'interested' || isInterestedThread(thread)) return badge('Interested', 'ok');
@@ -1507,6 +1605,18 @@
       runOutreachAction(key, 'mark_interested', {}, 'Marked interested.');
     }
 
+    function confirmOpenHouse(key) {
+      const thread = findThread(key);
+      if (!thread) return;
+      if (isOptOutThread(thread)) {
+        showToast('This contact is opted out.');
+        return;
+      }
+      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
+      if (!window.confirm(`Mark ${target} as a confirmed true open house and add it to Reports?`)) return;
+      runOutreachAction(key, 'confirm_open_house', {}, 'Open house confirmed for Reports.');
+    }
+
     function acceptOpenHouse(key) {
       const thread = findThread(key);
       if (!thread) return;
@@ -1766,6 +1876,9 @@
       document.querySelectorAll('[data-mark-interested]').forEach((button) => {
         button.addEventListener('click', () => markInterested(button.dataset.markInterested));
       });
+      document.querySelectorAll('[data-confirm-open-house]').forEach((button) => {
+        button.addEventListener('click', () => confirmOpenHouse(button.dataset.confirmOpenHouse));
+      });
       document.querySelectorAll('[data-accept-open-house]').forEach((button) => {
         button.addEventListener('click', () => acceptOpenHouse(button.dataset.acceptOpenHouse));
       });
@@ -1782,6 +1895,12 @@
         button.addEventListener('click', () => endEvent(button.dataset.endEvent));
       });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
+      document.getElementById('reportWindow')?.addEventListener('change', (event) => {
+        state.reportWindow = event.target.value;
+        refreshAreaContent();
+      });
+      document.getElementById('downloadConfirmedCsv')?.addEventListener('click', downloadConfirmedCsv);
+      document.getElementById('printConfirmedReport')?.addEventListener('click', () => window.print());
     }
 
     function renderStats() {
@@ -1791,6 +1910,7 @@
       const stats = [
         { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4 },
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10 },
+        { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8 },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8 },
         { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8 },
         { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6 },
@@ -1923,8 +2043,10 @@
       const disabled = isOptOutThread(thread) || !thread.queue_row_id;
       const interested = isInterestedThread(thread);
       const markBusy = state.actionKey === actionId('mark_interested', key);
+      const confirmBusy = state.actionKey === actionId('confirm_open_house', key);
       const acceptBusy = state.actionKey === actionId('accept_open_house', key);
       const dripBusy = state.actionKey === actionId('schedule_drip', key);
+      const confirmed = thread.review_status === 'confirmed_open_house';
       const selectedUid = profiles[0]?.uid || '';
       const dripText = thread.followup_sms || defaultDripText(thread);
       const dripAt = defaultDripSendAt(thread);
@@ -1940,6 +2062,9 @@
             </button>
           </div>
           <div class="action-grid">
+            <button class="btn soft" data-confirm-open-house="${esc(key)}" ${disabled || confirmBusy || confirmed ? 'disabled' : ''}>
+              <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Confirming...' : confirmed ? 'Confirmed true OH' : 'Confirm true OH'}</span>
+            </button>
             <select id="accept_lo_${domId(key)}" class="select" ${disabled || !profiles.length ? 'disabled' : ''}>
               ${profiles.length ? profiles.map((profile) => `
                 <option value="${esc(profile.uid)}"${profile.uid === selectedUid ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>
@@ -2148,14 +2273,183 @@
       `);
     }
 
+    function reportDateMs(value) {
+      const date = new Date(value || '');
+      return Number.isFinite(date.getTime()) ? date.getTime() : 0;
+    }
+
+    function confirmedReportRows() {
+      const now = Date.now();
+      return filterByQuery(state.command?.confirmed_open_houses || [])
+        .filter((row) => {
+          const end = reportDateMs(row.scheduled_end) || reportDateMs(row.scheduled_start) || reportDateMs(row.confirmed_at);
+          if (state.reportWindow === 'upcoming') return end >= now - 2 * 60 * 60 * 1000;
+          if (state.reportWindow === 'past') return end < now - 2 * 60 * 60 * 1000;
+          return true;
+        })
+        .sort((a, b) => {
+          const aTime = reportDateMs(a.scheduled_start) || reportDateMs(a.confirmed_at);
+          const bTime = reportDateMs(b.scheduled_start) || reportDateMs(b.confirmed_at);
+          return state.reportWindow === 'past' ? bTime - aTime : aTime - bTime;
+        });
+    }
+
+    function csvCell(value) {
+      let text = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      if (/^[=+\-@]/.test(text.trim())) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    function downloadConfirmedCsv() {
+      const rows = confirmedReportRows();
+      if (!rows.length) {
+        showToast('No confirmed open houses in this report view.');
+        return;
+      }
+      const headers = [
+        'Confirmed At',
+        'Open Start',
+        'Open End',
+        'Property Address',
+        'City',
+        'State',
+        'Zip',
+        'Price',
+        'Beds',
+        'Baths',
+        'Agent Name',
+        'Agent Phone',
+        'Agent Email',
+        'Brokerage',
+        'Loan Officer',
+        'Loan Officer Phone',
+        'Loan Officer Email',
+        'Visit Status',
+        'Review Status',
+        'Listing Photo URL',
+        'Agent Photo URL',
+        'Mockup Image URL',
+        'Conversation Snapshot'
+      ];
+      const lines = [
+        headers.map(csvCell).join(','),
+        ...rows.map((row) => [
+          row.confirmed_at,
+          row.scheduled_start,
+          row.scheduled_end,
+          row.property_address,
+          row.city,
+          row.state,
+          row.zip,
+          row.price,
+          row.beds,
+          row.baths,
+          row.agent_name,
+          row.agent_phone,
+          row.agent_email,
+          row.brokerage,
+          row.loan_officer_name,
+          row.loan_officer_phone,
+          row.loan_officer_email,
+          row.visit_status,
+          row.review_status,
+          row.listing_photo_url,
+          row.agent_photo_url,
+          row.mockup_image_url,
+          row.conversation_snapshot
+        ].map(csvCell).join(','))
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const day = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `rel8tion-confirmed-open-houses-${state.reportWindow}-${day}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded ${rows.length} confirmed open houses.`);
+    }
+
+    function renderConfirmedReportCard(row) {
+      const photo = row.listing_photo_url || row.mockup_image_url || '';
+      const conversation = row.conversation_snapshot || 'No conversation snapshot loaded.';
+      const facts = [money(row.price), row.beds ? `${row.beds} beds` : '', row.baths ? `${row.baths} baths` : ''].filter(Boolean).join(' | ');
+      return `
+        <article class="confirmed-card">
+          <div class="report-media">
+            ${photo ? `<img class="report-photo" src="${esc(photo)}" alt="${esc(row.property_address || 'Confirmed open house')}">` : `<div class="image-fallback">${esc(row.property_address || 'No property photo')}</div>`}
+            ${row.agent_photo_url ? `<img class="report-agent-photo" src="${esc(row.agent_photo_url)}" alt="${esc(row.agent_name || 'Agent')}">` : ''}
+          </div>
+          <div class="confirmed-body">
+            <div>
+              <div class="address">${esc(row.property_address || 'Confirmed open house')}</div>
+              <div class="open-time">${esc([fmtDate(row.scheduled_start), facts].filter(Boolean).join(' | '))}</div>
+            </div>
+            <div class="badges">
+              ${badge(row.visit_status || 'confirmed', row.visit_status === 'cancelled' ? 'bad' : 'ok')}
+              ${badge(row.review_status || 'confirmed open house', 'info')}
+              ${badge(`${row.message_count || 0} messages`, row.message_count ? 'ok' : 'warn')}
+            </div>
+            <div class="report-detail-grid">
+              <div class="report-detail">
+                <div class="mini-title">Agent</div>
+                <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+                <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
+              </div>
+              <div class="report-detail">
+                <div class="mini-title">Loan officer</div>
+                <div class="primary">${esc(row.loan_officer_name || 'Not assigned')}</div>
+                <div class="secondary">${esc([row.loan_officer_company, fmtPhone(row.loan_officer_phone), row.loan_officer_email].filter(Boolean).join(' | ') || 'No LO coverage recorded')}</div>
+              </div>
+              <div class="report-detail">
+                <div class="mini-title">Confirmed</div>
+                <div class="primary">${esc(fmtDate(row.confirmed_at) || 'No date')}</div>
+                <div class="secondary">${esc(row.open_house_id || row.queue_row_id || '')}</div>
+              </div>
+              <div class="report-detail">
+                <div class="mini-title">Photos</div>
+                <div class="secondary">${esc([row.listing_photo_url ? 'listing' : '', row.agent_photo_url ? 'agent' : '', row.mockup_image_url ? 'mockup' : ''].filter(Boolean).join(' | ') || 'No photo URLs')}</div>
+              </div>
+            </div>
+            <div>
+              <div class="mini-title">Conversation snapshot</div>
+              <div class="conversation-preview">${esc(conversation)}</div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
     function renderReports() {
       const outreach = state.command?.outreach || {};
+      const confirmed = confirmedReportRows();
+      const allConfirmed = state.command?.confirmed_open_houses || [];
+      const now = Date.now();
+      const upcomingCount = allConfirmed.filter((row) => {
+        const end = reportDateMs(row.scheduled_end) || reportDateMs(row.scheduled_start) || reportDateMs(row.confirmed_at);
+        return end >= now - 2 * 60 * 60 * 1000;
+      }).length;
+      const pastCount = allConfirmed.length - upcomingCount;
       return `
         <div class="section-head">
           <div>
             <h2>Reports</h2>
-            <div class="sub">Live operational status by queue and pipeline state</div>
+            <div class="sub">${confirmed.length} confirmed open houses in this view | ${upcomingCount} upcoming | ${pastCount} previous</div>
           </div>
+          <div class="report-toolbar">
+            <select id="reportWindow" class="select" style="max-width:190px;">
+              <option value="upcoming"${state.reportWindow === 'upcoming' ? ' selected' : ''}>Upcoming confirmed</option>
+              <option value="past"${state.reportWindow === 'past' ? ' selected' : ''}>Previous confirmed</option>
+              <option value="all"${state.reportWindow === 'all' ? ' selected' : ''}>All confirmed</option>
+            </select>
+            <button class="btn soft" id="downloadConfirmedCsv"><i data-lucide="file-spreadsheet"></i><span>Export CSV</span></button>
+            <button class="btn soft" id="printConfirmedReport"><i data-lucide="printer"></i><span>Print</span></button>
+          </div>
+        </div>
+        <div class="confirmed-report-grid">
+          ${confirmed.length ? confirmed.slice(0, 120).map(renderConfirmedReportCard).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No confirmed open houses match this report view.</div>'}
         </div>
         <div class="report-grid">
           ${renderBarCard('Review status', outreach.by_review_status || {})}

@@ -22,10 +22,11 @@ function sortCounts(rows) {
   };
 
   for (const row of rows) {
+    const handled = ['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled'].includes(row.review_status);
     if (row.direction !== 'outbound') counts.inbound += 1;
     if (row.any_opt_out || row.latest_reply_opt_out || row.review_status === 'opted_out') counts.opt_out += 1;
-    if (['interested', 'accepted_open_house', 'drip_scheduled'].includes(row.review_status)) counts.interested += 1;
-    if (row.direction !== 'outbound' && !row.any_opt_out && row.review_status !== 'opted_out') counts.needs_reply += 1;
+    if (handled) counts.interested += 1;
+    if (row.direction !== 'outbound' && !row.any_opt_out && row.review_status !== 'opted_out' && !handled) counts.needs_reply += 1;
   }
 
   return counts;

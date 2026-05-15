@@ -125,7 +125,7 @@ async function writeParticipant(path, payload, method = 'POST') {
   }
 }
 
-async function upsertFieldVisit(queue) {
+async function upsertFieldVisit(queue, options = {}) {
   const event = await loadMatchingEvent(queue);
   const now = new Date().toISOString();
   const scheduledStart = queue.open_start || new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -152,10 +152,10 @@ async function upsertFieldVisit(queue) {
     status: existing?.status && existing.status !== 'scheduled' ? existing.status : 'confirmed',
     coverage_mode: 'physical_support',
     demo_type: 'buyer_financing_support',
-    source: 'admin_interested_reply',
-    assignment_source: 'accepted_outreach',
+    source: options.source || 'admin_interested_reply',
+    assignment_source: options.assignment_source || 'accepted_outreach',
     notes: [
-      `Accepted from REL8TION COMMAND outreach reply on ${now}.`,
+      `${options.note_prefix || 'Accepted from REL8TION COMMAND outreach reply'} on ${now}.`,
       address ? `Open house: ${address}.` : '',
       queue.agent_phone ? `Agent phone: ${queue.agent_phone}.` : ''
     ].filter(Boolean).join(' ')
@@ -264,6 +264,24 @@ async function acceptOpenHouse(body) {
   return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile };
 }
 
+async function confirmOpenHouse(body) {
+  const queue = await loadQueueRow(body.queue_row_id);
+  if (queue.review_status === 'opted_out') {
+    const error = new Error('This contact is opted out.');
+    error.status = 409;
+    throw error;
+  }
+
+  const visit = await upsertFieldVisit(queue, {
+    source: 'admin_confirmed_open_house',
+    assignment_source: 'confirmed_outreach',
+    note_prefix: 'Confirmed as a true open house from REL8TION COMMAND outreach'
+  });
+  const updated_queue = await markInterested(queue.id, 'confirmed_open_house');
+
+  return { queue: updated_queue || queue, visit };
+}
+
 async function scheduleDrip(body) {
   const queue = await loadQueueRow(body.queue_row_id);
   const text = String(body.body || '').replace(/\s+\n/g, '\n').trim();
@@ -344,6 +362,12 @@ module.exports = async function handler(req, res) {
 
     if (action === 'accept_open_house') {
       const result = await acceptOpenHouse(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'confirm_open_house') {
+      const result = await confirmOpenHouse(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

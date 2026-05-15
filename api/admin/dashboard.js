@@ -25,6 +25,37 @@ function recent(rows, field, limit = 12) {
     .slice(0, limit);
 }
 
+function enc(value) {
+  return encodeURIComponent(String(value || '').trim());
+}
+
+function inFilter(ids) {
+  return `in.(${ids.map((id) => enc(id)).join(',')})`;
+}
+
+function unique(values) {
+  return [...new Set((values || []).filter(Boolean))];
+}
+
+function firstPresent(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return '';
+}
+
+async function safeRestInChunks(ids, buildPath, fallback, warnings, label, chunkSize = 80) {
+  const uniqueIds = unique(ids);
+  if (!uniqueIds.length) return fallback;
+  const batches = [];
+  for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+    const chunk = uniqueIds.slice(index, index + chunkSize);
+    batches.push(safeRest(buildPath(chunk), [], warnings, label));
+  }
+  const rows = await Promise.all(batches);
+  return rows.flat();
+}
+
 function phoneDigits(value) {
   const digits = String(value || '').replace(/\D/g, '');
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
@@ -121,6 +152,138 @@ function eventContext(event) {
 function eventAddress(event) {
   const context = eventContext(event);
   return context.address || context.property_address || context.listing_address || context.open_house_address || event?.open_house_source_id || event?.id || 'Open house';
+}
+
+function compactAddress(parts) {
+  return [
+    parts.address,
+    [parts.city, parts.state].filter(Boolean).join(', '),
+    parts.zip
+  ].filter(Boolean).join(' ');
+}
+
+function buildConversationSnapshot(queue, messages) {
+  const lines = [];
+  if (queue?.selected_sms) {
+    const sentAt = queue.initial_sent_at || queue.last_outreach_at || queue.created_at || '';
+    lines.push(`OUTBOUND${sentAt ? ` ${sentAt}` : ''}: ${queue.selected_sms}`);
+  }
+
+  for (const message of messages || []) {
+    const direction = message.direction === 'outbound' ? 'OUTBOUND' : 'INBOUND';
+    const when = message.received_at || message.created_at || '';
+    lines.push(`${direction}${when ? ` ${when}` : ''}: ${message.body || ''}`);
+  }
+
+  return lines.join('\n\n');
+}
+
+function reportCandidateQueueIds({ outreach, visits }) {
+  const reportStatuses = new Set(['confirmed_open_house', 'accepted_open_house']);
+  return unique([
+    ...(visits || [])
+      .filter((visit) => visit.status !== 'cancelled')
+      .map((visit) => visit.outreach_queue_id),
+    ...(outreach || [])
+      .filter((row) => reportStatuses.has(row.review_status))
+      .map((row) => row.id)
+  ]);
+}
+
+function buildConfirmedOpenHouses({ outreach, visits, participants, messages, openHouses, events, loanSessions }) {
+  const queueById = new Map((outreach || []).map((row) => [row.id, row]));
+  const openHouseById = new Map((openHouses || []).map((row) => [row.id, row]));
+  const eventById = new Map((events || []).map((row) => [row.id, row]));
+  const visitsByQueue = new Map();
+  const participantsByVisit = new Map();
+  const messagesByQueue = new Map();
+  const liveLoanByEvent = new Map();
+
+  for (const visit of visits || []) {
+    if (!visit.outreach_queue_id || visit.status === 'cancelled') continue;
+    const existing = visitsByQueue.get(visit.outreach_queue_id);
+    if (!existing || new Date(visit.confirmed_at || visit.created_at || 0) > new Date(existing.confirmed_at || existing.created_at || 0)) {
+      visitsByQueue.set(visit.outreach_queue_id, visit);
+    }
+  }
+
+  for (const participant of participants || []) {
+    if (!participant.field_demo_visit_id) continue;
+    if (!participantsByVisit.has(participant.field_demo_visit_id)) participantsByVisit.set(participant.field_demo_visit_id, []);
+    participantsByVisit.get(participant.field_demo_visit_id).push(participant);
+  }
+
+  for (const message of messages || []) {
+    if (!message.queue_row_id) continue;
+    if (!messagesByQueue.has(message.queue_row_id)) messagesByQueue.set(message.queue_row_id, []);
+    messagesByQueue.get(message.queue_row_id).push(message);
+  }
+
+  for (const session of (loanSessions || []).filter((row) => row.status === 'live')) {
+    const existing = liveLoanByEvent.get(session.open_house_event_id);
+    if (!existing || new Date(session.signed_in_at || session.created_at || 0) > new Date(existing.signed_in_at || existing.created_at || 0)) {
+      liveLoanByEvent.set(session.open_house_event_id, session);
+    }
+  }
+
+  const queueIds = reportCandidateQueueIds({ outreach, visits });
+  return queueIds.map((queueId) => {
+    const queue = queueById.get(queueId) || {};
+    const visit = visitsByQueue.get(queueId) || {};
+    const openHouse = queue.open_house_id ? openHouseById.get(queue.open_house_id) || {} : {};
+    const event = visit.open_house_event_id ? eventById.get(visit.open_house_event_id) || {} : {};
+    const context = eventContext(event);
+    const visitParticipants = participantsByVisit.get(visit.id) || [];
+    const primaryParticipant = visitParticipants.find((item) => item.is_primary) || visitParticipants[0] || null;
+    const liveLoan = event.id ? liveLoanByEvent.get(event.id) || null : null;
+    const rowMessages = messagesByQueue.get(queueId) || [];
+
+    const scheduledStart = firstPresent(visit.scheduled_start, queue.open_start, event.start_time, openHouse.open_start, context.open_start);
+    const scheduledEnd = firstPresent(visit.scheduled_end, queue.open_end, event.end_time, openHouse.open_end, context.open_end);
+    const address = firstPresent(queue.address, openHouse.address, context.address, context.property_address, eventAddress(event));
+    const city = firstPresent(queue.city, openHouse.city, context.city);
+    const state = firstPresent(queue.state, openHouse.state, context.state);
+    const zip = firstPresent(queue.zip, openHouse.zip, context.zip, visit.property_zip);
+    const fullAddress = compactAddress({ address, city, state, zip }) || address || 'Confirmed open house';
+
+    return {
+      id: visit.id || queueId,
+      queue_row_id: queueId,
+      field_visit_id: visit.id || null,
+      open_house_id: firstPresent(queue.open_house_id, visit.open_house_id, event.open_house_source_id, openHouse.id),
+      open_house_event_id: visit.open_house_event_id || event.id || null,
+      review_status: queue.review_status || '',
+      visit_status: visit.status || '',
+      confirmed_at: firstPresent(visit.confirmed_at, visit.created_at, queue.initial_sent_at, queue.created_at),
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      property_address: fullAddress,
+      address,
+      city,
+      state,
+      zip,
+      price: firstPresent(queue.price, openHouse.price, openHouse.list_price, openHouse.ListPrice),
+      beds: firstPresent(queue.beds, openHouse.beds, openHouse.bedrooms, openHouse.BedroomsTotal),
+      baths: firstPresent(queue.baths, openHouse.baths, openHouse.bathrooms, openHouse.BathroomsTotal),
+      listing_photo_url: firstPresent(queue.listing_photo_url, openHouse.listing_photo_url, openHouse.photo_url, openHouse.image_url, openHouse.primary_photo_url),
+      mockup_image_url: queue.mockup_image_url || '',
+      agent_photo_url: queue.agent_photo_url || '',
+      agent_name: firstPresent(queue.agent_name, visit.agent_name, context.agent_name),
+      agent_phone: firstPresent(queue.agent_phone, visit.agent_phone, context.agent_phone),
+      agent_email: firstPresent(queue.agent_email, visit.agent_email, context.agent_email),
+      brokerage: firstPresent(queue.brokerage, visit.brokerage, context.brokerage),
+      loan_officer_name: firstPresent(primaryParticipant?.participant_name, liveLoan?.loan_officer_name, liveLoan?.loan_officer_slug),
+      loan_officer_phone: firstPresent(primaryParticipant?.participant_phone, liveLoan?.loan_officer_phone),
+      loan_officer_email: firstPresent(primaryParticipant?.participant_email, liveLoan?.loan_officer_email),
+      loan_officer_company: firstPresent(primaryParticipant?.participant_company, liveLoan?.loan_officer_company),
+      loan_officer_uid: firstPresent(primaryParticipant?.participant_uid, liveLoan?.loan_officer_uid, liveLoan?.verified_profile_uid),
+      loan_officer_status: firstPresent(primaryParticipant?.status, liveLoan?.status),
+      selected_sms: queue.selected_sms || '',
+      conversation_snapshot: buildConversationSnapshot(queue, rowMessages),
+      message_count: rowMessages.length,
+      messages: rowMessages
+    };
+  }).sort((a, b) => new Date(a.scheduled_start || a.confirmed_at || 0) - new Date(b.scheduled_start || b.confirmed_at || 0));
 }
 
 function buildLeads({ leads, checkins, events }) {
@@ -229,8 +392,29 @@ module.exports = async function handler(req, res) {
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
       safeRest('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc&limit=250', [], warnings, 'field_demo_visits'),
       safeRest('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc&limit=500', [], warnings, 'field_demo_visit_participants'),
-      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,review_status,initial_send_status,initial_sent_at,followup_send_status,followup_send_at,followup_sent_at,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
+      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,initial_send_status,initial_sent_at,followup_sms,followup_send_status,followup_send_at,followup_sent_at,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
       safeRest('agent_outreach_inbox?select=thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status&order=last_reply_at.desc&limit=250', [], warnings, 'agent_outreach_inbox')
+    ]);
+
+    const confirmedQueueIds = reportCandidateQueueIds({ outreach, visits: fieldVisits });
+    const confirmedOpenHouseIds = unique(outreach
+      .filter((row) => confirmedQueueIds.includes(row.id))
+      .map((row) => row.open_house_id));
+    const [confirmedMessages, confirmedOpenHouses] = await Promise.all([
+      safeRestInChunks(
+        confirmedQueueIds,
+        (ids) => `agent_outreach_replies?queue_row_id=${inFilter(ids)}&select=id,queue_row_id,from_phone,to_phone,body,direction,opt_out,message_sid,received_at,created_at&order=received_at.asc&limit=1000`,
+        [],
+        warnings,
+        'confirmed_open_house_messages'
+      ),
+      safeRestInChunks(
+        confirmedOpenHouseIds,
+        (ids) => `open_houses?id=${inFilter(ids)}&select=*&limit=${ids.length}`,
+        [],
+        warnings,
+        'confirmed_open_house_listings'
+      )
     ]);
 
     const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
@@ -239,6 +423,15 @@ module.exports = async function handler(req, res) {
     const leadRows = buildLeads({ leads, checkins, events });
     const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
     const paymentRows = buildPayments({ crmRows, signs });
+    const confirmedOpenHouseRows = buildConfirmedOpenHouses({
+      outreach,
+      visits: fieldVisits,
+      participants: fieldParticipants,
+      messages: confirmedMessages,
+      openHouses: confirmedOpenHouses,
+      events,
+      loanSessions
+    });
 
     sendJson(res, 200, {
       ok: true,
@@ -254,8 +447,9 @@ module.exports = async function handler(req, res) {
         leads: leadRows.length,
         live_loan_officers: loanSessions.filter((row) => row.status === 'live').length,
         open_events_without_lo: eventRows.filter((row) => row.status === 'active' && !row.ended_at && !row.live_loan_officer).length,
+        confirmed_open_houses: confirmedOpenHouseRows.length,
         incoming_threads: inbox.length,
-        needs_reply: inbox.filter((row) => row.direction !== 'outbound' && !row.any_opt_out).length,
+        needs_reply: inbox.filter((row) => row.direction !== 'outbound' && !row.any_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled'].includes(row.review_status)).length,
         payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length
       },
       crm: crmRows,
@@ -265,6 +459,7 @@ module.exports = async function handler(req, res) {
       events: eventRows,
       checkins: recent(checkins, 'created_at', 100),
       field_visits: fieldVisitRows,
+      confirmed_open_houses: confirmedOpenHouseRows,
       loan_officers: verifiedProfiles,
       loan_sessions: loanSessions,
       payments: paymentRows,
