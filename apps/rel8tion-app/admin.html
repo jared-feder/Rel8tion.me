@@ -4,6 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>REL8TION COMMAND</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            rel8tion: {
+              sky: '#38bdf8',
+              mist: '#e8f8ff',
+              navy: '#1f2a5a',
+              ink: '#17224f',
+              teal: '#0ea5c8'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif']
+          },
+          boxShadow: {
+            glass: '0 28px 70px rgba(23, 34, 79, 0.16), 0 2px 10px rgba(23, 34, 79, 0.06)'
+          }
+        }
+      }
+    };
+  </script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -2172,8 +2199,8 @@
       const loadedText = state.loadedAt ? `Live data loaded ${fmtDate(state.loadedAt)}` : 'Live command center';
       const needsReplyCount = state.counts.needs_reply || o.needs_reply || 0;
       app.innerHTML = `
-        <main class="app">
-          <div class="command-shell">
+        <main class="app min-h-screen antialiased text-slate-900">
+          <div class="command-shell shadow-glass ring-1 ring-white/70">
             <aside class="command-sidebar">
               <div>
                 <div class="sidebar-brand">
@@ -2195,8 +2222,8 @@
               <button class="btn soft" id="lockBtn"><i data-lucide="log-out"></i><span>Lock command</span></button>
             </aside>
 
-            <section class="command-workspace">
-              <header class="topbar">
+            <section class="command-workspace bg-white/55">
+              <header class="topbar sticky top-3 z-20">
                 <div class="search-wrap">
                   <i data-lucide="search"></i>
                   <input id="globalSearch" class="field" value="${esc(state.query)}" autocomplete="off" placeholder="Search agents, signs, open houses, SMS">
@@ -2891,7 +2918,12 @@
           compactReportStatus(row)
         ].filter(Boolean).join(' | ');
         const agentMeta = [fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | ');
-        const loMeta = [row.loan_officer_name ? `LO: ${row.loan_officer_name}` : 'LO: unassigned', fmtPhone(row.loan_officer_phone)].filter(Boolean).join(' | ');
+        const loanOfficerAssigned = [
+          row.loan_officer_name || 'Unassigned',
+          row.loan_officer_company,
+          fmtPhone(row.loan_officer_phone),
+          row.loan_officer_email
+        ].filter(Boolean).join(' | ');
         return `
           <tr>
             <td class="n">${esc(index + 1)}</td>
@@ -2901,7 +2933,8 @@
               ${esc(facts || 'No property facts')}<br>
               <b>${esc(row.agent_name || 'Unknown agent')}</b><br>
               ${esc(agentMeta || row.brokerage || 'No agent contact')}<br>
-              <span class="muted">${esc([row.brokerage, loMeta].filter(Boolean).join(' | '))}</span>
+              ${row.brokerage ? `<span class="muted">${esc(row.brokerage)}</span>` : ''}
+              <span class="lo-line"><b>Loan Officer Assigned:</b> ${esc(loanOfficerAssigned)}</span>
             </td>
             <td class="me">${reportOutboundBlocks(row)}</td>
             <td class="agent">${reportAgentBlocks(row)}</td>
@@ -2926,6 +2959,7 @@ th { background:#f8fafc; text-align:left; font-weight:bold; }
 .agent { line-height:1.19; word-wrap:break-word; }
 .me div,.agent div { margin-bottom:3px; }
 .muted { color:#64748b; }
+.lo-line { display:block; margin-top:3px; color:#0f172a; }
 </style></head><body>
 <h1>${esc(title)}</h1>
 <p>${esc(rows.length)} ${esc(windowLabel)} open house records. Generated ${esc(generated)}. Full outbound message text, inbound agent replies, coverage windows, and loan officer assignment are included.</p>
