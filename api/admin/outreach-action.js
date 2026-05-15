@@ -150,14 +150,22 @@ async function writeParticipant(path, payload, method = 'POST') {
 async function upsertFieldVisit(queue, options = {}) {
   const event = await loadMatchingEvent(queue);
   const now = new Date().toISOString();
-  const baseStart = queue.open_start || new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  const coverage = coverageWindow({ ...options, coverage_end: options.coverage_end || queue.open_end }, baseStart);
-  const scheduledStart = coverage.start;
-  const scheduledEnd = coverage.end;
-  const address = [queue.address, queue.city, queue.state, queue.zip].filter(Boolean).join(', ');
   const existing = one(await supabaseRest(
     `field_demo_visits?outreach_queue_id=eq.${enc(queue.id)}&status=neq.cancelled&select=*&order=created_at.desc&limit=1`
   ).catch(() => []));
+  const hasCoverageOverride = Boolean(options.coverage_start || options.coverage_end || options.coverage_label);
+  const baseStart = options.coverage_start || existing?.scheduled_start || queue.open_start || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const coverageOptions = hasCoverageOverride
+    ? { ...options, coverage_end: options.coverage_end || queue.open_end || existing?.scheduled_end }
+    : {
+        coverage_start: existing?.scheduled_start || queue.open_start,
+        coverage_end: existing?.scheduled_end || (existing?.scheduled_start ? fallbackEnd(existing.scheduled_start) : queue.open_end),
+        coverage_label: options.coverage_label || ''
+      };
+  const coverage = coverageWindow(coverageOptions, baseStart);
+  const scheduledStart = coverage.start;
+  const scheduledEnd = coverage.end;
+  const address = [queue.address, queue.city, queue.state, queue.zip].filter(Boolean).join(', ');
 
   const payload = {
     open_house_id: queue.open_house_id || null,

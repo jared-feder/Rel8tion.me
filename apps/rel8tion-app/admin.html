@@ -767,6 +767,39 @@
         rgba(255,255,255,.58);
     }
 
+    .accepted-summary {
+      border: 1px solid rgba(15,123,95,.20);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(236,253,245,.86), rgba(240,249,255,.78)),
+        rgba(255,255,255,.64);
+      padding: 10px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .accepted-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .accepted-summary-item {
+      min-width: 0;
+      border: 1px solid rgba(136,164,190,.22);
+      border-radius: 8px;
+      background: rgba(255,255,255,.64);
+      padding: 8px;
+    }
+
+    .accepted-summary-item strong {
+      display: block;
+      color: #1f2a44;
+      font-size: 13px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
     .action-grid {
       display: grid;
       grid-template-columns: max-content minmax(220px, 1fr) max-content;
@@ -1157,6 +1190,7 @@
       .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
       .action-grid,
       .drip-grid { grid-template-columns: 1fr; }
+      .accepted-summary-grid { grid-template-columns: 1fr; }
       .confirmed-report-grid { grid-template-columns: 1fr; }
       .confirmed-card { grid-template-columns: 1fr; }
       .report-media { min-height: 240px; }
@@ -1582,6 +1616,46 @@
       return (state.command?.loan_officers || []).filter((row) => row.is_active !== false);
     }
 
+    function fieldVisitForThread(thread) {
+      const queueId = thread?.queue_row_id;
+      if (!queueId) return null;
+      const visits = (state.command?.field_visits || [])
+        .filter((visit) => visit.outreach_queue_id === queueId && visit.status !== 'cancelled')
+        .sort((a, b) => new Date(b.confirmed_at || b.created_at || 0) - new Date(a.confirmed_at || a.created_at || 0));
+      return visits[0] || null;
+    }
+
+    function reportRowForThread(thread) {
+      const queueId = thread?.queue_row_id;
+      if (!queueId) return null;
+      return (state.command?.confirmed_open_houses || []).find((row) => row.queue_row_id === queueId) || null;
+    }
+
+    function primaryVisitParticipant(visit) {
+      const participants = Array.isArray(visit?.participants) ? visit.participants : [];
+      return participants.find((item) => item.is_primary) || participants[0] || null;
+    }
+
+    function outreachAssignment(thread) {
+      const visit = fieldVisitForThread(thread);
+      const report = reportRowForThread(thread);
+      const participant = primaryVisitParticipant(visit);
+      const assignedUid = participant?.participant_uid || participant?.participant_profile_id || report?.loan_officer_uid || '';
+      const assignedName = participant?.participant_name || report?.loan_officer_name || '';
+      return {
+        visit,
+        report,
+        participant,
+        assignedUid,
+        assignedName,
+        assignedPhone: participant?.participant_phone || report?.loan_officer_phone || '',
+        assignedCompany: participant?.participant_company || report?.loan_officer_company || '',
+        acceptedAt: visit?.confirmed_at || visit?.created_at || report?.confirmed_at || '',
+        scheduledStart: visit?.scheduled_start || report?.scheduled_start || thread?.open_start || '',
+        scheduledEnd: visit?.scheduled_end || report?.scheduled_end || thread?.open_end || ''
+      };
+    }
+
     function findThread(key) {
       return state.inbox.find((item) => item.thread_key === key);
     }
@@ -1883,8 +1957,13 @@
       const loanOfficerUid = select?.value || '';
       const profile = activeLoanOfficers().find((row) => row.uid === loanOfficerUid);
       const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
-      const assignment = profile ? ` and assign ${loanOfficerLabel(profile)}` : ' without a loan officer assignment yet';
-      if (!window.confirm(`Accept ${target}${assignment}?`)) return;
+      const assignment = outreachAssignment(thread);
+      const alreadyAccepted = thread.review_status === 'accepted_open_house' || assignment.participant;
+      const prompt = alreadyAccepted
+        ? `Update LO assignment for ${target}${profile ? ` to ${loanOfficerLabel(profile)}` : ''}?`
+        : `Accept ${target}${profile ? ` and assign ${loanOfficerLabel(profile)}` : ' without a loan officer assignment yet'}?`;
+      if (!window.confirm(prompt)) return;
+      if (state.outreachFilter === 'needs_reply') state.outreachFilter = 'interested';
       runOutreachAction(key, 'accept_open_house', { loan_officer_uid: loanOfficerUid }, 'Open house accepted and assignment updated.');
     }
 
@@ -2386,17 +2465,62 @@
       `;
     }
 
+    function renderAcceptedSummary(thread) {
+      const assignment = outreachAssignment(thread);
+      const show = assignment.visit || assignment.report || thread.review_status === 'accepted_open_house' || thread.review_status === 'confirmed_open_house';
+      if (!show) return '';
+      const accepted = thread.review_status === 'accepted_open_house' || Boolean(assignment.participant);
+      const statusText = accepted ? 'Accepted open house' : 'Confirmed open house';
+      const acceptedLabel = accepted ? 'Accepted' : 'Confirmed';
+      const coverage = [fmtDate(assignment.scheduledStart), fmtDate(assignment.scheduledEnd)].filter(Boolean).join(' - ') || 'No coverage time stored';
+      const acceptedAt = fmtDate(assignment.acceptedAt) || 'Time not recorded';
+      const officer = assignment.assignedName || 'No loan officer assigned';
+      const officerMeta = [assignment.assignedCompany, fmtPhone(assignment.assignedPhone)].filter(Boolean).join(' | ');
+      return `
+        <div class="accepted-summary">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">${esc(statusText)}</div>
+              <div class="small">${assignment.assignedName ? 'LO assignment is active on this field visit.' : 'Assign or reassign the loan officer below.'}</div>
+            </div>
+            ${badge(accepted ? 'Accepted' : 'Confirmed', 'ok')}
+          </div>
+          <div class="accepted-summary-grid">
+            <div class="accepted-summary-item">
+              <div class="mini-title">Coverage</div>
+              <strong>${esc(coverage)}</strong>
+            </div>
+            <div class="accepted-summary-item">
+              <div class="mini-title">${esc(acceptedLabel)}</div>
+              <strong>${esc(acceptedAt)}</strong>
+            </div>
+            <div class="accepted-summary-item">
+              <div class="mini-title">Loan officer</div>
+              <strong>${esc(officer)}</strong>
+              ${officerMeta ? `<div class="small">${esc(officerMeta)}</div>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderOutreachActions(thread) {
       const key = thread.thread_key;
       const profiles = activeLoanOfficers();
+      const assignment = outreachAssignment(thread);
       const disabled = isOptOutThread(thread) || !thread.queue_row_id;
       const interested = isInterestedThread(thread);
       const markBusy = state.actionKey === actionId('mark_interested', key);
       const confirmBusy = state.actionKey === actionId('confirm_open_house', key);
       const acceptBusy = state.actionKey === actionId('accept_open_house', key);
       const dripBusy = state.actionKey === actionId('schedule_drip', key);
-      const confirmed = thread.review_status === 'confirmed_open_house';
-      const selectedUid = profiles[0]?.uid || '';
+      const hasVisit = Boolean(assignment.visit || assignment.report);
+      const accepted = thread.review_status === 'accepted_open_house' || Boolean(assignment.participant);
+      const confirmed = thread.review_status === 'confirmed_open_house' || (hasVisit && !accepted);
+      const confirmDone = accepted || confirmed || hasVisit;
+      const acceptDisabled = disabled || acceptBusy || (accepted && !profiles.length);
+      const assignedIsActive = profiles.some((profile) => profile.uid === assignment.assignedUid);
+      const selectedUid = assignedIsActive ? assignment.assignedUid : profiles[0]?.uid || '';
       const dripText = thread.followup_sms || defaultDripText(thread);
       const dripAt = defaultDripSendAt(thread);
       return `
@@ -2410,17 +2534,18 @@
               <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Mark interested'}</span>
             </button>
           </div>
+          ${renderAcceptedSummary(thread)}
           <div class="action-grid">
-            <button class="btn soft" data-confirm-open-house="${esc(key)}" ${disabled || confirmBusy || confirmed ? 'disabled' : ''}>
-              <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Confirming...' : confirmed ? 'Confirmed true OH' : 'Confirm true OH'}</span>
+            <button class="btn soft" data-confirm-open-house="${esc(key)}" ${disabled || confirmBusy || confirmDone ? 'disabled' : ''}>
+              <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Confirming...' : accepted ? 'Accepted OH' : confirmed ? 'Confirmed true OH' : 'Confirm true OH'}</span>
             </button>
             <select id="accept_lo_${domId(key)}" class="select" ${disabled || !profiles.length ? 'disabled' : ''}>
               ${profiles.length ? profiles.map((profile) => `
                 <option value="${esc(profile.uid)}"${profile.uid === selectedUid ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>
               `).join('') : '<option>No active loan officers</option>'}
             </select>
-            <button class="btn primary" data-accept-open-house="${esc(key)}" ${disabled || acceptBusy ? 'disabled' : ''}>
-              <i data-lucide="calendar-check"></i><span>${acceptBusy ? 'Accepting...' : profiles.length ? 'Accept + assign LO' : 'Accept open house'}</span>
+            <button class="btn primary" data-accept-open-house="${esc(key)}" ${acceptDisabled ? 'disabled' : ''}>
+              <i data-lucide="calendar-check"></i><span>${acceptBusy ? 'Saving...' : accepted ? (profiles.length ? 'Reassign LO' : 'Accepted OH') : profiles.length ? 'Accept + assign LO' : 'Accept open house'}</span>
             </button>
           </div>
           <div class="drip-grid">
