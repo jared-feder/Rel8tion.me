@@ -91,6 +91,103 @@ async function insertLiveCoverage(event, profile) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+function eventContext(event) {
+  return event?.setup_context && typeof event.setup_context === 'object' ? event.setup_context : {};
+}
+
+function fallbackEnd(start) {
+  const date = new Date(start || Date.now());
+  if (!Number.isFinite(date.getTime())) return new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  return new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
+}
+
+async function upsertFieldVisitAssignment(event, profile, source = 'manual_admin') {
+  try {
+    const context = eventContext(event);
+    const scheduledStart = event.start_time || context.open_start || context.start_time || new Date().toISOString();
+    const scheduledEnd = event.end_time || context.open_end || context.end_time || fallbackEnd(scheduledStart);
+    const existingVisit = await supabaseRest(
+      `field_demo_visits?open_house_event_id=eq.${enc(event.id)}&status=neq.cancelled&select=*&order=created_at.desc&limit=1`
+    ).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
+
+    const visitPayload = {
+      open_house_event_id: event.id,
+      open_house_id: event.open_house_source_id || context.open_house_id || null,
+      agent_slug: event.host_agent_slug || context.agent_slug || null,
+      agent_name: context.agent_name || null,
+      agent_phone: context.agent_phone || null,
+      agent_email: context.agent_email || null,
+      brokerage: context.brokerage || null,
+      property_zip: context.zip || context.property_zip || null,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      status: existingVisit?.status || 'scheduled',
+      coverage_mode: 'remote_support',
+      demo_type: 'buyer_financing_support',
+      source: 'admin_lo_assignment',
+      assignment_source: source,
+      notes: `Admin assigned ${profile.full_name || profile.slug || 'loan officer'} to this open house.`
+    };
+
+    const visit = existingVisit?.id
+      ? await supabaseRest(`field_demo_visits?id=eq.${enc(existingVisit.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(visitPayload)
+        }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null))
+      : await supabaseRest('field_demo_visits', {
+          method: 'POST',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(visitPayload)
+        }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
+
+    if (!visit?.id) return { visit: null, participant: null };
+
+    await supabaseRest(
+      `field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&responsibility=eq.financing_support&is_primary=eq.true`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ is_primary: false })
+      }
+    ).catch(() => null);
+
+    const existingParticipant = await supabaseRest(
+      `field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&participant_profile_id=eq.${enc(profile.uid)}&responsibility=eq.financing_support&select=*&limit=1`
+    ).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
+
+    const participantPayload = {
+      field_demo_visit_id: visit.id,
+      participant_profile_id: profile.uid,
+      participant_uid: profile.uid,
+      participant_name: profile.full_name || profile.slug || null,
+      participant_phone: profile.phone || null,
+      participant_email: profile.email || null,
+      participant_company: profile.company_name || null,
+      role: 'loan_officer',
+      responsibility: 'financing_support',
+      status: 'assigned',
+      is_primary: true,
+      assignment_reason: 'Admin LO assignment'
+    };
+
+    const participant = existingParticipant?.id
+      ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existingParticipant.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(participantPayload)
+        }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null))
+      : await supabaseRest('field_demo_visit_participants', {
+          method: 'POST',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify(participantPayload)
+        }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
+
+    return { visit, participant };
+  } catch (error) {
+    return { visit: null, participant: null, warning: error.message || String(error) };
+  }
+}
+
 async function assignLiveCoverage(eventId, loanOfficerUid) {
   const [event, profile] = await Promise.all([
     loadEvent(eventId),
@@ -105,8 +202,9 @@ async function assignLiveCoverage(eventId, loanOfficerUid) {
 
   const ended = await endLiveCoverage(event.id);
   const assigned = await insertLiveCoverage(event, profile);
+  const field_assignment = await upsertFieldVisitAssignment(event, profile, 'manual_admin');
 
-  return { event, loan_officer: profile, ended, assigned };
+  return { event, loan_officer: profile, ended, assigned, field_assignment };
 }
 
 function recentWindowStart() {
@@ -152,7 +250,8 @@ async function autoAssignLiveCoverage() {
     })[0];
 
     const assigned = await insertLiveCoverage(event, profile);
-    assignments.push({ event, loan_officer: profile, assigned });
+    const field_assignment = await upsertFieldVisitAssignment(event, profile, 'auto_admin');
+    assignments.push({ event, loan_officer: profile, assigned, field_assignment });
     coveredEvents.add(event.id);
     loadByUid[profile.uid] = (loadByUid[profile.uid] || 0) + 1;
   }

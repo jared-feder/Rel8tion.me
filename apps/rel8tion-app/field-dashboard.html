@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>REL8TION Field Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 42%,#f8fbff 100%);">
+    <section class="mx-auto max-w-7xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Field Operations</div>
+            <div id="profileLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Loading...</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Field Dashboard</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading assigned REL8TION demo visits.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260512-field-chat';
+
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      uid: params.get('uid') || params.get('participant_uid') || '',
+      slug: params.get('slug') || '',
+      role: params.get('role') || '',
+      profile: null,
+      availability: [],
+      visits: [],
+      outreachCandidates: [],
+      buyerRequests: {},
+      conversations: {},
+      messages: {},
+      activeConversationByVisit: {},
+      scheduleOpen: false,
+      busy: false,
+      message: '',
+      error: ''
+    };
+
+    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    const app = document.getElementById('app');
+    const profileLabel = document.getElementById('profileLabel');
+
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+    const titleize = (value) => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+    const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
+    const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
+    const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const extractZip = (...values) => {
+      for (const value of values) {
+        const match = String(value || '').match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (match) return match[1];
+      }
+      return '';
+    };
+
+    const fmtTime = (value) => {
+      if (!value) return 'Not scheduled';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Not scheduled';
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    };
+
+    const fmtShort = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString([], { hour: 'numeric', minute: '2-digit' });
+    };
+
+    function defaultScheduleDate(offsetDays = 1) {
+      const date = new Date();
+      date.setDate(date.getDate() + offsetDays);
+      return date.toISOString().slice(0, 10);
+    }
+
+    async function request(path, options = {}) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: { ...headers, ...(options.headers || {}) }
+      });
+      const raw = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      const raw = await res.text().catch(() => '');
+      const payload = raw ? JSON.parse(raw) : null;
+      if (!res.ok || payload?.ok === false) throw new Error(payload?.error || raw || `Request failed: ${res.status}`);
+      return payload;
+    }
+
+    function dashboardRange() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 8);
+      return { start, end };
+    }
+
+    async function loadProfile() {
+      if (state.uid) {
+        const rows = await request(`verified_profiles?uid=eq.${encodeURIComponent(state.uid)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(rows) && rows[0]) return rows[0];
+      }
+      if (state.slug) {
+        const rows = await request(`verified_profiles?slug=eq.${encodeURIComponent(state.slug)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(rows) && rows[0]) return rows[0];
+      }
+      return null;
+    }
+
+    async function loadParticipantRows() {
+      const { start, end } = dashboardRange();
+      const queries = [];
+      if (state.profile?.uid) {
+        queries.push(`participant_profile_id=eq.${encodeURIComponent(state.profile.uid)}`);
+        queries.push(`participant_uid=eq.${encodeURIComponent(state.profile.uid)}`);
+      }
+      if (state.uid && state.uid !== state.profile?.uid) queries.push(`participant_uid=eq.${encodeURIComponent(state.uid)}`);
+      if (!queries.length) return [];
+
+      const seen = new Map();
+      for (const filter of queries) {
+        const rows = await request(
+          `field_demo_visit_participants?${filter}&select=*,field_demo_visits(*)&order=created_at.asc&limit=200`
+        ).catch((error) => {
+          console.log('field demo participant load skipped', error);
+          return [];
+        });
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+          const visit = row.field_demo_visits;
+          if (!visit?.id) return;
+          const scheduled = new Date(visit.scheduled_start || '');
+          if (!Number.isNaN(scheduled.getTime()) && (scheduled < start || scheduled >= end)) return;
+          seen.set(row.id, row);
+        });
+      }
+      return [...seen.values()];
+    }
+
+    function groupVisits(participantRows) {
+      const visits = new Map();
+      participantRows.forEach((participant) => {
+        const visit = participant.field_demo_visits;
+        if (!visit?.id) return;
+        if (!visits.has(visit.id)) visits.set(visit.id, { ...visit, participants: [] });
+        visits.get(visit.id).participants.push({ ...participant, field_demo_visits: undefined });
+      });
+      return [...visits.values()].sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
+    }
+
+    function responsibilities(visit) {
+      return [...new Set((visit.participants || []).map((row) => row.responsibility).filter(Boolean))];
+    }
+
+    function hasFinance(visit) {
+      return responsibilities(visit).includes('financing_support');
+    }
+
+    function hasDemoWork(visit) {
+      return responsibilities(visit).some((item) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(item));
+    }
+
+    async function loadBuyerRequestsForVisits(visits = []) {
+      const next = {};
+      for (const visit of visits) {
+        if (!visit.open_house_event_id) continue;
+        const eventId = visit.open_house_event_id;
+        next[eventId] = await request(
+          `event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,metadata,created_at&order=created_at.desc&limit=50`
+        ).catch((error) => {
+          console.log('buyer request load skipped', eventId, error);
+          return [];
+        });
+      }
+      state.buyerRequests = next;
+    }
+
+    async function loadChatsForVisits(visits = []) {
+      const nextConversations = {};
+      const nextMessages = {};
+      for (const visit of visits) {
+        if (!visit.open_house_event_id) continue;
+        const payload = await api('/api/event-chat/list', {
+          open_house_event_id: visit.open_house_event_id
+        }).catch((error) => {
+          console.log('event chat load skipped', visit.open_house_event_id, error);
+          return { conversations: [], messagesByConversation: {} };
+        });
+        nextConversations[visit.open_house_event_id] = payload.conversations || [];
+        Object.assign(nextMessages, payload.messagesByConversation || {});
+      }
+      state.conversations = nextConversations;
+      state.messages = nextMessages;
+    }
+
+    async function loadOutreachCandidates() {
+      if (!state.profile?.uid && !state.uid && !state.slug) return [];
+      const payload = await api('/api/field-demo/outreach-candidates', {
+        uid: state.profile?.uid || state.uid || '',
+        slug: state.profile?.slug || state.slug || '',
+        days: 10,
+        limit: 50
+      }).catch((error) => {
+        console.log('outreach candidates load skipped', error);
+        return { candidates: [] };
+      });
+      return payload.candidates || [];
+    }
+
+    async function loadAvailability() {
+      if (!state.profile?.uid && !state.uid && !state.slug) return [];
+      const payload = await api('/api/field-demo/availability', {
+        action: 'list',
+        uid: state.profile?.uid || state.uid || '',
+        slug: state.profile?.slug || state.slug || '',
+        days: 14
+      }).catch((error) => {
+        console.log('availability load skipped', error);
+        return { availability: [] };
+      });
+      return payload.availability || [];
+    }
+
+    function visitStats() {
+      const now = new Date();
+      const today = now.toDateString();
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrow = tomorrowDate.toDateString();
+      const allRequests = Object.values(state.buyerRequests).flat();
+      return {
+        today: state.visits.filter((visit) => new Date(visit.scheduled_start || '').toDateString() === today).length,
+        tomorrow: state.visits.filter((visit) => new Date(visit.scheduled_start || '').toDateString() === tomorrow).length,
+        live: state.visits.filter((visit) => visit.status === 'live').length,
+        buyers: allRequests.length,
+        financing: allRequests.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length
+      };
+    }
+
+    function formatMoney(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return '';
+      return number.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    }
+
+    function stat(label, value, tone = 'slate') {
+      const color = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-sky-700' : tone === 'rose' ? 'text-rose-700' : 'text-slate-900';
+      return `<div class="rounded-[26px] border border-white/80 bg-white/75 p-5 shadow-sm">
+        <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div>
+        <div class="mt-2 text-4xl font-black ${color}">${esc(value)}</div>
+      </div>`;
+    }
+
+    function visitStatusPill(status) {
+      const color = status === 'live' ? 'bg-emerald-100 text-emerald-700'
+        : status === 'completed' || status === 'converted' ? 'bg-slate-100 text-slate-700'
+          : status === 'cancelled' ? 'bg-rose-100 text-rose-700'
+            : 'bg-sky-100 text-sky-700';
+      return `<span class="rounded-full px-3 py-1 text-xs font-black uppercase tracking-[.12em] ${color}">${esc(status || 'scheduled')}</span>`;
+    }
+
+    function actionButton(label, onclick, tone = 'blue') {
+      const palette = tone === 'green'
+        ? 'bg-emerald-600 text-white'
+        : tone === 'white'
+          ? 'bg-white text-slate-700 ring-1 ring-slate-200'
+          : 'bg-sky-600 text-white';
+      return `<button type="button" onclick="${onclick}" class="rounded-full px-4 py-3 text-sm font-black ${palette}">${esc(label)}</button>`;
+    }
+
+    function primaryParticipant(visit, responsibility) {
+      return (visit.participants || []).find((row) => row.responsibility === responsibility && row.is_primary)
+        || (visit.participants || []).find((row) => row.responsibility === responsibility)
+        || (visit.participants || [])[0]
+        || {};
+    }
+
+    function participantName(row) {
+      return row?.participant_name || state.profile?.full_name || 'Field Specialist';
+    }
+
+    function buyerRequestCard(visit, row) {
+      const meta = row.metadata || {};
+      const name = row.visitor_name || meta.name || 'Buyer';
+      const phone = row.visitor_phone || meta.phone || '';
+      const email = row.visitor_email || meta.email || '';
+      const preApproved = row.pre_approved === true ? 'Pre-approved'
+        : row.pre_approved === false ? 'Needs financing'
+          : 'Not shared';
+      const financingRequested = row.pre_approved === false || meta.financing_requested === true;
+      const textBody = `Hi ${name}, this is ${state.profile?.full_name || 'your NMB loan officer'} with REL8TION. I am live for this open house and can help with financing questions.`;
+      return `
+        <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="text-base font-black text-slate-900">${esc(name)}</div>
+              <div class="mt-1 text-xs font-black uppercase tracking-[.1em] ${financingRequested ? 'text-rose-600' : 'text-slate-500'}">${esc(preApproved)}</div>
+              <div class="mt-1 text-xs font-bold text-slate-400">${esc([phone, email].filter(Boolean).join(' - ') || fmtTime(row.created_at))}</div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white ${phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+              <a href="${esc(smsHref(phone, textBody))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+              <button type="button" onclick="window.openBuyerChat('${esc(visit.id)}','${esc(row.id)}')" class="rounded-full bg-sky-600 px-3 py-2 text-xs font-black text-white">Open Chat</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBuyerRequests(visit) {
+      if (!visit.open_house_event_id) {
+        return `<div class="mt-4 rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-emerald-100">Attach this visit to an open house event before buyer requests can appear here.</div>`;
+      }
+      const rows = state.buyerRequests[visit.open_house_event_id] || [];
+      const needsHelp = rows.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true);
+      return `
+        <div class="mt-4 rounded-[22px] bg-white/80 p-4 ring-1 ring-emerald-100">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.14em] text-emerald-700">Buyer Requests</div>
+              <div class="mt-1 text-sm font-extrabold text-slate-600">${rows.length} check-ins - ${needsHelp.length} financing follow-up</div>
+            </div>
+            <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">Refresh</button>
+          </div>
+          <div class="mt-3 grid gap-2">
+            ${rows.length ? rows.map((row) => buyerRequestCard(visit, row)).join('') : `<div class="rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No buyer check-ins yet. New financing opt-ins will appear here without opening the agent dashboard.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function conversationTitle(conversation) {
+      return conversation?.buyer_name || conversation?.buyer_phone || 'Event conversation';
+    }
+
+    function renderMessages(conversation) {
+      const messages = state.messages[conversation?.id] || [];
+      if (!messages.length) {
+        return `<div class="rounded-2xl bg-white/70 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No messages yet. Send the first note to start the event thread.</div>`;
+      }
+      return messages.map((message) => {
+        const own = ['loan_officer', 'field_specialist'].includes(message.sender_role);
+        return `<div class="flex ${own ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[86%] rounded-2xl ${own ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-100'} px-4 py-3">
+            <div class="text-[10px] font-black uppercase tracking-[.12em] ${own ? 'text-emerald-50' : 'text-slate-400'}">${esc(message.sender_name || titleize(message.sender_role))} - ${esc(fmtShort(message.created_at))}</div>
+            <div class="mt-1 text-sm font-bold leading-relaxed">${esc(message.body)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderConversationPanel(visit) {
+      if (!visit.open_house_event_id) return '';
+      const conversations = state.conversations[visit.open_house_event_id] || [];
+      const activeId = state.activeConversationByVisit[visit.id] || conversations[0]?.id || '';
+      const active = conversations.find((row) => row.id === activeId) || conversations[0] || null;
+      return `
+        <section class="rounded-[24px] border border-sky-200 bg-sky-50/80 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Event Chat</div>
+              <div class="mt-1 text-sm font-extrabold text-slate-600">${conversations.length} open thread${conversations.length === 1 ? '' : 's'}</div>
+            </div>
+            <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-white px-3 py-2 text-xs font-black text-sky-700 ring-1 ring-sky-200">Reload</button>
+          </div>
+          ${conversations.length ? `
+            <div class="mt-3 flex flex-wrap gap-2">
+              ${conversations.map((conversation) => `<button type="button" onclick="window.selectConversation('${esc(visit.id)}','${esc(conversation.id)}')" class="rounded-full px-3 py-2 text-xs font-black ${conversation.id === activeId ? 'bg-sky-600 text-white' : 'bg-white text-sky-700 ring-1 ring-sky-200'}">${esc(conversationTitle(conversation))}</button>`).join('')}
+            </div>
+          ` : `<div class="mt-3 rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">Open chat from a buyer request, or wait for a buyer to send a financing question after check-in.</div>`}
+          ${active ? `
+            <div class="mt-4 rounded-[20px] bg-white/70 p-3 ring-1 ring-white">
+              <div class="mb-3 text-sm font-black text-slate-800">${esc(conversationTitle(active))}</div>
+              <div class="grid max-h-[340px] gap-2 overflow-y-auto pr-1">${renderMessages(active)}</div>
+              <div class="mt-3 grid gap-2">
+                <textarea id="chat-draft-${esc(visit.id)}-${esc(active.id)}" rows="3" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-sky-400" placeholder="Type a note to the buyer, agent, or support team..."></textarea>
+                <button type="button" onclick="window.sendEventMessage('${esc(visit.id)}','${esc(active.id)}')" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white">Send Message</button>
+              </div>
+            </div>
+          ` : ''}
+        </section>
+      `;
+    }
+
+    function renderVisit(visit) {
+      const visitResponsibilities = responsibilities(visit);
+      const primary = (visit.participants || []).find((row) => row.is_primary) || visit.participants?.[0] || {};
+      const financeParticipant = primaryParticipant(visit, 'financing_support');
+      const demoParticipant = primaryParticipant(visit, 'product_demo');
+      const agentLine = [visit.agent_name, visit.brokerage].filter(Boolean).join(' - ');
+      const address = visit.open_house_id || visit.open_house_event_id || 'Field visit';
+      const agentMessage = `Hi${visit.agent_name ? ` ${visit.agent_name}` : ''}, this is ${state.profile?.full_name || participantName(primary)}. I am assigned to your REL8TION field demo.`;
+      return `
+        <article class="rounded-[30px] border border-white/80 bg-white/78 p-5 shadow-[0_18px_50px_rgba(15,23,42,.10)]">
+          <div class="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                ${visitStatusPill(visit.status)}
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 ring-1 ring-slate-200">${esc(titleize(visit.coverage_mode))}</span>
+              </div>
+              <h2 class="mt-3 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold leading-tight">${esc(agentLine || visit.agent_slug || 'Assigned Field Visit')}</h2>
+              <p class="mt-2 text-sm font-bold text-slate-500">${esc(address)}</p>
+              <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                ${visitResponsibilities.map((item) => `<span class="rounded-full bg-slate-50 px-3 py-2 text-xs font-black uppercase tracking-[.1em] text-slate-600 ring-1 ring-slate-200">${esc(titleize(item))}</span>`).join('')}
+              </div>
+            </div>
+            <div class="rounded-[24px] bg-white/75 p-4 ring-1 ring-slate-100">
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Primary Contact</div>
+              <div class="mt-2 text-xl font-black">${esc(participantName(primary))}</div>
+              <div class="mt-1 text-sm font-bold text-slate-500">${esc(primary.participant_company || state.profile?.company_name || 'REL8TION Field Team')}</div>
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <a href="${esc(telHref(primary.participant_phone || state.profile?.phone))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200">Call</a>
+                <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text Agent</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 grid gap-3 xl:grid-cols-[1fr_1fr]">
+            ${hasFinance(visit) ? `
+              <section class="rounded-[24px] border border-emerald-200 bg-emerald-50/85 p-4">
+                <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">Financing Support</div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                  ${actionButton('Go Live For Financing', `window.startVisit('${visit.id}', '${financeParticipant?.id || ''}')`, 'green')}
+                  ${actionButton('Mark Financing Complete', `window.updateParticipant('${financeParticipant?.id || ''}', 'completed')`, 'white')}
+                </div>
+                ${renderBuyerRequests(visit)}
+              </section>
+            ` : ''}
+
+            ${hasDemoWork(visit) ? `
+              <section class="rounded-[24px] border border-sky-200 bg-sky-50/85 p-4">
+                <div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Demo + Agent Onboarding</div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                  ${actionButton('Mark En Route', `window.updateVisitAndParticipant('${visit.id}', '${demoParticipant?.id || ''}', 'en_route')`)}
+                  ${actionButton('Mark On Site', `window.updateVisitAndParticipant('${visit.id}', '${demoParticipant?.id || ''}', 'on_site')`)}
+                  <a href="/sign-demo-activate${visit.demo_public_code ? `?code=${encodeURIComponent(visit.demo_public_code)}` : ''}${visit.agent_slug ? `${visit.demo_public_code ? '&' : '?'}agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Activate Demo Sign</a>
+                  <a href="/event${visit.open_house_event_id ? `?event=${encodeURIComponent(visit.open_house_event_id)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Demo Buyer Flow</a>
+                  <a href="/onboarding${visit.agent_slug ? `?agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Onboard Agent</a>
+                  ${actionButton('Convert To Virtual Support', `window.convertVisit('${visit.id}')`, 'green')}
+                  ${actionButton('End Demo', `window.updateVisit('${visit.id}', 'completed')`, 'white')}
+                </div>
+              </section>
+            ` : ''}
+          </div>
+
+          <div class="mt-4">
+            ${renderConversationPanel(visit)}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderSchedulePanel() {
+      const contactName = state.profile?.full_name || '';
+      const contactPhone = state.profile?.phone || '';
+      const contactEmail = state.profile?.email || '';
+      const contactCompany = state.profile?.company_name || 'Nationwide Mortgage Bankers';
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Scheduling</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Book Field Coverage</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Use this to get tomorrow's outreach visits onto the LO/field dashboard. One person can hold multiple responsibilities.</p>
+            </div>
+            <button type="button" onclick="window.toggleSchedule()" class="rounded-full bg-sky-600 px-5 py-3 text-sm font-black text-white">${state.scheduleOpen ? 'Hide Scheduler' : 'Schedule Visit'}</button>
+          </div>
+          ${state.scheduleOpen ? `
+            <form id="schedule-form" class="mt-5 grid gap-3 md:grid-cols-2">
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Agent Name
+                <input name="agent_name" required class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Agent name">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Agent Phone
+                <input name="agent_phone" required inputmode="tel" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Cell phone">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Agent Email
+                <input name="agent_email" type="email" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Email">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Brokerage
+                <input name="brokerage" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Brokerage">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Open House/Event ID
+                <input name="open_house_event_id" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional event UUID">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Open House Source ID
+                <input name="open_house_id" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional MLS/source id">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Demo Sign Code
+                <input name="demo_public_code" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional public code">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Coverage Mode
+                <select name="coverage_mode" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                  <option value="physical_demo">Physical demo</option>
+                  <option value="physical_support">Physical support</option>
+                  <option value="remote_support">Remote support</option>
+                </select>
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Date
+                <input name="date" type="date" required value="${defaultScheduleDate(1)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Start
+                <input name="start_time" type="time" required value="12:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+              </label>
+              <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">End
+                <input name="end_time" type="time" required value="14:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+              </label>
+              <label class="md:col-span-2 grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Notes
+                <textarea name="notes" rows="3" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Context for the visit"></textarea>
+              </label>
+              <div class="md:col-span-2 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                <div class="mb-3 text-xs font-black uppercase tracking-[.14em] text-slate-500">Responsibilities for ${esc(contactName || 'this profile')}</div>
+                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  ${[
+                    ['financing_support', 'Financing support'],
+                    ['product_demo', 'Product demo'],
+                    ['sign_setup', 'Sign setup'],
+                    ['agent_onboarding', 'Agent onboarding']
+                  ].map(([value, label]) => `<label class="flex items-center gap-2 rounded-2xl bg-white px-3 py-3 text-sm font-black ring-1 ring-slate-100"><input type="checkbox" name="responsibilities" value="${value}" checked class="h-4 w-4">${label}</label>`).join('')}
+                </div>
+              </div>
+              <input type="hidden" name="participant_name" value="${esc(contactName)}">
+              <input type="hidden" name="participant_phone" value="${esc(contactPhone)}">
+              <input type="hidden" name="participant_email" value="${esc(contactEmail)}">
+              <input type="hidden" name="participant_company" value="${esc(contactCompany)}">
+              <button type="submit" class="md:col-span-2 rounded-full bg-emerald-600 px-5 py-4 text-base font-black text-white">Create Scheduled Visit</button>
+            </form>
+          ` : ''}
+        </section>
+      `;
+    }
+
+    function renderAvailabilityPanel() {
+      const contactName = state.profile?.full_name || 'this profile';
+      const defaultZip = extractZip(state.profile?.areas?.join?.(', '), state.profile?.areas, state.availability[0]?.service_zip);
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-violet-700">Availability Queue</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Set Coverage Availability</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Add the times and ZIPs where ${esc(contactName)} can support open houses. Scheduling ranks open slots by time match first, then ZIP proximity.</p>
+            </div>
+          </div>
+          <form id="availability-form" class="mt-5 grid gap-3 md:grid-cols-6">
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Date
+              <input name="date" type="date" required value="${defaultScheduleDate(1)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Start
+              <input name="start_time" type="time" required value="10:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">End
+              <input name="end_time" type="time" required value="16:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Service ZIP
+              <input name="service_zip" required inputmode="numeric" maxlength="5" value="${esc(defaultZip)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="11572">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Miles
+              <input name="service_radius_miles" type="number" min="1" max="250" value="15" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Role
+              <select name="role" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                <option value="loan_officer">Loan officer</option>
+                <option value="field_sales_rep">Field sales rep</option>
+                <option value="demo_presenter">Demo presenter</option>
+                <option value="onboarding_specialist">Onboarding specialist</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Responsibility
+              <select name="responsibility" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                <option value="financing_support">Financing support</option>
+                <option value="product_demo">Product demo</option>
+                <option value="sign_setup">Sign setup</option>
+                <option value="agent_onboarding">Agent onboarding</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Notes
+              <input name="notes" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional">
+            </label>
+            <button type="submit" class="md:col-span-6 rounded-full bg-violet-600 px-5 py-4 text-base font-black text-white">Add Availability Slot</button>
+          </form>
+          <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            ${state.availability.length ? state.availability.slice(0, 12).map((slot) => `
+              <article class="rounded-2xl bg-white/85 p-4 ring-1 ring-slate-100">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="text-xs font-black uppercase tracking-[.12em] ${slot.status === 'open' ? 'text-emerald-700' : slot.status === 'booked' ? 'text-sky-700' : 'text-slate-500'}">${esc(titleize(slot.status))}</div>
+                    <div class="mt-1 text-lg font-black">${esc(slot.service_zip)} · ${esc(slot.service_radius_miles)} mi</div>
+                    <div class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(slot.available_start))} - ${esc(fmtTime(slot.available_end))}</div>
+                    <div class="mt-1 text-xs font-black uppercase tracking-[.1em] text-slate-400">${esc(titleize(slot.role))} / ${esc(titleize(slot.responsibility))}</div>
+                  </div>
+                  ${slot.status === 'open' ? `<button type="button" onclick="window.cancelAvailability('${esc(slot.id)}')" class="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-700 ring-1 ring-rose-100">Cancel</button>` : ''}
+                </div>
+              </article>
+            `).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 md:col-span-2 xl:col-span-3">No availability slots yet. Add tomorrow's coverage window so assignment can find this profile.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function outreachStatus(row) {
+      if (row.field_visit?.id) return `Scheduled ${fmtTime(row.field_visit.scheduled_start)}`;
+      if (row.initial_send_status === 'sent' || row.followup_send_status === 'sent') return 'Outreach sent';
+      if (row.mockup_status === 'rendered' && row.generation_status === 'generated') return 'Ready to send';
+      if (row.generation_status === 'generated') return 'Needs mockup';
+      if (row.enrichment_status === 'ready') return 'Needs message';
+      return 'Needs enrichment';
+    }
+
+    function renderOutreachPanel() {
+      const rows = state.outreachCandidates || [];
+      const unscheduled = rows.filter((row) => !row.field_visit?.id);
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-emerald-700">Outreach Coverage</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Upcoming Outreach Visits</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Pull upcoming outreach rows into scheduled field visits so tomorrow's outreach has real coverage behind it.</p>
+            </div>
+            <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Reload</button>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            ${rows.length ? rows.slice(0, 12).map((row) => {
+              const alreadyScheduled = !!row.field_visit?.id;
+              const details = [formatMoney(row.price), row.beds ? `${row.beds} bd` : '', row.baths ? `${row.baths} ba` : ''].filter(Boolean).join(' - ');
+              return `
+                <article class="rounded-[24px] bg-white/85 p-4 ring-1 ring-slate-100">
+                  <div class="flex items-start gap-3">
+                    ${row.listing_photo_url ? `<img src="${esc(row.listing_photo_url)}" alt="" class="h-20 w-24 rounded-2xl object-cover">` : `<div class="h-20 w-24 rounded-2xl bg-slate-100"></div>`}
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black uppercase tracking-[.12em] ${alreadyScheduled ? 'text-emerald-700' : 'text-sky-700'}">${esc(outreachStatus(row))}</div>
+                      <h3 class="mt-1 text-lg font-black leading-tight">${esc(row.agent_name || row.agent_first_name || 'Agent')}</h3>
+                      <p class="mt-1 text-sm font-bold text-slate-500">${esc(row.address || row.open_house_id || 'Open house')}</p>
+                      <p class="mt-1 text-xs font-bold text-slate-400">${esc([row.brokerage, details].filter(Boolean).join(' - '))}</p>
+                      <p class="mt-1 text-xs font-black text-slate-500">${esc(fmtTime(row.open_start))} - ${esc(fmtTime(row.open_end))}</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <a href="${esc(telHref(row.agent_phone))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${row.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                    <a href="${esc(smsHref(row.agent_phone, row.selected_sms || ''))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${row.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                    <button type="button" onclick="window.scheduleFromOutreach('${esc(row.id)}')" class="rounded-full ${alreadyScheduled ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-emerald-600 text-white'} px-3 py-2 text-xs font-black" ${alreadyScheduled ? 'disabled' : ''}>${alreadyScheduled ? 'Scheduled' : 'Schedule Coverage'}</button>
+                  </div>
+                </article>
+              `;
+            }).join('') : `<div class="lg:col-span-2 rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No upcoming outreach rows found in the next 10 days. That usually means the queue/generation pipeline has no ready future open houses yet.</div>`}
+          </div>
+          ${unscheduled.length ? `<p class="mt-3 text-xs font-black uppercase tracking-[.12em] text-slate-500">${unscheduled.length} outreach row${unscheduled.length === 1 ? '' : 's'} still need scheduled coverage.</p>` : ''}
+        </section>
+      `;
+    }
+
+    function render() {
+      const profileName = state.profile?.full_name || state.uid || state.slug || 'Field Team';
+      const stats = visitStats();
+      profileLabel.textContent = profileName;
+      app.innerHTML = `
+        <section class="mb-6">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Next 7 Days</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">Loan Officer Field Dashboard</h1>
+          <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">
+            Schedule visits, go live for financing support, see buyer requests, and keep the event conversation in one place.
+          </p>
+          ${state.message ? `<div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
+          ${state.error ? `<div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
+        </section>
+
+        ${!state.profile && !state.uid ? `
+          <section class="mb-6 rounded-[28px] border border-amber-200 bg-amber-50/90 p-5">
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Profile Not Identified</h2>
+            <p class="mt-2 font-semibold leading-relaxed text-amber-900">Open this dashboard from a verified NMB/field profile link using <code>uid</code> or <code>slug</code>, or tap a verified field/loan officer chip once that router path is added.</p>
+          </section>
+        ` : ''}
+
+        <section class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          ${stat('Today', stats.today, 'blue')}
+          ${stat('Tomorrow', stats.tomorrow, 'blue')}
+          ${stat('Live', stats.live, 'green')}
+          ${stat('Buyer requests', stats.buyers, 'slate')}
+          ${stat('Financing', stats.financing, stats.financing ? 'rose' : 'slate')}
+        </section>
+
+        ${renderSchedulePanel()}
+
+        ${renderAvailabilityPanel()}
+
+        ${renderOutreachPanel()}
+
+        <section class="grid gap-4">
+          ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No Assigned Visits In The Next 7 Days</h2>
+            <p class="mt-2 font-semibold text-slate-500">Use Schedule Visit to create tomorrow's field coverage, then send outreach with a concrete appointment path.</p>
+          </div>`}
+        </section>
+      `;
+      document.getElementById('schedule-form')?.addEventListener('submit', handleScheduleSubmit);
+      document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
+    }
+
+    function selectedVisit(visitId) {
+      return state.visits.find((visit) => visit.id === visitId);
+    }
+
+    function currentParticipantPayload(responsibility, isPrimary = false, overrides = {}) {
+      const profileUid = state.profile?.uid || '';
+      const participantUid = profileUid || state.uid || '';
+      const roleByResponsibility = {
+        financing_support: 'loan_officer',
+        product_demo: 'demo_presenter',
+        sign_setup: 'field_sales_rep',
+        agent_onboarding: 'onboarding_specialist'
+      };
+      return {
+        participant_profile_id: isUuid(profileUid) ? profileUid : null,
+        participant_uid: participantUid || null,
+        participant_name: state.profile?.full_name || document.querySelector('[name="participant_name"]')?.value || null,
+        participant_phone: state.profile?.phone || document.querySelector('[name="participant_phone"]')?.value || null,
+        participant_email: state.profile?.email || document.querySelector('[name="participant_email"]')?.value || null,
+        participant_company: state.profile?.company_name || document.querySelector('[name="participant_company"]')?.value || 'Nationwide Mortgage Bankers',
+        role: roleByResponsibility[responsibility],
+        responsibility,
+        is_primary: isPrimary,
+        ...overrides
+      };
+    }
+
+    async function handleScheduleSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const responsibilitiesSelected = data.getAll('responsibilities');
+      if (!responsibilitiesSelected.length) {
+        state.error = 'Select at least one responsibility for the visit.';
+        render();
+        return;
+      }
+      const scheduledStart = new Date(`${data.get('date')}T${data.get('start_time')}`);
+      const scheduledEnd = new Date(`${data.get('date')}T${data.get('end_time')}`);
+      if (Number.isNaN(scheduledStart.getTime()) || Number.isNaN(scheduledEnd.getTime()) || scheduledEnd <= scheduledStart) {
+        state.error = 'Use a valid start and end time.';
+        render();
+        return;
+      }
+
+      try {
+        state.error = '';
+        state.message = 'Creating scheduled visit...';
+        render();
+        const participants = responsibilitiesSelected.map((responsibility, index) => currentParticipantPayload(responsibility, index === 0));
+        await api('/api/field-demo/create', {
+          agent_name: data.get('agent_name') || null,
+          agent_phone: data.get('agent_phone') || null,
+          agent_email: data.get('agent_email') || null,
+          brokerage: data.get('brokerage') || null,
+          open_house_event_id: data.get('open_house_event_id') || null,
+          open_house_id: data.get('open_house_id') || null,
+          demo_public_code: data.get('demo_public_code') || null,
+          coverage_mode: data.get('coverage_mode') || 'physical_demo',
+          demo_type: responsibilitiesSelected.includes('agent_onboarding') ? 'agent_onboarding' : 'buyer_financing_support',
+          scheduled_start: scheduledStart.toISOString(),
+          scheduled_end: scheduledEnd.toISOString(),
+          source: 'field_dashboard',
+          notes: data.get('notes') || null,
+          participants
+        });
+        state.scheduleOpen = false;
+        await refresh('Scheduled visit created.');
+      } catch (error) {
+        state.error = error.message || 'Could not create scheduled visit.';
+        render();
+      }
+    }
+
+    async function handleAvailabilitySubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const availableStart = new Date(`${data.get('date')}T${data.get('start_time')}`);
+      const availableEnd = new Date(`${data.get('date')}T${data.get('end_time')}`);
+      if (Number.isNaN(availableStart.getTime()) || Number.isNaN(availableEnd.getTime()) || availableEnd <= availableStart) {
+        state.error = 'Use a valid availability start and end time.';
+        render();
+        return;
+      }
+      try {
+        state.error = '';
+        await api('/api/field-demo/availability', {
+          action: 'upsert',
+          uid: state.profile?.uid || state.uid || '',
+          slug: state.profile?.slug || state.slug || '',
+          role: data.get('role') || 'loan_officer',
+          responsibility: data.get('responsibility') || 'financing_support',
+          service_zip: data.get('service_zip') || '',
+          service_radius_miles: data.get('service_radius_miles') || 15,
+          available_start: availableStart.toISOString(),
+          available_end: availableEnd.toISOString(),
+          notes: data.get('notes') || null
+        });
+        await refresh('Availability slot added.');
+      } catch (error) {
+        state.error = error.message || 'Could not save availability.';
+        render();
+      }
+    }
+
+    async function refresh(message = '') {
+      state.message = message;
+      state.error = '';
+      state.profile = await loadProfile();
+      state.availability = await loadAvailability();
+      state.outreachCandidates = await loadOutreachCandidates();
+      const rows = await loadParticipantRows();
+      state.visits = groupVisits(rows);
+      await loadBuyerRequestsForVisits(state.visits);
+      await loadChatsForVisits(state.visits);
+      render();
+    }
+
+    window.toggleSchedule = () => {
+      state.scheduleOpen = !state.scheduleOpen;
+      render();
+    };
+
+    window.refreshDashboard = () => refresh('Dashboard refreshed.');
+
+    window.cancelAvailability = async (availabilityId) => {
+      try {
+        await api('/api/field-demo/availability', {
+          action: 'cancel',
+          uid: state.profile?.uid || state.uid || '',
+          slug: state.profile?.slug || state.slug || '',
+          id: availabilityId
+        });
+        await refresh('Availability slot cancelled.');
+      } catch (error) {
+        state.error = error.message || 'Could not cancel availability.';
+        render();
+      }
+    };
+
+    function participantFromAvailability(candidate, isPrimary = true) {
+      return {
+        participant_profile_id: candidate.participant_profile_id || null,
+        participant_uid: candidate.participant_uid || candidate.participant_profile_id || null,
+        participant_name: candidate.participant_name || 'Available Field Support',
+        participant_phone: candidate.participant_phone || null,
+        participant_email: candidate.participant_email || null,
+        participant_company: candidate.participant_company || 'Nationwide Mortgage Bankers',
+        role: candidate.role || 'loan_officer',
+        responsibility: candidate.responsibility || 'financing_support',
+        availability_id: candidate.id,
+        assignment_score: candidate.assignment_score,
+        assignment_reason: candidate.assignment_reason,
+        is_primary: isPrimary
+      };
+    }
+
+    window.scheduleFromOutreach = async (queueId) => {
+      try {
+        const row = (state.outreachCandidates || []).find((candidate) => candidate.id === queueId);
+        if (!row?.id) throw new Error('Outreach row not found.');
+        const scheduledStart = row.open_start ? new Date(row.open_start) : new Date();
+        const scheduledEnd = row.open_end ? new Date(row.open_end) : new Date(scheduledStart.getTime() + 2 * 60 * 60 * 1000);
+        if (Number.isNaN(scheduledStart.getTime()) || Number.isNaN(scheduledEnd.getTime())) {
+          throw new Error('This outreach row does not have a usable open house time.');
+        }
+        const zip = row.zip || extractZip(row.address);
+        const support = await api('/api/field-demo/available-support', {
+          responsibility: 'financing_support',
+          open_house_id: row.open_house_id || null,
+          address: row.address || '',
+          property_zip: zip,
+          scheduled_start: scheduledStart.toISOString(),
+          scheduled_end: scheduledEnd.toISOString(),
+          limit: 1
+        }).catch(() => ({ candidates: [] }));
+        const bestFinancing = support.candidates?.[0] || null;
+        const participants = [];
+        if (bestFinancing) {
+          participants.push(participantFromAvailability(bestFinancing, true));
+        } else {
+          participants.push(currentParticipantPayload('financing_support', true, {
+            assignment_reason: 'No matching open availability found; assigned to scheduler profile.'
+          }));
+        }
+        participants.push(currentParticipantPayload('product_demo', false));
+        participants.push(currentParticipantPayload('sign_setup', false));
+        participants.push(currentParticipantPayload('agent_onboarding', false));
+        await api('/api/field-demo/create', {
+          outreach_queue_id: row.id,
+          agent_name: row.agent_name || row.agent_first_name || null,
+          agent_phone: row.agent_phone || null,
+          agent_email: row.agent_email || null,
+          brokerage: row.brokerage || null,
+          open_house_id: row.open_house_id || null,
+          property_zip: zip || null,
+          assignment_source: bestFinancing ? 'availability_zip_match' : 'scheduler_fallback',
+          assigned_by_availability_id: bestFinancing?.id || null,
+          coverage_mode: 'physical_demo',
+          demo_type: 'agent_onboarding',
+          scheduled_start: scheduledStart.toISOString(),
+          scheduled_end: scheduledEnd.toISOString(),
+          source: 'agent_outreach',
+          notes: `Scheduled from outreach queue for ${row.address || row.open_house_id || 'open house'}.`,
+          participants
+        });
+        await refresh(bestFinancing ? `Outreach visit scheduled with ${bestFinancing.participant_name || 'available support'}.` : 'Outreach visit scheduled with scheduler fallback.');
+      } catch (error) {
+        state.error = error.message || 'Could not schedule outreach visit.';
+        render();
+      }
+    };
+
+    window.selectConversation = (visitId, conversationId) => {
+      state.activeConversationByVisit[visitId] = conversationId;
+      render();
+    };
+
+    window.openBuyerChat = async (visitId, checkinId) => {
+      try {
+        const visit = selectedVisit(visitId);
+        const checkin = (state.buyerRequests[visit?.open_house_event_id] || []).find((row) => row.id === checkinId);
+        if (!visit?.open_house_event_id || !checkin?.id) throw new Error('Missing visit or buyer request.');
+        const meta = checkin.metadata || {};
+        const payload = await api('/api/event-chat/send', {
+          open_house_event_id: visit.open_house_event_id,
+          field_demo_visit_id: visit.id,
+          buyer_checkin_id: checkin.id,
+          buyer_name: checkin.visitor_name || meta.name || 'Buyer',
+          buyer_phone: checkin.visitor_phone || meta.phone || '',
+          agent_slug: visit.agent_slug || '',
+          agent_name: visit.agent_name || '',
+          agent_phone: visit.agent_phone || '',
+          loan_officer_slug: state.profile?.slug || '',
+          loan_officer_name: state.profile?.full_name || '',
+          loan_officer_phone: state.profile?.phone || '',
+          sender_role: 'system',
+          sender_name: 'REL8TION',
+          body: 'Field support opened this buyer financing conversation.'
+        });
+        state.activeConversationByVisit[visit.id] = payload.conversation?.id || '';
+        await refresh('Buyer chat opened.');
+      } catch (error) {
+        state.error = error.message || 'Could not open buyer chat.';
+        render();
+      }
+    };
+
+    window.sendEventMessage = async (visitId, conversationId) => {
+      try {
+        const visit = selectedVisit(visitId);
+        const textarea = document.getElementById(`chat-draft-${visitId}-${conversationId}`);
+        const body = textarea?.value?.trim() || '';
+        if (!body) throw new Error('Type a message first.');
+        await api('/api/event-chat/send', {
+          conversation_id: conversationId,
+          open_house_event_id: visit?.open_house_event_id || '',
+          field_demo_visit_id: visit?.id || null,
+          agent_slug: visit?.agent_slug || '',
+          agent_name: visit?.agent_name || '',
+          agent_phone: visit?.agent_phone || '',
+          loan_officer_slug: state.profile?.slug || '',
+          loan_officer_name: state.profile?.full_name || '',
+          loan_officer_phone: state.profile?.phone || '',
+          sender_role: hasFinance(visit) ? 'loan_officer' : 'field_specialist',
+          sender_name: state.profile?.full_name || 'Field Specialist',
+          sender_phone: state.profile?.phone || '',
+          sender_uid: state.profile?.uid || state.uid || '',
+          sender_slug: state.profile?.slug || '',
+          body
+        });
+        textarea.value = '';
+        state.activeConversationByVisit[visitId] = conversationId;
+        await refresh('Message sent.');
+      } catch (error) {
+        state.error = error.message || 'Could not send message.';
+        render();
+      }
+    };
+
+    window.updateVisit = async (visitId, status) => {
+      try {
+        await api('/api/field-demo/update-status', { visit_id: visitId, status });
+        await refresh(`Visit marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update visit.';
+        render();
+      }
+    };
+
+    window.updateParticipant = async (participantId, status) => {
+      try {
+        if (!participantId) throw new Error('No participant id was available for this action.');
+        await api('/api/field-demo/update-participant-status', { participant_id: participantId, status });
+        await refresh(`Participant marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update participant.';
+        render();
+      }
+    };
+
+    window.updateVisitAndParticipant = async (visitId, participantId, status) => {
+      try {
+        await api('/api/field-demo/update-status', { visit_id: visitId, status });
+        if (participantId) await api('/api/field-demo/update-participant-status', { participant_id: participantId, status });
+        await refresh(`Visit marked ${titleize(status)}.`);
+      } catch (error) {
+        state.error = error.message || 'Could not update visit.';
+        render();
+      }
+    };
+
+    window.startVisit = async (visitId, participantId) => {
+      try {
+        await api('/api/field-demo/start', { visit_id: visitId, participant_id: participantId || null });
+        await refresh('Field demo is live. Financing coverage is linked when this visit has an event and financing participant.');
+      } catch (error) {
+        state.error = error.message || 'Could not start field demo.';
+        render();
+      }
+    };
+
+    window.convertVisit = async (visitId) => {
+      try {
+        await api('/api/field-demo/convert-agent', { visit_id: visitId, agent_onboarded: true });
+        await refresh('Agent converted to virtual support.');
+      } catch (error) {
+        state.error = error.message || 'Could not convert agent.';
+        render();
+      }
+    };
+
+    refresh().catch((error) => {
+      state.error = error.message || 'Could not load field dashboard.';
+      render();
+    });
+  </script>
+</body>
+</html>

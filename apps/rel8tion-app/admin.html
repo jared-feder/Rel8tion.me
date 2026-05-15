@@ -1250,7 +1250,7 @@
           <div>${badge(row.is_active ? 'active' : 'inactive', row.is_active ? 'ok' : 'bad')}</div>
           <div>${badge(row.industry || 'profile', 'info')}</div>
           <div>${badge(row.calendar_url ? 'calendar' : 'no calendar', row.calendar_url ? 'ok' : 'warn')}</div>
-          <div>${badge(fmtDate(row.updated_at || row.created_at) || 'no date', 'info')}</div>
+          <div><a class="btn soft" href="/lo-field-dashboard?uid=${esc(row.uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open dashboard</span></a></div>
         `)}
         ${renderRows('LO coverage', `${sessions.length} recent sessions`, sessions.slice(0, 80), (row) => `
           <div>

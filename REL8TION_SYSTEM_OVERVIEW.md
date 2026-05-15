@@ -56,6 +56,8 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/s` and `/sign` to `apps/rel8tion-app/sign.html`
 - `/event` to `apps/rel8tion-app/event.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
+- `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
+- `/lo-field-dashboard` to `apps/rel8tion-app/lo-field-dashboard.html`
 - `/admin` to `apps/rel8tion-app/admin.html`
 - `/nmb-activate` and `/nmb-verified` to app pages
 - `/services/nmb/activate` and `/services/nmb/verified` to app pages
@@ -98,6 +100,9 @@ It uses:
 - `api/admin/outreach-reply.js`
 - `api/admin/reset-key.js`
 - `api/cron/enrich-agents.js`
+- `api/event-chat/list.js`
+- `api/event-chat/send.js`
+- `api/field-demo/*`
 
 ### Supabase Edge Functions
 
@@ -386,6 +391,24 @@ Role: public verified loan officer profile.
 
 - Loads `verified_profiles` by slug and `is_active = true`.
 - Shows photo, company logo, contact info, areas, bio, call/text, VCard, CTA, and calendar actions.
+
+### `/field-dashboard` And `/lo-field-dashboard`
+
+Files:
+
+- `apps/rel8tion-app/field-dashboard.html`
+- `apps/rel8tion-app/lo-field-dashboard.html`
+
+Role: tested field/loan-officer work surface for scheduled REL8TION demo and support visits. `/lo-field-dashboard` opens `/field-dashboard?role=loan_officer`.
+
+`[PARTIAL]` Confirmed repo behavior:
+
+- Loads a verified profile by `uid` or `slug`.
+- Shows next-7-days field visit stats, assigned visits, buyer financing requests, event chat logs, and LO/field availability controls.
+- Lets an LO or field profile add availability windows using role, responsibility, service ZIP, service radius, and time window.
+- Can create field/demo visits and participants through `/api/field-demo/*`.
+- Can start a financing-support visit and upsert live `event_loan_officer_sessions`, which existing buyer financing routing and the agent dashboard already understand.
+- Uses `event_conversations` and `event_conversation_messages` for in-app conversation logging. This is not realtime, not SMS-relayed, not video, and not a hardened multi-user auth model yet.
 
 ### `/key-reset`
 
@@ -1134,12 +1157,12 @@ Important gaps/risks:
 - `[PARTIAL]` `apps/rel8tion-app/admin.html` is the admin-keychain/token-protected REL8TION COMMAND dashboard. It has a command-header layout, area selector, live stats, hot-list-style outreach cards with agent/listing imagery, inline reply composers, thread history, Agent CRM, smart signs/events, loan officer assignment/profile/session views, payments-needed setup, and outreach reports.
 - `[IMPLEMENTED]` `/api/admin/auth` validates `ADMIN_KEYCHAIN_UIDS` or fallback admin token access for the dashboard.
 - `[IMPLEMENTED]` `/api/admin/dashboard` loads aggregate project/CRM/sign/event/LO/payment/reporting data with the server-side Supabase service role.
-- `[IMPLEMENTED]` `/api/admin/loan-officer-assignment` can assign, end, or auto-assign live LO coverage for active `open_house_events` by writing server-side `event_loan_officer_sessions` rows. Assignments use `status = live`, so existing buyer financing routing and agent dashboard LO cards pick them up immediately.
+- `[IMPLEMENTED]` `/api/admin/loan-officer-assignment` can assign, end, or auto-assign live LO coverage for active `open_house_events` by writing server-side `event_loan_officer_sessions` rows. It also creates/updates tested field dashboard visit/participant records when `field_demo_visits` and `field_demo_visit_participants` are available, so assigned LOs can see work in `/lo-field-dashboard`.
 - `[IMPLEMENTED]` `/api/admin/outreach-inbox` loads `agent_outreach_inbox`, linked `agent_outreach_queue` context, and `agent_outreach_replies` using the server-side Supabase service role.
 - `[IMPLEMENTED]` `/api/admin/outreach-reply` calls the protected Supabase `send-agent-manual-reply` function so SMS replies are sent server-side and recorded as outbound replies.
 - `[IMPLEMENTED]` `/k` checks scanned UIDs against the admin auth API before normal keychain routing, so an allowed admin keychain opens `/admin?uid=...`.
 - `[PARTIAL]` Practical reset tooling still exists separately through `/key-reset` and `api/admin/reset-key.js`.
-- `[PARTIAL]` Broader write controls for sign inventory, CRM updates, LO calendar/availability edits, billing automation, and deep analytics drilldowns remain future work.
+- `[PARTIAL]` Broader write controls for sign inventory, CRM updates, external calendar conflict checking, billing automation, and deep analytics drilldowns remain future work.
 - `[PARTIAL]` WordPress hot-list files provide older outreach visibility/admin-style UI outside the app, but are not auto-synced to production.
 
 ## Scaling And Stability Concerns
@@ -1168,7 +1191,7 @@ Confirmed or needs-verification gaps:
 
 - `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[INTENDED]` Agent-to-loan-officer relationship tables are not present in current app code.
-- `[INTENDED]` Chat/modal/video support between buyer, agent, and loan officer is not implemented.
+- `[PARTIAL]` In-app event conversation logging exists through `event_conversations`, `event_conversation_messages`, `/api/event-chat/*`, and `/field-dashboard`; realtime delivery, push/SMS relay, video, and hardened auth are not built.
 - `[PARTIAL]` REL8TION COMMAND exists as the protected admin dashboard and can assign live LO coverage to active open house events, but the deeper action layer for sign inventory edits, CRM updates, LO calendar/availability modification, billing automation, and full project controls is not complete.
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
@@ -1223,7 +1246,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |
 | `/nmb-activate` and `/nmb-verified` are loan officer profile routes. | `[PARTIAL]` | `apps/rel8tion-app/nmb-activate.html` and `nmb-verified.html`; Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
 | `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |
-| Admin command dashboard exists. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` plus protected `/api/admin/dashboard`, `/api/admin/outreach-inbox`, `/api/admin/outreach-reply`, and `/api/admin/loan-officer-assignment`; outreach replies and live LO assignment are implemented, while most CRM/sign/payment controls are still read/reporting only. |
+| Admin command dashboard exists. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` plus protected `/api/admin/dashboard`, `/api/admin/outreach-inbox`, `/api/admin/outreach-reply`, and `/api/admin/loan-officer-assignment`; outreach replies, live LO assignment, field visit creation, and LO dashboard launch links are implemented, while most CRM/sign/payment controls are still read/reporting only. |
 | Twilio inbound reply handling is checked into deployed function structure. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
 | WordPress is not the product brain. | `[PARTIAL]` | `wordpress/README.md` says files are local tracking and not auto-synced. Product state/routes live in Vercel app files and Supabase calls. |
 | Estately enrichment worker exists and updates listing agent data. | `[PARTIAL]` | `estately-enrichment-worker.cjs` and `api/cron/enrich-agents.js`; scheduling and live data quality need verification. |
@@ -1238,14 +1261,14 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | WordPress should remain marketing/presentation. | `[INTENDED]` | WordPress README frames files as local tracking. No product state is stored there in checked code. |
 | Supabase sensitive writes should move through Edge Functions/serverless APIs. | `[INTENDED]` | Current browser code directly writes several public tables. This is not current implementation. |
 | Formal remote LO coverage management should support agents remotely by invite/request/accept. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
-| Buyer, agent, and loan officer should be able to communicate in a richer live modal. | `[INTENDED]` | Current implementation has SMS/call/text links only. |
+| Buyer, agent, and loan officer should be able to communicate in a richer live modal. | `[PARTIAL]` | In-app event conversation logging exists through `event_conversations`, `event_conversation_messages`, `/api/event-chat/*`, and `/field-dashboard`; realtime delivery, push/SMS relay, video, and hardened auth are not built. |
 
 ### [PARTIAL], [NEEDS VERIFICATION], And [RISK]
 
 | Major claim | Status | Evidence |
 | --- | --- | --- |
 | Formal remote LO coverage management is desired but not built. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
-| Chat/video support is desired but not built. | `[INTENDED]` | No chat/video modules/routes found. |
+| Chat/video support is desired but not fully built. | `[PARTIAL]` | In-app event conversation logging exists; realtime, push/SMS relay, video, and hardened auth are not built. |
 | Full admin action dashboard is desired but not fully built. | `[PARTIAL]` | REL8TION COMMAND exists at `/admin` with outreach replies, live LO assignment, and live read/reporting cards, but sign inventory edits, CRM edits, LO calendar/availability changes, and billing automation remain unfinished. |
 | Root Estately endpoint is scheduled by Vercel Cron. | `[NEEDS VERIFICATION]` | `api/cron/enrich-agents.js` exists; root `vercel.json` has no `crons` block. |
 | `send-lead-sms` implementation is checked in. | `[IMPLEMENTED]` | Source exists at `supabase/functions/send-lead-sms/index.ts`; deployed source/version matching and Twilio behavior still need verification. |
