@@ -140,6 +140,20 @@
     .thread-time { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
     .thread-body { color: #334155; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .thread-meta { color: var(--muted); font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
+    .reply-cue {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      width: fit-content;
+      border-radius: 8px;
+      border: 1px solid #bae6fd;
+      background: #f0f9ff;
+      color: var(--brand-strong);
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 900;
+    }
 
     .content {
       min-width: 0;
@@ -231,6 +245,26 @@
       padding: 14px 20px 18px;
       display: grid;
       gap: 10px;
+    }
+
+    .composer-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--ink);
+    }
+
+    .reply-target {
+      border: 1px solid #bae6fd;
+      background: #f0f9ff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     .composer textarea {
@@ -540,7 +574,7 @@
       }
     }
 
-    async function loadThread(threadKey) {
+    async function loadThread(threadKey, shouldFocus = false) {
       if (!threadKey) return;
       state.selectedKey = threadKey;
       render();
@@ -550,6 +584,12 @@
         state.messages = data.messages || [];
         state.error = '';
         render();
+        if (shouldFocus) {
+          window.setTimeout(() => {
+            document.getElementById('composerPanel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            document.getElementById('replyBody')?.focus();
+          }, 80);
+        }
       } catch (error) {
         state.error = error.message || 'Unable to load thread.';
         render();
@@ -718,7 +758,7 @@
       document.getElementById('signOutBtn')?.addEventListener('click', signOut);
       document.getElementById('filterSelect')?.addEventListener('change', (event) => setFilter(event.target.value));
       document.querySelectorAll('[data-thread-key]').forEach((button) => {
-        button.addEventListener('click', () => loadThread(button.getAttribute('data-thread-key')));
+        button.addEventListener('click', () => loadThread(button.getAttribute('data-thread-key'), true));
       });
       document.getElementById('replyBody')?.addEventListener('input', (event) => updateDraft(event.target.value));
       document.getElementById('sendReplyBtn')?.addEventListener('click', sendReply);
@@ -734,6 +774,7 @@
             <div class="thread-time">${esc(fmtDate(thread.last_reply_at))}</div>
           </div>
           <div>${threadBadge(thread)}</div>
+          ${needsReply(thread) ? '<div class="reply-cue"><i data-lucide="message-square-reply"></i><span>Reply</span></div>' : ''}
           <div class="thread-body">${esc(thread.latest_reply_body || '')}</div>
           <div class="thread-meta">${esc(thread.address || thread.brokerage || fmtPhone(thread.from_phone_normalized) || '')}</div>
         </button>
@@ -757,6 +798,7 @@
           : '';
       const draft = state.drafts[state.selectedKey] || '';
       const canSend = !disabledReason && !state.sending;
+      const latestInbound = [...state.messages].reverse().find((message) => message.direction !== 'outbound');
 
       return `
         <section class="content">
@@ -779,7 +821,16 @@
             ${state.messages.map((message) => renderMessage(message)).join('')}
           </div>
 
-          <div class="composer">
+          <div class="composer" id="composerPanel">
+            <div class="composer-title">
+              <span>Reply by SMS</span>
+              <span class="small muted">${esc(fmtPhone(thread.agent_phone || thread.from_phone) || '')}</span>
+            </div>
+            ${latestInbound ? `
+              <div class="reply-target">
+                <strong>Latest incoming:</strong> ${esc(latestInbound.body || '')}
+              </div>
+            ` : ''}
             <textarea id="replyBody" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${disabledReason ? esc(disabledReason) : 'Write SMS reply'}">${esc(draft)}</textarea>
             <div class="composer-actions">
               <button id="sendReplyBtn" class="btn primary" ${canSend ? '' : 'disabled'}>
