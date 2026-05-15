@@ -16,7 +16,7 @@ Status labels used in this file:
 
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
-- `[IMPLEMENTED]` Latest inspected production deployment includes REL8TION COMMAND outreach card/style cleanup from `main` commit `7b84d61` (`Clarify admin home background layer`). Vercel reports the current production alias ready at `app.rel8tion.me`.
+- `[IMPLEMENTED]` Latest inspected production deployment includes REL8TION COMMAND focus-safe outreach refresh from `main` commit `7b8077a` (`Keep admin outreach editing stable during refresh`). Vercel reports the production alias ready at `app.rel8tion.me`; `/admin` redirects to `/apps/rel8tion-app/admin.html`, and that target route served the focus guard, quiet auto-refresh, scroll/focus restore, and prior outreach card/style cleanup.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
