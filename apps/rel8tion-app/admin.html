@@ -1487,6 +1487,103 @@
       return local.toISOString().slice(0, 16);
     }
 
+    function dateInputValue(date) {
+      const d = new Date(date);
+      if (!Number.isFinite(d.getTime())) return '';
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
+    function dateAtTime(dateText, timeSource, fallbackHour = 13) {
+      const match = String(dateText || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const source = new Date(timeSource || '');
+      const hour = Number.isFinite(source.getTime()) ? source.getHours() : fallbackHour;
+      const minute = Number.isFinite(source.getTime()) ? source.getMinutes() : 0;
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour, minute, 0, 0);
+    }
+
+    function fallbackCoverageEnd(start) {
+      const date = new Date(start || Date.now());
+      if (!Number.isFinite(date.getTime())) return new Date(Date.now() + 2 * 60 * 60 * 1000);
+      return new Date(date.getTime() + 2 * 60 * 60 * 1000);
+    }
+
+    function normalizeCoverageWindow(start, end, label) {
+      const startDate = new Date(start || '');
+      if (!Number.isFinite(startDate.getTime())) return null;
+      const endDate = new Date(end || '');
+      const finalEnd = Number.isFinite(endDate.getTime()) && endDate > startDate ? endDate : fallbackCoverageEnd(startDate);
+      return {
+        coverage_start: startDate.toISOString(),
+        coverage_end: finalEnd.toISOString(),
+        coverage_label: label || `${fmtDate(startDate)} - ${fmtDate(finalEnd)}`
+      };
+    }
+
+    function coverageChoices(thread) {
+      const start = new Date(thread?.open_start || '');
+      if (!Number.isFinite(start.getTime())) return [];
+      const endCandidate = new Date(thread?.open_end || '');
+      const end = Number.isFinite(endCandidate.getTime()) && endCandidate > start ? endCandidate : fallbackCoverageEnd(start);
+      const firstDay = dateInputValue(start);
+      const lastDay = dateInputValue(end);
+      const days = [];
+      const cursor = dateAtTime(firstDay, start);
+      const last = dateAtTime(lastDay, start);
+      while (cursor && last && cursor <= last && days.length < 7) {
+        const dayText = dateInputValue(cursor);
+        const dayStart = dateAtTime(dayText, start);
+        const dayEnd = dateAtTime(dayText, end, start.getHours() + 2);
+        days.push(normalizeCoverageWindow(dayStart, dayEnd, `${fmtDate(dayStart)} - ${fmtDate(dayEnd)}`));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      if (days.length > 1) {
+        days.push(normalizeCoverageWindow(start, end, `All listed days: ${fmtDate(start)} - ${fmtDate(end)}`));
+      }
+      return days.filter(Boolean);
+    }
+
+    function customCoverageWindow(thread, answer) {
+      const parts = String(answer || '')
+        .split(/(?:,|\band\b|\bto\b|&|\+)/i)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const dateParts = parts.filter((part) => /^\d{4}-\d{2}-\d{2}$/.test(part));
+      if (!dateParts.length) return null;
+      const startSource = thread?.open_start || '';
+      const endSource = thread?.open_end || thread?.open_start || '';
+      const start = dateAtTime(dateParts[0], startSource);
+      const end = dateAtTime(dateParts[dateParts.length - 1], endSource, 15);
+      const label = dateParts.length > 1
+        ? `Selected days: ${dateParts.join(', ')}`
+        : `Selected day: ${dateParts[0]}`;
+      return normalizeCoverageWindow(start, end, label);
+    }
+
+    function chooseCoverageWindow(thread) {
+      const choices = coverageChoices(thread);
+      const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
+      const lines = [
+        `Which day are you covering for ${target}?`,
+        '',
+        ...choices.map((choice, index) => `${index + 1} = ${choice.coverage_label}`)
+      ];
+      if (choices.length > 1) lines.push('both = all listed days');
+      lines.push('', 'You can also type a date like 2026-05-16, or two dates like 2026-05-16, 2026-05-17.');
+      const defaultAnswer = choices.length > 1 ? 'both' : choices.length ? '1' : '';
+      const answer = window.prompt(lines.join('\n'), defaultAnswer);
+      if (answer === null) return null;
+      const clean = String(answer || '').trim().toLowerCase();
+      if (!clean) return null;
+      if (clean === 'both' || clean === 'all') return choices[choices.length - 1] || null;
+      if (/^\d+$/.test(clean)) {
+        const index = Number(clean) - 1;
+        return choices[index] || null;
+      }
+      return customCoverageWindow(thread, clean);
+    }
+
     function defaultDripSendAt(thread) {
       const base = new Date(thread?.open_end || thread?.open_start || Date.now());
       const date = Number.isFinite(base.getTime()) ? base : new Date();
@@ -1614,8 +1711,13 @@
         return;
       }
       const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
-      if (!window.confirm(`Mark ${target} as a confirmed true open house and add it to Reports?`)) return;
-      runOutreachAction(key, 'confirm_open_house', {}, 'Open house confirmed for Reports.');
+      const coverage = chooseCoverageWindow(thread);
+      if (!coverage) {
+        showToast('Choose a valid coverage day first.');
+        return;
+      }
+      if (!window.confirm(`Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`)) return;
+      runOutreachAction(key, 'confirm_open_house', coverage, 'Open house confirmed for Reports.');
     }
 
     function acceptOpenHouse(key) {
@@ -2422,6 +2524,10 @@
       const photo = row.listing_photo_url || row.mockup_image_url || '';
       const conversation = row.conversation_snapshot || 'No conversation snapshot loaded.';
       const facts = [money(row.price), row.beds ? `${row.beds} beds` : '', row.baths ? `${row.baths} baths` : ''].filter(Boolean).join(' | ');
+      const openWindow = [fmtDate(row.scheduled_start), fmtDate(row.scheduled_end)]
+        .filter(Boolean)
+        .filter((value, index, values) => index === 0 || value !== values[0])
+        .join(' - ');
       return `
         <article class="confirmed-card">
           <div class="report-media">
@@ -2431,7 +2537,7 @@
           <div class="confirmed-body">
             <div>
               <div class="address">${esc(row.property_address || 'Confirmed open house')}</div>
-              <div class="open-time">${esc([fmtDate(row.scheduled_start), facts].filter(Boolean).join(' | '))}</div>
+              <div class="open-time">${esc([openWindow, facts].filter(Boolean).join(' | '))}</div>
             </div>
             <div class="badges">
               ${badge(row.visit_status || 'confirmed', row.visit_status === 'cancelled' ? 'bad' : 'ok')}

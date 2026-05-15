@@ -28,6 +28,28 @@ function fallbackEnd(start) {
   return new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
 }
 
+function coverageWindow(options, fallbackStart) {
+  const start = new Date(options.coverage_start || fallbackStart || Date.now());
+  if (!Number.isFinite(start.getTime())) {
+    const error = new Error('A valid coverage start date is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const end = new Date(options.coverage_end || fallbackEnd(start.toISOString()));
+  if (!Number.isFinite(end.getTime()) || end <= start) {
+    const error = new Error('Coverage end must be after the coverage start.');
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    label: String(options.coverage_label || '').trim()
+  };
+}
+
 function cleanPhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -128,8 +150,10 @@ async function writeParticipant(path, payload, method = 'POST') {
 async function upsertFieldVisit(queue, options = {}) {
   const event = await loadMatchingEvent(queue);
   const now = new Date().toISOString();
-  const scheduledStart = queue.open_start || new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  const scheduledEnd = queue.open_end || fallbackEnd(scheduledStart);
+  const baseStart = queue.open_start || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const coverage = coverageWindow({ ...options, coverage_end: options.coverage_end || queue.open_end }, baseStart);
+  const scheduledStart = coverage.start;
+  const scheduledEnd = coverage.end;
   const address = [queue.address, queue.city, queue.state, queue.zip].filter(Boolean).join(', ');
   const existing = one(await supabaseRest(
     `field_demo_visits?outreach_queue_id=eq.${enc(queue.id)}&status=neq.cancelled&select=*&order=created_at.desc&limit=1`
@@ -156,6 +180,7 @@ async function upsertFieldVisit(queue, options = {}) {
     assignment_source: options.assignment_source || 'accepted_outreach',
     notes: [
       `${options.note_prefix || 'Accepted from REL8TION COMMAND outreach reply'} on ${now}.`,
+      coverage.label ? `Coverage selected: ${coverage.label}.` : '',
       address ? `Open house: ${address}.` : '',
       queue.agent_phone ? `Agent phone: ${queue.agent_phone}.` : ''
     ].filter(Boolean).join(' ')
