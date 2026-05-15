@@ -16,6 +16,7 @@ Status labels used in this file:
 
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
+- `[IMPLEMENTED]` Latest inspected production deployment after REL8TION COMMAND action controls is `main` commit `e59297e` (`Add admin dashboard action controls`). Vercel reports deployment `rel8tion-7pdjem2dj-jared-feders-projects.vercel.app` ready and aliased to `app.rel8tion.me`.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
@@ -999,7 +1000,7 @@ Observed behavior in reference source:
 
 - `sync-openhouses` pulls OneKey data and restores enriched agent contact data from `listing_agents`.
 - `generate-agent-outreach` queues and generates outreach rows.
-- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`.
+- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`; this source was deployed to Supabase on 2026-05-15 after the REL8TION COMMAND action-control update.
 - `send-agent-manual-reply` sends manual replies from outreach UI. `[IMPLEMENTED]` Deployable source exists under `supabase/functions/send-agent-manual-reply/index.ts`; the 2026-05-14 version requires service-role authorization and is intended to be called through the protected Vercel admin API, not directly from browser code.
 
 ### RPCs Used By Current Code
