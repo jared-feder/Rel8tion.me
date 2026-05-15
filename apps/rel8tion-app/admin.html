@@ -43,16 +43,16 @@
       --ink: #1f2a5a;
       --muted: #64748b;
       --soft: #f0f7ff;
-      --line: rgba(255, 255, 255, .54);
-      --glass: rgba(255, 255, 255, .66);
-      --glass-strong: rgba(255, 255, 255, .88);
+      --line: rgba(255, 255, 255, .72);
+      --glass: rgba(255, 255, 255, .50);
+      --glass-strong: rgba(255, 255, 255, .74);
       --ok: #0f7b5f;
       --warn: #9a5b00;
       --bad: #b42318;
       --violet: #6657d9;
       --orange: #f97316;
-      --shadow: 0 24px 70px rgba(23, 32, 51, .14);
-      --soft-shadow: 0 14px 34px rgba(23, 32, 51, .08);
+      --shadow: 0 32px 90px rgba(23, 34, 79, .18), inset 0 1px 0 rgba(255,255,255,.50);
+      --soft-shadow: 0 18px 44px rgba(23, 34, 79, .11), inset 0 1px 0 rgba(255,255,255,.42);
     }
 
     * { box-sizing: border-box; }
@@ -63,8 +63,10 @@
       color: var(--ink);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at 50% 52%, rgba(255,255,255,0) 20%, rgba(240,247,255,.86) 74%, rgba(240,247,255,.98) 100%),
-        linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
+        linear-gradient(180deg, rgba(56,189,248,.88) 0%, rgba(221,246,255,.82) 42%, rgba(248,252,255,.96) 100%),
+        url("https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png");
+      background-size: cover;
+      background-position: center bottom;
       background-attachment: fixed;
       overflow-x: hidden;
     }
@@ -125,12 +127,14 @@
       grid-template-columns: 260px minmax(0, 1fr);
       min-height: calc(100vh - 68px);
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,.76);
-      border-radius: 8px;
-      background: rgba(255,255,255,.26);
-      backdrop-filter: blur(18px) saturate(150%);
-      -webkit-backdrop-filter: blur(18px) saturate(150%);
-      box-shadow: 0 25px 50px rgba(31, 42, 90, .12), inset 0 1px 1px rgba(255,255,255,.28);
+      border: 1px solid rgba(255,255,255,.84);
+      border-radius: 26px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.42), rgba(226,246,255,.22)),
+        rgba(255,255,255,.18);
+      backdrop-filter: blur(28px) saturate(175%);
+      -webkit-backdrop-filter: blur(28px) saturate(175%);
+      box-shadow: var(--shadow);
     }
 
     .command-sidebar {
@@ -138,8 +142,12 @@
       grid-template-rows: auto minmax(0, 1fr) auto;
       gap: 18px;
       padding: 20px 12px;
-      border-right: 1px solid rgba(122,148,173,.18);
-      background: rgba(255,255,255,.34);
+      border-right: 1px solid rgba(255,255,255,.54);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.68), rgba(255,255,255,.36)),
+        rgba(255,255,255,.34);
+      backdrop-filter: blur(24px) saturate(165%);
+      -webkit-backdrop-filter: blur(24px) saturate(165%);
     }
 
     .sidebar-brand {
@@ -217,8 +225,10 @@
       border: 1px solid rgba(255,255,255,.82);
       border-radius: 8px;
       background:
-        linear-gradient(135deg, rgba(255,255,255,.84), rgba(229,246,255,.64)),
-        rgba(255,255,255,.66);
+        linear-gradient(135deg, rgba(255,255,255,.72), rgba(228,247,255,.38)),
+        rgba(255,255,255,.38);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
       box-shadow: var(--soft-shadow);
       padding: 13px;
       display: grid;
@@ -239,7 +249,7 @@
       gap: 14px;
       padding: 14px;
       background:
-        linear-gradient(180deg, rgba(240,247,255,.58), rgba(240,247,255,.88)),
+        linear-gradient(180deg, rgba(255,255,255,.08), rgba(240,247,255,.42)),
         url("https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png");
       background-size: cover;
       background-position: center bottom;
@@ -252,10 +262,12 @@
       gap: 10px;
       align-items: center;
       padding: 10px;
-      border: 1px solid rgba(255,255,255,.76);
+      border: 1px solid rgba(255,255,255,.84);
       border-radius: 8px;
-      background: rgba(255,255,255,.76);
-      box-shadow: 0 10px 26px rgba(23,32,51,.05);
+      background: rgba(255,255,255,.56);
+      backdrop-filter: blur(20px) saturate(165%);
+      -webkit-backdrop-filter: blur(20px) saturate(165%);
+      box-shadow: var(--soft-shadow);
     }
 
     .search-wrap {
@@ -286,10 +298,11 @@
 
     .hero-panel,
     .score-panel {
-      border: 1px solid rgba(255,255,255,.78);
+      border: 1px solid rgba(255,255,255,.84);
       border-radius: 8px;
-      background: rgba(255,255,255,.72);
-      backdrop-filter: blur(18px);
+      background: rgba(255,255,255,.54);
+      backdrop-filter: blur(22px) saturate(165%);
+      -webkit-backdrop-filter: blur(22px) saturate(165%);
       box-shadow: var(--soft-shadow);
       padding: 16px;
     }
@@ -300,8 +313,8 @@
       gap: 18px;
       align-items: center;
       background:
-        linear-gradient(135deg, rgba(255,255,255,.86), rgba(236,249,255,.68)),
-        rgba(255,255,255,.70);
+        linear-gradient(135deg, rgba(255,255,255,.68), rgba(222,247,255,.32)),
+        rgba(255,255,255,.42);
     }
 
     .hero-label {
@@ -451,11 +464,14 @@
     .stat-card,
     .glass-card,
     .outreach-card {
-      border: 1px solid rgba(255,255,255,.72);
+      border: 1px solid rgba(255,255,255,.82);
       border-radius: 8px;
-      background: var(--glass);
-      backdrop-filter: blur(18px);
-      box-shadow: 0 16px 42px rgba(23,32,51,.08);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.62), rgba(236,249,255,.34)),
+        var(--glass);
+      backdrop-filter: blur(22px) saturate(165%);
+      -webkit-backdrop-filter: blur(22px) saturate(165%);
+      box-shadow: var(--soft-shadow);
     }
 
     .stat-card {
@@ -467,7 +483,7 @@
       align-content: space-between;
       gap: 14px;
       background:
-        linear-gradient(135deg, rgba(255,255,255,.92), rgba(246,251,255,.72)),
+        linear-gradient(135deg, rgba(255,255,255,.70), rgba(246,251,255,.38)),
         var(--glass);
     }
 
@@ -582,7 +598,9 @@
 
     .outreach-card {
       overflow: visible;
-      background: rgba(255,255,255,.70);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.62), rgba(232,248,255,.30)),
+        rgba(255,255,255,.42);
     }
 
     .outreach-main {
@@ -592,7 +610,7 @@
     }
 
     .media-col {
-      background: rgba(255,255,255,.28);
+      background: rgba(255,255,255,.22);
       border-right: 1px solid var(--line);
       padding: 10px;
       display: grid;
@@ -2222,8 +2240,8 @@
               <button class="btn soft" id="lockBtn"><i data-lucide="log-out"></i><span>Lock command</span></button>
             </aside>
 
-            <section class="command-workspace bg-white/55">
-              <header class="topbar sticky top-3 z-20">
+            <section class="command-workspace">
+              <header class="topbar sticky top-3 z-20 backdrop-blur-xl ring-1 ring-white/70">
                 <div class="search-wrap">
                   <i data-lucide="search"></i>
                   <input id="globalSearch" class="field" value="${esc(state.query)}" autocomplete="off" placeholder="Search agents, signs, open houses, SMS">

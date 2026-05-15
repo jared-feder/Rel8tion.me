@@ -46,6 +46,7 @@
     { "source": "/lo-field-dashboard", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/lo-field-dashboard.html", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/admin", "destination": "/apps/rel8tion-app/admin.html" },
+    { "source": "/admin.html", "destination": "/apps/rel8tion-app/admin.html" },
     { "source": "/nmb-activate", "destination": "/apps/rel8tion-app/nmb-activate.html" },
     { "source": "/nmb-activate.html", "destination": "/apps/rel8tion-app/nmb-activate.html" },
     { "source": "/nmb-verified", "destination": "/apps/rel8tion-app/nmb-verified.html" },
