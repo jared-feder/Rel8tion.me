@@ -29,6 +29,102 @@ function sortCounts(rows) {
   return counts;
 }
 
+const QUEUE_SELECT = [
+  'id',
+  'agent_name',
+  'agent_phone',
+  'agent_phone_normalized',
+  'agent_email',
+  'brokerage',
+  'address',
+  'city',
+  'state',
+  'zip',
+  'price',
+  'beds',
+  'baths',
+  'open_start',
+  'open_end',
+  'template_key',
+  'listing_photo_url',
+  'agent_photo_url',
+  'mockup_image_url',
+  'selected_sms',
+  'followup_sms',
+  'review_status',
+  'initial_send_status',
+  'followup_send_status',
+  'send_mode',
+  'last_outreach_at',
+  'created_at'
+].join(',');
+
+function inFilter(ids) {
+  return `in.(${ids.map((id) => encodeURIComponent(id)).join(',')})`;
+}
+
+async function loadQueueRows(ids) {
+  const uniqueIds = [...new Set((ids || []).filter(Boolean))];
+  if (!uniqueIds.length) return new Map();
+
+  let rows;
+  try {
+    rows = await supabaseRest(
+      `agent_outreach_queue?id=${inFilter(uniqueIds)}&select=${QUEUE_SELECT}&limit=${uniqueIds.length}`
+    );
+  } catch (error) {
+    rows = await supabaseRest(
+      `agent_outreach_queue?id=${inFilter(uniqueIds)}&select=*&limit=${uniqueIds.length}`
+    );
+  }
+
+  return new Map((Array.isArray(rows) ? rows : []).map((row) => [row.id, row]));
+}
+
+async function loadMessagesForQueueRows(ids) {
+  const uniqueIds = [...new Set((ids || []).filter(Boolean))];
+  if (!uniqueIds.length) return new Map();
+
+  const rows = await supabaseRest(
+    `agent_outreach_replies?queue_row_id=${inFilter(uniqueIds)}&select=id,queue_row_id,from_phone,to_phone,body,direction,opt_out,message_sid,received_at,created_at&order=received_at.asc&limit=1000`
+  );
+  const grouped = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!grouped.has(row.queue_row_id)) grouped.set(row.queue_row_id, []);
+    grouped.get(row.queue_row_id).push(row);
+  }
+
+  return grouped;
+}
+
+async function enrichInboxRows(rows) {
+  const inbox = Array.isArray(rows) ? rows : [];
+  const ids = inbox.map((row) => row.queue_row_id).filter(Boolean);
+  const [queueMap, messageMap] = await Promise.all([
+    loadQueueRows(ids),
+    loadMessagesForQueueRows(ids)
+  ]);
+
+  return inbox.map((row) => {
+    const queue = row.queue_row_id ? queueMap.get(row.queue_row_id) || null : null;
+    return {
+      ...row,
+      ...(queue || {}),
+      thread_key: row.thread_key,
+      queue_row_id: row.queue_row_id,
+      latest_reply_body: row.latest_reply_body,
+      latest_reply_opt_out: row.latest_reply_opt_out,
+      any_opt_out: row.any_opt_out,
+      direction: row.direction,
+      last_reply_at: row.last_reply_at,
+      reply_count: row.reply_count,
+      queue,
+      messages: row.queue_row_id ? messageMap.get(row.queue_row_id) || [] : []
+    };
+  });
+}
+
 async function loadThread(threadKey) {
   const rows = await supabaseRest(
     `agent_outreach_inbox?thread_key=eq.${encodeURIComponent(threadKey)}&select=*&limit=1`
@@ -47,8 +143,17 @@ async function loadThread(threadKey) {
     );
   }
 
+  const queueMap = await loadQueueRows(thread.queue_row_id ? [thread.queue_row_id] : []);
+  const queue = thread.queue_row_id ? queueMap.get(thread.queue_row_id) || null : null;
+
   return {
-    thread,
+    thread: {
+      ...thread,
+      ...(queue || {}),
+      thread_key: thread.thread_key,
+      queue_row_id: thread.queue_row_id,
+      queue
+    },
     messages: Array.isArray(messages) ? messages : []
   };
 }
@@ -79,7 +184,7 @@ module.exports = async function handler(req, res) {
     const rows = await supabaseRest(
       `agent_outreach_inbox?select=*&order=last_reply_at.desc&limit=${limit}`
     );
-    const inbox = Array.isArray(rows) ? rows : [];
+    const inbox = await enrichInboxRows(rows);
 
     sendJson(res, 200, {
       ok: true,

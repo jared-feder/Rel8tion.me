@@ -3,291 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rel8tion Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>REL8TION COMMAND</title>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: light;
+      --sky: #37bdf4;
+      --teal: #0f8fbd;
+      --teal-strong: #075e7e;
       --ink: #172033;
       --muted: #64748b;
-      --line: #dbe4ef;
-      --panel: #ffffff;
-      --wash: #f6f9fc;
-      --brand: #0f8fbd;
-      --brand-strong: #075e7e;
-      --ok: #12815f;
+      --line: rgba(136, 164, 190, .32);
+      --glass: rgba(255, 255, 255, .68);
+      --glass-strong: rgba(255, 255, 255, .86);
+      --wash: #eef8ff;
+      --ok: #0f7b5f;
       --warn: #9a5b00;
       --bad: #b42318;
+      --shadow: 0 22px 60px rgba(23, 32, 51, .11);
     }
 
     * { box-sizing: border-box; }
+    html { min-height: 100%; }
     body {
       margin: 0;
       min-height: 100vh;
-      background: var(--wash);
       color: var(--ink);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        linear-gradient(180deg, rgba(55,189,244,.82) 0, rgba(238,248,255,.92) 250px, #f7fbff 100%),
+        linear-gradient(120deg, rgba(12,104,133,.18), rgba(255,255,255,0) 42%),
+        #f7fbff;
     }
 
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; }
-    button:disabled { cursor: not-allowed; opacity: .55; }
+    button:disabled { cursor: not-allowed; opacity: .58; }
 
-    .shell {
+    .app {
       min-height: 100vh;
-      display: grid;
-      grid-template-rows: auto 1fr;
+      padding: 18px;
     }
 
-    .topbar {
+    .command-shell {
+      width: min(1480px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .command-header {
+      min-height: 92px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      min-height: 72px;
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.92);
-      backdrop-filter: blur(14px);
-      position: sticky;
-      top: 0;
-      z-index: 20;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background: rgba(255,255,255,.42);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       min-width: 0;
     }
 
-    .brand img { width: 76px; height: auto; flex: 0 0 auto; }
-    .brand-title {
+    .brand img {
+      width: 78px;
+      height: auto;
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
       font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: 22px;
+      font-size: clamp(28px, 4vw, 54px);
       font-weight: 800;
+      line-height: .94;
       letter-spacing: 0;
-      line-height: 1;
     }
 
-    .brand-sub {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      margin-top: 4px;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 340px minmax(0, 1fr);
-      min-height: calc(100vh - 72px);
-    }
-
-    .sidebar {
-      border-right: 1px solid var(--line);
-      background: #fff;
-      min-height: 0;
-      display: grid;
-      grid-template-rows: auto auto minmax(0, 1fr);
-    }
-
-    .toolbar {
-      padding: 14px;
-      display: grid;
-      gap: 10px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      border-bottom: 1px solid var(--line);
-      background: #fbfdff;
-    }
-
-    .stat {
-      padding: 11px 10px;
-      border-right: 1px solid var(--line);
-      min-width: 0;
-    }
-
-    .stat:last-child { border-right: 0; }
-    .stat strong { display: block; font-size: 18px; line-height: 1; }
-    .stat span { display: block; margin-top: 5px; font-size: 10px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-
-    .threads {
-      overflow: auto;
-      min-height: 0;
-    }
-
-    .thread {
-      width: 100%;
-      display: grid;
-      gap: 8px;
-      padding: 13px 14px;
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
-      text-align: left;
-    }
-
-    .thread:hover { background: #f7fbff; }
-    .thread.active { background: #eaf7fb; box-shadow: inset 3px 0 0 var(--brand); }
-    .thread-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-    .thread-name { font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
-    .thread-time { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
-    .thread-body { color: #334155; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .thread-meta { color: var(--muted); font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
-    .reply-cue {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      min-height: 28px;
-      width: fit-content;
-      border-radius: 8px;
-      border: 1px solid #bae6fd;
-      background: #f0f9ff;
-      color: var(--brand-strong);
-      padding: 5px 9px;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .content {
-      min-width: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      min-height: 0;
-    }
-
-    .detail-head {
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-    }
-
-    .detail-title {
-      font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-weight: 800;
-      font-size: 26px;
-      line-height: 1.08;
-      letter-spacing: 0;
-      overflow-wrap: anywhere;
-    }
-
-    .detail-sub {
-      color: var(--muted);
-      font-weight: 700;
+    .brand .sub {
       margin-top: 6px;
-      line-height: 1.35;
-    }
-
-    .messages {
-      overflow: auto;
-      padding: 18px 20px;
-      display: grid;
-      align-content: start;
-      gap: 12px;
-      background:
-        linear-gradient(#f6f9fc 0 0) padding-box;
-    }
-
-    .message {
-      width: min(720px, 86%);
-      border: 1px solid var(--line);
-      background: #fff;
-      border-radius: 8px;
-      padding: 12px 14px;
-      box-shadow: 0 8px 22px rgba(23,32,51,.05);
-    }
-
-    .message.outbound {
-      justify-self: end;
-      border-color: #b8e4d8;
-      background: #f1fbf7;
-    }
-
-    .message.optout {
-      border-color: #fecaca;
-      background: #fff6f6;
-    }
-
-    .message-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 7px;
-      color: var(--muted);
-      font-size: 11px;
+      color: #36566b;
+      font-size: 13px;
       font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: .08em;
     }
 
-    .message-body {
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      color: #1f2937;
-      font-size: 15px;
-      line-height: 1.45;
-    }
-
-    .composer {
-      border-top: 1px solid var(--line);
-      background: #fff;
-      padding: 14px 20px 18px;
-      display: grid;
-      gap: 10px;
-    }
-
-    .composer-title {
+    .header-actions,
+    .row-actions,
+    .control-row,
+    .badges {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      font-weight: 900;
-      color: var(--ink);
-    }
-
-    .reply-target {
-      border: 1px solid #bae6fd;
-      background: #f0f9ff;
-      border-radius: 8px;
-      padding: 10px 12px;
-      color: #334155;
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
-    .composer textarea {
-      width: 100%;
-      min-height: 112px;
-      max-height: 260px;
-      resize: vertical;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 12px 13px;
-      line-height: 1.45;
-      outline: none;
-    }
-
-    .composer textarea:focus, .field:focus, .select:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(15,143,189,.16);
-    }
-
-    .composer-actions, .top-actions, .filter-row {
-      display: flex;
       gap: 8px;
-      align-items: center;
       flex-wrap: wrap;
     }
 
@@ -299,34 +114,249 @@
       gap: 8px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fff;
+      background: var(--glass-strong);
       color: var(--ink);
       padding: 9px 12px;
-      font-weight: 800;
+      font-weight: 900;
       line-height: 1;
       white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(23,32,51,.04);
     }
 
     .btn svg { width: 17px; height: 17px; }
-    .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
-    .btn.primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); }
-    .btn.ghost { background: #f8fafc; }
-    .btn.danger { background: #fff7f7; color: var(--bad); border-color: #fecaca; }
-    .btn.icon { width: 40px; padding: 0; }
+    .btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+    .btn.primary:hover { background: var(--teal-strong); border-color: var(--teal-strong); }
+    .btn.soft { background: rgba(255,255,255,.58); }
+    .btn.bad { color: var(--bad); border-color: rgba(180,35,24,.25); background: rgba(255,247,247,.8); }
 
-    .field, .select {
-      min-height: 40px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 9px 11px;
-      background: #fff;
-      outline: none;
-      color: var(--ink);
-      font-weight: 700;
+    .select,
+    .field,
+    textarea {
       width: 100%;
+      min-height: 40px;
+      border: 1px solid rgba(119, 146, 173, .42);
+      border-radius: 8px;
+      background: rgba(255,255,255,.86);
+      color: var(--ink);
+      outline: none;
+      font-weight: 800;
+      padding: 9px 11px;
     }
 
-    .select { appearance: auto; }
+    textarea {
+      resize: vertical;
+      min-height: 104px;
+      max-height: 240px;
+      line-height: 1.45;
+      font-weight: 600;
+    }
+
+    .select:focus,
+    .field:focus,
+    textarea:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(15,143,189,.16);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) minmax(220px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background: rgba(255,255,255,.50);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 14px 34px rgba(23,32,51,.06);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat-card,
+    .glass-card,
+    .outreach-card {
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 8px;
+      background: var(--glass);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 16px 42px rgba(23,32,51,.08);
+    }
+
+    .stat-card {
+      padding: 13px;
+      min-height: 92px;
+      display: grid;
+      align-content: space-between;
+    }
+
+    .stat-card .value {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .stat-card .label {
+      margin-top: 8px;
+      color: #446175;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .main-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 14px;
+      padding: 6px 2px 0;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .section-head .sub {
+      margin-top: 4px;
+      color: #426175;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .outreach-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .outreach-card {
+      overflow: hidden;
+      background: rgba(255,255,255,.74);
+    }
+
+    .outreach-main {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      min-height: 100%;
+    }
+
+    .media-col {
+      background: rgba(226, 242, 252, .78);
+      border-right: 1px solid var(--line);
+      padding: 10px;
+      display: grid;
+      gap: 9px;
+      align-content: start;
+    }
+
+    .listing-img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.72);
+      background: #dff3ff;
+      display: block;
+    }
+
+    .image-fallback {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.72);
+      background: linear-gradient(135deg, rgba(55,189,244,.28), rgba(255,255,255,.74));
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      text-align: center;
+      color: #31566a;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .agent-strip {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.70);
+      border: 1px solid rgba(255,255,255,.72);
+    }
+
+    .avatar,
+    .avatar-fallback {
+      width: 52px;
+      height: 52px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #0f8fbd;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .agent-name {
+      font-weight: 900;
+      line-height: 1.12;
+      overflow-wrap: anywhere;
+    }
+
+    .agent-meta {
+      color: #526a7b;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+    }
+
+    .card-body {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .address {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .open-time {
+      color: #526a7b;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 5px;
+    }
 
     .badge {
       display: inline-flex;
@@ -334,47 +364,181 @@
       min-height: 24px;
       border-radius: 999px;
       padding: 4px 9px;
-      font-size: 11px;
-      font-weight: 800;
       border: 1px solid var(--line);
-      background: #f8fafc;
+      background: rgba(255,255,255,.68);
       color: #334155;
+      font-size: 11px;
+      font-weight: 900;
       white-space: nowrap;
     }
 
-    .badge.ok { border-color: #b8e4d8; background: #ecfdf5; color: var(--ok); }
-    .badge.warn { border-color: #fed7aa; background: #fff7ed; color: var(--warn); }
-    .badge.bad { border-color: #fecaca; background: #fff1f2; color: var(--bad); }
-    .badge.info { border-color: #bae6fd; background: #f0f9ff; color: var(--brand-strong); }
+    .badge.ok { border-color: rgba(15,123,95,.24); background: rgba(236,253,245,.78); color: var(--ok); }
+    .badge.warn { border-color: rgba(154,91,0,.26); background: rgba(255,247,237,.86); color: var(--warn); }
+    .badge.bad { border-color: rgba(180,35,24,.24); background: rgba(255,241,242,.82); color: var(--bad); }
+    .badge.info { border-color: rgba(15,143,189,.24); background: rgba(240,249,255,.82); color: var(--teal-strong); }
 
-    .empty, .lock {
-      min-height: calc(100vh - 72px);
+    .mini-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.58);
+      padding: 10px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .mini-title {
+      color: #456173;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .message-list {
+      display: grid;
+      gap: 7px;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 3px;
+    }
+
+    .msg {
+      border-radius: 8px;
+      border: 1px solid rgba(136,164,190,.28);
+      background: rgba(255,255,255,.76);
+      padding: 8px 9px;
+    }
+
+    .msg.outbound {
+      background: rgba(236,253,245,.74);
+      border-color: rgba(15,123,95,.22);
+    }
+
+    .msg.optout {
+      background: rgba(255,241,242,.84);
+      border-color: rgba(180,35,24,.22);
+    }
+
+    .msg-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 4px;
+    }
+
+    .msg-body,
+    .copy-body {
+      color: #263545;
+      font-size: 13px;
+      line-height: 1.42;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .reply-box {
+      display: grid;
+      gap: 8px;
+    }
+
+    .reply-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .rows {
+      display: grid;
+      gap: 8px;
+    }
+
+    .data-row {
+      display: grid;
+      grid-template-columns: minmax(170px, 1.2fr) repeat(4, minmax(80px, .5fr));
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.68);
+    }
+
+    .data-row .primary {
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .data-row .secondary,
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 48px;
+      gap: 9px;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .bar-track {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(15,143,189,.12);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--teal), #11a87e);
+    }
+
+    .lock {
+      min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 24px;
+      padding: 18px;
     }
 
     .lock-panel {
       width: min(460px, 100%);
-      border: 1px solid var(--line);
-      background: #fff;
+      border: 1px solid rgba(255,255,255,.72);
       border-radius: 8px;
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
       padding: 22px;
-      box-shadow: 0 18px 45px rgba(23,32,51,.08);
     }
 
+    .lock-panel img { width: 88px; margin-bottom: 14px; }
     .lock-panel h1 {
-      font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: 28px;
-      font-weight: 800;
       margin: 0 0 14px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 30px;
+      font-weight: 800;
       letter-spacing: 0;
     }
 
     .lock-panel form { display: grid; gap: 10px; }
+    .error { color: var(--bad); font-weight: 900; }
     .muted { color: var(--muted); }
-    .small { font-size: 12px; font-weight: 700; }
-    .error { color: var(--bad); font-weight: 800; }
 
     .toast {
       position: fixed;
@@ -382,24 +546,33 @@
       bottom: 16px;
       z-index: 50;
       max-width: min(420px, calc(100vw - 32px));
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255,255,255,.72);
       border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 18px 45px rgba(23,32,51,.14);
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
       padding: 12px 14px;
       display: none;
-      font-weight: 800;
+      font-weight: 900;
     }
 
     .toast.show { display: block; }
 
-    @media (max-width: 920px) {
-      .topbar { position: static; }
-      .layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(520px, 1fr); }
-      .sidebar { border-right: 0; border-bottom: 1px solid var(--line); max-height: 48vh; }
-      .content { min-height: 620px; }
-      .detail-head { flex-direction: column; }
-      .message { width: 100%; }
+    @media (max-width: 1120px) {
+      .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .outreach-grid { grid-template-columns: 1fr; }
+      .controls { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .app { padding: 10px; }
+      .command-header { align-items: flex-start; flex-direction: column; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .outreach-main { grid-template-columns: 1fr; }
+      .media-col { border-right: 0; border-bottom: 1px solid var(--line); }
+      .data-row { grid-template-columns: 1fr; }
+      .report-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -411,18 +584,27 @@
     const ADMIN_UID_KEY = 'rel8tion_admin_uid';
     const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
     const DRAFTS_KEY = 'rel8tion_admin_reply_drafts';
+    const AREA_KEY = 'rel8tion_admin_area';
+
+    const AREAS = [
+      ['outreach', 'Outreach command'],
+      ['crm', 'Agent CRM'],
+      ['signs', 'Signs and events'],
+      ['lo', 'Loan officers'],
+      ['payments', 'Payments'],
+      ['reports', 'Reports']
+    ];
 
     const state = {
       verified: false,
       loading: false,
-      sending: false,
+      sendingKey: '',
       error: '',
-      filter: 'needs_reply',
+      area: window.localStorage.getItem(AREA_KEY) || 'outreach',
+      outreachFilter: 'needs_reply',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, opt_out: 0 },
-      selectedKey: '',
-      selectedThread: null,
-      messages: [],
+      command: null,
       loadedAt: '',
       drafts: readDrafts()
     };
@@ -492,6 +674,25 @@
       return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
     }
 
+    function money(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+    }
+
+    function initials(value) {
+      return String(value || 'R')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('') || 'R';
+    }
+
+    function domId(value) {
+      return `k_${String(value || '').replace(/[^a-z0-9_-]/gi, '_')}`;
+    }
+
     function isOptOutThread(thread) {
       return Boolean(thread?.any_opt_out || thread?.latest_reply_opt_out || thread?.review_status === 'opted_out');
     }
@@ -500,19 +701,23 @@
       return thread?.direction !== 'outbound' && !isOptOutThread(thread);
     }
 
-    function threadBadge(thread) {
-      if (isOptOutThread(thread)) return '<span class="badge bad">Opted out</span>';
-      if (needsReply(thread)) return '<span class="badge warn">Needs reply</span>';
-      if (thread.direction === 'outbound') return '<span class="badge ok">Replied</span>';
-      return '<span class="badge info">Inbound</span>';
+    function badge(text, type = 'info') {
+      return `<span class="badge ${type}">${esc(text)}</span>`;
+    }
+
+    function statusBadge(thread) {
+      if (isOptOutThread(thread)) return badge('Opted out', 'bad');
+      if (needsReply(thread)) return badge('Needs reply', 'warn');
+      if (thread.direction === 'outbound') return badge('Replied', 'ok');
+      return badge('Inbound', 'info');
     }
 
     function filteredInbox() {
       return state.inbox.filter((thread) => {
-        if (state.filter === 'all') return true;
-        if (state.filter === 'inbound') return thread.direction !== 'outbound';
-        if (state.filter === 'needs_reply') return needsReply(thread);
-        if (state.filter === 'opt_out') return isOptOutThread(thread);
+        if (state.outreachFilter === 'all') return true;
+        if (state.outreachFilter === 'inbound') return thread.direction !== 'outbound';
+        if (state.outreachFilter === 'needs_reply') return needsReply(thread);
+        if (state.outreachFilter === 'opt_out') return isOptOutThread(thread);
         return true;
       });
     }
@@ -544,7 +749,7 @@
         await api('/api/admin/auth');
         state.verified = true;
         state.error = '';
-        await loadInbox();
+        await loadAll();
       } catch (error) {
         state.verified = false;
         state.error = error.message || 'Unauthorized.';
@@ -552,77 +757,48 @@
       }
     }
 
-    async function loadInbox() {
+    async function loadAll() {
       state.loading = true;
       render();
       try {
-        const data = await api('/api/admin/outreach-inbox?limit=100');
-        state.inbox = data.inbox || [];
-        state.counts = data.counts || state.counts;
-        state.loadedAt = data.loaded_at || new Date().toISOString();
-        const visible = filteredInbox();
-        if (!state.selectedKey || !state.inbox.some((thread) => thread.thread_key === state.selectedKey)) {
-          state.selectedKey = visible[0]?.thread_key || state.inbox[0]?.thread_key || '';
-        }
+        const [dashboard, inbox] = await Promise.all([
+          api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
+          api('/api/admin/outreach-inbox?limit=120')
+        ]);
+        state.command = dashboard.ok === false ? null : dashboard;
+        state.inbox = inbox.inbox || [];
+        state.counts = inbox.counts || state.counts;
+        state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         state.loading = false;
         render();
-        if (state.selectedKey) await loadThread(state.selectedKey);
       } catch (error) {
         state.loading = false;
-        state.error = error.message || 'Unable to load inbox.';
+        state.error = error.message || 'Unable to load command data.';
         render();
       }
     }
 
-    async function loadThread(threadKey, shouldFocus = false) {
-      if (!threadKey) return;
-      state.selectedKey = threadKey;
-      render();
-      try {
-        const data = await api(`/api/admin/outreach-inbox?thread_key=${encodeURIComponent(threadKey)}`);
-        state.selectedThread = data.thread || null;
-        state.messages = data.messages || [];
-        state.error = '';
-        render();
-        if (shouldFocus) {
-          window.setTimeout(() => {
-            document.getElementById('composerPanel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            document.getElementById('replyBody')?.focus();
-          }, 80);
-        }
-      } catch (error) {
-        state.error = error.message || 'Unable to load thread.';
-        render();
-      }
-    }
-
-    function setFilter(filter) {
-      state.filter = filter;
-      const visible = filteredInbox();
-      if (!visible.some((thread) => thread.thread_key === state.selectedKey)) {
-        state.selectedKey = visible[0]?.thread_key || '';
-        state.selectedThread = null;
-        state.messages = [];
-        if (state.selectedKey) loadThread(state.selectedKey);
-      }
+    function setArea(area) {
+      state.area = area;
+      window.localStorage.setItem(AREA_KEY, area);
       render();
     }
 
-    function updateDraft(value) {
-      if (!state.selectedKey) return;
-      state.drafts[state.selectedKey] = value;
+    function setOutreachFilter(filter) {
+      state.outreachFilter = filter;
+      render();
+    }
+
+    function updateDraft(key, value) {
+      state.drafts[key] = value;
       saveDrafts();
-      renderComposerOnly(value);
-    }
-
-    function renderComposerOnly(value) {
-      const count = document.getElementById('replyCount');
+      const count = document.getElementById(`count_${domId(key)}`);
       if (count) count.textContent = `${value.length} characters`;
     }
 
-    async function sendReply() {
-      const thread = state.selectedThread;
-      const textarea = document.getElementById('replyBody');
+    async function sendReply(key) {
+      const thread = state.inbox.find((item) => item.thread_key === key);
+      const textarea = document.getElementById(`reply_${domId(key)}`);
       const messageBody = textarea?.value?.trim() || '';
 
       if (!thread?.queue_row_id) {
@@ -641,7 +817,9 @@
         return;
       }
 
-      state.sending = true;
+      state.drafts[key] = messageBody;
+      saveDrafts();
+      state.sendingKey = key;
       render();
       try {
         await api('/api/admin/outreach-reply', {
@@ -651,15 +829,14 @@
             body: messageBody
           })
         });
-        delete state.drafts[state.selectedKey];
+        delete state.drafts[key];
         saveDrafts();
+        state.sendingKey = '';
         showToast('Reply sent.');
-        state.sending = false;
-        await loadInbox();
+        await loadAll();
       } catch (error) {
-        state.sending = false;
-        state.error = error.message || 'Unable to send reply.';
-        showToast(state.error);
+        state.sendingKey = '';
+        showToast(error.message || 'Unable to send reply.');
         render();
       }
     }
@@ -669,9 +846,7 @@
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
       state.verified = false;
       state.inbox = [];
-      state.selectedKey = '';
-      state.selectedThread = null;
-      state.messages = [];
+      state.command = null;
       render();
     }
 
@@ -687,8 +862,8 @@
       app.innerHTML = `
         <main class="lock">
           <section class="lock-panel">
-            <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" style="width:88px;margin-bottom:16px;">
-            <h1>Admin Access</h1>
+            <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+            <h1>REL8TION COMMAND</h1>
             <form id="authForm">
               <input id="uidInput" class="field" value="${esc(cred.uid)}" autocomplete="off" placeholder="Admin UID">
               <input id="tokenInput" class="field" type="password" value="${esc(cred.token)}" autocomplete="current-password" placeholder="Fallback admin token">
@@ -711,137 +886,174 @@
     }
 
     function renderShell() {
-      const visible = filteredInbox();
+      const areaLabel = AREAS.find(([key]) => key === state.area)?.[1] || 'Outreach command';
       app.innerHTML = `
-        <main class="shell">
-          <header class="topbar">
-            <div class="brand">
-              <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
-              <div>
-                <div class="brand-title">Admin</div>
-                <div class="brand-sub">${state.loadedAt ? `Loaded ${esc(fmtDate(state.loadedAt))}` : 'Outreach inbox'}</div>
+        <main class="app">
+          <div class="command-shell">
+            <header class="command-header">
+              <div class="brand">
+                <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+                <div>
+                  <h1>REL8TION COMMAND</h1>
+                  <div class="sub">${state.loadedAt ? `Live data loaded ${esc(fmtDate(state.loadedAt))}` : 'Live command center'}</div>
+                </div>
               </div>
-            </div>
-            <div class="top-actions">
-              <button class="btn ghost" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
-              <button class="btn" id="signOutBtn"><i data-lucide="log-out"></i><span>Lock</span></button>
-            </div>
-          </header>
+              <div class="header-actions">
+                ${state.loading ? badge('Refreshing', 'info') : badge('Live', 'ok')}
+                <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+                <button class="btn soft" id="lockBtn"><i data-lucide="log-out"></i><span>Lock</span></button>
+              </div>
+            </header>
 
-          <section class="layout">
-            <aside class="sidebar">
-              <div class="toolbar">
-                <select id="filterSelect" class="select">
-                  <option value="needs_reply"${state.filter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
-                  <option value="inbound"${state.filter === 'inbound' ? ' selected' : ''}>Inbound</option>
-                  <option value="all"${state.filter === 'all' ? ' selected' : ''}>All threads</option>
-                  <option value="opt_out"${state.filter === 'opt_out' ? ' selected' : ''}>Opt-outs</option>
-                </select>
+            <section class="controls">
+              <select id="areaSelect" class="select">
+                ${AREAS.map(([key, label]) => `<option value="${key}"${state.area === key ? ' selected' : ''}>${esc(label)}</option>`).join('')}
+              </select>
+              <div class="control-row">
+                ${badge(areaLabel, 'info')}
+                ${state.error ? badge(state.error, 'bad') : ''}
               </div>
-              <div class="stats">
-                <div class="stat"><strong>${state.counts.needs_reply || 0}</strong><span>Needs</span></div>
-                <div class="stat"><strong>${state.counts.inbound || 0}</strong><span>Inbound</span></div>
-                <div class="stat"><strong>${state.counts.opt_out || 0}</strong><span>Stops</span></div>
-                <div class="stat"><strong>${state.counts.all || 0}</strong><span>All</span></div>
+              <div class="row-actions">
+                <button class="btn primary" id="outreachJump"><i data-lucide="message-square-reply"></i><span>Outreach</span></button>
               </div>
-              <div class="threads">
-                ${state.loading ? '<div class="thread"><div class="thread-name">Loading...</div></div>' : ''}
-                ${!state.loading && visible.length === 0 ? '<div class="thread"><div class="thread-name">No threads</div><div class="thread-meta">Change the filter or refresh.</div></div>' : ''}
-                ${visible.map((thread) => renderThreadButton(thread)).join('')}
-              </div>
-            </aside>
-            ${renderDetail()}
-          </section>
+            </section>
+
+            ${renderStats()}
+            <section class="main-grid">${renderArea()}</section>
+          </div>
         </main>
       `;
 
-      document.getElementById('refreshBtn')?.addEventListener('click', loadInbox);
-      document.getElementById('signOutBtn')?.addEventListener('click', signOut);
-      document.getElementById('filterSelect')?.addEventListener('change', (event) => setFilter(event.target.value));
-      document.querySelectorAll('[data-thread-key]').forEach((button) => {
-        button.addEventListener('click', () => loadThread(button.getAttribute('data-thread-key'), true));
+      document.getElementById('refreshBtn')?.addEventListener('click', loadAll);
+      document.getElementById('lockBtn')?.addEventListener('click', signOut);
+      document.getElementById('areaSelect')?.addEventListener('change', (event) => setArea(event.target.value));
+      document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
+      document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
+      document.querySelectorAll('[data-draft-key]').forEach((textarea) => {
+        textarea.addEventListener('input', () => updateDraft(textarea.dataset.draftKey, textarea.value));
       });
-      document.getElementById('replyBody')?.addEventListener('input', (event) => updateDraft(event.target.value));
-      document.getElementById('sendReplyBtn')?.addEventListener('click', sendReply);
+      document.querySelectorAll('[data-send-key]').forEach((button) => {
+        button.addEventListener('click', () => sendReply(button.dataset.sendKey));
+      });
       window.lucide?.createIcons();
     }
 
-    function renderThreadButton(thread) {
-      const active = thread.thread_key === state.selectedKey ? ' active' : '';
+    function renderStats() {
+      const o = state.command?.overview || {};
+      const stats = [
+        ['Needs reply', state.counts.needs_reply || o.needs_reply || 0],
+        ['Inbound', state.counts.inbound || o.incoming_threads || 0],
+        ['Agents', o.agents || 0],
+        ['Active signs', o.active_signs || 0],
+        ['Check-ins', o.checkins || 0],
+        ['Pay setup', o.payments_needing_setup || 0]
+      ];
+      return `<section class="stats-grid">${stats.map(([label, value]) => `
+        <div class="stat-card">
+          <div class="value">${esc(value)}</div>
+          <div class="label">${esc(label)}</div>
+        </div>
+      `).join('')}</section>`;
+    }
+
+    function renderArea() {
+      if (state.area === 'crm') return renderCrm();
+      if (state.area === 'signs') return renderSigns();
+      if (state.area === 'lo') return renderLoanOfficers();
+      if (state.area === 'payments') return renderPayments();
+      if (state.area === 'reports') return renderReports();
+      return renderOutreach();
+    }
+
+    function renderOutreach() {
+      const rows = filteredInbox();
       return `
-        <button class="thread${active}" data-thread-key="${esc(thread.thread_key)}">
-          <div class="thread-head">
-            <div class="thread-name">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown contact')}</div>
-            <div class="thread-time">${esc(fmtDate(thread.last_reply_at))}</div>
+        <div class="section-head">
+          <div>
+            <h2>Outreach command</h2>
+            <div class="sub">${rows.length} conversations in this view</div>
           </div>
-          <div>${threadBadge(thread)}</div>
-          ${needsReply(thread) ? '<div class="reply-cue"><i data-lucide="message-square-reply"></i><span>Reply</span></div>' : ''}
-          <div class="thread-body">${esc(thread.latest_reply_body || '')}</div>
-          <div class="thread-meta">${esc(thread.address || thread.brokerage || fmtPhone(thread.from_phone_normalized) || '')}</div>
-        </button>
+          <select id="outreachFilter" class="select" style="max-width:220px;">
+            <option value="needs_reply"${state.outreachFilter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
+            <option value="inbound"${state.outreachFilter === 'inbound' ? ' selected' : ''}>Inbound</option>
+            <option value="all"${state.outreachFilter === 'all' ? ' selected' : ''}>All threads</option>
+            <option value="opt_out"${state.outreachFilter === 'opt_out' ? ' selected' : ''}>Opt-outs</option>
+          </select>
+        </div>
+        <div class="outreach-grid">
+          ${state.loading ? '<div class="glass-card" style="padding:18px;font-weight:900;">Loading...</div>' : ''}
+          ${!state.loading && rows.length === 0 ? '<div class="glass-card" style="padding:18px;font-weight:900;">No conversations in this view.</div>' : ''}
+          ${rows.map(renderOutreachCard).join('')}
+        </div>
       `;
     }
 
-    function renderDetail() {
-      const thread = state.selectedThread || state.inbox.find((item) => item.thread_key === state.selectedKey);
-      if (!thread) {
-        return `
-          <section class="empty">
-            <div class="muted">No thread selected.</div>
-          </section>
-        `;
-      }
-
+    function renderOutreachCard(thread) {
+      const key = thread.thread_key;
+      const media = thread.mockup_image_url || thread.listing_photo_url || '';
+      const draft = state.drafts[key] || '';
       const disabledReason = isOptOutThread(thread)
         ? 'Opted out'
         : !thread.queue_row_id
           ? 'No linked queue row'
           : '';
-      const draft = state.drafts[state.selectedKey] || '';
-      const canSend = !disabledReason && !state.sending;
-      const latestInbound = [...state.messages].reverse().find((message) => message.direction !== 'outbound');
+      const canSend = !disabledReason && state.sendingKey !== key;
+      const messages = Array.isArray(thread.messages) ? thread.messages : [];
+      const phone = fmtPhone(thread.agent_phone || thread.from_phone);
 
       return `
-        <section class="content">
-          <div class="detail-head">
-            <div>
-              <div class="detail-title">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown contact')}</div>
-              <div class="detail-sub">
-                ${esc([thread.brokerage, thread.address, fmtPhone(thread.agent_phone || thread.from_phone)].filter(Boolean).join(' | '))}
+        <article class="outreach-card">
+          <div class="outreach-main">
+            <div class="media-col">
+              ${media ? `<img class="listing-img" src="${esc(media)}" alt="${esc(thread.address || 'Outreach mockup')}">` : `<div class="image-fallback">${esc(thread.address || 'No image')}</div>`}
+              <div class="agent-strip">
+                ${thread.agent_photo_url ? `<img class="avatar" src="${esc(thread.agent_photo_url)}" alt="${esc(thread.agent_name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(thread.agent_name))}</div>`}
+                <div>
+                  <div class="agent-name">${esc(thread.agent_name || 'Unknown agent')}</div>
+                  <div class="agent-meta">${esc(thread.brokerage || 'No brokerage')}</div>
+                </div>
+              </div>
+              <div class="badges">
+                ${statusBadge(thread)}
+                ${thread.template_key ? badge(thread.template_key.replace(/_/g, ' '), 'info') : ''}
               </div>
             </div>
-            <div class="top-actions">
-              ${threadBadge(thread)}
-              ${thread.open_start ? `<span class="badge info">${esc(fmtDate(thread.open_start))}</span>` : ''}
-            </div>
-          </div>
 
-          <div class="messages" id="messages">
-            ${state.error ? `<div class="message optout"><div class="message-body">${esc(state.error)}</div></div>` : ''}
-            ${state.messages.length === 0 ? '<div class="message"><div class="message-body">No messages loaded.</div></div>' : ''}
-            ${state.messages.map((message) => renderMessage(message)).join('')}
-          </div>
-
-          <div class="composer" id="composerPanel">
-            <div class="composer-title">
-              <span>Reply by SMS</span>
-              <span class="small muted">${esc(fmtPhone(thread.agent_phone || thread.from_phone) || '')}</span>
-            </div>
-            ${latestInbound ? `
-              <div class="reply-target">
-                <strong>Latest incoming:</strong> ${esc(latestInbound.body || '')}
+            <div class="card-body">
+              <div class="card-top">
+                <div>
+                  <div class="address">${esc(thread.address || 'No address')}</div>
+                  <div class="open-time">${esc([fmtDate(thread.open_start), money(thread.price), phone].filter(Boolean).join(' | '))}</div>
+                </div>
+                ${thread.last_reply_at ? badge(fmtDate(thread.last_reply_at), 'info') : ''}
               </div>
-            ` : ''}
-            <textarea id="replyBody" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${disabledReason ? esc(disabledReason) : 'Write SMS reply'}">${esc(draft)}</textarea>
-            <div class="composer-actions">
-              <button id="sendReplyBtn" class="btn primary" ${canSend ? '' : 'disabled'}>
-                <i data-lucide="send"></i><span>${state.sending ? 'Sending...' : 'Send SMS'}</span>
-              </button>
-              <span id="replyCount" class="small muted">${draft.length} characters</span>
-              ${disabledReason ? `<span class="badge bad">${esc(disabledReason)}</span>` : ''}
+
+              <div class="mini-panel">
+                <div class="mini-title">My outreach</div>
+                <div class="copy-body">${esc(thread.selected_sms || 'No initial outreach copy stored.')}</div>
+              </div>
+
+              <div class="mini-panel">
+                <div class="mini-title">Conversation</div>
+                <div class="message-list">
+                  ${messages.length ? messages.map(renderMessage).join('') : `<div class="msg"><div class="msg-body">${esc(thread.latest_reply_body || 'No messages loaded.')}</div></div>`}
+                </div>
+              </div>
+
+              <div class="mini-panel reply-box">
+                <div class="mini-title">Reply by SMS</div>
+                <textarea id="reply_${domId(key)}" data-draft-key="${esc(key)}" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${disabledReason ? esc(disabledReason) : 'Write reply'}">${esc(draft)}</textarea>
+                <div class="reply-footer">
+                  <button class="btn primary" data-send-key="${esc(key)}" ${canSend ? '' : 'disabled'}>
+                    <i data-lucide="send"></i><span>${state.sendingKey === key ? 'Sending...' : 'Send SMS'}</span>
+                  </button>
+                  <span id="count_${domId(key)}" class="small">${draft.length} characters</span>
+                  ${disabledReason ? badge(disabledReason, 'bad') : ''}
+                </div>
+              </div>
             </div>
           </div>
-        </section>
+        </article>
       `;
     }
 
@@ -849,13 +1061,142 @@
       const outbound = message.direction === 'outbound';
       const optout = message.opt_out ? ' optout' : '';
       return `
-        <article class="message ${outbound ? 'outbound' : 'inbound'}${optout}">
-          <div class="message-row">
+        <div class="msg ${outbound ? 'outbound' : 'inbound'}${optout}">
+          <div class="msg-head">
             <span>${outbound ? 'Sent' : (message.opt_out ? 'Opt-out' : 'Inbound')}</span>
             <span>${esc(fmtDate(message.received_at))}</span>
           </div>
-          <div class="message-body">${esc(message.body || '')}</div>
-        </article>
+          <div class="msg-body">${esc(message.body || '')}</div>
+        </div>
+      `;
+    }
+
+    function renderCrm() {
+      const rows = state.command?.crm || [];
+      return renderRows('Agent CRM', `${rows.length} agent records and outreach contacts`, rows.slice(0, 80), (row) => `
+        <div>
+          <div class="primary">${esc(row.name || 'Unknown agent')}</div>
+          <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
+        </div>
+        <div>${badge(`${row.keychain_count || 0} keys`, 'info')}</div>
+        <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
+        <div>${badge(`${row.reply_count || 0} replies`, row.reply_count ? 'warn' : 'info')}</div>
+        <div>${badge(`${row.lead_count || 0} leads`, row.lead_count ? 'ok' : 'info')}</div>
+      `);
+    }
+
+    function renderSigns() {
+      const signs = state.command?.signs || [];
+      const events = state.command?.events || [];
+      return `
+        ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.public_code || row.id)}</div>
+            <div class="secondary">${esc(row.owner_agent_slug || row.assigned_agent_slug || 'Unassigned')}</div>
+          </div>
+          <div>${badge(row.status || 'unknown', row.status === 'active' ? 'ok' : 'info')}</div>
+          <div>${badge(`${row.inventory_alias_count || 0} QR`, 'info')}</div>
+          <div>${badge(row.active_event_host || 'No event', row.active_event_host ? 'ok' : 'info')}</div>
+          <div>${badge(row.primary_device_type || 'front', 'info')}</div>
+        `)}
+        ${renderRows('Live and recent events', `${events.length} events`, events.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.host_agent_slug || 'No host')}</div>
+            <div class="secondary">${esc(fmtDate(row.start_time) || row.id)}</div>
+          </div>
+          <div>${badge(row.status || 'unknown', row.status === 'active' ? 'ok' : 'info')}</div>
+          <div>${badge(`${row.checkin_count || 0} check-ins`, 'info')}</div>
+          <div>${badge(`${row.financing_need_count || 0} finance`, row.financing_need_count ? 'warn' : 'info')}</div>
+          <div>${badge(`${row.live_loan_officer_count || 0} LO`, row.live_loan_officer_count ? 'ok' : 'info')}</div>
+        `)}
+      `;
+    }
+
+    function renderLoanOfficers() {
+      const profiles = state.command?.loan_officers || [];
+      const sessions = state.command?.loan_sessions || [];
+      return `
+        ${renderRows('Loan officers', `${profiles.length} verified profiles`, profiles.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.full_name || row.slug || 'Unknown LO')}</div>
+            <div class="secondary">${esc([row.company_name, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${badge(row.is_active ? 'active' : 'inactive', row.is_active ? 'ok' : 'bad')}</div>
+          <div>${badge(row.industry || 'profile', 'info')}</div>
+          <div>${badge(row.calendar_url ? 'calendar' : 'no calendar', row.calendar_url ? 'ok' : 'warn')}</div>
+          <div>${badge(fmtDate(row.updated_at || row.created_at) || 'no date', 'info')}</div>
+        `)}
+        ${renderRows('LO coverage', `${sessions.length} recent sessions`, sessions.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.loan_officer_name || row.loan_officer_slug || 'Coverage session')}</div>
+            <div class="secondary">${esc(fmtPhone(row.loan_officer_phone) || row.open_house_event_id || '')}</div>
+          </div>
+          <div>${badge(row.status || 'unknown', row.status === 'live' ? 'ok' : 'info')}</div>
+          <div>${badge(fmtDate(row.signed_in_at || row.created_at) || 'no date', 'info')}</div>
+          <div>${badge(row.loan_officer_uid || 'no uid', 'info')}</div>
+          <div>${badge(row.open_house_event_id ? 'event linked' : 'no event', row.open_house_event_id ? 'ok' : 'warn')}</div>
+        `)}
+      `;
+    }
+
+    function renderPayments() {
+      const rows = state.command?.payments || [];
+      return renderRows('Payment control', `${rows.length} billing records to create or reconcile`, rows.slice(0, 100), (row) => `
+        <div>
+          <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+          <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
+        </div>
+        <div>${badge(row.payment_status || 'unknown', 'warn')}</div>
+        <div>${badge(`${row.sign_count || 0} signs`, 'info')}</div>
+        <div>${badge(`${row.lead_count || 0} leads`, 'info')}</div>
+        <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
+      `);
+    }
+
+    function renderReports() {
+      const outreach = state.command?.outreach || {};
+      return `
+        <div class="section-head">
+          <div>
+            <h2>Reports</h2>
+            <div class="sub">Live operational status by queue and pipeline state</div>
+          </div>
+        </div>
+        <div class="report-grid">
+          ${renderBarCard('Review status', outreach.by_review_status || {})}
+          ${renderBarCard('Initial status', outreach.by_initial_status || {})}
+        </div>
+      `;
+    }
+
+    function renderBarCard(title, values) {
+      const entries = Object.entries(values || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      const max = Math.max(1, ...entries.map(([, count]) => count));
+      return `
+        <div class="glass-card" style="padding:14px;">
+          <div class="mini-title">${esc(title)}</div>
+          ${entries.length ? entries.map(([label, count]) => `
+            <div class="bar-row">
+              <div>${esc(label)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4, Math.round((count / max) * 100))}%"></div></div>
+              <div>${esc(count)}</div>
+            </div>
+          `).join('') : '<div class="small" style="margin-top:10px;">No data</div>'}
+        </div>
+      `;
+    }
+
+    function renderRows(title, subtitle, rows, rowRenderer) {
+      return `
+        <div class="section-head">
+          <div>
+            <h2>${esc(title)}</h2>
+            <div class="sub">${esc(subtitle)}</div>
+          </div>
+        </div>
+        <div class="rows">
+          ${rows.length ? rows.map((row) => `<div class="data-row">${rowRenderer(row)}</div>`).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No rows loaded.</div>'}
+        </div>
       `;
     }
 
@@ -865,6 +1206,11 @@
     }
 
     verify();
+    window.setInterval(() => {
+      if (state.verified && !state.loading && !state.sendingKey) {
+        loadAll().catch(() => null);
+      }
+    }, 45000);
   </script>
 </body>
 </html>

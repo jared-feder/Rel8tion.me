@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-14.
+Last inspected: 2026-05-15.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -66,7 +66,7 @@ Status labels:
 - `[IMPLEMENTED]` Agent dashboard has end/move controls for the current open house. Ending marks `open_house_events.status = ended`, stamps `ended_at`, clears `smart_signs.active_event_id`, and sets the sign back to inactive without deleting captured check-ins. Moving performs the same closeout and opens sign activation for the next listing.
 - `[PARTIAL]` Present/local loan officer sign-in exists through dashboard prompt, loan officer tag scan, `verified_profiles`, and `event_loan_officer_sessions`. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[IMPLEMENTED]` NMB loan officer activation/profile pages exist at `/nmb-activate` and `/nmb-verified`.
-- `[PARTIAL]` `/admin` is now an admin-keychain/token-protected operator dashboard with an outreach SMS inbox, thread history, and manual reply composer. It loads via server-side `/api/admin/outreach-inbox` and sends replies through `/api/admin/outreach-reply`, which calls the protected Supabase `send-agent-manual-reply` Edge Function. Broader sign/event/CRM/payment controls are still not built.
+- `[PARTIAL]` `/admin` is now the admin-keychain/token-protected REL8TION COMMAND dashboard. It has a command-header layout, area selector, live overview stats, hot-list-style outreach cards with agent/listing imagery, inline SMS reply composers, thread history, and read/reporting views for Agent CRM, smart signs/events, loan officer profiles/sessions, payments-needed setup, and outreach reports. It loads privileged data through `/api/admin/dashboard` and `/api/admin/outreach-inbox`, and sends replies through `/api/admin/outreach-reply`, which calls the protected Supabase `send-agent-manual-reply` Edge Function. CRM/sign/LO/payment sections are still mostly read-only; billing tables and formal LO availability/calendar editing are not wired.
 - `[IMPLEMENTED]` Temporary key/sign reset admin tooling exists at `/key-reset` with server API `api/admin/reset-key.js`.
 - `[IMPLEMENTED]` The temporary reset tooling is restricted to the protected beta lane only: keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`, sign public code `0e4b015f3782`, front chip UID `f005e166-70b3-407c-ba24-b91464a3d22a`, and rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`. Elena/Galluzzo sign data remains protected by reset guardrails.
 - `[IMPLEMENTED]` Beta fresh-claim cleanup clears stale browser host/sign activation sessions and inactive sign QR scans preserve the current host session, so a newly claimed demo keychain profile can carry forward into sign activation instead of falling back to stale `agent-*` context.
@@ -88,7 +88,7 @@ Status labels:
 
 - `[PARTIAL]` Root `vercel.json` now has a cron for OneKey freshness. `api/cron/enrich-agents.js` still exists but is not scheduled by the root config.
 - `[PARTIAL]` The Estately worker can enrich `listing_agents`, but quality depends on Estately parsing and phone validation.
-- `[PARTIAL]` `/admin` has a live outreach reply inbox, but it is not yet the full admin dashboard for signs, events, CRM, LO coverage, payments, and analytics.
+- `[PARTIAL]` `/admin` has the REL8TION COMMAND operator dashboard with outreach replies plus live read/reporting sections for signs, events, CRM, LO coverage, payments-needed setup, and analytics. Direct editing/control for most non-outreach areas is still future work.
 - `[NEEDS VERIFICATION]` Some outreach source still exists under `docs/supabase-functions`; deployment state for each function should be verified before relying on docs-only source.
 - `[PARTIAL]` WordPress hot-list files exist locally, but they are not automatically synced to WordPress.
 - `[PARTIAL]` `/b` buyer profile and `/event` smart sign check-in are both active concepts but save into different tables.
@@ -112,7 +112,7 @@ Status labels:
 - `[INTENDED]` Buyer-agent-loan-officer chat modal is not built.
 - `[INTENDED]` Rich buyer dashboard with external listing-site/Zillow-style media, neighborhood data, and persistent chat is not built. Current `/event` post-check-in experience shows available property/agent/LO context and uses SMS/call links for messaging.
 - `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
-- `[PARTIAL]` Full admin dashboard for signs, events, CRM, LO coverage, payments, and analytics is not built. Outreach reply inbox/send exists.
+- `[PARTIAL]` REL8TION COMMAND exists as the protected admin dashboard, but the deeper action layer for sign inventory edits, CRM updates, LO calendar/availability modification, billing automation, and full project controls is not complete.
 - `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
 - `[RISK]` QR export needs cleanup: current activation expects `smart_sign_inventory.public_code`, while `smart-sign-qr-export.sql` exports from `smart_signs`.
 - `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
@@ -179,7 +179,7 @@ Highest-value next work:
    - event start prompt
    - live coverage session
    - buyer financing alert and contact modal
-7. Replace placeholder `/admin` with a protected operational dashboard.
+7. Continue the protected REL8TION COMMAND dashboard from read/reporting into real action controls for CRM edits, sign inventory, LO coverage/calendar workflows, billing/payment state, and analytics drilldowns.
 8. Add a small E2E/runbook suite for:
    - claim keychain
    - activate sign QR
@@ -245,7 +245,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Buyer financing opt-in falls back to Jared if no live LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert`; the post-check-in temporary financing chat button opens SMS to `347-775-8059`. |
 | Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Agent dashboard arms pending LO session; `/k` verifies `verified_profiles` and writes `event_loan_officer_sessions`. |
 | NMB activation/profile pages exist. | `[IMPLEMENTED]` | `nmb-activate.html` and `nmb-verified.html`. |
-| Admin key/sign reset exists. | `[PARTIAL]` | `key-reset.html` plus `api/admin/reset-key.js`; full admin dashboard is not built. |
+| Admin command dashboard exists. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` plus protected `/api/admin/dashboard`, `/api/admin/outreach-inbox`, and `/api/admin/outreach-reply`; outreach replies work through the server-side manual reply function, while most CRM/sign/LO/payment controls are still read/reporting only. |
 | Estately enrichment worker exists at batch size 20. | `[IMPLEMENTED]` | `estately-enrichment-worker.cjs`. |
 | Browserless/Trulia enrichment exists. | `[NEEDS VERIFICATION]` | No tracked Browserless/Trulia enrichment source was found in the repo audit; current tracked enrichment is Estately/Cheerio. |
 | Twilio inbound reply Edge Functions are present. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
@@ -267,7 +267,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | --- | --- | --- |
 | Formal remote LO coverage management is desired but not built. | `[INTENDED]` | No invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
 | Buyer-agent-LO chat/video is desired but not built. | `[INTENDED]` | Current code only has SMS/call/text links. |
-| Full admin dashboard is built. | `[INTENDED]` | `/admin` is placeholder. |
+| Full admin action dashboard is built. | `[PARTIAL]` | REL8TION COMMAND exists at `/admin` with outreach replies and live read/reporting cards, but sign inventory edits, CRM edits, LO calendar/availability changes, and billing automation remain unfinished. |
 | Root enrichment cron is live from this repo config. | `[NEEDS VERIFICATION]` | Endpoint exists; root `vercel.json` has no cron schedule. |
 | `send-lead-sms` source is present. | `[IMPLEMENTED]` | Source now exists at `supabase/functions/send-lead-sms/index.ts`; live deployment/source matching and Twilio behavior still need verification because the verifier does not send SMS. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
