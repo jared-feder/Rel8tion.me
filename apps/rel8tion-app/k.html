@@ -272,6 +272,12 @@
       return Array.isArray(rows) ? rows[0] || null : null;
     }
 
+    async function loadInventoryByPublicCode(publicCode) {
+      if (!publicCode) return null;
+      const rows = await request(`smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}&select=id,public_code,inventory_type,smart_sign_id&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
+    }
+
     async function findActiveEventByActivationUid(chipUid) {
       if (!chipUid) return null;
       const rows = await request(`open_house_events?activation_uid_primary=eq.${encodeURIComponent(chipUid)}&ended_at=is.null&select=id,smart_sign_id,host_agent_slug,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
@@ -292,6 +298,19 @@
       return String(row?.device_role || '').trim().toLowerCase() === 'event_pass_keychain';
     }
 
+    async function markEventPassKeychain(chipUid, agentSlug) {
+      if (!chipUid || !agentSlug) return null;
+      return request(`keys?uid=eq.${encodeURIComponent(chipUid)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          agent_slug: agentSlug,
+          claimed: true,
+          device_role: 'event_pass_keychain',
+          assigned_slot: null
+        })
+      }).catch(() => null);
+    }
+
     async function findRemoteSignActivationSession(stages = [], agentSlug = '') {
       const now = new Date().toISOString();
       const stageFilter = stages.length
@@ -302,6 +321,21 @@
         `smart_sign_activation_sessions?status=eq.pending&sign_id=not.is.null&expires_at=gt.${encodeURIComponent(now)}${stageFilter}${agentFilter}&select=*&order=updated_at.desc&limit=1`
       ).catch(() => []);
       return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function findRemoteEventPassActivationSession(agentSlug = '') {
+      const now = new Date().toISOString();
+      const rows = await request(
+        `smart_sign_activation_sessions?status=eq.pending&stage=eq.waiting_for_agent_keychain&expires_at=gt.${encodeURIComponent(now)}&select=*&order=updated_at.desc&limit=12`
+      ).catch(() => []);
+      for (const row of Array.isArray(rows) ? rows : []) {
+        if (agentSlug && row.agent_slug && row.agent_slug !== agentSlug) continue;
+        const inventory = await loadInventoryByPublicCode(row.public_code);
+        if (inventory?.inventory_type === 'event_pass') {
+          return { ...row, inventory };
+        }
+      }
+      return null;
     }
 
     async function findRemoteSignActivationSessionForSign(sign, stages = []) {
@@ -784,10 +818,24 @@
           savePendingSignActivation({
             code: pendingSignActivation.publicCode,
             signId: pendingSignActivation.signId || '',
+            inventoryId: pendingSignActivation.inventoryId || '',
             source: pendingSignActivation.source || 'sign-qr'
           });
         }
         if (isPendingEventPassActivation(pendingSignActivation)) {
+          setStatus('Event Pass NFC Found', 'Activating this Event Pass keychain for the selected open house.');
+          goToClaim();
+          return;
+        }
+
+        const remoteEventPassActivation = await findRemoteEventPassActivationSession();
+        if (remoteEventPassActivation?.public_code) {
+          savePendingSignActivation({
+            code: remoteEventPassActivation.public_code,
+            signId: remoteEventPassActivation.sign_id || '',
+            inventoryId: remoteEventPassActivation.inventory_id || remoteEventPassActivation.inventory?.id || '',
+            source: 'event_pass'
+          });
           setStatus('Event Pass NFC Found', 'Activating this Event Pass keychain for the selected open house.');
           goToClaim();
           return;
@@ -872,13 +920,37 @@
             setStatus('Wrong Keychain', `This sign is assigned to ${pendingSignActivation.ownerAgentSlug}.`);
             return;
           }
-          setStatus('Keychain Confirmed', 'Opening sign activation.');
+          const eventPassPending = pendingSignActivation.source === 'event_pass';
+          if (eventPassPending) await markEventPassKeychain(uid, record.agent_slug);
+          setStatus(eventPassPending ? 'Event Pass NFC Confirmed' : 'Keychain Confirmed', eventPassPending ? 'Opening Event Pass activation.' : 'Opening sign activation.');
           continueSignActivation({
             uid,
             agent: record.agent_slug,
             code: pendingSignActivation.publicCode,
             sign_id: pendingSignActivation.signId,
+            inventory_id: pendingSignActivation.inventoryId,
             source: pendingSignActivation.source || ''
+          });
+          return;
+        }
+
+        const remoteEventPassActivation = await findRemoteEventPassActivationSession(record.agent_slug);
+        if (remoteEventPassActivation?.public_code) {
+          await markEventPassKeychain(uid, record.agent_slug);
+          if (remoteEventPassActivation.id) {
+            await updateRemoteSignActivationSession(remoteEventPassActivation.id, {
+              agent_key_uid: uid,
+              agent_slug: record.agent_slug
+            });
+          }
+          setStatus('Event Pass NFC Confirmed', 'Opening Event Pass activation.');
+          continueSignActivation({
+            uid,
+            agent: record.agent_slug,
+            code: remoteEventPassActivation.public_code,
+            sign_id: remoteEventPassActivation.sign_id,
+            inventory_id: remoteEventPassActivation.inventory_id || remoteEventPassActivation.inventory?.id || '',
+            source: 'event_pass'
           });
           return;
         }
@@ -1003,6 +1075,20 @@
         savePendingSignActivation({
           code: pendingEventPassActivation.publicCode,
           signId: pendingEventPassActivation.signId || '',
+          inventoryId: pendingEventPassActivation.inventoryId || '',
+          source: 'event_pass'
+        });
+        setStatus('Event Pass NFC Found', 'Finishing Event Pass activation.');
+        goToClaim();
+        return;
+      }
+
+      const remoteEventPassActivation = await findRemoteEventPassActivationSession();
+      if (remoteEventPassActivation?.public_code) {
+        savePendingSignActivation({
+          code: remoteEventPassActivation.public_code,
+          signId: remoteEventPassActivation.sign_id || '',
+          inventoryId: remoteEventPassActivation.inventory_id || remoteEventPassActivation.inventory?.id || '',
           source: 'event_pass'
         });
         setStatus('Event Pass NFC Found', 'Finishing Event Pass activation.');
