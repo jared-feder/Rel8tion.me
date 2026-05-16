@@ -43,6 +43,13 @@ async function loadLoanOfficer(uid) {
   );
 }
 
+async function loadLoanOfficerProfile(uid) {
+  return loadOne(
+    `verified_profiles?uid=eq.${enc(uid)}&select=*`,
+    'Loan officer profile'
+  );
+}
+
 function sessionPayload(event, profile) {
   const now = new Date().toISOString();
   return {
@@ -80,6 +87,38 @@ async function endLiveCoverage(eventId) {
     }
   );
   return Array.isArray(rows) ? rows : [];
+}
+
+async function endLiveCoverageForLoanOfficer(uid, now = new Date().toISOString()) {
+  const rows = await supabaseRest(
+    `event_loan_officer_sessions?status=eq.live&or=(loan_officer_uid.eq.${enc(uid)},verified_profile_uid.eq.${enc(uid)})`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'ended',
+        signed_out_at: now,
+        updated_at: now
+      })
+    }
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function cancelFieldAssignmentsForLoanOfficer(uid) {
+  return supabaseRest(
+    `field_demo_visit_participants?role=eq.loan_officer&responsibility=eq.financing_support&status=in.(assigned,confirmed,en_route,on_site,live)&or=(participant_uid.eq.${enc(uid)},participant_profile_id.eq.${enc(uid)})`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'cancelled',
+        is_primary: false
+      })
+    }
+  ).then((rows) => (Array.isArray(rows) ? rows : [])).catch((error) => ({
+    warning: error.message || String(error)
+  }));
 }
 
 async function insertLiveCoverage(event, profile) {
@@ -207,6 +246,29 @@ async function assignLiveCoverage(eventId, loanOfficerUid) {
   return { event, loan_officer: profile, ended, assigned, field_assignment };
 }
 
+async function removeLoanOfficerProfile(loanOfficerUid) {
+  const profile = await loadLoanOfficerProfile(loanOfficerUid);
+  const now = new Date().toISOString();
+  const ended = await endLiveCoverageForLoanOfficer(profile.uid, now);
+  const field_assignments = await cancelFieldAssignmentsForLoanOfficer(profile.uid);
+
+  const rows = await supabaseRest(`verified_profiles?uid=eq.${enc(profile.uid)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      is_active: false,
+      updated_at: now
+    })
+  });
+
+  return {
+    loan_officer_before: profile,
+    loan_officer: Array.isArray(rows) ? rows[0] || null : null,
+    ended,
+    field_assignments
+  };
+}
+
 function recentWindowStart() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 }
@@ -289,6 +351,16 @@ module.exports = async function handler(req, res) {
 
     if (action === 'auto_assign') {
       const result = await autoAssignLiveCoverage();
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'remove_profile') {
+      if (!body.loan_officer_uid) {
+        sendJson(res, 400, { ok: false, error: 'Missing loan_officer_uid.' });
+        return;
+      }
+      const result = await removeLoanOfficerProfile(body.loan_officer_uid);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

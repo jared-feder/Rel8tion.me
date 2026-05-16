@@ -1831,7 +1831,7 @@
     }
 
     async function updateLoanOfficerAssignment(action, body = {}) {
-      const actionKey = body.event_id ? `${action}:${body.event_id}` : action;
+      const actionKey = body.event_id ? `${action}:${body.event_id}` : body.loan_officer_uid ? `${action}:${body.loan_officer_uid}` : action;
       state.actionKey = actionKey;
       render();
       try {
@@ -1842,6 +1842,8 @@
         state.actionKey = '';
         showToast(action === 'auto_assign'
           ? `Auto assigned ${result.assignments?.length || 0} open houses.`
+          : action === 'remove_profile'
+            ? 'Loan officer removed from active use.'
           : action === 'end'
             ? 'Loan officer coverage ended.'
             : 'Loan officer assigned live.'
@@ -1872,13 +1874,22 @@
 
     function endLoanOfficer(eventId) {
       const event = (state.command?.events || []).find((item) => item.id === eventId);
-      if (!window.confirm(`End live loan officer coverage for ${eventAddress(event)}?`)) return;
+      if (!window.confirm(`Remove live loan officer coverage from ${eventAddress(event)}?`)) return;
       updateLoanOfficerAssignment('end', { event_id: eventId });
     }
 
     function autoAssignLoanOfficers() {
       if (!window.confirm('Auto assign active loan officers to active open houses without live coverage?')) return;
       updateLoanOfficerAssignment('auto_assign');
+    }
+
+    function removeLoanOfficerProfile(loanOfficerUid) {
+      const profile = (state.command?.loan_officers || []).find((item) => item.uid === loanOfficerUid);
+      const label = loanOfficerLabel(profile) || loanOfficerUid;
+      if (!window.confirm(`Remove ${label} from active loan officer use?\n\nThis will deactivate their verified profile, end any live LO coverage, and cancel current field-demo LO assignments. Historical records stay intact.`)) return;
+      updateLoanOfficerAssignment('remove_profile', {
+        loan_officer_uid: loanOfficerUid
+      });
     }
 
     async function runOutreachAction(key, action, body = {}, message = 'Updated.') {
@@ -2426,6 +2437,9 @@
       document.querySelectorAll('[data-end-lo]').forEach((button) => {
         button.addEventListener('click', () => endLoanOfficer(button.dataset.endLo));
       });
+      document.querySelectorAll('[data-remove-lo-profile]').forEach((button) => {
+        button.addEventListener('click', () => removeLoanOfficerProfile(button.dataset.removeLoProfile));
+      });
       document.querySelectorAll('[data-end-event]').forEach((button) => {
         button.addEventListener('click', () => endEvent(button.dataset.endEvent));
       });
@@ -2838,7 +2852,9 @@
             <div>${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>LO view</span></a>` : badge(row.coverage_mode || 'coverage', 'info')}</div>
           `;
         })}
-        ${renderRows('Loan officers', `${profiles.length} verified profiles`, profiles.slice(0, 80), (row) => `
+        ${renderRows('Loan officers', `${activeProfiles.length} active verified profiles${profiles.length > activeProfiles.length ? `, ${profiles.length - activeProfiles.length} removed` : ''}`, activeProfiles.slice(0, 80), (row) => {
+          const removeKey = `remove_profile:${row.uid}`;
+          return `
           <div>
             <div class="primary">${esc(row.full_name || row.slug || 'Unknown LO')}</div>
             <div class="secondary">${esc([row.company_name, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
@@ -2846,8 +2862,13 @@
           <div>${badge(row.is_active ? 'active' : 'inactive', row.is_active ? 'ok' : 'bad')}</div>
           <div>${badge(row.industry || 'profile', 'info')}</div>
           <div>${badge(row.calendar_url ? 'calendar' : 'no calendar', row.calendar_url ? 'ok' : 'warn')}</div>
-          <div><a class="btn soft" href="/lo-field-dashboard?uid=${esc(row.uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open dashboard</span></a></div>
-        `)}
+          <div class="row-actions">
+            <a class="btn soft" href="/lo-field-dashboard?uid=${esc(row.uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open dashboard</span></a>
+            <button class="btn bad" data-remove-lo-profile="${esc(row.uid)}" ${state.actionKey === removeKey ? 'disabled' : ''}>
+              <i data-lucide="user-x"></i><span>${state.actionKey === removeKey ? 'Removing...' : 'Remove'}</span>
+            </button>
+          </div>
+        `})}
         ${renderRows('LO coverage', `${sessions.length} recent sessions`, sessions.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.loan_officer_name || row.loan_officer_slug || 'Coverage session')}</div>
@@ -2888,7 +2909,7 @@
               <i data-lucide="user-check"></i><span>${assigning ? 'Assigning...' : live ? 'Reassign' : 'Assign live'}</span>
             </button>
             <button class="btn bad" data-end-lo="${esc(event.id)}" ${live && !assigning && !ending ? '' : 'disabled'}>
-              <i data-lucide="circle-x"></i><span>${ending ? 'Ending...' : 'End'}</span>
+              <i data-lucide="circle-x"></i><span>${ending ? 'Removing...' : 'Remove LO'}</span>
             </button>
             <button class="btn bad" data-end-event="${esc(event.id)}" ${state.actionKey === `end_event:${event.id}` ? 'disabled' : ''}>
               <i data-lucide="octagon-x"></i><span>${state.actionKey === `end_event:${event.id}` ? 'Ending...' : 'End event'}</span>
