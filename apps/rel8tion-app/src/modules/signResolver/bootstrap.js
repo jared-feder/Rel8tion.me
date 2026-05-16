@@ -151,7 +151,7 @@ function isEventPassMode() {
 function activationUrlForCode(code, options = {}) {
   const params = new URLSearchParams();
   params.set('code', code || getCodeFromUrl());
-  if (isEventPassMode() || options.source === 'event_pass') params.set('source', 'event_pass');
+  if (options.source === 'event_pass') params.set('source', 'event_pass');
   if (options.freshQr) params.set('fresh_qr', '1');
   return `/sign-demo-activate?${params.toString()}`;
 }
