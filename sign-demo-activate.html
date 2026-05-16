@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rel8tion Smart Sign Activation</title>
-  <meta http-equiv="refresh" content="0; url=/apps/rel8tion-app/sign-demo-activate.html">
+  <meta http-equiv="refresh" content="0; url=/apps/rel8tion-app/sign-demo-activate.html?v=event-pass-uid-fix">
   <script>
-    window.location.replace(`/apps/rel8tion-app/sign-demo-activate.html${window.location.search}${window.location.hash}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set('v', 'event-pass-uid-fix');
+    const query = params.toString() ? `?${params.toString()}` : '';
+    window.location.replace(`/apps/rel8tion-app/sign-demo-activate.html${query}${window.location.hash}`);
   </script>
 </head>
 <body>
