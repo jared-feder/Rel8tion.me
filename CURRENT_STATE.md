@@ -31,7 +31,8 @@ Status labels:
 - `[IMPLEMENTED]` `/onboarding` shows Rel8tionChip keychain slots and can arm an "Add Backup Keychain" flow. The next scanned keychain is linked to the same agent through `/k` using `keys.device_role = keychain` and `keys.assigned_slot` slot 1/2. The flow stores both local browser state and a short-lived `smart_sign_activation_sessions` backup-keychain session so iPhone/new-tab NFC handoff can still complete the link.
 - `[IMPLEMENTED]` `/onboarding` prompts agents with exactly one keychain to choose whether they have a second keychain before smart sign activation. Choosing yes arms the next scan as the backup keychain; choosing no continues to smart sign activation.
 - `[IMPLEMENTED]` Smart sign activation exists at `/sign-demo-activate`.
-- `[IMPLEMENTED]` Activation uses sign QR/public code lookup through `smart_sign_inventory`.
+- `[IMPLEMENTED]` Activation uses sign QR/public code lookup through `smart_sign_inventory`. Printed QR generation now treats `public.smart_sign_inventory.public_code` as the only source of truth; `smart_signs.public_code` must not be used for new QR exports.
+- `[PARTIAL]` `smart_sign_inventory.inventory_type` is represented by repo migration `sql/migrations/20260516_smart_sign_inventory_inventory_type.sql` with allowed values `smart_sign` and `event_pass`. Existing/current smart sign inventory rows may keep `qr_url` values using `/s.html?code=...` or `/s?code=...`; new event pass rows must use `/pass?code=...`.
 - `[PARTIAL]` Multiple printed QR/public-code inventory rows can still resolve to the same canonical sign when `smart_sign_inventory.smart_sign_id` points at the same `smart_signs.id`, but the activation success screen no longer treats the old second printed QR as the add-on path. The supported add-on path is an extra physical front/buyer NFC chip linked through `smart_sign_chip_aliases`; the migration is present in the repo and live Supabase application remains `[NEEDS VERIFICATION]`.
 - `[IMPLEMENTED]` Activation supports camera QR scan, camera photo fallback, and manual code entry.
 - `[IMPLEMENTED]` Activation supports front chip and rear chip pairing.
@@ -43,7 +44,7 @@ Status labels:
 - `[IMPLEMENTED]` Binding has loose nearby/listing search behavior and a manual listing fallback.
 - `[IMPLEMENTED]` When a keychain claim flow stores a selected open house in the host session, smart sign activation offers that selected listing first before other nearby/search/manual options.
 - `[IMPLEMENTED]` Smart sign activation now loads the agent profile and displays the agent name/brokerage instead of relying on raw slugs in the visible activation flow.
-- `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`.
+- `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`; `/pass` is an alias to the same resolver for Event Pass printed QR URLs.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event` first visible screen is buyer-first: a formatted "Welcome to" property-address header, property image when available, hosted-by agent photo/name/brokerage, then small top check-in path buttons and immediate name/phone/pre-approval inputs. Email is optional. Host contact/save-contact actions are intentionally shown after successful check-in.
@@ -115,7 +116,7 @@ Status labels:
 - `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
 - `[PARTIAL]` REL8TION COMMAND exists as the protected admin dashboard and can assign live LO coverage to active open house events, end active sign events, detach a smart sign to make it fresh again, view leads, confirm true outreach open houses into field visits/reports, accept interested outreach into field visits, assign a loan officer participant, generate confirmed open house PDF-style reports, and schedule a follow-up drip. The deeper action layer for broader sign inventory edits, CRM updates, LO calendar/availability modification, billing automation, and full project controls is not complete.
 - `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
-- `[RISK]` QR export needs cleanup: current activation expects `smart_sign_inventory.public_code`, while `smart-sign-qr-export.sql` exports from `smart_signs`.
+- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now exports only from `public.smart_sign_inventory`, includes separate unprinted Event Pass, unprinted Smart Sign, and all-unprinted inventory exports, and includes optional Event Pass insert/qr_url-fix/mark-printed blocks.
 - `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
 
 ## Changed Recently
@@ -278,4 +279,4 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `send-lead-sms` source is present. | `[IMPLEMENTED]` | Source now exists at `supabase/functions/send-lead-sms/index.ts`; live deployment/source matching and Twilio behavior still need verification because the verifier does not send SMS. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
 | Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
-| QR inventory/export process is unified. | `[RISK]` | Activation uses `smart_sign_inventory`, but export SQL uses `smart_signs`. |
+| QR inventory/export process is unified. | `[IMPLEMENTED]` | `smart-sign-qr-export.sql` exports from `public.smart_sign_inventory` only. `inventory_type` is constrained to `smart_sign` or `event_pass`; smart sign rows may keep `/s.html` or `/s` URLs, and event pass rows print `/pass` URLs. |

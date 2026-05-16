@@ -9,6 +9,8 @@
     { "source": "/key-reset", "destination": "/key-reset.html" },
     { "source": "/s", "destination": "/sign.html" },
     { "source": "/sign", "destination": "/sign.html" },
+    { "source": "/pass", "destination": "/sign.html" },
+    { "source": "/pass.html", "destination": "/sign.html" },
     { "source": "/event", "destination": "/event.html" },
     { "source": "/agent-dashboard", "destination": "/agent-dashboard.html" },
     { "source": "/field-dashboard", "destination": "/field-dashboard.html" },

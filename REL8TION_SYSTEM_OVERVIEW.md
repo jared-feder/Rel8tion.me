@@ -54,7 +54,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/sign-demo-activate` to `apps/rel8tion-app/sign-demo-activate.html`
 - `/k` to `apps/rel8tion-app/k.html`
 - `/key-reset` to `apps/rel8tion-app/key-reset.html`
-- `/s` and `/sign` to `apps/rel8tion-app/sign.html`
+- `/s`, `/sign`, and `/pass` to `apps/rel8tion-app/sign.html`
 - `/event` to `apps/rel8tion-app/event.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
@@ -254,6 +254,8 @@ QR handling:
 - Accepts manual code entry.
 - Extracts public code from raw code or URL.
 - Resolves `smart_sign_inventory.public_code` first. If an inventory row already points to `smart_sign_id`, the activation flow uses that canonical sign row.
+- Printed QR generation uses `public.smart_sign_inventory.public_code` only. `smart_signs.public_code` must not be used to create new printable QR codes.
+- `smart_sign_inventory.inventory_type` has only `smart_sign` and `event_pass`. Smart sign rows may retain `/s.html?code=...` or `/s?code=...` `qr_url` values; Event Pass rows must print as `/pass?code=...`.
 - After a sign is activated, the success screen can link an extra physical front/buyer NFC chip to the same `smart_sign_id` through `smart_sign_chip_aliases`. This is for another NFC chip only; it is not a second QR-code setup path and does not replace the rear agent dashboard chip.
 
 Listing binding:
@@ -268,7 +270,7 @@ Current field names:
 - Event host field is `host_agent_slug`.
 - Older references to `agent_slug` on `open_house_events` are wrong for the current schema.
 
-### `/s` And `/sign`
+### `/s`, `/sign`, And `/pass`
 
 Files:
 
@@ -276,12 +278,13 @@ Files:
 - `apps/rel8tion-app/src/modules/signResolver/bootstrap.js`
 - `apps/rel8tion-app/src/modules/signResolver/*`
 
-Role: public smart sign resolver.
+Role: public smart sign resolver. `/pass` is an Event Pass URL alias that uses the same resolver behavior while allowing Event Pass print batches to use a distinct public URL.
 
 `[IMPLEMENTED]` Confirmed repo behavior:
 
 - Reads `code` from URL.
 - Resolves smart sign by `smart_signs.public_code`, then falls back to `smart_sign_inventory.public_code -> smart_sign_id` so an inventory/public-code alias can open the same canonical sign.
+- New QR print exports do not use `smart_signs.public_code`; printable URLs come from `smart_sign_inventory.public_code`.
 - If no sign exists, routes to `/sign-demo-activate.html?code=<code>&fresh_qr=1`.
 - If sign has an active event, redirects to `/event?event=<eventId>`.
 - If sign exists but has no active event, renders "Sign Found" and activation options.
@@ -645,6 +648,7 @@ Expected dedupe:
 Used for:
 
 - printed sign QR/public code inventory
+- event pass QR/public code inventory
 - public code resolution before sign row exists
 - optional link to `smart_signs.id`
 - legacy public-code aliasing when more than one printed inventory row points to the same `smart_sign_id`
@@ -654,8 +658,20 @@ Important fields:
 
 - `id`
 - `public_code`
+- `inventory_type`
+- `qr_url`
+- `is_printed`
 - `smart_sign_id`
 - `claimed_at`
+- `notes`
+
+Rules:
+
+- `public.smart_sign_inventory.public_code` is the only QR print source of truth.
+- `inventory_type` only allows `smart_sign` and `event_pass`.
+- Smart sign rows may keep existing `/s.html?code=...` or `/s?code=...` `qr_url` values.
+- Event Pass rows must use `/pass?code=...` URLs.
+- `smart_signs.public_code` must not be used for new QR generation.
 
 ### `smart_signs`
 
@@ -687,6 +703,10 @@ Important fields:
 - `status`
 - `setup_confirmed_at`
 - `deactivated_at`
+
+QR printing note:
+
+- `smart_signs.public_code` is not a print source. New printed QR exports must use `smart_sign_inventory.public_code`.
 
 Expected relationships:
 
@@ -1211,7 +1231,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
 - `[RISK]` NYS disclosure handling is implemented as a configurable REL8TION-hosted Supabase Storage PDF link plus stored acknowledgement metadata. The official DOS form page remains the source-of-truth reference, and final legal/form-version review remains `[NEEDS VERIFICATION]`.
-- `[RISK]` `smart-sign-qr-export.sql` and the current activation flow disagree on whether QR source should be `smart_signs` or `smart_sign_inventory`.
+- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now uses `public.smart_sign_inventory` only. Event Pass rows print `/pass?code=...`; Smart Sign rows may retain existing `/s.html` or `/s` URLs.
 
 ## [INTENDED] Top Priority Next Task
 
@@ -1285,4 +1305,4 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Supabase RPC definitions are present in repo SQL. | `[NEEDS VERIFICATION]` | RPCs are called but definitions were not found in checked-in SQL. |
 | Live production schema/RLS exactly matches repo assumptions. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
 | `event_loan_officer_sessions` RLS is production-safe. | `[RISK]` | SQL grants anon/auth access; RLS enablement was not found in that SQL file. |
-| QR source is unified between printed inventory and sign rows. | `[RISK]` | Activation uses `smart_sign_inventory`; `smart-sign-qr-export.sql` exports from `smart_signs`. |
+| QR source is unified for printing. | `[IMPLEMENTED]` | Printable QR exports use `public.smart_sign_inventory.public_code` only. `inventory_type` allows only `smart_sign` and `event_pass`; event passes print through `/pass`, and `smart_signs.public_code` is not used for new QR generation. |
