@@ -128,6 +128,7 @@ Status labels:
 Recent repo state includes:
 
 - `[IMPLEMENTED]` Event Pass backing sign creation now satisfies the current live `smart_signs.uid_primary` not-null constraint by storing the Event Pass NFC UID as the compatibility primary UID with `primary_device_type = event_pass_keychain`. `/k` recognizes that role so active Event Pass NFC taps keep opening the host/dashboard path instead of the public buyer sign route.
+- `[IMPLEMENTED]` Active Event Pass NFC taps now clear stale sign-demo setup state and route directly to `/agent-dashboard` for the linked active event. The activation page also detects when a stale QR/session tries to reuse an NFC UID that already belongs to an active Event Pass and redirects to that existing dashboard instead of attempting a duplicate `smart_signs` insert.
 - `[IMPLEMENTED]` `/pass` now runs as a real Event Pass resolver: it reads `smart_sign_inventory.public_code`, preserves smart-sign behavior for smart-sign rows, routes fresh Event Pass inventory into QR-first/Event-Pass-NFC setup, redirects linked/live passes to `/event`, and shows branded invalid/inactive Event Pass states. Event Pass setup is strictly event binding and dashboard access, not an agent profile route.
 - `[IMPLEMENTED]` Production now deploys from `main`; the `/event` cloud/modal fix was verified live after commit `c8789ae`.
 - `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.

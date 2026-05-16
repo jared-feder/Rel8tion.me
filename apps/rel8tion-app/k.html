@@ -777,6 +777,19 @@
           setStatus('Agent Side Found', 'Tap your Rel8tionChip keychain to verify and open the live event dashboard.');
           return;
         }
+        if (role === 'keychain') {
+          window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+          saveHostSession({ agentSlug: activeSign.owner_agent_slug || '', uid, source: 'event-pass-keychain-dashboard' });
+          setStatus('Event Pass Dashboard', 'Opening the dashboard for this Event Pass event.');
+          goToAgentDashboard({
+            agentSlug: activeSign.owner_agent_slug || '',
+            eventId: activeSign.active_event_id || '',
+            signId: activeSign.id || '',
+            publicCode: activeSign.public_code || ''
+          });
+          return;
+        }
         if (role === 'front_buyer') {
           setStatus('Opening Sign', 'Loading the live buyer check-in route.');
           goToLiveSign(activeSign.public_code);
