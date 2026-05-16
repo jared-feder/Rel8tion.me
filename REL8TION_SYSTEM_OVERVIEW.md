@@ -54,7 +54,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/sign-demo-activate` to `apps/rel8tion-app/sign-demo-activate.html`
 - `/k` to `apps/rel8tion-app/k.html`
 - `/key-reset` to `apps/rel8tion-app/key-reset.html`
-- `/s`, `/sign`, and `/pass` to `apps/rel8tion-app/sign.html`
+- `/s` and `/sign` to `apps/rel8tion-app/sign.html`; `/pass` to `apps/rel8tion-app/pass.html`, which reuses the same resolver module
 - `/event` to `apps/rel8tion-app/event.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
@@ -275,6 +275,7 @@ Current field names:
 Files:
 
 - `apps/rel8tion-app/sign.html`
+- `apps/rel8tion-app/pass.html`
 - `apps/rel8tion-app/src/modules/signResolver/bootstrap.js`
 - `apps/rel8tion-app/src/modules/signResolver/*`
 
