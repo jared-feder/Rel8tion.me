@@ -302,6 +302,12 @@
       return Array.isArray(rows) ? rows[0] || null : null;
     }
 
+    async function findRecentEventBySignId(signId) {
+      if (!signId) return null;
+      const rows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(signId)}&select=id,status,ended_at,created_at&order=created_at.desc&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
+    }
+
     function isPendingEventPassActivation(pending) {
       return pending?.publicCode && pending?.source === 'event_pass' && pending.stage === 'waiting_for_agent_keychain';
     }
@@ -1065,6 +1071,12 @@
 
           const eventPassSign = await findEventPassSignByActivationUid(uid);
           if (eventPassSign?.public_code) {
+            const priorEvent = await findRecentEventBySignId(eventPassSign.id);
+            if (priorEvent?.id) {
+              window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+              setStatus('Event Pass Used', 'This one-event pass has already been used. Contact the sponsoring loan officer to renew it for another open house.');
+              return;
+            }
             setStatus('Event Pass Ready', 'Opening setup for the next open house.');
             continueSignActivation({
               uid,
