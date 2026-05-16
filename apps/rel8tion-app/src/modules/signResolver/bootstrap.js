@@ -5,14 +5,16 @@ import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../
 import {
   assignSmartSignToAgent,
   getActiveSmartSignEvent,
-  getSmartSignByPublicCode,
   getSmartSignsByAssignedAgent,
+  resolveSmartSignPublicCode,
   updateSmartSign
-} from '../../api/smartSigns.js?v=20260426-1455';
+} from '../../api/smartSigns.js?v=20260516-event-pass-runtime';
 import { authHeaders, esc, money } from '../../core/utils.js';
 
 const pageState = {
+  mode: 'smart_sign',
   sign: null,
+  inventory: null,
   hostSession: null,
   nearbyHouses: [],
   activating: false,
@@ -131,6 +133,27 @@ function mergeOpenHouses(lat, lng, ...groups) {
 
 function getCodeFromUrl() {
   return new URLSearchParams(window.location.search).get('code') || '';
+}
+
+function getResolverMode() {
+  const params = new URLSearchParams(window.location.search);
+  const path = window.location.pathname.toLowerCase();
+  if (path.endsWith('/pass') || path.endsWith('/pass.html') || params.get('source') === 'event_pass') {
+    return 'event_pass';
+  }
+  return 'smart_sign';
+}
+
+function isEventPassMode() {
+  return pageState.mode === 'event_pass';
+}
+
+function activationUrlForCode(code, options = {}) {
+  const params = new URLSearchParams();
+  params.set('code', code || getCodeFromUrl());
+  if (isEventPassMode() || options.source === 'event_pass') params.set('source', 'event_pass');
+  if (options.freshQr) params.set('fresh_qr', '1');
+  return `/sign-demo-activate?${params.toString()}`;
 }
 
 function firstPresent(...values) {
@@ -252,20 +275,36 @@ function shell(content) {
 }
 
 function loading(message) {
+  const label = isEventPassMode() ? 'Event Pass' : 'Smart Sign';
+  const title = isEventPassMode() ? 'Opening Event Pass' : 'Opening Live Event';
   shell(`
-    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Smart Sign</div>
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">${label}</div>
     <div class="mx-auto mb-6 h-14 w-14 rounded-full border-[6px] border-slate-200 border-t-sky-500 animate-spin"></div>
-    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Opening Live Event</h1>
+    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">${title}</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto">${esc(message)}</p>
   `);
 }
 
 function errorView(title, message) {
+  const label = isEventPassMode() ? 'Event Pass' : 'Smart Sign';
   shell(`
-    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Smart Sign</div>
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">${label}</div>
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">${esc(title)}</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-8">${esc(message)}</p>
     <a href="/" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Go Home</a>
+  `);
+}
+
+function invalidEventPassView() {
+  shell(`
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Event Pass</div>
+    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Invalid Event Pass</h1>
+    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Event Pass code was not found. Please check the QR code or contact Rel8tion support.</p>
+    <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.</p>
+    <div class="flex flex-col md:flex-row gap-3 justify-center">
+      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Contact Rel8tion</a>
+      <a href="/" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Go Home</a>
+    </div>
   `);
 }
 
@@ -393,6 +432,31 @@ function inactiveView(sign) {
   `);
 
   attachInactiveHandlers(sign);
+}
+
+function eventPassInactiveView(sign, inventory) {
+  const code = inventory?.public_code || sign?.inventory_public_code || sign?.public_code || getCodeFromUrl();
+  const setupUrl = activationUrlForCode(code, {
+    source: 'event_pass',
+    freshQr: !inventory?.smart_sign_id
+  });
+
+  shell(`
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Event Pass</div>
+    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Event Pass Ready</h1>
+    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Rel8tion Event Pass is ready to be activated for a live open house. If you are the host agent, tap your Rel8tionChip or continue setup to connect this pass to today's event.</p>
+    <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.</p>
+    <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
+      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
+      <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
+      <div class="text-slate-600 font-semibold">Status: ${esc(sign?.status || 'inactive')}</div>
+    </div>
+    <div class="flex flex-col md:flex-row gap-3 justify-center">
+      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Event Pass</a>
+      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">I'm the Host Agent</a>
+      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
+    </div>
+  `);
 }
 
 function activeView(sign, eventRow, house) {
@@ -573,48 +637,113 @@ async function activateSignToHouse(sign, house) {
   }
 }
 
+async function loadSmartSignExperience(code, resolution) {
+  const sign = resolution?.sign || null;
+  pageState.inventory = resolution?.inventory || null;
+
+  if (!sign) {
+    window.location.replace(activationUrlForCode(code, { freshQr: true }));
+    return;
+  }
+  pageState.sign = sign;
+
+  let eventRow = null;
+  if (sign.active_event_id) {
+    loading('Loading active event...');
+    eventRow = await getEventById(sign.active_event_id);
+  }
+  if (!eventRow && sign.id) {
+    loading('Checking for a current live event...');
+    eventRow = await getActiveSmartSignEvent(sign.id);
+  }
+
+  if (!eventRow) {
+    inactiveView(sign);
+    return;
+  }
+
+  const house = eventRow.open_house_source_id
+    ? await getOpenHouseById(eventRow.open_house_source_id)
+    : null;
+
+  activeView(sign, eventRow, house);
+}
+
+async function loadEventPassExperience(code) {
+  const resolution = await resolveSmartSignPublicCode(code, {
+    allowSignPublicCodeFallback: false
+  });
+  const inventory = resolution.inventory || null;
+  pageState.inventory = inventory;
+
+  if (!inventory) {
+    invalidEventPassView();
+    return;
+  }
+
+  if (inventory.inventory_type !== 'event_pass') {
+    const smartSignResolution = resolution.sign
+      ? resolution
+      : await resolveSmartSignPublicCode(code, { allowSignPublicCodeFallback: true });
+    await loadSmartSignExperience(code, smartSignResolution);
+    return;
+  }
+
+  if (!inventory.smart_sign_id || !resolution.sign) {
+    window.location.replace(activationUrlForCode(inventory.public_code || code, {
+      source: 'event_pass',
+      freshQr: true
+    }));
+    return;
+  }
+
+  const sign = resolution.sign;
+  pageState.sign = sign;
+
+  if (sign.active_event_id) {
+    window.location.replace(`${ROUTES.event}?event=${encodeURIComponent(sign.active_event_id)}`);
+    return;
+  }
+
+  loading('Checking for a current live event...');
+  const eventRow = sign.id ? await getActiveSmartSignEvent(sign.id) : null;
+  if (eventRow?.id) {
+    window.location.replace(`${ROUTES.event}?event=${encodeURIComponent(eventRow.id)}`);
+    return;
+  }
+
+  eventPassInactiveView(sign, inventory);
+}
+
 export async function initSignResolverPage() {
+  pageState.mode = getResolverMode();
   const code = getCodeFromUrl();
   if (!code) {
+    if (isEventPassMode()) {
+      invalidEventPassView();
+      return;
+    }
     errorView('Missing Sign Code', 'This route needs ?code=YOUR_PUBLIC_CODE');
     return;
   }
 
-  if (continueSignActivationFromQr(code)) {
+  if (!isEventPassMode() && continueSignActivationFromQr(code)) {
     return;
   }
 
-  loading('Looking up sign identity...');
+  loading(isEventPassMode() ? 'Looking up Event Pass inventory...' : 'Looking up sign identity...');
 
   try {
     pageState.hostSession = await resolveHostSessionForCode(code);
-    const sign = await getSmartSignByPublicCode(code);
-    if (!sign) {
-      window.location.replace(`/sign-demo-activate.html?code=${encodeURIComponent(code)}&fresh_qr=1`);
-      return;
-    }
-    pageState.sign = sign;
-
-    let eventRow = null;
-    if (sign.active_event_id) {
-      loading('Loading active event...');
-      eventRow = await getEventById(sign.active_event_id);
-    }
-    if (!eventRow && sign.id) {
-      loading('Checking for a current live event...');
-      eventRow = await getActiveSmartSignEvent(sign.id);
-    }
-
-    if (!eventRow) {
-      inactiveView(sign);
+    if (isEventPassMode()) {
+      await loadEventPassExperience(code);
       return;
     }
 
-    const house = eventRow.open_house_source_id
-      ? await getOpenHouseById(eventRow.open_house_source_id)
-      : null;
-
-    activeView(sign, eventRow, house);
+    const resolution = await resolveSmartSignPublicCode(code, {
+      allowSignPublicCodeFallback: true
+    });
+    await loadSmartSignExperience(code, resolution);
   } catch (error) {
     console.error(error);
     errorView('Resolve Failed', error.message || 'Something went wrong while loading this sign.');

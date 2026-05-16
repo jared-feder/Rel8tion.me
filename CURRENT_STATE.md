@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-15.
+Last inspected: 2026-05-16.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -44,7 +44,9 @@ Status labels:
 - `[IMPLEMENTED]` Binding has loose nearby/listing search behavior and a manual listing fallback.
 - `[IMPLEMENTED]` When a keychain claim flow stores a selected open house in the host session, smart sign activation offers that selected listing first before other nearby/search/manual options.
 - `[IMPLEMENTED]` Smart sign activation now loads the agent profile and displays the agent name/brokerage instead of relying on raw slugs in the visible activation flow.
-- `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`; `/pass` is an alias to the same resolver for Event Pass printed QR URLs.
+- `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`. `/pass` is now the Event Pass resolver route for printed Event Pass QR URLs and reuses the same resolver module with Event Pass-aware behavior.
+- `[IMPLEMENTED]` `/pass?code=PUBLIC_CODE` looks up `smart_sign_inventory.public_code` first. Missing inventory shows a branded invalid Event Pass state; `inventory_type = event_pass` with no `smart_sign_id` routes to `/sign-demo-activate?code=PUBLIC_CODE&source=event_pass&fresh_qr=1`; linked event passes redirect to `/event?event=...` when the linked sign has a live event and otherwise show an Event Pass Ready setup state.
+- `[INTENDED]` Event Pass is a B2B open-house technology/pass/verified-profile availability product sponsored by a loan officer, not buyer lead selling or referral purchasing. Rel8tion is not a lender, mortgage broker, or pre-approval provider, and buyer financing help is only routed when a buyer explicitly requests it.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event` first visible screen is buyer-first: a formatted "Welcome to" property-address header, property image when available, hosted-by agent photo/name/brokerage, then small top check-in path buttons and immediate name/phone/pre-approval inputs. Email is optional. Host contact/save-contact actions are intentionally shown after successful check-in.
@@ -123,6 +125,7 @@ Status labels:
 
 Recent repo state includes:
 
+- `[IMPLEMENTED]` `/pass` now runs as a real Event Pass resolver: it reads `smart_sign_inventory.public_code`, preserves smart-sign behavior for smart-sign rows, routes fresh Event Pass inventory into setup, redirects linked/live passes to `/event`, and shows branded invalid/inactive Event Pass states.
 - `[IMPLEMENTED]` Production now deploys from `main`; the `/event` cloud/modal fix was verified live after commit `c8789ae`.
 - `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.
 - `[IMPLEMENTED]` The older production deploy from `modular-claim-test` commit `51d2d1a` remains tagged as `production-51d2d1a-2026-05-08`.
@@ -279,4 +282,4 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | `send-lead-sms` source is present. | `[IMPLEMENTED]` | Source now exists at `supabase/functions/send-lead-sms/index.ts`; live deployment/source matching and Twilio behavior still need verification because the verifier does not send SMS. |
 | Outreach source under `docs/supabase-functions` is deployed. | `[NEEDS VERIFICATION]` | Files are under docs, not deployable `supabase/functions`. |
 | Live RLS/schema matches direct browser writes. | `[NEEDS VERIFICATION]` | Latest anon run confirms core table/column exposure through anon PostgREST; live RLS/write behavior and service-role checks were not verified. |
-| QR inventory/export process is unified. | `[IMPLEMENTED]` | `smart-sign-qr-export.sql` exports from `public.smart_sign_inventory` only. `inventory_type` is constrained to `smart_sign` or `event_pass`; smart sign rows may keep `/s.html` or `/s` URLs, and event pass rows print `/pass` URLs. |
+| QR inventory/export process is unified. | `[IMPLEMENTED]` | `smart-sign-qr-export.sql` exports from `public.smart_sign_inventory` only. `inventory_type` is constrained to `smart_sign` or `event_pass`; smart sign rows may keep `/s.html` or `/s` URLs, and event pass rows print and resolve through `/pass` URLs. |

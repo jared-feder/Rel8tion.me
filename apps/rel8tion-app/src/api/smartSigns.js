@@ -2,33 +2,91 @@ import { KEY, SUPABASE_URL } from '../core/config.js';
 import { authHeaders, jsonHeaders } from '../core/utils.js';
 import { fetchJson } from './http.js';
 
-export async function getSmartSignByPublicCode(publicCode) {
+const SMART_SIGN_INVENTORY_SELECT = [
+  'id',
+  'public_code',
+  'inventory_type',
+  'qr_url',
+  'is_printed',
+  'claimed_at',
+  'smart_sign_id',
+  'notes',
+  'created_at'
+].join(',');
+
+function normalizeInventoryType(value) {
+  return value === 'event_pass' ? 'event_pass' : 'smart_sign';
+}
+
+function withInventoryAlias(sign, inventory, publicCode) {
+  if (!sign) return null;
+  if (!inventory) return sign;
+  return {
+    ...sign,
+    inventory_id: inventory.id,
+    inventory_public_code: inventory.public_code,
+    inventory_type: normalizeInventoryType(inventory.inventory_type),
+    public_code_alias: publicCode
+  };
+}
+
+export async function getSmartSignInventoryByPublicCode(publicCode) {
   if (!publicCode) return null;
   const rows = await fetchJson(
-    `${SUPABASE_URL}/rest/v1/smart_signs?public_code=eq.${encodeURIComponent(publicCode)}&select=*`,
+    `${SUPABASE_URL}/rest/v1/smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}&select=${SMART_SIGN_INVENTORY_SELECT}&limit=1`,
     { headers: authHeaders(KEY) }
   );
-  if (Array.isArray(rows) && rows.length) return rows[0];
-
-  const inventoryRows = await fetchJson(
-    `${SUPABASE_URL}/rest/v1/smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}&select=id,public_code,smart_sign_id&limit=1`,
-    { headers: authHeaders(KEY) }
-  ).catch(() => []);
-  const inventory = Array.isArray(inventoryRows) ? inventoryRows[0] : null;
-  if (!inventory?.smart_sign_id) return null;
-
-  const signRows = await fetchJson(
-    `${SUPABASE_URL}/rest/v1/smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=*&limit=1`,
-    { headers: authHeaders(KEY) }
-  );
-  const sign = Array.isArray(signRows) && signRows.length ? signRows[0] : null;
-  return sign
+  const inventory = Array.isArray(rows) && rows.length ? rows[0] : null;
+  return inventory
     ? {
-        ...sign,
-        inventory_public_code: inventory.public_code,
-        public_code_alias: publicCode
+        ...inventory,
+        inventory_type: normalizeInventoryType(inventory.inventory_type)
       }
     : null;
+}
+
+export async function getSmartSignById(signId) {
+  if (!signId) return null;
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_signs?id=eq.${encodeURIComponent(signId)}&select=*&limit=1`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+async function getSmartSignByLegacyPublicCode(publicCode) {
+  if (!publicCode) return null;
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_signs?public_code=eq.${encodeURIComponent(publicCode)}&select=*&limit=1`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+export async function resolveSmartSignPublicCode(publicCode, options = {}) {
+  const { allowSignPublicCodeFallback = true } = options;
+  if (!publicCode) return { inventory: null, sign: null };
+
+  const inventory = await getSmartSignInventoryByPublicCode(publicCode).catch(() => null);
+  let sign = inventory?.smart_sign_id
+    ? await getSmartSignById(inventory.smart_sign_id).catch(() => null)
+    : null;
+
+  if (!sign && allowSignPublicCodeFallback) {
+    sign = await getSmartSignByLegacyPublicCode(publicCode).catch(() => null);
+  }
+
+  return {
+    inventory,
+    sign: withInventoryAlias(sign, inventory, publicCode)
+  };
+}
+
+export async function getSmartSignByPublicCode(publicCode) {
+  const result = await resolveSmartSignPublicCode(publicCode, {
+    allowSignPublicCodeFallback: true
+  });
+  return result.sign || null;
 }
 
 export async function getActiveSmartSignEvent(signId) {
