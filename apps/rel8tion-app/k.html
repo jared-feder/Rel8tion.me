@@ -266,10 +266,22 @@
       return raw ? JSON.parse(raw) : null;
     }
 
+    function isEventPassSign(sign) {
+      return /event_pass_keychain/i.test(`${sign?.activation_method || ''} ${sign?.primary_device_type || ''}`);
+    }
+
     async function findActiveAgentEvent(agentSlug) {
       if (!agentSlug) return null;
-      const rows = await request(`open_house_events?host_agent_slug=eq.${encodeURIComponent(agentSlug)}&ended_at=is.null&select=id,smart_sign_id,host_agent_slug,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
-      return Array.isArray(rows) ? rows[0] || null : null;
+      const rows = await request(`open_house_events?host_agent_slug=eq.${encodeURIComponent(agentSlug)}&ended_at=is.null&select=id,smart_sign_id,host_agent_slug,status,open_house_source_id,created_at&order=created_at.desc&limit=12`).catch(() => []);
+      if (!Array.isArray(rows) || !rows.length) return null;
+
+      const signIds = [...new Set(rows.map((row) => row.smart_sign_id).filter(Boolean))];
+      if (!signIds.length) return rows[0] || null;
+
+      const signRows = await request(`smart_signs?id=in.(${signIds.map((id) => encodeURIComponent(id)).join(',')})&select=id,public_code,activation_method,primary_device_type`).catch(() => []);
+      const signsById = new Map((Array.isArray(signRows) ? signRows : []).map((sign) => [sign.id, sign]));
+      const smartSignEvent = rows.find((row) => row.smart_sign_id && !isEventPassSign(signsById.get(row.smart_sign_id)));
+      return smartSignEvent || rows[0] || null;
     }
 
     async function loadInventoryByPublicCode(publicCode) {
