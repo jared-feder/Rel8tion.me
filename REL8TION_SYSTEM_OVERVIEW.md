@@ -304,6 +304,7 @@ Event Pass product positioning:
 
 - Event Pass is a B2B open-house technology/access product sponsored by a loan officer. It is strictly an event pass and not an agent profile product.
 - The physical Event Pass has both the printed QR and an NFC chip. The QR starts setup, the NFC chip claims the temporary Event Pass keychain identity, and future NFC taps open the dashboard for the active event created by that pass.
+- REL8TION COMMAND can reset Event Pass inventory after typing `REL8TION`: live linked events and LO coverage are ended, the backing sign is made inactive, and `smart_sign_inventory.smart_sign_id/claimed_at` are cleared so the printed QR can be reused. Reset does not delete the inventory row or change `smart_sign_inventory.public_code`.
 - Loan officers are not buying buyer leads or referrals.
 - Rel8tion is not a lender, mortgage broker, or pre-approval provider.
 - Buyer financing help is only routed when a buyer explicitly requests it.

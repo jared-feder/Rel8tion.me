@@ -2095,6 +2095,41 @@
       }
     }
 
+    async function resetEventPass(inventoryId) {
+      const pass = (state.command?.event_passes || []).find((row) => row.id === inventoryId) || null;
+      const code = pass?.public_code || inventoryId;
+      const current = pass?.active_event_id
+        ? `Current event: ${pass.active_event_id}${pass.active_event_host ? ` for ${pass.active_event_host}` : ''}`
+        : pass?.linked_sign_id
+          ? `Linked sign: ${pass.linked_sign_id}`
+          : 'Already fresh / no linked event';
+      const typed = window.prompt(
+        `Reset Event Pass ${code}?\n${current}\n\nThis will end any live open house event, end live LO coverage, clear the QR/event link, and make the printed Event Pass ready for the next demo. It will NOT delete the inventory row or change the public code.\n\nType REL8TION to continue.`
+      );
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Event Pass reset cancelled.');
+        return;
+      }
+
+      state.actionKey = `reset_event_pass:${inventoryId}`;
+      render();
+      try {
+        const result = await api('/api/admin/sign-action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'reset_event_pass', inventory_id: inventoryId, public_code: pass?.public_code || '', confirmation: typed.trim() })
+        });
+        state.actionKey = '';
+        const endedCount = Array.isArray(result.ended_events) ? result.ended_events.length : 0;
+        showToast(endedCount ? `Event Pass reset. Ended ${endedCount} event${endedCount === 1 ? '' : 's'}.` : 'Event Pass reset and ready to reuse.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to reset Event Pass.');
+        render();
+      }
+    }
+
     function signOut() {
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -2397,6 +2432,9 @@
       document.querySelectorAll('[data-detach-sign]').forEach((button) => {
         button.addEventListener('click', () => detachSign(button.dataset.detachSign));
       });
+      document.querySelectorAll('[data-reset-event-pass]').forEach((button) => {
+        button.addEventListener('click', () => resetEventPass(button.dataset.resetEventPass));
+      });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
       document.getElementById('reportWindow')?.addEventListener('change', (event) => {
         state.reportWindow = event.target.value;
@@ -2418,6 +2456,7 @@
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10 },
         { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8 },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8 },
+        { label: 'Event passes', value: o.event_passes || 0, icon: 'badge', tone: 'sky', meter: o.event_passes ? 68 : 7 },
         { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8 },
         { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6 },
         { label: 'Leads', value: o.leads || 0, icon: 'contact-round', tone: 'green', meter: o.leads ? 82 : 8 },
@@ -2704,10 +2743,39 @@
       `;
     }
 
+    function renderEventPassActions(row) {
+      const resetKey = `reset_event_pass:${row.id}`;
+      return `
+        <div class="row-actions">
+          ${row.qr_url ? `<a class="btn soft" href="${esc(row.qr_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open</span></a>` : ''}
+          <button class="btn bad" data-reset-event-pass="${esc(row.id)}" ${state.actionKey === resetKey ? 'disabled' : ''}>
+            <i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset pass'}</span>
+          </button>
+        </div>
+      `;
+    }
+
+    function eventPassTone(row) {
+      if (row.pass_state === 'live') return 'ok';
+      if (row.pass_state === 'linked') return 'warn';
+      return 'info';
+    }
+
     function renderSigns() {
       const signs = filterByQuery(state.command?.signs || []);
+      const eventPasses = filterByQuery(state.command?.event_passes || []);
       const events = filterByQuery(state.command?.events || []);
       return `
+        ${renderRows('Event passes', `${eventPasses.length} printed Event Pass QR/NFC keychains`, eventPasses.slice(0, 120), (row) => `
+          <div>
+            <div class="primary">${esc(row.public_code || row.id)}</div>
+            <div class="secondary">${esc(row.qr_url || `/pass?code=${row.public_code || ''}`)}</div>
+          </div>
+          <div>${badge(row.pass_state || 'fresh', eventPassTone(row))}</div>
+          <div>${badge(row.active_event_host || row.nfc_agent_slug || 'No host', row.active_event_host || row.nfc_agent_slug ? 'ok' : 'info')}</div>
+          <div>${badge(row.nfc_claimed ? 'NFC claimed' : 'No NFC claim', row.nfc_claimed ? 'ok' : 'warn')}</div>
+          <div>${renderEventPassActions(row)}</div>
+        `)}
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>

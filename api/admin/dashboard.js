@@ -123,6 +123,35 @@ function buildSigns({ signs, inventory, events }) {
   });
 }
 
+function buildEventPasses({ inventory, signs, events, keys }) {
+  const signById = new Map((signs || []).map((sign) => [sign.id, sign]));
+  const eventById = new Map((events || []).map((event) => [event.id, event]));
+  const keyByUid = new Map((keys || []).map((key) => [key.uid, key]));
+
+  return (inventory || [])
+    .filter((row) => row.inventory_type === 'event_pass')
+    .map((row) => {
+      const sign = row.smart_sign_id ? signById.get(row.smart_sign_id) || null : null;
+      const event = sign?.active_event_id ? eventById.get(sign.active_event_id) || null : null;
+      const nfcUid = sign?.activation_uid_primary || '';
+      const key = nfcUid ? keyByUid.get(nfcUid) || null : null;
+      const live = Boolean(event?.id && event.status === 'active' && !event.ended_at);
+      return {
+        ...row,
+        linked_sign_id: sign?.id || '',
+        sign_status: sign?.status || '',
+        active_event_id: event?.id || sign?.active_event_id || '',
+        active_event_status: event?.status || '',
+        active_event_host: event?.host_agent_slug || sign?.owner_agent_slug || '',
+        active_event_start: event?.start_time || '',
+        nfc_uid: nfcUid,
+        nfc_agent_slug: key?.agent_slug || sign?.owner_agent_slug || '',
+        nfc_claimed: key?.claimed === true,
+        pass_state: live ? 'live' : sign?.id ? 'linked' : 'fresh'
+      };
+    });
+}
+
 function buildEvents({ events, checkins, loanSessions }) {
   const checkinCounts = countBy(checkins, (row) => row.open_house_event_id);
   const financingCounts = countBy(checkins.filter((row) => row.pre_approved === false), (row) => row.open_house_event_id);
@@ -392,8 +421,8 @@ module.exports = async function handler(req, res) {
     ] = await Promise.all([
       safeRest('agents?select=id,slug,name,phone,phone_normalized,email,brokerage,image_url,website&order=name.asc&limit=250', [], warnings, 'agents'),
       safeRest('keys?select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1000', [], warnings, 'keys'),
-      safeRest('smart_signs?select=id,public_code,status,owner_agent_slug,assigned_agent_slug,assigned_slot,active_event_id,uid_primary,uid_secondary,primary_device_type,secondary_device_type,created_at,updated_at,deactivated_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'smart_signs'),
-      safeRest('smart_sign_inventory?select=id,public_code,smart_sign_id,is_printed,claimed_at,created_at,notes&order=created_at.desc&limit=600', [], warnings, 'smart_sign_inventory'),
+      safeRest('smart_signs?select=id,public_code,status,owner_agent_slug,assigned_agent_slug,assigned_slot,active_event_id,uid_primary,uid_secondary,activation_uid_primary,activation_uid_secondary,activation_method,primary_device_type,secondary_device_type,created_at,updated_at,deactivated_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'smart_signs'),
+      safeRest('smart_sign_inventory?select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,created_at,notes&order=created_at.desc&limit=600', [], warnings, 'smart_sign_inventory'),
       safeRest('open_house_events?select=id,host_agent_slug,smart_sign_id,open_house_source_id,status,start_time,end_time,ended_at,last_activity_at,created_at,updated_at,setup_context&order=created_at.desc&limit=250', [], warnings, 'open_house_events'),
       safeRest('event_checkins?select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,created_at,metadata&order=created_at.desc&limit=800', [], warnings, 'event_checkins'),
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
@@ -428,6 +457,7 @@ module.exports = async function handler(req, res) {
 
     const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
     const signRows = buildSigns({ signs, inventory, events });
+    const eventPassRows = buildEventPasses({ inventory, signs, events, keys });
     const eventRows = buildEvents({ events, checkins, loanSessions });
     const leadRows = buildLeads({ leads, checkins, events });
     const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
@@ -450,6 +480,7 @@ module.exports = async function handler(req, res) {
         agents: crmRows.length,
         claimed_keychains: keys.filter((row) => row.claimed).length,
         smart_signs: signs.length,
+        event_passes: eventPassRows.length,
         active_signs: signs.filter((row) => row.status === 'active').length,
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,
@@ -464,6 +495,7 @@ module.exports = async function handler(req, res) {
       crm: crmRows,
       leads: leadRows,
       signs: signRows,
+      event_passes: eventPassRows,
       inventory: inventory.slice(0, 150),
       events: eventRows,
       checkins: recent(checkins, 'created_at', 100),
