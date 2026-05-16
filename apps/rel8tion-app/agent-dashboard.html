@@ -67,6 +67,7 @@
     const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
 
     async function request(path, options = {}) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -187,6 +188,47 @@
       </div>`;
     }
 
+    function isEventPassEvent() {
+      return state.event?.setup_context?.flow === 'event-pass'
+        || state.event?.setup_context?.qr_source === 'event_pass'
+        || Boolean(state.event?.setup_context?.event_pass_inventory_id);
+    }
+
+    function eventSummaryStats() {
+      const disclosureCount = state.checkins.filter((row) => disclosureSummary(row).signed).length;
+      const financingCount = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      return {
+        checkins: state.checkins.length,
+        disclosures: disclosureCount,
+        financing: financingCount
+      };
+    }
+
+    function eventSummarySubject() {
+      return `Rel8tion open house summary - ${state.house?.address || state.event?.setup_context?.address || 'Open House'}`;
+    }
+
+    function eventSummaryBody() {
+      const stats = eventSummaryStats();
+      const address = state.house?.address || state.event?.setup_context?.address || 'Open House';
+      const coverage = state.loanOfficer?.loan_officer_name
+        ? `${state.loanOfficer.loan_officer_name}${state.loanOfficer.loan_officer_company ? `, ${state.loanOfficer.loan_officer_company}` : ''}`
+        : 'No loan officer was signed in';
+      return [
+        `REL8TION EVENT SUMMARY`,
+        ``,
+        `Property: ${address}`,
+        `Event: ${state.event?.id || ''}`,
+        `Coverage: ${coverage}`,
+        ``,
+        `${stats.checkins} buyers checked in`,
+        `${stats.disclosures} disclosure packets completed`,
+        `${stats.financing} buyers requested or may need financing help`,
+        ``,
+        `Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.`
+      ].join('\n');
+    }
+
     function renderLead(checkin) {
       const meta = checkin.metadata || {};
       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
@@ -265,6 +307,7 @@
       const sqft = state.house?.sqft || state.house?.square_feet || state.event?.setup_context?.sqft || '-';
       const sentCount = state.outreach.filter((row) => row.initial_send_status === 'sent' || row.followup_send_status === 'sent').length;
       const needsFinancing = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
 
       agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
       app.innerHTML = `
@@ -306,6 +349,7 @@
               <div class="mt-4 grid gap-2">
                 <button onclick="window.moveSignToAnotherOpenHouse()" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-sm">Move Sign To Another Open House</button>
                 <button onclick="window.endCurrentOpenHouse()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">End This Open House</button>
+                <a href="${esc(summaryMail)}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Event Summary</a>
               </div>
             </div>
             <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
@@ -316,6 +360,39 @@
           </aside>
         </section>
       `;
+    }
+
+    function renderEndedSummary() {
+      const stats = eventSummaryStats();
+      const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
+      const passLabel = isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
+      const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
+      const kitBody = `I want to order an open house kit and start Rel8tion service for my next open house. Current event: ${address}`;
+      const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
+      const loPhone = state.loanOfficer?.loan_officer_phone || '';
+      app.innerHTML = `<div class="py-10">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
+        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. Check-ins and disclosure evidence remain saved.</p>
+
+        <div class="mt-6 grid gap-3 md:grid-cols-3">
+          ${stat('Buyers checked in', stats.checkins, 'blue')}
+          ${stat('Disclosures signed', stats.disclosures, stats.disclosures === stats.checkins && stats.checkins ? 'green' : 'slate')}
+          ${stat('Financing help', stats.financing, stats.financing ? 'green' : 'slate')}
+        </div>
+
+        <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Keep the keychain. The next activation is sponsored by the loan officer.</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-slate-600">For the next open house, the agent keeps the keychain on their keys and calls the sponsoring loan officer to activate the next Event Pass or service kit.</p>
+          <div class="mt-4 grid gap-2 md:grid-cols-2">
+            <a href="${esc(summaryMail)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Email Summary</a>
+            <a href="${esc(smsHref('3477758059', kitBody))}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Order Open House Kit</a>
+            <a href="${esc(loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody))}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
+            <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
+          </div>
+        </div>
+      </div>`;
     }
 
     async function closeCurrentOpenHouse({ move = false } = {}) {
@@ -342,6 +419,15 @@
           deactivated_at: now
         })
       });
+      await request(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(state.event.id)}&status=eq.live`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'ended',
+          signed_out_at: now,
+          updated_at: now,
+          last_seen_at: now
+        })
+      }).catch(() => null);
 
       if (move) {
         const params = new URLSearchParams();
@@ -352,12 +438,9 @@
         return;
       }
 
-      app.innerHTML = `<div class="py-14 text-center">
-        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
-        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">This Sign Is Available</h1>
-        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">The event was closed and the sign is no longer attached to this open house. Existing check-ins remain saved.</p>
-        <button onclick="window.moveSignToAnotherOpenHouse(true)" class="mt-6 rounded-full bg-sky-600 px-6 py-3 font-black text-white shadow-sm">Start Another Open House</button>
-      </div>`;
+      state.event = { ...state.event, status: 'ended', ended_at: now, last_activity_at: now };
+      state.sign = { ...state.sign, active_event_id: null, status: 'inactive', deactivated_at: now };
+      renderEndedSummary();
     }
 
     window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => renderError(error.message || 'Could not end this open house.'));

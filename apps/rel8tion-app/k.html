@@ -17,7 +17,7 @@
   </div>
   <script type="module">
     import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260426-1108';
-    import { saveHostSession } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260426-1108';
+    import { saveHostSession, savePendingSignActivation } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260426-1108';
 
     const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const AGENT_DASHBOARD_SESSION_KEY = 'rel8tion_agent_dashboard_pending';
@@ -216,6 +216,7 @@
       if (pending?.publicCode) next.set('code', pending.publicCode);
       if (pending?.signId) next.set('sign_id', pending.signId);
       if (pending?.inventoryId) next.set('inventory_id', pending.inventoryId);
+      if (pending?.source) next.set('source', pending.source);
       if (signCode && !next.has('code')) next.set('code', signCode);
       for (const [key, value] of Object.entries(query)) {
         if (value) next.set(key, value);
@@ -247,7 +248,7 @@
       if (signId) next.set('sign_id', signId);
       if (publicCode) next.set('code', publicCode);
       window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
-      window.location.href = `${window.location.origin}/apps/rel8tion-app/agent-dashboard?${next.toString()}`;
+      window.location.href = `${window.location.origin}/agent-dashboard?${next.toString()}`;
     }
 
     async function request(path, options = {}) {
@@ -263,6 +264,12 @@
       const raw = await response.text().catch(() => '');
       if (!response.ok) throw new Error(raw || `Request failed: ${response.status}`);
       return raw ? JSON.parse(raw) : null;
+    }
+
+    async function findActiveAgentEvent(agentSlug) {
+      if (!agentSlug) return null;
+      const rows = await request(`open_house_events?host_agent_slug=eq.${encodeURIComponent(agentSlug)}&ended_at=is.null&select=id,smart_sign_id,host_agent_slug,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
     }
 
     async function findRemoteSignActivationSession(stages = [], agentSlug = '') {
@@ -753,6 +760,13 @@
         }
 
         const pendingSignActivation = readSignActivationSession();
+        if (pendingSignActivation?.publicCode && pendingSignActivation.stage === 'waiting_for_agent_keychain') {
+          savePendingSignActivation({
+            code: pendingSignActivation.publicCode,
+            signId: pendingSignActivation.signId || '',
+            source: pendingSignActivation.source || 'sign-qr'
+          });
+        }
         if (
           pendingSignActivation?.publicCode
           && (pendingSignActivation.stage === 'waiting_for_sign_chip_1' || pendingSignActivation.stage === 'waiting_for_second_sign_chip')
@@ -838,7 +852,8 @@
             uid,
             agent: record.agent_slug,
             code: pendingSignActivation.publicCode,
-            sign_id: pendingSignActivation.signId
+            sign_id: pendingSignActivation.signId,
+            source: pendingSignActivation.source || ''
           });
           return;
         }
@@ -907,6 +922,18 @@
         }
 
         if (await maybeHandleAddKeychainSession()) {
+          return;
+        }
+
+        const activeAgentEvent = await findActiveAgentEvent(record.agent_slug);
+        if (activeAgentEvent?.id) {
+          saveHostSession({ agentSlug: record.agent_slug, uid, source: 'claimed-chip-dashboard' });
+          setStatus('Event Dashboard', 'Opening your live open house dashboard.');
+          goToAgentDashboard({
+            agentSlug: record.agent_slug,
+            eventId: activeAgentEvent.id,
+            signId: activeAgentEvent.smart_sign_id || ''
+          });
           return;
         }
 

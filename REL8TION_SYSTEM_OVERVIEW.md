@@ -161,7 +161,7 @@ Important localStorage keys:
 3. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
 4. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
 5. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
-6. If a claimed keychain exists, resume pending sign activation, satisfy dashboard challenge, or route the agent to `/a?agent=<slug>&uid=<uid>`.
+6. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
 
 `[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
@@ -257,6 +257,7 @@ QR handling:
 - Resolves `smart_sign_inventory.public_code` first. If an inventory row already points to `smart_sign_id`, the activation flow uses that canonical sign row.
 - Printed QR generation uses `public.smart_sign_inventory.public_code` only. `smart_signs.public_code` must not be used to create new printable QR codes.
 - `smart_sign_inventory.inventory_type` has only `smart_sign` and `event_pass`. Smart sign rows may retain `/s.html?code=...` or `/s?code=...` `qr_url` values; Event Pass rows must print and resolve as `/pass?code=...`.
+- Event Pass setup is not an agent profile flow. Fresh Event Pass inventory keeps the printed `/pass` code, asks for the agent keychain, skips front/rear smart-sign chip registration, creates only the backing activation row needed to bind an open house event, and then routes into the event/dashboard flow.
 - After a sign is activated, the success screen can link an extra physical front/buyer NFC chip to the same `smart_sign_id` through `smart_sign_chip_aliases`. This is for another NFC chip only; it is not a second QR-code setup path and does not replace the rear agent dashboard chip.
 
 Listing binding:
@@ -290,7 +291,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 - If no smart sign exists for a smart-sign code, routes to `/sign-demo-activate?code=<code>&fresh_qr=1`.
 - If `/pass?code=...` has no inventory row, renders a branded "Invalid Event Pass" state.
 - If `/pass?code=...` resolves to `inventory_type = smart_sign`, preserves existing smart-sign behavior.
-- If `/pass?code=...` resolves to `inventory_type = event_pass` with no `smart_sign_id`, routes to `/sign-demo-activate?code=<code>&source=event_pass&fresh_qr=1`.
+- If `/pass?code=...` resolves to `inventory_type = event_pass` with no `smart_sign_id`, routes to `/sign-demo-activate?code=<code>&source=event_pass&fresh_qr=1`; the setup page preserves that Event Pass source through keychain claim and binds the pass to an open house without registering front/rear sign NFC chips.
 - If an Event Pass is linked to a sign and that sign has `active_event_id`, redirects directly to `/event?event=<eventId>`.
 - If an Event Pass is linked to a sign but has no active event, renders "Event Pass Ready" with setup buttons that continue into `/sign-demo-activate?code=<code>&source=event_pass`.
 - If a smart sign route has an active event, redirects to `/event?event=<eventId>`.
@@ -301,7 +302,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 
 Event Pass product positioning:
 
-- Event Pass is a B2B open-house technology/pass/verified-profile availability product sponsored by a loan officer.
+- Event Pass is a B2B open-house technology/access product sponsored by a loan officer. It is strictly an event pass and not an agent profile product.
 - Loan officers are not buying buyer leads or referrals.
 - Rel8tion is not a lender, mortgage broker, or pre-approval provider.
 - Buyer financing help is only routed when a buyer explicitly requests it.
@@ -382,7 +383,8 @@ Inputs:
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
 - Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
 - Shows loan officer coverage card.
-- Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, and setting the sign inactive.
+- Can email a current event summary from the dashboard.
+- Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, setting the sign inactive, closing live loan officer sessions where possible, and rendering an event summary with buyer check-in count, signed disclosure count, financing-help count, email-summary action, open-house-kit prompt, and next-coverage call/SMS action.
 - The dashboard request helper supports PATCH/POST/DELETE options, so End/Move controls perform live Supabase writes instead of read-only requests.
 - Can move the same sign to another open house by closing the current event and opening sign activation for the next listing.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
@@ -429,6 +431,7 @@ Role: tested field/loan-officer work surface for scheduled REL8TION demo and sup
 - Lets an LO or field profile add availability windows using role, responsibility, service ZIP, service radius, and time window.
 - Can create field/demo visits and participants through `/api/field-demo/*`.
 - Can start a financing-support visit and upsert live `event_loan_officer_sessions`, which existing buyer financing routing and the agent dashboard already understand.
+- Visit cards can open the linked Event Dashboard when an `open_house_event_id` is present, giving the loan officer/field user a path to the same live event controls and closeout summary.
 - Uses `event_conversations` and `event_conversation_messages` for in-app conversation logging. This is not realtime, not SMS-relayed, not video, and not a hardened multi-user auth model yet.
 
 ### `/key-reset`
@@ -1270,7 +1273,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Sign activation uses sign inventory/public code lookup. | `[IMPLEMENTED]` | `sign-demo-activate.html` queries `smart_sign_inventory?public_code=eq...` before sign fallback. |
 | Smart sign activation stores front and rear chip roles. | `[IMPLEMENTED]` | `registerFirstChip` writes `primary_device_type: front_buyer_chip`; `registerSecondChip` writes `secondary_device_type: rear_agent_chip`. |
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
-| Agent dashboard can end or move a live sign event. | `[IMPLEMENTED]` | `agent-dashboard.html` patches `open_house_events.status/ended_at`, clears `smart_signs.active_event_id`, sets the sign inactive, and can route into `/sign-demo-activate.html` for the next listing. |
+| Agent dashboard can end or move a live sign/Event Pass event. | `[IMPLEMENTED]` | `agent-dashboard.html` patches `open_house_events.status/ended_at`, clears `smart_signs.active_event_id`, sets the sign inactive, closes live LO sessions where possible, renders a check-in/disclosure/financing summary with email and next-service actions, and can route into `/sign-demo-activate.html` for the next listing. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
 | `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a formatted property-address welcome, property image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |

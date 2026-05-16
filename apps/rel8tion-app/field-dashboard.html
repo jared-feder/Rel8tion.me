@@ -461,6 +461,7 @@
                   ${actionButton('Mark On Site', `window.updateVisitAndParticipant('${visit.id}', '${demoParticipant?.id || ''}', 'on_site')`)}
                   <a href="/sign-demo-activate${visit.demo_public_code ? `?code=${encodeURIComponent(visit.demo_public_code)}` : ''}${visit.agent_slug ? `${visit.demo_public_code ? '&' : '?'}agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Activate Demo Sign</a>
                   <a href="/event${visit.open_house_event_id ? `?event=${encodeURIComponent(visit.open_house_event_id)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Demo Buyer Flow</a>
+                  <a href="/agent-dashboard${visit.agent_slug || visit.open_house_event_id ? `?${new URLSearchParams({ agent: visit.agent_slug || '', event: visit.open_house_event_id || '' }).toString()}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Event Dashboard</a>
                   <a href="/onboarding${visit.agent_slug ? `?agent=${encodeURIComponent(visit.agent_slug)}` : ''}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-sky-700 ring-1 ring-sky-200">Onboard Agent</a>
                   ${actionButton('Convert To Virtual Support', `window.convertVisit('${visit.id}')`, 'green')}
                   ${actionButton('End Demo', `window.updateVisit('${visit.id}', 'completed')`, 'white')}

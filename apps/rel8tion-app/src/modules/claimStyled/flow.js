@@ -155,6 +155,10 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
     url.searchParams.set('code', pendingSign.code);
     url.searchParams.set('uid', state.uid || '');
     url.searchParams.set('agent', slug);
+    if (pendingSign.source === 'event_pass') {
+      url.searchParams.set('source', 'event_pass');
+      url.searchParams.set('fresh_qr', '1');
+    }
     return `${url.pathname}${url.search}`;
   }
 
