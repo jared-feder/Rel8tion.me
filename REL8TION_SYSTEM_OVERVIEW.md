@@ -1232,7 +1232,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
 - `[RISK]` NYS disclosure handling is implemented as a configurable REL8TION-hosted Supabase Storage PDF link plus stored acknowledgement metadata. The official DOS form page remains the source-of-truth reference, and final legal/form-version review remains `[NEEDS VERIFICATION]`.
-- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now uses `public.smart_sign_inventory` only. Event Pass rows print `/pass?code=...`; Smart Sign rows may retain existing `/s.html` or `/s` URLs.
+- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now uses `public.smart_sign_inventory` only. Event Pass rows print `/pass?code=...`; Smart Sign rows may retain existing `/s.html` or `/s` URLs. The file includes a 1000-row optional Smart Sign print-batch insert that creates only new `smart_sign_inventory` rows.
 
 ## [INTENDED] Top Priority Next Task
 

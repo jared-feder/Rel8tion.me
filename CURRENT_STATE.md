@@ -116,7 +116,7 @@ Status labels:
 - `[INTENDED]` Call/video workflow beyond simple call/text links is not built.
 - `[PARTIAL]` REL8TION COMMAND exists as the protected admin dashboard and can assign live LO coverage to active open house events, end active sign events, detach a smart sign to make it fresh again, view leads, confirm true outreach open houses into field visits/reports, accept interested outreach into field visits, assign a loan officer participant, generate confirmed open house PDF-style reports, and schedule a follow-up drip. The deeper action layer for broader sign inventory edits, CRM updates, LO calendar/availability modification, billing automation, and full project controls is not complete.
 - `[INTENDED]` Full automated E2E tests for NFC, sign activation, buyer check-in, dashboard, and SMS are not present.
-- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now exports only from `public.smart_sign_inventory`, includes separate unprinted Event Pass, unprinted Smart Sign, and all-unprinted inventory exports, and includes optional Event Pass insert/qr_url-fix/mark-printed blocks.
+- `[IMPLEMENTED]` `smart-sign-qr-export.sql` now exports only from `public.smart_sign_inventory`, includes separate unprinted Event Pass, unprinted Smart Sign, and all-unprinted inventory exports, and includes optional Smart Sign 1000-row insert plus Event Pass insert/qr_url-fix/mark-printed blocks.
 - `[PARTIAL]` Manual listing fallback creates event context but no linked `open_house_source_id`, which limits listing-data and outreach behavior.
 
 ## Changed Recently
