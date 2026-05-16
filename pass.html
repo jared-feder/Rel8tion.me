@@ -4,12 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rel8tion Event Pass</title>
-  <meta http-equiv="refresh" content="0; url=/apps/rel8tion-app/pass.html">
-  <script>
-    window.location.replace(`/apps/rel8tion-app/pass.html${window.location.search}${window.location.hash}`);
-  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:Inter,sans-serif;color:#17224f;background:#f4fbff}
+    .sign-bg{position:relative;overflow:hidden;background:linear-gradient(180deg,#69d9f6 0%,#dff5ff 36%,#f4fbff 100%)}
+    .sign-bg:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 12%,rgba(255,255,255,.38),rgba(255,255,255,0) 38%),linear-gradient(180deg,rgba(255,255,255,.06),rgba(244,251,255,.92) 78%);pointer-events:none}
+    .sign-bg:after{content:"";position:absolute;top:0;left:0;width:200%;height:360px;opacity:.68;pointer-events:none;background-image:url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnN2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjwvc3ZnPg==");background-repeat:repeat-x;background-size:800px auto;animation:driftClouds 120s linear infinite}
+    #app{position:relative;z-index:1}
+    @keyframes driftClouds{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @media (prefers-reduced-motion:reduce){.sign-bg:after{animation:none}}
+  </style>
 </head>
-<body>
-  Redirecting to the Event Pass flow...
+<body class="bg-[#f0f7ff]">
+  <main class="sign-bg min-h-screen flex items-center justify-center px-4 py-8">
+    <div id="app" class="w-full flex items-center justify-center"></div>
+  </main>
+
+  <script type="module">
+    import { initSignResolverPage } from '/apps/rel8tion-app/src/modules/signResolver/bootstrap.js?v=20260516-event-pass-runtime';
+    initSignResolverPage();
+  </script>
 </body>
 </html>
