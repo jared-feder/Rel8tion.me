@@ -1,5 +1,6 @@
 import { KEY, SUPABASE_URL } from '../core/config.js';
 import { state, setKeyRecord, setPrefilledAgent } from '../core/state.js';
+import { getPendingSignActivation } from '../core/hostSession.js';
 import { authHeaders, jsonHeaders } from '../core/utils.js';
 import { fetchJson } from './http.js';
 import { applyBranding } from './brokerages.js';
@@ -49,6 +50,11 @@ function resolveKeychainSlot({ existingRow, agentKeys, uid }) {
   return null;
 }
 
+function isEventPassClaim() {
+  const pending = getPendingSignActivation();
+  return pending?.source === 'event_pass' && !!pending?.code;
+}
+
 export async function loadAgentFromUID() {
   if (!state.uid) return null;
 
@@ -78,16 +84,17 @@ export async function linkKeyToAgent(slug) {
   if (!state.uid) throw new Error('Missing chip uid');
 
   const existingRow = await getKeyByUid(state.uid);
-  const agentKeys = await getClaimedKeysForAgent(slug);
-  const assignedSlot = resolveKeychainSlot({ existingRow, agentKeys, uid: state.uid });
-  if (!assignedSlot) {
+  const eventPassClaim = isEventPassClaim();
+  const agentKeys = eventPassClaim ? [] : await getClaimedKeysForAgent(slug);
+  const assignedSlot = eventPassClaim ? null : resolveKeychainSlot({ existingRow, agentKeys, uid: state.uid });
+  if (!eventPassClaim && !assignedSlot) {
     throw new Error('This agent already has two active keychains.');
   }
 
   const payload = {
     agent_slug: slug,
     claimed: true,
-    device_role: 'keychain',
+    device_role: eventPassClaim ? 'event_pass_keychain' : 'keychain',
     assigned_slot: assignedSlot
   };
 

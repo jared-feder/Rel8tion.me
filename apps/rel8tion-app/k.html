@@ -272,6 +272,26 @@
       return Array.isArray(rows) ? rows[0] || null : null;
     }
 
+    async function findActiveEventByActivationUid(chipUid) {
+      if (!chipUid) return null;
+      const rows = await request(`open_house_events?activation_uid_primary=eq.${encodeURIComponent(chipUid)}&ended_at=is.null&select=id,smart_sign_id,host_agent_slug,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
+    }
+
+    async function findEventPassSignByActivationUid(chipUid) {
+      if (!chipUid) return null;
+      const rows = await request(`smart_signs?activation_uid_primary=eq.${encodeURIComponent(chipUid)}&activation_method=eq.event_pass_keychain&select=id,public_code,owner_agent_slug,active_event_id,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
+    }
+
+    function isPendingEventPassActivation(pending) {
+      return pending?.publicCode && pending?.source === 'event_pass' && pending.stage === 'waiting_for_agent_keychain';
+    }
+
+    function isEventPassKeychain(row) {
+      return String(row?.device_role || '').trim().toLowerCase() === 'event_pass_keychain';
+    }
+
     async function findRemoteSignActivationSession(stages = [], agentSlug = '') {
       const now = new Date().toISOString();
       const stageFilter = stages.length
@@ -767,6 +787,11 @@
             source: pendingSignActivation.source || 'sign-qr'
           });
         }
+        if (isPendingEventPassActivation(pendingSignActivation)) {
+          setStatus('Event Pass NFC Found', 'Activating this Event Pass keychain for the selected open house.');
+          goToClaim();
+          return;
+        }
         if (
           pendingSignActivation?.publicCode
           && (pendingSignActivation.stage === 'waiting_for_sign_chip_1' || pendingSignActivation.stage === 'waiting_for_second_sign_chip')
@@ -925,6 +950,37 @@
           return;
         }
 
+        if (isEventPassKeychain(record)) {
+          const eventPassEvent = await findActiveEventByActivationUid(uid);
+          if (eventPassEvent?.id) {
+            const dashboardAgentSlug = eventPassEvent.host_agent_slug || record.agent_slug;
+            saveHostSession({ agentSlug: dashboardAgentSlug, uid, source: 'event-pass-keychain-dashboard' });
+            setStatus('Event Pass Dashboard', 'Opening the dashboard for this Event Pass event.');
+            goToAgentDashboard({
+              agentSlug: dashboardAgentSlug,
+              eventId: eventPassEvent.id,
+              signId: eventPassEvent.smart_sign_id || ''
+            });
+            return;
+          }
+
+          const eventPassSign = await findEventPassSignByActivationUid(uid);
+          if (eventPassSign?.public_code) {
+            setStatus('Event Pass Ready', 'Opening setup for the next open house.');
+            continueSignActivation({
+              uid,
+              agent: record.agent_slug,
+              code: eventPassSign.public_code,
+              sign_id: eventPassSign.id,
+              source: 'event_pass'
+            });
+            return;
+          }
+
+          setStatus('Event Pass Inactive', 'Scan the Event Pass QR first, then tap this chip to activate it.');
+          return;
+        }
+
         const activeAgentEvent = await findActiveAgentEvent(record.agent_slug);
         if (activeAgentEvent?.id) {
           saveHostSession({ agentSlug: record.agent_slug, uid, source: 'claimed-chip-dashboard' });
@@ -939,6 +995,18 @@
 
         setStatus('Already Active', 'Opening the live profile.');
         goToLiveProfile(record.agent_slug);
+        return;
+      }
+
+      const pendingEventPassActivation = readSignActivationSession();
+      if (isPendingEventPassActivation(pendingEventPassActivation)) {
+        savePendingSignActivation({
+          code: pendingEventPassActivation.publicCode,
+          signId: pendingEventPassActivation.signId || '',
+          source: 'event_pass'
+        });
+        setStatus('Event Pass NFC Found', 'Finishing Event Pass activation.');
+        goToClaim();
         return;
       }
 

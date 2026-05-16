@@ -165,6 +165,11 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
   return onboardingRoute(slug);
 }
 
+function isEventPassClaimFlow() {
+  const pendingSign = getPendingSignActivation();
+  return pendingSign?.source === 'event_pass' && !!pendingSign?.code;
+}
+
 export function bindPublicHandlers() {
   window.startFieldFlow = startFieldFlow;
   window.startOfficeFlow = startOfficeFlow;
@@ -610,8 +615,9 @@ export async function autoActivate() {
     };
 
     await upsertAgent(agent);
+    const eventPassClaim = isEventPassClaimFlow();
     await linkKeyToAgent(slug);
-    await sendActivationSMS(agent.phone, slug, agent.name);
+    if (!eventPassClaim) await sendActivationSMS(agent.phone, slug, agent.name);
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-auto-activate');
   } catch (e) {
     debug('AUTO ACTIVATE FAILED', { message: e?.message || String(e) });
@@ -667,8 +673,9 @@ export async function saveFullProfile() {
     setManuallyEnteredProfile(true);
     setSelectedBrokerage(brokerage);
     await applyBranding(brokerage);
+    const eventPassClaim = isEventPassClaimFlow();
     await linkKeyToAgent(slug);
-    await sendActivationSMS(phone, slug, name);
+    if (!eventPassClaim) await sendActivationSMS(phone, slug, name);
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-full-profile');
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });

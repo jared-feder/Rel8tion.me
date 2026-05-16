@@ -46,8 +46,8 @@ Status labels:
 - `[IMPLEMENTED]` Smart sign activation now loads the agent profile and displays the agent name/brokerage instead of relying on raw slugs in the visible activation flow.
 - `[IMPLEMENTED]` Public sign route exists at `/s` and `/sign`. `/pass` is now the Event Pass resolver route for printed Event Pass QR URLs and reuses the same resolver module with Event Pass-aware behavior.
 - `[IMPLEMENTED]` `/pass?code=PUBLIC_CODE` looks up `smart_sign_inventory.public_code` first. Missing inventory shows a branded invalid Event Pass state; `inventory_type = event_pass` with no `smart_sign_id` routes to `/sign-demo-activate?code=PUBLIC_CODE&source=event_pass&fresh_qr=1`; linked event passes redirect to `/event?event=...` when the linked sign has a live event and otherwise show an Event Pass Ready setup state.
-- `[IMPLEMENTED]` Event Pass setup is not an agent profile flow. Fresh Event Pass inventory keeps its `/pass` code, asks for the agent keychain, skips front/rear smart-sign chip registration, creates only the backing event record needed to bind an open house, and then routes into the event/dashboard flow.
-- `[IMPLEMENTED]` Claimed agent keychain scans now open the active open house dashboard when that agent has a live `open_house_events` row; otherwise normal keychain behavior remains available for the existing profile/onboarding flows.
+- `[IMPLEMENTED]` Event Pass setup is not an agent profile flow. Fresh Event Pass inventory keeps its `/pass` code, prompts the host to tap the NFC chip on that same Event Pass keychain, saves that chip as `keys.device_role = event_pass_keychain` without consuming normal keychain slots, skips front/rear smart-sign chip registration, and binds the selected open house as the Event Pass QR's live event.
+- `[IMPLEMENTED]` Event Pass keychain scans now prefer the active `open_house_events` row created by that chip (`activation_uid_primary`) and open the dashboard for that exact event. Normal claimed agent keychains still open the active open house dashboard for that agent when available, otherwise normal profile/onboarding behavior remains available.
 - `[INTENDED]` Event Pass is a B2B open-house technology/access product sponsored by a loan officer, not an agent profile product, buyer lead selling, or referral purchasing. Rel8tion is not a lender, mortgage broker, or pre-approval provider, and buyer financing help is only routed when a buyer explicitly requests it.
 - `[IMPLEMENTED]` Active front chip flow sends buyer to `/s?code=...` and then `/event`.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
@@ -127,7 +127,7 @@ Status labels:
 
 Recent repo state includes:
 
-- `[IMPLEMENTED]` `/pass` now runs as a real Event Pass resolver: it reads `smart_sign_inventory.public_code`, preserves smart-sign behavior for smart-sign rows, routes fresh Event Pass inventory into Event Pass setup, redirects linked/live passes to `/event`, and shows branded invalid/inactive Event Pass states. Event Pass setup is strictly event binding and dashboard access, not an agent profile route.
+- `[IMPLEMENTED]` `/pass` now runs as a real Event Pass resolver: it reads `smart_sign_inventory.public_code`, preserves smart-sign behavior for smart-sign rows, routes fresh Event Pass inventory into QR-first/Event-Pass-NFC setup, redirects linked/live passes to `/event`, and shows branded invalid/inactive Event Pass states. Event Pass setup is strictly event binding and dashboard access, not an agent profile route.
 - `[IMPLEMENTED]` Production now deploys from `main`; the `/event` cloud/modal fix was verified live after commit `c8789ae`.
 - `[IMPLEMENTED]` `staging` was created and pushed as the staging/pre-production branch.
 - `[IMPLEMENTED]` The older production deploy from `modular-claim-test` commit `51d2d1a` remains tagged as `production-51d2d1a-2026-05-08`.

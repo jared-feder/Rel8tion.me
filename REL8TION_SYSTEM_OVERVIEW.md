@@ -257,7 +257,7 @@ QR handling:
 - Resolves `smart_sign_inventory.public_code` first. If an inventory row already points to `smart_sign_id`, the activation flow uses that canonical sign row.
 - Printed QR generation uses `public.smart_sign_inventory.public_code` only. `smart_signs.public_code` must not be used to create new printable QR codes.
 - `smart_sign_inventory.inventory_type` has only `smart_sign` and `event_pass`. Smart sign rows may retain `/s.html?code=...` or `/s?code=...` `qr_url` values; Event Pass rows must print and resolve as `/pass?code=...`.
-- Event Pass setup is not an agent profile flow. Fresh Event Pass inventory keeps the printed `/pass` code, asks for the agent keychain, skips front/rear smart-sign chip registration, creates only the backing activation row needed to bind an open house event, and then routes into the event/dashboard flow.
+- Event Pass setup is not an agent profile flow. Fresh Event Pass inventory keeps the printed `/pass` code, prompts the host to tap the NFC chip on that same Event Pass keychain, stores that chip as `keys.device_role = event_pass_keychain` without taking a normal keychain slot, skips front/rear smart-sign chip registration, binds the selected open house as the QR's live event, and then routes into the event/dashboard flow.
 - After a sign is activated, the success screen can link an extra physical front/buyer NFC chip to the same `smart_sign_id` through `smart_sign_chip_aliases`. This is for another NFC chip only; it is not a second QR-code setup path and does not replace the rear agent dashboard chip.
 
 Listing binding:
@@ -291,7 +291,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 - If no smart sign exists for a smart-sign code, routes to `/sign-demo-activate?code=<code>&fresh_qr=1`.
 - If `/pass?code=...` has no inventory row, renders a branded "Invalid Event Pass" state.
 - If `/pass?code=...` resolves to `inventory_type = smart_sign`, preserves existing smart-sign behavior.
-- If `/pass?code=...` resolves to `inventory_type = event_pass` with no `smart_sign_id`, routes to `/sign-demo-activate?code=<code>&source=event_pass&fresh_qr=1`; the setup page preserves that Event Pass source through keychain claim and binds the pass to an open house without registering front/rear sign NFC chips.
+- If `/pass?code=...` resolves to `inventory_type = event_pass` with no `smart_sign_id`, routes to `/sign-demo-activate?code=<code>&source=event_pass&fresh_qr=1`; the setup page preserves that Event Pass source, prompts for the NFC chip on the same Event Pass keychain, stores it as an event-pass keychain, and binds the selected open house without registering front/rear sign NFC chips.
 - If an Event Pass is linked to a sign and that sign has `active_event_id`, redirects directly to `/event?event=<eventId>`.
 - If an Event Pass is linked to a sign but has no active event, renders "Event Pass Ready" with setup buttons that continue into `/sign-demo-activate?code=<code>&source=event_pass`.
 - If a smart sign route has an active event, redirects to `/event?event=<eventId>`.
@@ -303,6 +303,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 Event Pass product positioning:
 
 - Event Pass is a B2B open-house technology/access product sponsored by a loan officer. It is strictly an event pass and not an agent profile product.
+- The physical Event Pass has both the printed QR and an NFC chip. The QR starts setup, the NFC chip claims the temporary Event Pass keychain identity, and future NFC taps open the dashboard for the active event created by that pass.
 - Loan officers are not buying buyer leads or referrals.
 - Rel8tion is not a lender, mortgage broker, or pre-approval provider.
 - Buyer financing help is only routed when a buyer explicitly requests it.
@@ -510,6 +511,16 @@ This is separate from the smart sign `/event` check-in flow.
 5. Agent taps keychain.
 6. `/k` verifies keychain owner against event/sign ownership.
 7. Agent is sent to `/agent-dashboard`.
+
+### Event Pass QR And NFC Flow
+
+1. Event Pass QR opens `/pass?code=<public_code>`.
+2. `/pass` resolves `smart_sign_inventory.public_code` and sends fresh passes to `/sign-demo-activate?source=event_pass`.
+3. Setup prompts the host to tap the NFC chip on that same Event Pass keychain.
+4. `/k?uid=<eventPassUid>` saves the pending Event Pass activation and sends the host through `/claim` if the chip is not claimed yet.
+5. Claim saves the chip as `event_pass_keychain` rather than a normal agent keychain slot, then returns to Event Pass setup.
+6. The host chooses the open house; that selected open house becomes the QR's live Event Pass event.
+7. Future taps of that Event Pass NFC chip open `/agent-dashboard` for the active event created by that chip.
 
 ### Loan Officer Tag Verification
 

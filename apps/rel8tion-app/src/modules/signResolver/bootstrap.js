@@ -444,7 +444,7 @@ function eventPassInactiveView(sign, inventory) {
   shell(`
     <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Event Pass</div>
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Event Pass Ready</h1>
-    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Rel8tion Event Pass is ready to be activated for a live open house. If you are the host agent, tap your Rel8tionChip or continue setup to connect this pass to today's event.</p>
+    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Rel8tion Event Pass is ready to be activated for a live open house. If you are the host agent, continue setup and tap the NFC chip on this same Event Pass keychain to connect it to today's event.</p>
     <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.</p>
     <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
