@@ -479,7 +479,9 @@
       if (sign.uid_secondary === chipUid) {
         return /keychain/i.test(sign.secondary_device_type || '') ? 'keychain' : 'rear_agent';
       }
-      if (sign.uid_primary === chipUid) return 'front_buyer';
+      if (sign.uid_primary === chipUid) {
+        return /event_pass_keychain|keychain/i.test(sign.primary_device_type || '') ? 'keychain' : 'front_buyer';
+      }
       return '';
     }
 
