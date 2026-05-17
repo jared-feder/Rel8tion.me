@@ -188,6 +188,7 @@ export function bindPublicHandlers() {
   window.selectHouse = selectHouse;
   window.selectAgentByEncoded = selectAgentByEncoded;
   window.editDetectedProfile = editDetectedProfile;
+  window.showIntro = showIntro;
   window.showForm = showForm;
   window.showBrokerageStep = showBrokerageStep;
   window.showFullProfileForm = showFullProfileForm;
