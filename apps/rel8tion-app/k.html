@@ -397,9 +397,43 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    function normalizePhone(value = '') {
+      return String(value || '').replace(/\D/g, '');
+    }
+
     async function loadVerifiedProfile(chipUid) {
       const rows = await request(`verified_profiles?uid=eq.${encodeURIComponent(chipUid)}&is_active=eq.true&select=*&limit=1`);
       return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function loadAgentBySlug(agentSlug) {
+      if (!agentSlug) return null;
+      const rows = await request(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=slug,name,phone,phone_normalized,email&limit=1`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] : null;
+    }
+
+    async function loadVerifiedProfileByAgent(agentSlug) {
+      const agent = await loadAgentBySlug(agentSlug);
+      if (!agent) return null;
+      const phone = normalizePhone(agent.phone_normalized || agent.phone);
+      if (phone) {
+        const phoneRows = await request(`verified_profiles?or=(phone_normalized.eq.${encodeURIComponent(phone)},phone.eq.${encodeURIComponent(phone)})&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(phoneRows) && phoneRows[0]) return phoneRows[0];
+      }
+      if (agent.email) {
+        const emailRows = await request(`verified_profiles?email=eq.${encodeURIComponent(agent.email)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
+        if (Array.isArray(emailRows) && emailRows[0]) return emailRows[0];
+      }
+      return null;
+    }
+
+    async function loadVerifiedProfileForScan(chipUid, keyRecord = null) {
+      const directProfile = await loadVerifiedProfile(chipUid).catch(() => null);
+      if (directProfile?.uid) return directProfile;
+      if (keyRecord?.claimed === true && keyRecord.agent_slug) {
+        return await loadVerifiedProfileByAgent(keyRecord.agent_slug).catch(() => null);
+      }
+      return null;
     }
 
     async function activateLoanOfficerSession(pending, profile) {
@@ -439,12 +473,12 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
-    async function maybeHandlePendingLoanOfficerSession({ allowProfileActivation = true } = {}) {
+    async function maybeHandlePendingLoanOfficerSession({ allowProfileActivation = true, keyRecord = null } = {}) {
       const pendingLoanOfficer = readLoanOfficerSession();
       if (!pendingLoanOfficer?.eventId) return false;
 
       setStatus('Checking NMB Key...', 'Looking up the loan officer profile.');
-      const profile = await loadVerifiedProfile(uid);
+      const profile = await loadVerifiedProfileForScan(uid, keyRecord);
       if (!profile?.uid) {
         if (!allowProfileActivation) {
           window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
@@ -466,8 +500,8 @@
       return true;
     }
 
-    async function maybeOpenLoanOfficerDashboard() {
-      const profile = await loadVerifiedProfile(uid).catch(() => null);
+    async function maybeOpenLoanOfficerDashboard(keyRecord = null) {
+      const profile = await loadVerifiedProfileForScan(uid, keyRecord).catch(() => null);
       if (!profile?.uid) return false;
       setStatus('Loan Officer Keychain', 'Opening your coverage dashboard.');
       goToLoanOfficerDashboard(profile);
@@ -1077,15 +1111,7 @@
           return;
         }
 
-        if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: false })) {
-          return;
-        }
-
-        if (await maybeOpenLoanOfficerDashboard()) {
-          return;
-        }
-
-        if (await maybeHandleAddKeychainSession()) {
+        if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: false, keyRecord: record })) {
           return;
         }
 
@@ -1123,6 +1149,14 @@
           }
 
           setStatus('Event Pass Inactive', 'Scan the Event Pass QR first, then tap this chip to activate it.');
+          return;
+        }
+
+        if (await maybeOpenLoanOfficerDashboard(record)) {
+          return;
+        }
+
+        if (await maybeHandleAddKeychainSession()) {
           return;
         }
 

@@ -274,6 +274,58 @@ function esc(str){
     .replace(/'/g, "&#039;");
 }
 
+function normalizePhone(value = "") {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function openLoanOfficerDashboard(profile = {}) {
+  const next = new URLSearchParams();
+  next.set("uid", profile.uid || uid);
+  if (profile.slug) next.set("slug", profile.slug);
+  window.location.href = "/lo-field-dashboard?" + next.toString();
+}
+
+async function lookupVerifiedProfileByAgentKey(chipUid) {
+  const { data: keyRow } = await supabaseClient
+    .from("keys")
+    .select("uid,claimed,agent_slug,device_role")
+    .eq("uid", chipUid)
+    .maybeSingle();
+
+  if (!keyRow?.claimed || !keyRow.agent_slug) return null;
+
+  const { data: agentRow } = await supabaseClient
+    .from("agents")
+    .select("slug,name,phone,phone_normalized,email")
+    .eq("slug", keyRow.agent_slug)
+    .maybeSingle();
+
+  if (!agentRow) return null;
+
+  const phone = normalizePhone(agentRow.phone_normalized || agentRow.phone);
+  if (phone) {
+    const { data: phoneRows } = await supabaseClient
+      .from("verified_profiles")
+      .select("*")
+      .eq("is_active", true)
+      .or(`phone_normalized.eq.${phone},phone.eq.${phone}`)
+      .limit(1);
+    if (Array.isArray(phoneRows) && phoneRows[0]) return phoneRows[0];
+  }
+
+  if (agentRow.email) {
+    const { data: emailRow } = await supabaseClient
+      .from("verified_profiles")
+      .select("*")
+      .eq("is_active", true)
+      .eq("email", agentRow.email)
+      .maybeSingle();
+    if (emailRow?.uid) return emailRow;
+  }
+
+  return null;
+}
+
 function getFileExt(file){
   const name = file?.name || "";
   const parts = name.split(".");
@@ -436,8 +488,8 @@ function renderForm(existing = {}) {
         throw new Error("Activation succeeded but no slug was returned.");
       }
 
-      status.textContent = "Verified page activated. Redirecting...";
-      window.location.href = "/nmb-verified?slug=" + encodeURIComponent(data[0].slug);
+      status.textContent = "Profile active. Opening dashboard...";
+      openLoanOfficerDashboard(data[0]);
     } catch (err) {
       console.error(err);
       status.textContent = err.message || "Activation failed.";
@@ -469,7 +521,13 @@ async function boot() {
     const row = Array.isArray(data) && data.length ? data[0] : null;
 
     if (row && row.is_active && row.slug) {
-      window.location.href = "/nmb-verified?slug=" + encodeURIComponent(row.slug);
+      openLoanOfficerDashboard(row);
+      return;
+    }
+
+    const keychainProfile = await lookupVerifiedProfileByAgentKey(uid).catch(() => null);
+    if (keychainProfile?.uid) {
+      openLoanOfficerDashboard(keychainProfile);
       return;
     }
 
