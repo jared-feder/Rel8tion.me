@@ -77,9 +77,9 @@ module.exports = async function handler(req, res) {
     if (action === 'list') {
       const from = body.from || new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const toDate = new Date();
-      toDate.setDate(toDate.getDate() + Math.max(1, Math.min(Number(body.days || 14), 60)));
+      toDate.setDate(toDate.getDate() + Math.max(1, Math.min(Number(body.days || 60), 120)));
       const rows = await supabaseRest(
-        `field_coverage_availability?participant_profile_id=eq.${enc(profile.uid)}&available_end=gte.${enc(from)}&available_start=lt.${enc(toDate.toISOString())}&select=*&order=available_start.asc&limit=100`
+        `field_coverage_availability?participant_profile_id=eq.${enc(profile.uid)}&available_end=gte.${enc(from)}&available_start=lt.${enc(toDate.toISOString())}&select=*&order=available_start.asc&limit=300`
       ).catch(() => []);
       send(res, 200, { ok: true, profile, availability: rows || [] });
       return;
@@ -88,12 +88,22 @@ module.exports = async function handler(req, res) {
     if (action === 'upsert') {
       const slot = normalizeSlot(body, profile);
       const id = String(body.id || '').trim();
+      const existing = id ? null : one(await supabaseRest(
+        `field_coverage_availability?participant_profile_id=eq.${enc(profile.uid)}&responsibility=eq.${enc(slot.responsibility)}&available_start=eq.${enc(slot.available_start)}&available_end=eq.${enc(slot.available_end)}&status=in.(open,unavailable)&select=id&limit=1`
+      ).catch(() => []));
+      const targetId = id || existing?.id || '';
       const row = id
-        ? one(await supabaseRest(`field_coverage_availability?id=eq.${enc(id)}&participant_profile_id=eq.${enc(profile.uid)}`, {
+        ? one(await supabaseRest(`field_coverage_availability?id=eq.${enc(targetId)}&participant_profile_id=eq.${enc(profile.uid)}`, {
             method: 'PATCH',
             headers: { Prefer: 'return=representation' },
             body: JSON.stringify(slot)
           }))
+        : targetId
+          ? one(await supabaseRest(`field_coverage_availability?id=eq.${enc(targetId)}&participant_profile_id=eq.${enc(profile.uid)}`, {
+              method: 'PATCH',
+              headers: { Prefer: 'return=representation' },
+              body: JSON.stringify(slot)
+            }))
         : one(await supabaseRest('field_coverage_availability', {
             method: 'POST',
             headers: { Prefer: 'return=representation' },

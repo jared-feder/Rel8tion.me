@@ -63,6 +63,15 @@
     const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
     const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const WEEKDAY_OPTIONS = [
+      [0, 'Sun'],
+      [1, 'Mon'],
+      [2, 'Tue'],
+      [3, 'Wed'],
+      [4, 'Thu'],
+      [5, 'Fri'],
+      [6, 'Sat']
+    ];
     const extractZip = (...values) => {
       for (const value of values) {
         const match = String(value || '').match(/\b(\d{5})(?:-\d{4})?\b/);
@@ -88,7 +97,57 @@
     function defaultScheduleDate(offsetDays = 1) {
       const date = new Date();
       date.setDate(date.getDate() + offsetDays);
+      return localDateValue(date);
+    }
+
+    function localDateValue(value) {
+      const date = value instanceof Date ? new Date(value) : new Date(value || Date.now());
+      if (Number.isNaN(date.getTime())) return '';
+      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
       return date.toISOString().slice(0, 10);
+    }
+
+    function localDateFromInput(value) {
+      const date = new Date(`${value || ''}T00:00:00`);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function addDays(value, days) {
+      const date = new Date(value);
+      date.setDate(date.getDate() + days);
+      return date;
+    }
+
+    function buildAvailabilitySlots(data) {
+      const startDate = localDateFromInput(data.get('date'));
+      const rangeDays = Math.max(1, Math.min(Number(data.get('range_days') || 1), 90));
+      const startTime = String(data.get('start_time') || '').trim();
+      const endTime = String(data.get('end_time') || '').trim();
+      const selectedDays = data.getAll('weekdays').map(Number).filter((day) => day >= 0 && day <= 6);
+      const allowedDays = selectedDays.length ? selectedDays : WEEKDAY_OPTIONS.map(([day]) => day);
+      const status = data.get('status') === 'unavailable' ? 'unavailable' : 'open';
+
+      if (!startDate || !startTime || !endTime) throw new Error('Choose a valid date and time window.');
+
+      const slots = [];
+      for (let offset = 0; offset < rangeDays; offset += 1) {
+        const day = addDays(startDate, offset);
+        if (rangeDays > 1 && !allowedDays.includes(day.getDay())) continue;
+        const dayValue = localDateValue(day);
+        const availableStart = new Date(`${dayValue}T${startTime}`);
+        const availableEnd = new Date(`${dayValue}T${endTime}`);
+        if (Number.isNaN(availableStart.getTime()) || Number.isNaN(availableEnd.getTime()) || availableEnd <= availableStart) {
+          throw new Error('Use a valid availability start and end time.');
+        }
+        slots.push({
+          status,
+          available_start: availableStart.toISOString(),
+          available_end: availableEnd.toISOString()
+        });
+      }
+
+      if (!slots.length) throw new Error('No matching days were selected in that date range.');
+      return slots;
     }
 
     async function request(path, options = {}) {
@@ -238,7 +297,7 @@
         action: 'list',
         uid: state.profile?.uid || state.uid || '',
         slug: state.profile?.slug || state.slug || '',
-        days: 14
+        days: 90
       }).catch((error) => {
         console.log('availability load skipped', error);
         return { availability: [] };
@@ -569,8 +628,27 @@
             </div>
           </div>
           <form id="availability-form" class="mt-5 grid gap-3 md:grid-cols-6">
-            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Date
-              <input name="date" type="date" required value="${defaultScheduleDate(1)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            <div class="grid gap-2 md:col-span-6 sm:grid-cols-2">
+              <label class="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900 ring-1 ring-emerald-100">
+                <input type="radio" name="status" value="open" checked class="h-4 w-4">
+                <span>Available</span>
+              </label>
+              <label class="flex items-center gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-black text-rose-900 ring-1 ring-rose-100">
+                <input type="radio" name="status" value="unavailable" class="h-4 w-4">
+                <span>Not available</span>
+              </label>
+            </div>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Starting
+              <input name="date" type="date" required value="${defaultScheduleDate(0)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+            </label>
+            <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Repeat
+              <select name="range_days" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
+                <option value="1">One day</option>
+                <option value="7">One week</option>
+                <option value="14">Two weeks</option>
+                <option value="30">One month</option>
+                <option value="90">Three months</option>
+              </select>
             </label>
             <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Start
               <input name="start_time" type="time" required value="10:00" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none">
@@ -600,25 +678,40 @@
                 <option value="agent_onboarding">Agent onboarding</option>
               </select>
             </label>
+            <div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 md:col-span-6">
+              <div class="mb-2 text-xs font-black uppercase tracking-[.14em] text-slate-500">Days</div>
+              <div class="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                ${WEEKDAY_OPTIONS.map(([value, label]) => `
+                  <label class="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-100">
+                    <input type="checkbox" name="weekdays" value="${value}" ${value === 0 || value === 6 ? 'checked' : ''} class="h-4 w-4">
+                    <span>${label}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
             <label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 md:col-span-2">Notes
               <input name="notes" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal text-slate-900 outline-none" placeholder="Optional">
             </label>
-            <button type="submit" class="md:col-span-6 rounded-full bg-violet-600 px-5 py-4 text-base font-black text-white">Add Availability Slot</button>
+            <button type="submit" class="md:col-span-6 rounded-full bg-violet-600 px-5 py-4 text-base font-black text-white">Save Coverage Window</button>
           </form>
           <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            ${state.availability.length ? state.availability.slice(0, 12).map((slot) => `
+            ${state.availability.length ? state.availability.slice(0, 30).map((slot) => {
+              const cancelable = slot.status === 'open' || slot.status === 'unavailable';
+              const tone = slot.status === 'open' ? 'text-emerald-700' : slot.status === 'unavailable' ? 'text-rose-700' : slot.status === 'booked' ? 'text-sky-700' : 'text-slate-500';
+              return `
               <article class="rounded-2xl bg-white/85 p-4 ring-1 ring-slate-100">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <div class="text-xs font-black uppercase tracking-[.12em] ${slot.status === 'open' ? 'text-emerald-700' : slot.status === 'booked' ? 'text-sky-700' : 'text-slate-500'}">${esc(titleize(slot.status))}</div>
+                    <div class="text-xs font-black uppercase tracking-[.12em] ${tone}">${esc(titleize(slot.status))}</div>
                     <div class="mt-1 text-lg font-black">${esc(slot.service_zip)} · ${esc(slot.service_radius_miles)} mi</div>
                     <div class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(slot.available_start))} - ${esc(fmtTime(slot.available_end))}</div>
                     <div class="mt-1 text-xs font-black uppercase tracking-[.1em] text-slate-400">${esc(titleize(slot.role))} / ${esc(titleize(slot.responsibility))}</div>
+                    ${slot.notes ? `<div class="mt-2 text-xs font-bold text-slate-500">${esc(slot.notes)}</div>` : ''}
                   </div>
-                  ${slot.status === 'open' ? `<button type="button" onclick="window.cancelAvailability('${esc(slot.id)}')" class="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-700 ring-1 ring-rose-100">Cancel</button>` : ''}
+                  ${cancelable ? `<button type="button" onclick="window.cancelAvailability('${esc(slot.id)}')" class="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-700 ring-1 ring-rose-100">Cancel</button>` : ''}
                 </div>
               </article>
-            `).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 md:col-span-2 xl:col-span-3">No availability slots yet. Add tomorrow's coverage window so assignment can find this profile.</div>`}
+            `}).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 md:col-span-2 xl:col-span-3">No availability slots yet. Add tomorrow's coverage window so assignment can find this profile.</div>`}
           </div>
         </section>
       `;
@@ -801,28 +894,35 @@
       event.preventDefault();
       const form = event.currentTarget;
       const data = new FormData(form);
-      const availableStart = new Date(`${data.get('date')}T${data.get('start_time')}`);
-      const availableEnd = new Date(`${data.get('date')}T${data.get('end_time')}`);
-      if (Number.isNaN(availableStart.getTime()) || Number.isNaN(availableEnd.getTime()) || availableEnd <= availableStart) {
-        state.error = 'Use a valid availability start and end time.';
+      let slots = [];
+      try {
+        slots = buildAvailabilitySlots(data);
+      } catch (error) {
+        state.error = error.message || 'Use a valid availability start and end time.';
         render();
         return;
       }
+
       try {
         state.error = '';
-        await api('/api/field-demo/availability', {
-          action: 'upsert',
-          uid: state.profile?.uid || state.uid || '',
-          slug: state.profile?.slug || state.slug || '',
-          role: data.get('role') || 'loan_officer',
-          responsibility: data.get('responsibility') || 'financing_support',
-          service_zip: data.get('service_zip') || '',
-          service_radius_miles: data.get('service_radius_miles') || 15,
-          available_start: availableStart.toISOString(),
-          available_end: availableEnd.toISOString(),
-          notes: data.get('notes') || null
-        });
-        await refresh('Availability slot added.');
+        state.message = `Saving ${slots.length} coverage ${slots.length === 1 ? 'window' : 'windows'}...`;
+        render();
+        for (const slot of slots) {
+          await api('/api/field-demo/availability', {
+            action: 'upsert',
+            uid: state.profile?.uid || state.uid || '',
+            slug: state.profile?.slug || state.slug || '',
+            role: data.get('role') || 'loan_officer',
+            responsibility: data.get('responsibility') || 'financing_support',
+            service_zip: data.get('service_zip') || '',
+            service_radius_miles: data.get('service_radius_miles') || 15,
+            available_start: slot.available_start,
+            available_end: slot.available_end,
+            status: slot.status,
+            notes: data.get('notes') || (slot.status === 'unavailable' ? 'Not available' : null)
+          });
+        }
+        await refresh(`${slots.length} coverage ${slots.length === 1 ? 'window' : 'windows'} saved.`);
       } catch (error) {
         state.error = error.message || 'Could not save availability.';
         render();

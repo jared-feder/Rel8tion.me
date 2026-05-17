@@ -87,8 +87,16 @@ module.exports = async function handler(req, res) {
     const rows = await supabaseRest(
       `field_coverage_availability?status=eq.open&responsibility=eq.${enc(responsibility)}&available_start=lte.${enc(start)}&available_end=gte.${enc(end)}&select=*&limit=200`
     ).catch(() => []);
+    const unavailableRows = await supabaseRest(
+      `field_coverage_availability?status=eq.unavailable&responsibility=eq.${enc(responsibility)}&available_start=lt.${enc(end)}&available_end=gt.${enc(start)}&select=participant_profile_id,participant_uid,participant_slug,available_start,available_end&limit=200`
+    ).catch(() => []);
+    const blockedProfiles = new Set((Array.isArray(unavailableRows) ? unavailableRows : [])
+      .flatMap((row) => [row.participant_profile_id, row.participant_uid, row.participant_slug])
+      .filter(Boolean)
+      .map(String));
 
     const candidates = (Array.isArray(rows) ? rows : [])
+      .filter((row) => ![row.participant_profile_id, row.participant_uid, row.participant_slug].some((value) => value && blockedProfiles.has(String(value))))
       .map((row) => ({ ...row, ...candidateScore(row, targetZip, targetLat, targetLng) }))
       .filter((row) => row.in_service_radius || row.approximate_zip_score <= 35)
       .sort((a, b) => a.assignment_score - b.assignment_score || new Date(a.available_start) - new Date(b.available_start))
@@ -104,6 +112,7 @@ module.exports = async function handler(req, res) {
         end,
         responsibility
       },
+      unavailable: Array.isArray(unavailableRows) ? unavailableRows : [],
       candidates
     });
   } catch (error) {
