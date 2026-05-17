@@ -624,6 +624,11 @@ Important fields used in code:
 - `beds`
 - `baths`
 - `sqft` or `square_feet`
+- `lat`
+- `lng`
+- `location`
+
+`[IMPLEMENTED]` Spatial location is now enforced at the database layer by `supabase/migrations/20260517172206_ensure_open_house_location.sql`. The migration creates `public.set_open_house_location_from_lat_lng()` plus trigger `trg_open_houses_set_location_from_lat_lng`, which derives `open_houses.location` geography from valid `lng`/`lat` on insert or coordinate update. The live backfill on 2026-05-17 reduced rows with coordinates but missing `location` from 5,461 to 0.
 - `taxes`
 - `brokerage`
 - `agent`
@@ -1121,6 +1126,7 @@ Files:
 - `onekey-freshness-worker.cjs`
 - `api/cron/refresh-open-house-data.js`
 - `sql/migrations/20260509_open_house_freshness.sql`
+- `supabase/migrations/20260517172206_ensure_open_house_location.sql`
 
 `[IMPLEMENTED]` Confirmed worker behavior:
 
@@ -1130,6 +1136,7 @@ Files:
 - Looks up current OneKey listing data by a tight lat/lng search box.
 - Matches the source row by exact `UniqueListingId`; address match is a fallback.
 - Updates listing facts including price, beds, baths, square feet, brokerage, image, and coordinates.
+- Coordinate writes now automatically refresh `open_houses.location` through the database trigger, so geolocation RPCs do not depend on importer-specific spatial writes.
 - Does not overwrite `open_start` / `open_end` from the source freshness pass, because active demo/event windows may be manually corrected.
 - Supports `manual_price_override`; when present, source price is recorded but the display price is preserved.
 - Inserts `open_house_price_history` rows for detected price changes when the migration exists.
