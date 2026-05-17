@@ -433,6 +433,7 @@ Role: tested field/loan-officer work surface for scheduled REL8TION demo and sup
 
 - Loads a verified profile by `uid` or `slug`.
 - Shows next-7-days field visit stats, assigned visits, buyer financing requests, event chat logs, and LO/field availability controls.
+- In `/lo-field-dashboard` / `role=loan_officer` mode, hides the field-ops outreach queue and manual coverage scheduler so the page only shows assigned/upcoming open houses, agent/listing context, buyer financing, chat, and availability controls.
 - Lets an LO or field profile add one-day or repeated weekly/monthly availability windows using role, responsibility, service ZIP, service radius, and time window.
 - Lets an LO or field profile save `unavailable` exception blocks, such as blocking one Saturday inside a recurring weekend pattern.
 - Can create field/demo visits and participants through `/api/field-demo/*`.

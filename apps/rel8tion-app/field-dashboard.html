@@ -118,6 +118,10 @@
       return date;
     }
 
+    function isLoanOfficerDashboard() {
+      return state.role === 'loan_officer';
+    }
+
     function buildAvailabilitySlots(data) {
       const startDate = localDateFromInput(data.get('date'));
       const rangeDays = Math.max(1, Math.min(Number(data.get('range_days') || 1), 90));
@@ -278,6 +282,7 @@
     }
 
     async function loadOutreachCandidates() {
+      if (isLoanOfficerDashboard()) return [];
       if (!state.profile?.uid && !state.uid && !state.slug) return [];
       const payload = await api('/api/field-demo/outreach-candidates', {
         uid: state.profile?.uid || state.uid || '',
@@ -799,16 +804,16 @@
           ${stat('Financing', stats.financing, stats.financing ? 'rose' : 'slate')}
         </section>
 
-        ${renderSchedulePanel()}
+        ${isLoanOfficerDashboard() ? '' : renderSchedulePanel()}
 
         ${renderAvailabilityPanel()}
 
-        ${renderOutreachPanel()}
+        ${isLoanOfficerDashboard() ? '' : renderOutreachPanel()}
 
         <section class="grid gap-4">
           ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
-            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No Assigned Visits In The Next 7 Days</h2>
-            <p class="mt-2 font-semibold text-slate-500">Use Schedule Visit to create tomorrow's field coverage, then send outreach with a concrete appointment path.</p>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${isLoanOfficerDashboard() ? 'No Upcoming Open Houses Assigned' : 'No Assigned Visits In The Next 7 Days'}</h2>
+            <p class="mt-2 font-semibold text-slate-500">${isLoanOfficerDashboard() ? 'Assigned open houses will appear here with agent, listing, buyer financing, and live-event context.' : 'Use Schedule Visit to create the next field coverage, then send outreach with a concrete appointment path.'}</p>
           </div>`}
         </section>
       `;
@@ -983,6 +988,7 @@
 
     window.scheduleFromOutreach = async (queueId) => {
       try {
+        if (isLoanOfficerDashboard()) throw new Error('Outreach scheduling is not available on the loan officer dashboard.');
         const row = (state.outreachCandidates || []).find((candidate) => candidate.id === queueId);
         if (!row?.id) throw new Error('Outreach row not found.');
         const scheduledStart = row.open_start ? new Date(row.open_start) : new Date();
