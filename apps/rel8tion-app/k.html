@@ -251,6 +251,16 @@
       window.location.href = `${window.location.origin}/agent-dashboard?${next.toString()}`;
     }
 
+    function goToLoanOfficerDashboard(profile = {}) {
+      const next = new URLSearchParams();
+      next.set('uid', profile.uid || uid);
+      if (profile.slug) next.set('slug', profile.slug);
+      window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+      window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+      window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+      window.location.href = `${window.location.origin}/lo-field-dashboard?${next.toString()}`;
+    }
+
     async function request(path, options = {}) {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         ...options,
@@ -453,6 +463,14 @@
         signId: pendingLoanOfficer.signId,
         publicCode: pendingLoanOfficer.publicCode
       });
+      return true;
+    }
+
+    async function maybeOpenLoanOfficerDashboard() {
+      const profile = await loadVerifiedProfile(uid).catch(() => null);
+      if (!profile?.uid) return false;
+      setStatus('Loan Officer Keychain', 'Opening your coverage dashboard.');
+      goToLoanOfficerDashboard(profile);
       return true;
     }
 
@@ -846,6 +864,14 @@
           return;
         }
 
+        if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: true })) {
+          return;
+        }
+
+        if (await maybeOpenLoanOfficerDashboard()) {
+          return;
+        }
+
         const pendingSignActivation = readSignActivationSession();
         if (pendingSignActivation?.publicCode && pendingSignActivation.stage === 'waiting_for_agent_keychain') {
           savePendingSignActivation({
@@ -911,6 +937,10 @@
         }
 
         if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: true })) {
+          return;
+        }
+
+        if (await maybeOpenLoanOfficerDashboard()) {
           return;
         }
 
@@ -1048,6 +1078,10 @@
         }
 
         if (await maybeHandlePendingLoanOfficerSession({ allowProfileActivation: false })) {
+          return;
+        }
+
+        if (await maybeOpenLoanOfficerDashboard()) {
           return;
         }
 

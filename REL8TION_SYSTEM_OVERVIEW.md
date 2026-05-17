@@ -160,8 +160,9 @@ Important localStorage keys:
 2. If UID matches an active sign front chip, route to the live sign route `/s?code=<publicCode>`.
 3. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
 4. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
-5. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
-6. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
+5. If the UID matches an active `verified_profiles` row outside a pending event sign-in, open `/lo-field-dashboard?uid=<uid>` so LO chips are operational and not buyer-facing.
+6. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
+7. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
 
 `[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
@@ -434,6 +435,7 @@ Role: tested field/loan-officer work surface for scheduled REL8TION demo and sup
 - Loads a verified profile by `uid` or `slug`.
 - Shows next-7-days field visit stats, assigned visits, buyer financing requests, event chat logs, and LO/field availability controls.
 - In `/lo-field-dashboard` / `role=loan_officer` mode, hides the field-ops outreach queue and manual coverage scheduler so the page only shows assigned/upcoming open houses, agent/listing context, buyer financing, chat, and availability controls.
+- Standalone active LO keychain/tag scans through `/k` open this dashboard directly by UID.
 - Lets an LO or field profile add one-day or repeated weekly/monthly availability windows using role, responsibility, service ZIP, service radius, and time window.
 - Lets an LO or field profile save `unavailable` exception blocks, such as blocking one Saturday inside a recurring weekend pattern.
 - Can create field/demo visits and participants through `/api/field-demo/*`.
@@ -536,6 +538,7 @@ This is separate from the smart sign `/event` check-in flow.
 4. If missing, route to `/nmb-activate?uid=<uid>`.
 5. If active, insert or update `event_loan_officer_sessions` as `status = live`.
 6. Dashboard shows the live loan officer.
+7. Outside a pending event sign-in, the same active verified UID opens `/lo-field-dashboard?uid=...`.
 
 `[PARTIAL]` Current limitation: this is a present/local scan flow. Formal remote LO coverage management is `[INTENDED]` but not implemented in current app code: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 
@@ -1307,7 +1310,7 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Buyer financing help is opt-in. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` only marks financing requested when the buyer chooses second-opinion help or checks optional financing follow-up. `pre_approved=false` alone does not send financing outreach. |
 | Buyer financing opt-in routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `getLiveLoanOfficerSession`, then sends LO alert/intro only when financing help was requested. |
 | Buyer financing opt-in routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch; the buyer UI also has a temporary SMS financing button to `347-775-8059`. |
-| Loan officer tag scan verifies event support. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. |
+| Loan officer tag scan verifies event support and opens LO operations dashboard. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. Standalone active verified UID scans open `/lo-field-dashboard?uid=...`. |
 | `/nmb-activate` and `/nmb-verified` are loan officer profile routes. | `[PARTIAL]` | `apps/rel8tion-app/nmb-activate.html` and `nmb-verified.html`; Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
 | `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |
 | Admin command dashboard exists. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` plus protected `/api/admin/dashboard`, `/api/admin/outreach-inbox`, `/api/admin/outreach-reply`, `/api/admin/outreach-action`, `/api/admin/event-action`, `/api/admin/sign-action`, and `/api/admin/loan-officer-assignment`; leads, outreach replies, interested/confirmed/accepted open house workflow, confirmed open house reports/PDF-style export, drip scheduling, sign event closeout, smart-sign detach-to-fresh, live LO assignment/removal, LO profile soft-removal, field visit creation, and LO dashboard launch links are implemented, while CRM edits, broader sign inventory record edits, payment controls, and calendar availability editing remain unfinished. |
