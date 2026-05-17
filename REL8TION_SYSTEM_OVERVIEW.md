@@ -398,7 +398,10 @@ Inputs:
 
 ### `/nmb-activate`
 
-File: `apps/rel8tion-app/nmb-activate.html`.
+Files:
+
+- `apps/rel8tion-app/nmb-activate.html`
+- `nmb-activate.html` root mirror, because production can serve the root static file for `/nmb-activate` before the app rewrite.
 
 Role: activate or edit a loan officer/NMB verified profile tied to a chip UID.
 
