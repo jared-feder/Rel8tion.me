@@ -41,12 +41,11 @@ import {
   showForm,
   showFullProfileForm,
   showIntro,
-  showMissingChipNotice,
   showLoading,
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js?v=20260509-agent-name';
+} from './renderer.js?v=20260517-browser-back';
 
 const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
 const BETA_AGENT_SLUG = 'main-beta';
@@ -171,7 +170,126 @@ function isEventPassClaimFlow() {
   return pendingSign?.source === 'event_pass' && !!pendingSign?.code;
 }
 
+const CLAIM_HISTORY_FLOW = 'rel8tion-claim-activation';
+let claimHistoryBound = false;
+let claimHistoryIndex = 0;
+let restoringClaimHistory = false;
+
+function writeClaimHistory(screen, args = {}, mode = 'push') {
+  try {
+    if (restoringClaimHistory || !window.history?.pushState) return;
+
+    const current = window.history.state || {};
+    const currentIsClaim = current.rel8tionFlow === CLAIM_HISTORY_FLOW;
+    const sameScreen = currentIsClaim && current.screen === screen;
+    const method = mode === 'replace' || sameScreen ? 'replaceState' : 'pushState';
+    const currentIndex = currentIsClaim ? Number(current.stepIndex || 0) : claimHistoryIndex;
+    const nextIndex = method === 'pushState' ? currentIndex + 1 : currentIndex;
+
+    claimHistoryIndex = nextIndex;
+    window.history[method]({
+      rel8tionFlow: CLAIM_HISTORY_FLOW,
+      screen,
+      args,
+      stepIndex: nextIndex
+    }, '', window.location.href);
+  } catch (_) {}
+}
+
+async function restoreClaimHistoryScreen(entry) {
+  const screen = entry?.screen || 'intro';
+  const args = entry?.args || {};
+
+  restoringClaimHistory = true;
+  claimHistoryIndex = Number(entry?.stepIndex || 0);
+  try {
+    if (screen === 'brokerage') showBrokerageStep(args.notice || '');
+    else if (screen === 'fullProfile') showFullProfileForm(args.prefillBrokerage || '', args.notice || '');
+    else if (screen === 'detection') showDetection();
+    else if (screen === 'otherListings') showOtherListings();
+    else if (screen === 'listingSearch') showListingSearch(args.notice || '');
+    else if (screen === 'verifyAgent') showVerifyAgent();
+    else if (screen === 'agentSelection') await confirmListing();
+    else if (screen === 'betaClaimMenu') showBetaClaimMenu(args.agent || state.prefilledAgent || {}, args.notice || '');
+    else if (screen === 'alreadyClaimed') showAlreadyClaimed(args.agent || state.prefilledAgent || {});
+    else showIntro(args.notice || '');
+  } finally {
+    restoringClaimHistory = false;
+  }
+}
+
+function bindClaimBrowserHistory() {
+  if (claimHistoryBound) return;
+  claimHistoryBound = true;
+  window.addEventListener('popstate', (event) => {
+    if (event.state?.rel8tionFlow !== CLAIM_HISTORY_FLOW) return;
+    restoreClaimHistoryScreen(event.state);
+  });
+}
+
+function showIntroWithHistory(notice = '', mode = 'push') {
+  writeClaimHistory('intro', { notice }, mode);
+  showIntro(notice);
+}
+
+function showBrokerageStepWithHistory(notice = '', mode = 'push') {
+  writeClaimHistory('brokerage', { notice }, mode);
+  showBrokerageStep(notice);
+}
+
+function showFullProfileFormWithHistory(prefillBrokerage = '', notice = '', mode = 'push') {
+  writeClaimHistory('fullProfile', { prefillBrokerage, notice }, mode);
+  showFullProfileForm(prefillBrokerage, notice);
+}
+
+function showDetectionWithHistory(mode = 'push') {
+  writeClaimHistory('detection', {}, mode);
+  showDetection();
+}
+
+function showOtherListingsWithHistory(mode = 'push') {
+  writeClaimHistory('otherListings', {}, mode);
+  showOtherListings();
+}
+
+function showListingSearchWithHistory(notice = '', mode = 'push') {
+  writeClaimHistory('listingSearch', { notice }, mode);
+  showListingSearch(notice);
+}
+
+function showVerifyAgentWithHistory(mode = 'push') {
+  writeClaimHistory('verifyAgent', {}, mode);
+  showVerifyAgent();
+}
+
+function showBetaClaimMenuWithHistory(agent = {}, notice = '', mode = 'push') {
+  const agentSnapshot = {
+    slug: agent?.slug || '',
+    name: agent?.name || '',
+    brokerage: agent?.brokerage || '',
+    phone: agent?.phone || '',
+    email: agent?.email || ''
+  };
+  writeClaimHistory('betaClaimMenu', { agent: agentSnapshot, notice }, mode);
+  showBetaClaimMenu(agent, notice);
+}
+
+function showAlreadyClaimedWithHistory(agent = {}, mode = 'replace') {
+  writeClaimHistory('alreadyClaimed', { agent }, mode);
+  showAlreadyClaimed(agent);
+}
+
+function backToClaimIntro() {
+  const current = window.history?.state || {};
+  if (current.rel8tionFlow === CLAIM_HISTORY_FLOW && Number(current.stepIndex || 0) > 0) {
+    window.history.back();
+    return;
+  }
+  showIntroWithHistory('', 'replace');
+}
+
 export function bindPublicHandlers() {
+  bindClaimBrowserHistory();
   window.startFieldFlow = startFieldFlow;
   window.startOfficeFlow = startOfficeFlow;
   window.startDetection = startDetection;
@@ -179,8 +297,8 @@ export function bindPublicHandlers() {
   window.routeUnknownAgentFlow = routeUnknownAgentFlow;
   window.continueFromBrokerageStep = continueFromBrokerageStep;
   window.confirmListing = confirmListing;
-  window.showOtherListings = showOtherListings;
-  window.showListingSearch = showListingSearch;
+  window.showOtherListings = showOtherListingsWithHistory;
+  window.showListingSearch = showListingSearchWithHistory;
   window.searchListingByQuery = searchListingByQuery;
   window.autoActivate = autoActivate;
   window.saveFullProfile = saveFullProfile;
@@ -188,10 +306,11 @@ export function bindPublicHandlers() {
   window.selectHouse = selectHouse;
   window.selectAgentByEncoded = selectAgentByEncoded;
   window.editDetectedProfile = editDetectedProfile;
-  window.showIntro = showIntro;
+  window.showIntro = showIntroWithHistory;
+  window.backToClaimIntro = backToClaimIntro;
   window.showForm = showForm;
-  window.showBrokerageStep = showBrokerageStep;
-  window.showFullProfileForm = showFullProfileForm;
+  window.showBrokerageStep = showBrokerageStepWithHistory;
+  window.showFullProfileForm = showFullProfileFormWithHistory;
   window.startBetaClaimTest = startBetaClaimTest;
   window.continueBetaClaim = continueBetaClaim;
   window.resetLastBetaTrial = resetLastBetaTrial;
@@ -199,7 +318,7 @@ export function bindPublicHandlers() {
 }
 
 export function editDetectedProfile() {
-  showFullProfileForm(
+  showFullProfileFormWithHistory(
     state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '',
     'Update or complete your profile below.'
   );
@@ -230,7 +349,7 @@ export function startFieldFlow() {
 export function startOfficeFlow() {
   resetDetectionState();
   setSelectedBrokerage('');
-  showBrokerageStep('Choose your brokerage to continue.');
+  showBrokerageStepWithHistory('Choose your brokerage to continue.');
 }
 
 export async function startBetaClaimTest() {
@@ -244,10 +363,10 @@ export async function startBetaClaimTest() {
     setSelectedBrokerage('');
     setPrefilledAgent(null);
     setManuallyEnteredProfile(false);
-    showIntro('Beta fresh-claim mode is on. The beta keychain and beta sign will behave like a new activation for this test run.');
+    showIntroWithHistory('Beta fresh-claim mode is on. The beta keychain and beta sign will behave like a new activation for this test run.', 'replace');
   } catch (e) {
     debug('START BETA CLAIM TEST FAILED', { message: e?.message || String(e) });
-    showBetaClaimMenu(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not reset the last beta trial. Try again before starting the fresh test.');
+    showBetaClaimMenuWithHistory(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not reset the last beta trial. Try again before starting the fresh test.');
   }
 }
 
@@ -274,7 +393,7 @@ export async function resetLastBetaTrial({ renderMenu = true } = {}) {
   });
 
   if (renderMenu) {
-    showBetaClaimMenu(state.prefilledAgent, 'Last beta trial was cleared. The keychain is back to Main Beta and the beta sign is fresh.');
+    showBetaClaimMenuWithHistory(state.prefilledAgent, 'Last beta trial was cleared. The keychain is back to Main Beta and the beta sign is fresh.');
   }
 
   return result?.changed?.restoredKey || state.keyRecord;
@@ -293,10 +412,10 @@ export async function restoreBetaKeychain() {
       brokerage: 'Rel8tion Beta'
     });
     setManuallyEnteredProfile(false);
-    showBetaClaimMenu(state.prefilledAgent, `Restored this keychain to ${result?.changed?.agent_slug || BETA_AGENT_SLUG}.`);
+    showBetaClaimMenuWithHistory(state.prefilledAgent, `Restored this keychain to ${result?.changed?.agent_slug || BETA_AGENT_SLUG}.`);
   } catch (e) {
     debug('RESTORE BETA KEYCHAIN FAILED', { message: e?.message || String(e) });
-    showBetaClaimMenu(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not restore Main Beta. Try again.');
+    showBetaClaimMenuWithHistory(state.prefilledAgent || { slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG }, 'Could not restore Main Beta. Try again.');
   }
 }
 
@@ -305,13 +424,13 @@ export function routeUnknownAgentFlow(brokerage = '', notice = '') {
   if (cleanBrokerage) {
     setSelectedBrokerage(cleanBrokerage);
     applyBranding(cleanBrokerage).then(() => {
-      showFullProfileForm(cleanBrokerage, notice || 'Complete your profile to activate your Rel8tionchip.');
+      showFullProfileFormWithHistory(cleanBrokerage, notice || 'Complete your profile to activate your Rel8tionchip.');
     });
     return;
   }
 
   setSelectedBrokerage('');
-  showBrokerageStep(notice || 'Select your brokerage to continue.');
+  showBrokerageStepWithHistory(notice || 'Select your brokerage to continue.');
 }
 
 export async function continueFromBrokerageStep() {
@@ -328,7 +447,7 @@ export async function continueFromBrokerageStep() {
 
   setSelectedBrokerage(brokerage);
   await applyBranding(brokerage);
-  showFullProfileForm(brokerage, 'Complete your profile to activate your Rel8tionchip.');
+  showFullProfileFormWithHistory(brokerage, 'Complete your profile to activate your Rel8tionchip.');
 }
 
 export async function startDetection() {
@@ -354,7 +473,7 @@ export async function startDetection() {
         setSelectedBrokerage(state.detectedHouse.brokerage);
         await applyBranding(state.detectedHouse.brokerage);
       }
-      showDetection();
+      showDetectionWithHistory();
     } catch (e) {
       debug('DETECTION FAILED', { message: e?.message || String(e) });
       routeUnknownAgentFlow('', 'Detection failed. Continue manually.');
@@ -372,9 +491,9 @@ export function selectHouse(id) {
   setDetectedHouse(state.nearbyHouses.find((h) => String(h.id) === String(id)) || null);
   if (state.detectedHouse?.brokerage) {
     setSelectedBrokerage(state.detectedHouse.brokerage);
-    applyBranding(state.detectedHouse.brokerage).then(() => showDetection());
+    applyBranding(state.detectedHouse.brokerage).then(() => showDetectionWithHistory());
   } else {
-    showDetection();
+    showDetectionWithHistory();
   }
 }
 
@@ -383,7 +502,7 @@ export async function searchListingByQuery() {
   const query = input?.value?.trim() || '';
 
   if (!query) {
-    showListingSearch('Enter an address or MLS/source ID first.');
+    showListingSearchWithHistory('Enter an address or MLS/source ID first.');
     return;
   }
 
@@ -392,7 +511,7 @@ export async function searchListingByQuery() {
   try {
     const houses = await searchOpenHouses(query);
     if (!Array.isArray(houses) || !houses.length) {
-      showListingSearch('No matching listing found. Try another address, MLS/source ID, or continue manually.');
+      showListingSearchWithHistory('No matching listing found. Try another address, MLS/source ID, or continue manually.');
       return;
     }
 
@@ -402,10 +521,10 @@ export async function searchListingByQuery() {
       setSelectedBrokerage(state.detectedHouse.brokerage);
       await applyBranding(state.detectedHouse.brokerage);
     }
-    showOtherListings();
+    showOtherListingsWithHistory();
   } catch (e) {
     debug('LISTING SEARCH FAILED', { message: e?.message || String(e) });
-    showListingSearch('Search failed. Try another address, MLS/source ID, or continue manually.');
+    showListingSearchWithHistory('Search failed. Try another address, MLS/source ID, or continue manually.');
   }
 }
 
@@ -414,7 +533,7 @@ async function showAgentSelection() {
   if (!h) return;
 
   if (hasLockedProfileIdentity()) {
-    showVerifyAgent();
+    showVerifyAgentWithHistory();
     return;
   }
 
@@ -445,9 +564,9 @@ async function showAgentSelection() {
           brokerage: listingProfile.brokerage || h?.brokerage || state.prefilledAgent?.brokerage || '',
           image_url: profilePhoto || state.prefilledAgent?.image_url || ''
         });
-        showVerifyAgent();
+        showVerifyAgentWithHistory();
       } else if (h?.agent && !isGenericAgentName(h.agent)) {
-        showVerifyAgent();
+        showVerifyAgentWithHistory();
       } else {
         routeUnknownAgentFlow(h?.brokerage || '', 'We did not find an agent record. Complete your profile below.');
       }
@@ -473,6 +592,7 @@ async function showAgentSelection() {
       `;
     }).join('');
 
+    writeClaimHistory('agentSelection');
     document.getElementById('app').innerHTML = `
       <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
         <div class="mb-8">
@@ -489,7 +609,7 @@ async function showAgentSelection() {
   } catch (e) {
     debug('AGENT SELECTION FAILED', { message: e?.message || String(e) });
     if (h?.agent && !isGenericAgentName(h.agent)) {
-      showVerifyAgent();
+      showVerifyAgentWithHistory();
     } else {
       routeUnknownAgentFlow(h?.brokerage || '', 'Agent lookup failed. Continue manually.');
     }
@@ -510,7 +630,7 @@ export async function confirmListing() {
   }
 
   if (profileLocked) {
-    showVerifyAgent();
+    showVerifyAgentWithHistory();
     return;
   }
 
@@ -534,7 +654,7 @@ export function selectAgentByEncoded(encoded) {
 
 function selectAgent(agent) {
   if (hasLockedProfileIdentity()) {
-    showVerifyAgent();
+    showVerifyAgentWithHistory();
     return;
   }
 
@@ -554,7 +674,7 @@ function selectAgent(agent) {
   });
 
   setDetectedAgentPhoto(agent.primary_photo_url || agent.directory_photo_url || '');
-  showVerifyAgent();
+  showVerifyAgentWithHistory();
 }
 
 function getFullProfileBrokerage() {
@@ -681,7 +801,7 @@ export async function saveFullProfile() {
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-full-profile');
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
-    showFullProfileForm(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
+    showFullProfileFormWithHistory(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
   }
 }
 
@@ -690,17 +810,17 @@ export async function init() {
   startLoaderTextCycle();
 
   if (!state.uid) {
-    showMissingChipNotice();
+    showIntroWithHistory('This preview was opened without a chip uid. You can review the flow here, but live activation requires a real Rel8tionChip link.', 'replace');
     return;
   }
 
   try {
     await loadAgentFromUID();
     if (isBetaKeychain()) {
-      showBetaClaimMenu(state.prefilledAgent || {
+      showBetaClaimMenuWithHistory(state.prefilledAgent || {
         slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG,
         name: state.keyRecord?.agent_slug || 'Main Beta'
-      });
+      }, '', 'replace');
       return;
     }
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
@@ -709,13 +829,13 @@ export async function init() {
         window.location.href = nextRoute;
         return;
       }
-      if (state.prefilledAgent) showAlreadyClaimed(state.prefilledAgent);
+      if (state.prefilledAgent) showAlreadyClaimedWithHistory(state.prefilledAgent, 'replace');
       else window.location.href = nextRoute;
       return;
     }
-    showIntro();
+    showIntroWithHistory('', 'replace');
   } catch (e) {
     debug('INIT FAILED', { message: e?.message || String(e) });
-    showIntro();
+    showIntroWithHistory('', 'replace');
   }
 }

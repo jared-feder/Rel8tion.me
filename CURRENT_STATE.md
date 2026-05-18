@@ -25,6 +25,7 @@ Status labels:
 ## [IMPLEMENTED] Repo Code Present Today
 
 - `[IMPLEMENTED]` Agent keychain claim flow exists at `/claim`.
+- `[IMPLEMENTED]` The `/claim` activation flow writes lightweight browser history entries for its major in-page screens, so mobile browser Back can move from profile/brokerage/listing screens to the prior activation step instead of immediately closing the single-page scan session.
 - `[IMPLEMENTED]` Claimed keychains route through `/k` and then to `/a`, which redirects to `/b`.
 - `[IMPLEMENTED]` `/b` loads an agent by slug, shows agent info, captures buyer preferences, saves to `leads`, calls `send-lead-sms`, and shows a three-property preference modal.
 - `[IMPLEMENTED]` Agent onboarding exists at `/onboarding` and includes the smart sign activation entry point.
