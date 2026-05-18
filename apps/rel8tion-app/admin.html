@@ -485,6 +485,19 @@
       background:
         linear-gradient(135deg, rgba(255,255,255,.70), rgba(246,251,255,.38)),
         var(--glass);
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    }
+
+    .stat-card:hover,
+    .stat-card:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(91,141,255,.34);
+      box-shadow: 0 20px 52px rgba(23, 34, 79, .15), inset 0 1px 0 rgba(255,255,255,.58);
+      outline: none;
     }
 
     .stat-card::after {
@@ -1590,6 +1603,14 @@
       render();
     }
 
+    function openStatCard(area, filter = '') {
+      if (!area) return;
+      state.area = area;
+      if (filter) state.outreachFilter = filter;
+      window.localStorage.setItem(AREA_KEY, area);
+      render();
+    }
+
     function updateDraft(key, value) {
       state.drafts[key] = value;
       saveDrafts();
@@ -2376,6 +2397,9 @@
       document.querySelectorAll('[data-area-nav]').forEach((button) => {
         button.addEventListener('click', () => setArea(button.dataset.areaNav));
       });
+      document.querySelectorAll('[data-stat-area]').forEach((button) => {
+        button.addEventListener('click', () => openStatCard(button.dataset.statArea, button.dataset.statFilter || ''));
+      });
       document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
       document.getElementById('globalSearch')?.addEventListener('input', (event) => {
         state.query = event.target.value;
@@ -2466,19 +2490,19 @@
       const inbound = state.counts.inbound || o.incoming_threads || 0;
       const needs = state.counts.needs_reply || o.needs_reply || 0;
       const stats = [
-        { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4 },
-        { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10 },
-        { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8 },
-        { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8 },
-        { label: 'Event passes', value: o.event_passes || 0, icon: 'badge', tone: 'sky', meter: o.event_passes ? 68 : 7 },
-        { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8 },
-        { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6 },
-        { label: 'Leads', value: o.leads || 0, icon: 'contact-round', tone: 'green', meter: o.leads ? 82 : 8 },
-        { label: 'Check-ins', value: o.checkins || 0, icon: 'badge-check', tone: 'sky', meter: o.checkins ? 86 : 12 },
-        { label: 'Pay setup', value: o.payments_needing_setup || 0, icon: 'credit-card', tone: o.payments_needing_setup ? 'orange' : 'green', meter: o.payments_needing_setup ? 62 : 7 }
+        { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4, area: 'outreach', filter: 'needs_reply' },
+        { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
+        { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
+        { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
+        { label: 'QR codes', value: o.event_passes || 0, icon: 'qr-code', tone: 'sky', meter: o.event_passes ? 68 : 7, area: 'signs' },
+        { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8, area: 'signs' },
+        { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6, area: 'lo' },
+        { label: 'Leads', value: o.leads || 0, icon: 'contact-round', tone: 'green', meter: o.leads ? 82 : 8, area: 'leads' },
+        { label: 'Check-ins', value: o.checkins || 0, icon: 'badge-check', tone: 'sky', meter: o.checkins ? 86 : 12, area: 'leads' },
+        { label: 'Pay setup', value: o.payments_needing_setup || 0, icon: 'credit-card', tone: o.payments_needing_setup ? 'orange' : 'green', meter: o.payments_needing_setup ? 62 : 7, area: 'payments' }
       ];
       return `<section class="stats-grid">${stats.map((stat) => `
-        <div class="stat-card ${esc(stat.tone)}">
+        <button type="button" class="stat-card ${esc(stat.tone)}" data-stat-area="${esc(stat.area)}"${stat.filter ? ` data-stat-filter="${esc(stat.filter)}"` : ''} aria-label="Open ${esc(stat.label)}">
           <div class="stat-top">
             <div>
               <div class="value">${esc(stat.value)}</div>
@@ -2487,7 +2511,7 @@
             <div class="stat-icon"><i data-lucide="${esc(stat.icon)}"></i></div>
           </div>
           <div class="meter"><span style="width:${Math.max(4, Math.min(100, Math.round(stat.meter)))}%"></span></div>
-        </div>
+        </button>
       `).join('')}</section>`;
     }
 
@@ -2763,7 +2787,7 @@
         <div class="row-actions">
           ${row.qr_url ? `<a class="btn soft" href="${esc(row.qr_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open</span></a>` : ''}
           <button class="btn bad" data-reset-event-pass="${esc(row.id)}" ${state.actionKey === resetKey ? 'disabled' : ''}>
-            <i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset pass'}</span>
+            <i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset QR'}</span>
           </button>
         </div>
       `;
@@ -2780,7 +2804,7 @@
       const eventPasses = filterByQuery(state.command?.event_passes || []);
       const events = filterByQuery(state.command?.events || []);
       return `
-        ${renderRows('Event passes', `${eventPasses.length} printed Event Pass QR/NFC keychains`, eventPasses.slice(0, 120), (row) => `
+        ${renderRows('QR codes', `${eventPasses.length} printed QR codes`, eventPasses.slice(0, 120), (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>
             <div class="secondary">${esc(row.qr_url || `/pass?code=${row.public_code || ''}`)}</div>
