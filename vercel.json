@@ -43,6 +43,8 @@
     { "source": "/event-shell-test.html", "destination": "/apps/rel8tion-app/event.html" },
     { "source": "/agent-dashboard", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
     { "source": "/agent-dashboard.html", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
+    { "source": "/open-house-kit", "destination": "/apps/rel8tion-app/open-house-kit.html" },
+    { "source": "/open-house-kit.html", "destination": "/apps/rel8tion-app/open-house-kit.html" },
     { "source": "/field-dashboard", "destination": "/apps/rel8tion-app/field-dashboard.html" },
     { "source": "/field-dashboard.html", "destination": "/apps/rel8tion-app/field-dashboard.html" },
     { "source": "/lo-field-dashboard", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },

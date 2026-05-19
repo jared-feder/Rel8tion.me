@@ -13,6 +13,7 @@
     { "source": "/pass.html", "destination": "/pass.html" },
     { "source": "/event", "destination": "/event.html" },
     { "source": "/agent-dashboard", "destination": "/agent-dashboard.html" },
+    { "source": "/open-house-kit", "destination": "/open-house-kit.html" },
     { "source": "/field-dashboard", "destination": "/field-dashboard.html" },
     { "source": "/lo-field-dashboard", "destination": "/lo-field-dashboard.html" },
     { "source": "/admin", "destination": "/admin.html" },

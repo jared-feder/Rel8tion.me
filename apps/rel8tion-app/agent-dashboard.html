@@ -68,6 +68,16 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+    function openHouseKitHref(address = '') {
+      const kitParams = new URLSearchParams();
+      const agentSlug = state.event?.host_agent_slug || state.agent || '';
+      if (agentSlug) kitParams.set('agent', agentSlug);
+      if (state.event?.id) kitParams.set('event', state.event.id);
+      if (state.sign?.id) kitParams.set('sign_id', state.sign.id);
+      if (address) kitParams.set('address', address);
+      kitParams.set('source', isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
+      return `/open-house-kit?${kitParams.toString()}`;
+    }
 
     async function request(path, options = {}) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -367,7 +377,7 @@
       const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
       const passLabel = isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
-      const kitBody = `I want to order an open house kit and start Rel8tion service for my next open house. Current event: ${address}`;
+      const kitUrl = openHouseKitHref(address);
       const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
       const loPhone = state.loanOfficer?.loan_officer_phone || '';
       app.innerHTML = `<div class="py-10">
@@ -387,7 +397,7 @@
           <p class="mt-2 font-semibold leading-relaxed text-slate-600">For the next open house, the agent keeps the keychain on their keys and calls the sponsoring loan officer to activate the next Event Pass or service kit.</p>
           <div class="mt-4 grid gap-2 md:grid-cols-2">
             <a href="${esc(summaryMail)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Email Summary</a>
-            <a href="${esc(smsHref('3477758059', kitBody))}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Order Open House Kit</a>
+            <a href="${esc(kitUrl)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Get Open House Kit</a>
             <a href="${esc(loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody))}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
             <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
           </div>
