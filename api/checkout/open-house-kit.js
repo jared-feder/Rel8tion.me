@@ -1,21 +1,21 @@
 const STRIPE_API_VERSION = '2026-02-25.clover';
 const DEFAULT_OPEN_HOUSE_KIT_PRICE_ID = 'price_1TYtd12LIj1DZULXtTeeeYSm';
 const PLANS = {
-  kit: {
-    key: 'kit',
-    label: 'Open House Kit',
-    mode: 'payment',
-    defaultPriceId: DEFAULT_OPEN_HOUSE_KIT_PRICE_ID,
-    paymentLinkEnv: ['STRIPE_OPEN_HOUSE_KIT_PAYMENT_LINK', 'OPEN_HOUSE_KIT_PAYMENT_LINK'],
-    priceEnv: ['STRIPE_OPEN_HOUSE_KIT_PRICE_ID', 'OPEN_HOUSE_KIT_PRICE_ID']
-  },
   monthly: {
     key: 'monthly',
-    label: 'Monthly Event Pass + Dashboard',
+    label: 'Open House Kit + Monthly Service',
     mode: 'subscription',
     defaultPriceId: '',
-    paymentLinkEnv: ['STRIPE_EVENT_PASS_MONTHLY_PAYMENT_LINK', 'STRIPE_REL8TION_MONTHLY_PAYMENT_LINK', 'OPEN_HOUSE_MONTHLY_PAYMENT_LINK'],
+    paymentLinkEnv: ['STRIPE_OPEN_HOUSE_KIT_MONTHLY_PAYMENT_LINK'],
     priceEnv: ['STRIPE_EVENT_PASS_MONTHLY_PRICE_ID', 'STRIPE_REL8TION_MONTHLY_PRICE_ID', 'OPEN_HOUSE_MONTHLY_PRICE_ID']
+  },
+  annual: {
+    key: 'annual',
+    label: 'Open House Kit + Annual Service',
+    mode: 'subscription',
+    defaultPriceId: '',
+    paymentLinkEnv: ['STRIPE_OPEN_HOUSE_KIT_ANNUAL_PAYMENT_LINK', 'STRIPE_OPEN_HOUSE_KIT_YEARLY_PAYMENT_LINK'],
+    priceEnv: ['STRIPE_EVENT_PASS_ANNUAL_PRICE_ID', 'STRIPE_EVENT_PASS_YEARLY_PRICE_ID', 'STRIPE_REL8TION_ANNUAL_PRICE_ID', 'OPEN_HOUSE_ANNUAL_PRICE_ID']
   }
 };
 
@@ -43,7 +43,9 @@ function firstEnv(names) {
 }
 
 function getPlan(planKey) {
-  return String(planKey || '').toLowerCase() === 'monthly' ? PLANS.monthly : PLANS.kit;
+  const normalized = String(planKey || '').toLowerCase();
+  if (normalized === 'annual' || normalized === 'yearly' || normalized === 'year') return PLANS.annual;
+  return PLANS.monthly;
 }
 
 async function readBody(req) {
@@ -92,16 +94,17 @@ module.exports = async function handler(req, res) {
   }
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const priceId = firstEnv(plan.priceEnv) || plan.defaultPriceId;
+  const servicePriceId = firstEnv(plan.priceEnv) || plan.defaultPriceId;
+  const kitPriceId = firstEnv(['STRIPE_OPEN_HOUSE_KIT_PRICE_ID', 'OPEN_HOUSE_KIT_PRICE_ID']) || DEFAULT_OPEN_HOUSE_KIT_PRICE_ID;
 
-  if (!secretKey || !priceId) {
+  if (!secretKey || !servicePriceId || !kitPriceId) {
     return sendJson(res, 501, {
       ok: false,
       plan: plan.key,
       error: `${plan.label} checkout is not configured yet.`,
       setup: plan.key === 'monthly'
-        ? 'Set STRIPE_SECRET_KEY and STRIPE_EVENT_PASS_MONTHLY_PRICE_ID, or set STRIPE_EVENT_PASS_MONTHLY_PAYMENT_LINK.'
-        : 'Set STRIPE_SECRET_KEY. The Open House Kit price defaults to price_1TYtd12LIj1DZULXtTeeeYSm unless STRIPE_OPEN_HOUSE_KIT_PRICE_ID is set.'
+        ? 'Set STRIPE_SECRET_KEY and STRIPE_EVENT_PASS_MONTHLY_PRICE_ID. The one-time kit defaults to price_1TYtd12LIj1DZULXtTeeeYSm unless STRIPE_OPEN_HOUSE_KIT_PRICE_ID is set.'
+        : 'Set STRIPE_SECRET_KEY and STRIPE_EVENT_PASS_ANNUAL_PRICE_ID. The one-time kit defaults to price_1TYtd12LIj1DZULXtTeeeYSm unless STRIPE_OPEN_HOUSE_KIT_PRICE_ID is set.'
     });
   }
 
@@ -110,8 +113,10 @@ module.exports = async function handler(req, res) {
   const referenceParts = [cleanMetadataValue(body.agent, 80), cleanMetadataValue(body.event, 80)].filter(Boolean);
 
   checkoutParams.set('mode', plan.mode);
-  checkoutParams.set('line_items[0][price]', priceId);
+  checkoutParams.set('line_items[0][price]', kitPriceId);
   checkoutParams.set('line_items[0][quantity]', '1');
+  checkoutParams.set('line_items[1][price]', servicePriceId);
+  checkoutParams.set('line_items[1][quantity]', '1');
   checkoutParams.set('billing_address_collection', 'auto');
   checkoutParams.set('allow_promotion_codes', 'true');
   checkoutParams.set('success_url', `${origin}/open-house-kit?success=1&plan=${encodeURIComponent(plan.key)}&session_id={CHECKOUT_SESSION_ID}`);
