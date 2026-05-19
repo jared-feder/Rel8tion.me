@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Rel8tion Open House Kit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #101a42;
+      --muted: #5b667c;
+      --blue: #172c76;
+      --sky: #29b8e6;
+      --mint: #42c78f;
+      --coral: #ff7f6f;
+      --paper: rgba(255,255,255,.78);
+      --line: rgba(255,255,255,.82);
+      --shadow: 0 28px 80px rgba(23,44,118,.16);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% 14%, rgba(255,255,255,.9) 0 11rem, transparent 11.2rem),
+        radial-gradient(circle at 86% 12%, rgba(255,255,255,.78) 0 9rem, transparent 9.2rem),
+        linear-gradient(180deg, #58d2ef 0%, #e9f8ff 42%, #f8fbff 100%);
+    }
+    a { color: inherit; }
+    .wrap {
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 18px 0 42px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255,255,255,.52);
+      box-shadow: 0 18px 50px rgba(15,23,42,.1);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+    }
+    .topbar img { width: 118px; height: auto; }
+    .topbar .eyebrow {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #0e7490;
+      text-align: right;
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, .72fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+    }
+    .hero { padding: clamp(24px, 4vw, 42px); overflow: hidden; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: max-content;
+      max-width: 100%;
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.82);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      box-shadow: 0 12px 28px rgba(15,23,42,.08);
+    }
+    h1 {
+      margin: 18px 0 14px;
+      max-width: 760px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(44px, 8vw, 84px);
+      line-height: .92;
+      letter-spacing: 0;
+    }
+    .lead {
+      max-width: 720px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(17px, 2.5vw, 22px);
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .kit-preview {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 26px;
+    }
+    .piece {
+      min-height: 150px;
+      border: 1px solid rgba(23,44,118,.11);
+      border-radius: 24px;
+      background: rgba(255,255,255,.68);
+      padding: 18px;
+      box-shadow: 0 18px 36px rgba(23,44,118,.08);
+    }
+    .piece strong {
+      display: block;
+      margin-bottom: 8px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 20px;
+    }
+    .piece span {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+    .tag {
+      display: inline-grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 18px;
+      border-radius: 16px;
+      color: white;
+      font-weight: 900;
+      background: var(--blue);
+    }
+    .tag.sky { background: var(--sky); }
+    .tag.mint { background: var(--mint); }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .feature {
+      border: 1px solid rgba(16,26,66,.08);
+      border-radius: 22px;
+      background: rgba(255,255,255,.64);
+      padding: 18px;
+    }
+    .feature b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .checkout {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      padding: 24px;
+    }
+    .price {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(16,26,66,.1);
+    }
+    .price h2 {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 30px;
+      line-height: 1.02;
+    }
+    .price .secure {
+      color: #047857;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+    label {
+      display: block;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    input {
+      width: 100%;
+      margin-top: 7px;
+      border: 1px solid rgba(16,26,66,.14);
+      border-radius: 17px;
+      background: rgba(255,255,255,.82);
+      padding: 14px 15px;
+      color: var(--ink);
+      font: 800 16px Inter, sans-serif;
+      outline: none;
+    }
+    input:focus {
+      border-color: rgba(41,184,230,.95);
+      box-shadow: 0 0 0 4px rgba(41,184,230,.18);
+    }
+    button {
+      width: 100%;
+      min-height: 54px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      font: 900 15px Inter, sans-serif;
+      box-shadow: 0 18px 38px rgba(23,44,118,.22);
+    }
+    button:disabled { cursor: wait; opacity: .68; }
+    .note {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .status {
+      display: none;
+      margin-top: 14px;
+      border-radius: 20px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+    .status.show { display: block; }
+    .status.ok {
+      background: rgba(66,199,143,.15);
+      color: #047857;
+      border: 1px solid rgba(66,199,143,.28);
+    }
+    .status.warn {
+      background: rgba(255,127,111,.13);
+      color: #9f2318;
+      border: 1px solid rgba(255,127,111,.3);
+    }
+    .fine {
+      margin-top: 18px;
+      color: #667085;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    @media (max-width: 880px) {
+      .shell { grid-template-columns: 1fr; }
+      .checkout { position: static; }
+      .kit-preview { grid-template-columns: 1fr; }
+      .features { grid-template-columns: 1fr; }
+      .topbar { align-items: flex-start; }
+    }
+    @media (max-width: 520px) {
+      .wrap { width: min(100% - 20px, 1120px); padding-top: 10px; }
+      .hero, .checkout { padding: 20px; border-radius: 26px; }
+      .topbar { border-radius: 22px; }
+      h1 { font-size: clamp(40px, 15vw, 58px); }
+      .price { display: block; }
+      .price .secure { margin-top: 9px; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+      <div>
+        <div class="eyebrow">Open House Kit</div>
+      </div>
+    </header>
+
+    <section class="shell">
+      <article class="panel hero">
+        <div class="pill">Event Pass upgrade path</div>
+        <h1>Open House Kit</h1>
+        <p class="lead">Give the agent a reusable REL8TION setup for the next listing: buyer check-in, disclosure capture, loan officer coverage routing, and a cleaner post-event handoff.</p>
+
+        <div class="kit-preview" aria-label="Open House Kit contents">
+          <div class="piece">
+            <div class="tag">QR</div>
+            <strong>Event-ready entry</strong>
+            <span>Printed QR and NFC-ready flow for fast buyer check-in at the property.</span>
+          </div>
+          <div class="piece">
+            <div class="tag sky">LO</div>
+            <strong>Coverage handoff</strong>
+            <span>Financing requests route to the active loan officer when coverage is present.</span>
+          </div>
+          <div class="piece">
+            <div class="tag mint">DOC</div>
+            <strong>Disclosure evidence</strong>
+            <span>Check-ins keep agency, housing, and courtesy acknowledgement context together.</span>
+          </div>
+        </div>
+
+        <div class="features">
+          <div class="feature">
+            <b>No paper sign-in sheet chase</b>
+            <p>Buyer names, phones, attendance, and signed acknowledgement status stay tied to the open house.</p>
+          </div>
+          <div class="feature">
+            <b>Works after the one-event pass</b>
+            <p>The agent keeps the keychain, then upgrades into a reusable kit for future open houses.</p>
+          </div>
+          <div class="feature">
+            <b>Better loan officer visibility</b>
+            <p>When an LO is active, financing help requests can land with the right person instead of becoming a loose follow-up.</p>
+          </div>
+          <div class="feature">
+            <b>Cleaner event closeout</b>
+            <p>The dashboard summary, disclosure status, and next-step service path are available as soon as the event ends.</p>
+          </div>
+        </div>
+      </article>
+
+      <aside class="panel checkout" aria-label="Checkout">
+        <div id="statusBox" class="status"></div>
+        <div class="price">
+          <h2>Start the kit</h2>
+          <div class="secure">Secure Stripe checkout</div>
+        </div>
+        <form id="checkoutForm">
+          <label for="agentName">Agent or host</label>
+          <input id="agentName" name="agentName" autocomplete="name" placeholder="Agent name">
+
+          <label for="propertyAddress">Property</label>
+          <input id="propertyAddress" name="propertyAddress" autocomplete="street-address" placeholder="Open house address">
+
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="agent@example.com">
+
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="(555) 555-5555">
+
+          <button id="checkoutButton" type="submit">Continue To Payment</button>
+        </form>
+        <p class="note">Card details are entered on Stripe's secure checkout screen. REL8TION does not store card numbers in this app.</p>
+        <p class="fine">The property and agent context from the closed Event Pass is attached to the checkout request when available.</p>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const statusBox = document.getElementById('statusBox');
+    const checkoutForm = document.getElementById('checkoutForm');
+    const checkoutButton = document.getElementById('checkoutButton');
+    const agentInput = document.getElementById('agentName');
+    const addressInput = document.getElementById('propertyAddress');
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+
+    function labelSlug(slug) {
+      return String(slug || '').split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+    }
+
+    function showStatus(message, tone = 'warn') {
+      statusBox.className = `status show ${tone}`;
+      statusBox.innerHTML = message;
+    }
+
+    const agentSlug = params.get('agent') || '';
+    agentInput.value = labelSlug(agentSlug);
+    addressInput.value = params.get('address') || '';
+
+    if (params.get('success')) {
+      showStatus('Payment received. REL8TION will use this checkout to prepare the open house kit.', 'ok');
+    } else if (params.get('canceled')) {
+      showStatus('Checkout was canceled. You can restart secure payment whenever the agent is ready.', 'warn');
+    }
+
+    checkoutForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      checkoutButton.disabled = true;
+      checkoutButton.textContent = 'Opening Stripe...';
+      statusBox.className = 'status';
+      statusBox.textContent = '';
+
+      const payload = {
+        source: params.get('source') || 'open_house_kit',
+        agent: agentSlug || agentInput.value,
+        event: params.get('event') || '',
+        sign_id: params.get('sign_id') || '',
+        address: addressInput.value,
+        email: emailInput.value,
+        phone: phoneInput.value
+      };
+
+      try {
+        const res = await fetch('/api/checkout/open-house-kit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) throw new Error(data.error || 'Checkout could not be started.');
+        window.location.href = data.url;
+      } catch (error) {
+        const address = addressInput.value || 'the next open house';
+        const body = encodeURIComponent(`I want to order an open house kit for ${address}.`);
+        showStatus(`Checkout is not connected yet. Set the Stripe Open House Kit env vars, or <a href="sms:3477758059?&body=${body}">text Rel8tion to finish this order</a>.`, 'warn');
+        checkoutButton.disabled = false;
+        checkoutButton.textContent = 'Continue To Payment';
+      }
+    });
+  </script>
+</body>
+</html>

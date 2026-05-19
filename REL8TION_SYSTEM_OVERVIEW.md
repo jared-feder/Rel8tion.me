@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-16.
+Last inspected: 2026-05-19.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -58,6 +58,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/s` and `/sign` to `apps/rel8tion-app/sign.html`; `/pass` to `apps/rel8tion-app/pass.html`, which reuses the same resolver module in Event Pass mode
 - `/event` to `apps/rel8tion-app/event.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
+- `/open-house-kit` to `apps/rel8tion-app/open-house-kit.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
 - `/lo-field-dashboard` to `apps/rel8tion-app/lo-field-dashboard.html`
 - `/admin` to `apps/rel8tion-app/admin.html`
@@ -104,6 +105,7 @@ It uses:
 - `api/admin/outreach-reply.js`
 - `api/admin/reset-key.js`
 - `api/admin/sign-action.js`
+- `api/checkout/open-house-kit.js`
 - `api/cron/enrich-agents.js`
 - `api/event-chat/list.js`
 - `api/event-chat/send.js`
@@ -391,7 +393,7 @@ Inputs:
 - Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
 - Shows loan officer coverage card.
 - Can email a current event summary from the dashboard.
-- Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, setting the sign inactive, closing live loan officer sessions where possible, and rendering an event summary with buyer check-in count, signed disclosure count, financing-help count, email-summary action, open-house-kit prompt, and next-coverage call/SMS action.
+- Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, setting the sign inactive, closing live loan officer sessions where possible, and rendering an event summary with buyer check-in count, signed disclosure count, financing-help count, email-summary action, a Get Open House Kit link to `/open-house-kit`, and next-coverage call/SMS action.
 - The dashboard request helper supports PATCH/POST/DELETE options, so End/Move controls perform live Supabase writes instead of read-only requests.
 - Can move the same sign to another open house by closing the current event and opening sign activation for the next listing.
 - Can arm loan officer sign-in by writing `rel8tion_loan_officer_pending` and prompting a loan officer tag scan.
@@ -1306,7 +1308,8 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Sign activation uses sign inventory/public code lookup. | `[IMPLEMENTED]` | `sign-demo-activate.html` queries `smart_sign_inventory?public_code=eq...` before sign fallback. |
 | Smart sign activation stores front and rear chip roles. | `[IMPLEMENTED]` | `registerFirstChip` writes `primary_device_type: front_buyer_chip`; `registerSecondChip` writes `secondary_device_type: rear_agent_chip`. |
 | Smart sign activation binds a sign to `open_house_events`. | `[IMPLEMENTED]` | `createOrLockEvent` inserts/updates `open_house_events` and patches `smart_signs.active_event_id`. |
-| Agent dashboard can end or move a live sign/Event Pass event. | `[IMPLEMENTED]` | `agent-dashboard.html` patches `open_house_events.status/ended_at`, clears `smart_signs.active_event_id`, sets the sign inactive, closes live LO sessions where possible, renders a check-in/disclosure/financing summary with email and next-service actions, and can route into `/sign-demo-activate.html` for the next listing. |
+| Agent dashboard can end or move a live sign/Event Pass event. | `[IMPLEMENTED]` | `agent-dashboard.html` patches `open_house_events.status/ended_at`, clears `smart_signs.active_event_id`, sets the sign inactive, closes live LO sessions where possible, renders a check-in/disclosure/financing summary with email, next-service actions, and a Get Open House Kit link to `/open-house-kit`, and can route into `/sign-demo-activate.html` for the next listing. |
+| Event Pass closeout can start kit checkout. | `[PARTIAL]` | `/open-house-kit` explains the Open House Kit and posts to `/api/checkout/open-house-kit`, which uses a configured Stripe Payment Link or Stripe Checkout Session. Live Stripe env vars/product pricing still need verification. |
 | `/s` resolves active signs to `/event`. | `[IMPLEMENTED]` | `signResolver` loads a sign/event and redirects to `/event?event=...` when an event exists. |
 | `/event` saves buyer check-ins to `event_checkins`. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` builds payloads and calls `createCheckin`; `src/api/events.js` posts to `event_checkins`. |
 | `/event` first screen is buyer-first. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` renders a formatted property-address welcome, property image, hosted-by agent photo/name/brokerage, compact top path buttons, and immediate name/phone/pre-approval inputs before contact/save-contact actions. Email is optional. |
