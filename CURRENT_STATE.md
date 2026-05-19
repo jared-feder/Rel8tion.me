@@ -184,6 +184,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.
 - `[IMPLEMENTED]` Mockup rendering for outreach no longer lets failed listing-photo fetches clog the render queue: the renderer processes only `mockup_status = pending` rows during normal runs and falls back to a branded property card when a listing image cannot be fetched. This keeps generated outreach rows eligible for the send step after rendering instead of leaving new rows stuck behind repeated 403 image failures.
+- `[IMPLEMENTED]` Future open-house outreach generation now uses the Event Pass sponsorship wording: quick pre-approval support plus a sponsored Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture with no app needed. Follow-up and missed-open-house variants were aligned so older beta/custom-sign wording does not regenerate.
 
 ## [INTENDED] Build Next
 

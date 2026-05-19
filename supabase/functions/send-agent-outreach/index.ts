@@ -12,6 +12,18 @@ const BUSINESS_CARD_URL =
   Deno.env.get("NMB_BUSINESS_CARD_URL") ||
   "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/outreach-mockups/mynmb.jpg";
 
+type OutreachRow = {
+  agent_first_name?: string | null;
+  agent_name?: string | null;
+  agent_phone?: string | null;
+  address?: string | null;
+  open_start?: string | null;
+  selected_sms?: string | null;
+  followup_sms?: string | null;
+  review_status?: string | null;
+  template_key?: string | null;
+};
+
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
   return phone.replace(/\D/g, "");
@@ -21,6 +33,97 @@ function toE164(phone: string | null): string {
   const digits = normalizePhone(phone);
   if (!digits) return "";
   return digits.startsWith("1") ? `+${digits}` : `+1${digits}`;
+}
+
+function firstNameSafe(name: string | null): string {
+  if (!name?.trim()) return "there";
+  const first = name.trim().split(/\s+/)[0].replace(/[:;,]+$/, "");
+  if (/^(agent|listing|unknown|phone)$/i.test(first)) return "there";
+  return first;
+}
+
+function shortAddress(address: string | null): string {
+  if (!address?.trim()) return "your open house";
+  const withoutStateZip = address.replace(/,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?$/i, "").trim();
+  const parts = withoutStateZip.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[0] : withoutStateZip;
+}
+
+function formatOpenHouse(openStart: string | null): string {
+  if (!openStart) return "this weekend";
+
+  try {
+    const dt = new Date(openStart);
+
+    const day = dt.toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone: "America/New_York",
+    });
+
+    const time = dt.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "America/New_York",
+    }).replace(":00", "");
+
+    return `${day} at ${time}`;
+  } catch {
+    return "this weekend";
+  }
+}
+
+function buildSmsLink(phone: string | null, body: string): string {
+  const clean = normalizePhone(phone);
+  return `sms:${clean}?body=${encodeURIComponent(body)}`;
+}
+
+function shouldRebuildRel8tionCopy(row: OutreachRow): boolean {
+  if (row.template_key === "future_open_house" || row.template_key === "missed_open_house") return true;
+
+  const storedCopy = `${row.selected_sms || ""} ${row.followup_sms || ""}`.toLowerCase();
+  return (
+    storedCopy.includes("custom check-in sign") ||
+    storedCopy.includes("rel8tion beta") ||
+    storedCopy.includes("sponsored beta setup") ||
+    storedCopy.includes("paperless check-in")
+  );
+}
+
+function buildInitialOutreachBody(row: OutreachRow): string {
+  if (!shouldRebuildRel8tionCopy(row)) return row.selected_sms || "";
+
+  const firstName = firstNameSafe(row.agent_first_name || row.agent_name || null);
+  const addr = shortAddress(row.address || null);
+
+  if (row.template_key === "missed_open_house") {
+    return (
+      `Hey ${firstName} 👋 Sorry I missed your open house at ${addr}. ` +
+      `I’d still love to support your next one with quick pre-approval help and sponsor a Rel8tion Event Pass — paperless check-in, e-sign disclosures, and lead capture with no app needed. Reply STOP to opt out.`
+    );
+  }
+
+  const when = formatOpenHouse(row.open_start || null);
+  return (
+    `Hey ${firstName} 👋 I’d love to stop by your open house at ${addr} ${when} to provide quick pre-approval support.\n\n` +
+    `I’m also sponsoring a Rel8tion Event Pass for you — paperless check-in, e-sign disclosures, and lead capture with no app needed.\n\n` +
+    `Looking forward to meeting you. Reply STOP to opt out.`
+  );
+}
+
+function buildFollowupOutreachBody(row: OutreachRow): string | null {
+  if (row.review_status === "drip_scheduled") return row.followup_sms || null;
+  if (row.template_key === "missed_open_house") return row.followup_sms || null;
+  if (!shouldRebuildRel8tionCopy(row)) return row.followup_sms || null;
+
+  const firstName = firstNameSafe(row.agent_first_name || row.agent_name || null);
+  const addr = shortAddress(row.address || null);
+  const when = formatOpenHouse(row.open_start || null);
+
+  return (
+    `Hey ${firstName} 👋 Just circling back before your open house at ${addr} ${when}. ` +
+    `I’d still love to stop by with quick pre-approval support and sponsor a Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture. Reply STOP to opt out.`
+  );
 }
 
 function isWithinAllowedSendWindow(): boolean {
@@ -154,9 +257,11 @@ serve(async (req) => {
       .select(`
         id,
         open_house_id,
+        agent_first_name,
         agent_name,
         agent_phone,
         agent_phone_normalized,
+        address,
         selected_sms,
         followup_sms,
         mockup_image_url,
@@ -284,6 +389,10 @@ serve(async (req) => {
           continue;
         }
 
+        const initialBody = initialDue ? buildInitialOutreachBody(row) : "";
+        const followupBody = followupDue ? buildFollowupOutreachBody(row) : null;
+        const storedFollowupBody = buildFollowupOutreachBody(row);
+
         if (isBlockedReviewStatus(row.review_status)) {
           await supabase
             .from("agent_outreach_queue")
@@ -348,13 +457,18 @@ serve(async (req) => {
             authToken: twilioToken,
             from: twilioFrom,
             to,
-            body: row.selected_sms,
+            body: initialBody,
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
           });
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
             .update({
+              selected_sms: initialBody,
+              sms_variant_1: initialBody,
+              sms_link: buildSmsLink(row.agent_phone, initialBody),
+              followup_sms: storedFollowupBody,
+              followup_sms_link: storedFollowupBody ? buildSmsLink(row.agent_phone, storedFollowupBody) : null,
               initial_send_status: "sent",
               initial_sent_at: new Date().toISOString(),
               twilio_sid_initial: twilioRes.sid,
@@ -385,13 +499,15 @@ serve(async (req) => {
             authToken: twilioToken,
             from: twilioFrom,
             to,
-            body: row.followup_sms,
+            body: followupBody || row.followup_sms || "",
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
           });
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
             .update({
+              followup_sms: followupBody || row.followup_sms || null,
+              followup_sms_link: followupBody ? buildSmsLink(row.agent_phone, followupBody) : null,
               followup_send_status: "sent",
               followup_sent_at: new Date().toISOString(),
               twilio_sid_followup: twilioRes.sid,

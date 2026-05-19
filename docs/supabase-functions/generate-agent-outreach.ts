@@ -34,7 +34,9 @@ function firstNameSafe(name: string | null): string {
 
 function shortAddress(address: string | null): string {
   if (!address?.trim()) return "your open house";
-  return address.replace(/,\s*NY\s+\d{5}$/i, "").trim();
+  const withoutStateZip = address.replace(/,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?$/i, "").trim();
+  const parts = withoutStateZip.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[0] : withoutStateZip;
 }
 
 function formatOpenHouse(openStart: string | null): string {
@@ -101,12 +103,13 @@ function buildVariants(row: QueueRow) {
   const addr = shortAddress(row.address);
 
   const main =
-    `Hey ${firstName} 👋 I’d love to stop by your open house at ${addr} ${when} and provide preapproval support for you and your buyers. ` +
-    `No pressure. I also need a few local agents to beta Rel8tion, so I’ll bring a custom check-in sign and my card. Let me know. Reply STOP to opt out.`;
+    `Hey ${firstName} 👋 I’d love to stop by your open house at ${addr} ${when} to provide quick pre-approval support.\n\n` +
+    `I’m also sponsoring a Rel8tion Event Pass for you — paperless check-in, e-sign disclosures, and lead capture with no app needed.\n\n` +
+    `Looking forward to meeting you. Reply STOP to opt out.`;
 
   const followup =
-    `Hey ${firstName} 👋 Just circling back before ${addr}. ` +
-    `Happy to stop by with the custom check-in sign and my card if helpful. Reply STOP to opt out.`;
+    `Hey ${firstName} 👋 Just circling back before your open house at ${addr} ${when}. ` +
+    `I’d still love to stop by with quick pre-approval support and sponsor a Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture. Reply STOP to opt out.`;
 
   return { v1: main, v2: null, v3: null, selected: main, followup };
 }
@@ -117,8 +120,7 @@ function buildMissedOpenHouseVariants(row: QueueRow) {
 
   const main =
     `Hey ${firstName} 👋 Sorry I missed your open house at ${addr}. ` +
-    `I made a quick Rel8tion preview around that listing and would still love to help on whatever you have coming up next. ` +
-    `If you have another open house soon, I can stop by with buyer preapproval support, a custom check-in sign, and my card. Reply STOP to opt out.`;
+    `I’d still love to support your next one with quick pre-approval help and sponsor a Rel8tion Event Pass — paperless check-in, e-sign disclosures, and lead capture with no app needed. Reply STOP to opt out.`;
 
   return { v1: main, v2: null, v3: null, selected: main, followup: null };
 }
