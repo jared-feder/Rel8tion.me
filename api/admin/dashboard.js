@@ -481,6 +481,8 @@ module.exports = async function handler(req, res) {
         claimed_keychains: keys.filter((row) => row.claimed).length,
         smart_signs: signs.length,
         event_passes: eventPassRows.length,
+        outreach_queue: outreach.length,
+        outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
         active_signs: signs.filter((row) => row.status === 'active').length,
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,
