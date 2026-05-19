@@ -183,6 +183,7 @@ Recent repo state includes:
 - `[IMPLEMENTED]` OneKey listing freshness worker, API route, cron config, migration, npm scripts, and live-verification contract entries were added so stale prices can be checked against current OneKey source data.
 - `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
 - `[NEEDS VERIFICATION]` Outreach cleanup and bad-phone handling were worked on, but live deployment and current queue health need verification.
+- `[IMPLEMENTED]` Mockup rendering for outreach no longer lets failed listing-photo fetches clog the render queue: the renderer processes only `mockup_status = pending` rows during normal runs and falls back to a branded property card when a listing image cannot be fetched. This keeps generated outreach rows eligible for the send step after rendering instead of leaving new rows stuck behind repeated 403 image failures.
 
 ## [INTENDED] Build Next
 

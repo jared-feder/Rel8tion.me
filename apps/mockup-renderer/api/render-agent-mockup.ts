@@ -183,6 +183,7 @@ export default async function handler(req: any, res: any) {
 
     if (!force) {
       url += `&mockup_image_url=is.null`;
+      url += `&mockup_status=eq.pending`;
     }
 
     if (ids.length > 0) {
