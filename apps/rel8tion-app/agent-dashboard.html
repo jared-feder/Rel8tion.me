@@ -75,6 +75,8 @@
       if (state.event?.id) kitParams.set('event', state.event.id);
       if (state.sign?.id) kitParams.set('sign_id', state.sign.id);
       if (address) kitParams.set('address', address);
+      if (state.loanOfficer?.loan_officer_phone) kitParams.set('lo_phone', state.loanOfficer.loan_officer_phone);
+      if (state.loanOfficer?.loan_officer_name) kitParams.set('lo_name', state.loanOfficer.loan_officer_name);
       kitParams.set('source', isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
       return `/open-house-kit?${kitParams.toString()}`;
     }

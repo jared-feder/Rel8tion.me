@@ -198,6 +198,58 @@
       text-align: right;
       text-transform: uppercase;
     }
+    .plan-options {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 4px;
+    }
+    .plan-option,
+    .call-option {
+      display: block;
+      width: 100%;
+      border: 1px solid rgba(16,26,66,.12);
+      border-radius: 20px;
+      background: rgba(255,255,255,.7);
+      padding: 15px;
+      color: var(--ink);
+      text-align: left;
+      text-decoration: none;
+      box-shadow: 0 12px 26px rgba(23,44,118,.07);
+    }
+    .plan-option {
+      cursor: pointer;
+      font: inherit;
+    }
+    .plan-option.is-active {
+      border-color: rgba(41,184,230,.78);
+      background: rgba(230,248,255,.9);
+      box-shadow: 0 0 0 4px rgba(41,184,230,.14), 0 16px 30px rgba(23,44,118,.1);
+    }
+    .plan-kicker {
+      display: block;
+      color: #0e7490;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .plan-title {
+      display: block;
+      margin-top: 5px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.15;
+    }
+    .plan-copy {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.38;
+    }
+    .call-option .plan-kicker { color: #9f2318; }
     label {
       display: block;
       margin-top: 14px;
@@ -222,7 +274,7 @@
       border-color: rgba(41,184,230,.95);
       box-shadow: 0 0 0 4px rgba(41,184,230,.18);
     }
-    button {
+    #checkoutButton {
       width: 100%;
       min-height: 54px;
       margin-top: 18px;
@@ -234,7 +286,7 @@
       font: 900 15px Inter, sans-serif;
       box-shadow: 0 18px 38px rgba(23,44,118,.22);
     }
-    button:disabled { cursor: wait; opacity: .68; }
+    #checkoutButton:disabled { cursor: wait; opacity: .68; }
     .note {
       margin: 13px 0 0;
       color: var(--muted);
@@ -342,8 +394,25 @@
       <aside class="panel checkout" aria-label="Checkout">
         <div id="statusBox" class="status"></div>
         <div class="price">
-          <h2>Start the kit</h2>
+          <h2>Choose next step</h2>
           <div class="secure">Secure Stripe checkout</div>
+        </div>
+        <div class="plan-options" role="radiogroup" aria-label="Service options">
+          <button type="button" class="plan-option is-active" data-plan="kit" role="radio" aria-checked="true">
+            <span class="plan-kicker">One-time</span>
+            <span class="plan-title">Buy the Open House Kit</span>
+            <span class="plan-copy">A reusable kit for the next listing, with REL8TION buyer check-in and closeout tools.</span>
+          </button>
+          <button type="button" class="plan-option" data-plan="monthly" role="radio" aria-checked="false">
+            <span class="plan-kicker">Monthly</span>
+            <span class="plan-title">Keep dashboard + Event Pass active</span>
+            <span class="plan-copy">Turn the one-event pass into ongoing service so the agent can keep using the dashboard.</span>
+          </button>
+          <a id="loanOfficerLink" class="call-option" href="sms:3477758059?&body=I%20need%20loan%20officer%20help%20setting%20up%20my%20next%20open%20house.">
+            <span class="plan-kicker">No purchase now</span>
+            <span class="plan-title">Call the loan officer next week</span>
+            <span class="plan-copy">If they do not upgrade, they keep the keychain and need the sponsoring loan officer to set up the next open house.</span>
+          </a>
         </div>
         <form id="checkoutForm">
           <label for="agentName">Agent or host</label>
@@ -358,9 +427,9 @@
           <label for="phone">Phone</label>
           <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="(555) 555-5555">
 
-          <button id="checkoutButton" type="submit">Continue To Payment</button>
+          <button id="checkoutButton" type="submit">Buy Open House Kit</button>
         </form>
-        <p class="note">Card details are entered on Stripe's secure checkout screen. REL8TION does not store card numbers in this app.</p>
+        <p id="checkoutNote" class="note">Card details are entered on Stripe's secure checkout screen. REL8TION does not store card numbers in this app.</p>
         <p class="fine">The property and agent context from the closed Event Pass is attached to the checkout request when available.</p>
       </aside>
     </section>
@@ -375,9 +444,32 @@
     const addressInput = document.getElementById('propertyAddress');
     const emailInput = document.getElementById('email');
     const phoneInput = document.getElementById('phone');
+    const planButtons = Array.from(document.querySelectorAll('.plan-option'));
+    const checkoutNote = document.getElementById('checkoutNote');
+    const loanOfficerLink = document.getElementById('loanOfficerLink');
+    const planCopy = {
+      kit: {
+        button: 'Buy Open House Kit',
+        opening: 'Opening kit checkout...',
+        success: 'Payment received. REL8TION will use this checkout to prepare the open house kit.',
+        note: "Card details are entered on Stripe's secure checkout screen. REL8TION does not store card numbers in this app.",
+        fallback: 'I want to order an open house kit'
+      },
+      monthly: {
+        button: 'Activate Monthly Service',
+        opening: 'Opening subscription checkout...',
+        success: 'Monthly service started. REL8TION will keep the Event Pass and dashboard service active.',
+        note: 'The monthly subscription is handled by Stripe Billing. REL8TION does not store card numbers in this app.',
+        fallback: 'I want to activate monthly REL8TION service'
+      }
+    };
 
     function labelSlug(slug) {
       return String(slug || '').split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+    }
+
+    function cleanPhone(phone) {
+      return String(phone || '').replace(/[^\d+]/g, '');
     }
 
     function showStatus(message, tone = 'warn') {
@@ -386,11 +478,35 @@
     }
 
     const agentSlug = params.get('agent') || '';
+    const loPhone = cleanPhone(params.get('lo_phone') || '');
+    const loName = params.get('lo_name') || 'the loan officer';
+    let activePlan = params.get('plan') === 'monthly' ? 'monthly' : 'kit';
+
+    function selectPlan(plan) {
+      activePlan = plan === 'monthly' ? 'monthly' : 'kit';
+      planButtons.forEach((button) => {
+        const selected = button.dataset.plan === activePlan;
+        button.classList.toggle('is-active', selected);
+        button.setAttribute('aria-checked', selected ? 'true' : 'false');
+      });
+      checkoutButton.textContent = planCopy[activePlan].button;
+      checkoutNote.textContent = planCopy[activePlan].note;
+    }
+
     agentInput.value = labelSlug(agentSlug);
     addressInput.value = params.get('address') || '';
+    if (loPhone) {
+      loanOfficerLink.href = `tel:${loPhone}`;
+      loanOfficerLink.querySelector('.plan-title').textContent = `Call ${loName}`;
+    } else {
+      const address = encodeURIComponent(addressInput.value || 'my next open house');
+      loanOfficerLink.href = `sms:3477758059?&body=I%20need%20loan%20officer%20help%20setting%20up%20${address}.`;
+    }
+    planButtons.forEach((button) => button.addEventListener('click', () => selectPlan(button.dataset.plan)));
+    selectPlan(activePlan);
 
     if (params.get('success')) {
-      showStatus('Payment received. REL8TION will use this checkout to prepare the open house kit.', 'ok');
+      showStatus(planCopy[activePlan].success, 'ok');
     } else if (params.get('canceled')) {
       showStatus('Checkout was canceled. You can restart secure payment whenever the agent is ready.', 'warn');
     }
@@ -398,11 +514,12 @@
     checkoutForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       checkoutButton.disabled = true;
-      checkoutButton.textContent = 'Opening Stripe...';
+      checkoutButton.textContent = planCopy[activePlan].opening;
       statusBox.className = 'status';
       statusBox.textContent = '';
 
       const payload = {
+        plan: activePlan,
         source: params.get('source') || 'open_house_kit',
         agent: agentSlug || agentInput.value,
         event: params.get('event') || '',
@@ -423,10 +540,12 @@
         window.location.href = data.url;
       } catch (error) {
         const address = addressInput.value || 'the next open house';
-        const body = encodeURIComponent(`I want to order an open house kit for ${address}.`);
-        showStatus(`Checkout is not connected yet. Set the Stripe Open House Kit env vars, or <a href="sms:3477758059?&body=${body}">text Rel8tion to finish this order</a>.`, 'warn');
+        const body = encodeURIComponent(`${planCopy[activePlan].fallback} for ${address}.`);
+        const fallbackHref = loPhone ? `tel:${loPhone}` : `sms:3477758059?&body=${body}`;
+        const fallbackText = loPhone ? `call ${loName}` : 'text Rel8tion';
+        showStatus(`Checkout is not connected yet. ${error.message || 'Stripe could not be started.'} You can <a href="${fallbackHref}">${fallbackText}</a> to finish this setup.`, 'warn');
         checkoutButton.disabled = false;
-        checkoutButton.textContent = 'Continue To Payment';
+        checkoutButton.textContent = planCopy[activePlan].button;
       }
     });
   </script>
