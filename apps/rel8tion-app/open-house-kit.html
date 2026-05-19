@@ -170,6 +170,54 @@
       font-weight: 700;
       line-height: 1.45;
     }
+    .promise-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .promise-card {
+      border: 1px solid rgba(16,26,66,.09);
+      border-radius: 22px;
+      background: rgba(255,255,255,.76);
+      padding: 16px;
+      box-shadow: 0 16px 32px rgba(23,44,118,.08);
+    }
+    .promise-card .mini {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(41,184,230,.15);
+      color: #075985;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .promise-card:nth-child(2) .mini {
+      background: rgba(66,199,143,.16);
+      color: #047857;
+    }
+    .promise-card:nth-child(3) .mini {
+      background: rgba(255,127,111,.14);
+      color: #9f2318;
+    }
+    .promise-card b {
+      display: block;
+      margin-top: 11px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 18px;
+      line-height: 1.18;
+    }
+    .promise-card p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.4;
+    }
     .checkout {
       position: sticky;
       top: 18px;
@@ -250,6 +298,30 @@
       line-height: 1.38;
     }
     .call-option .plan-kicker { color: #9f2318; }
+    .included {
+      margin-top: 14px;
+      border: 1px solid rgba(66,199,143,.24);
+      border-radius: 22px;
+      background: rgba(236,253,245,.76);
+      padding: 15px;
+    }
+    .included b {
+      display: block;
+      color: #047857;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .included ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: #30515e;
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.45;
+    }
+    .included li + li { margin-top: 6px; }
     label {
       display: block;
       margin-top: 14px;
@@ -325,6 +397,7 @@
       .shell { grid-template-columns: 1fr; }
       .checkout { position: static; }
       .kit-preview { grid-template-columns: 1fr; }
+      .promise-grid { grid-template-columns: 1fr; }
       .features { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; }
     }
@@ -352,6 +425,24 @@
         <div class="pill">Event Pass upgrade path</div>
         <h1>Open House Kit</h1>
         <p class="lead">Give the agent a reusable REL8TION setup for the next listing: buyer check-in, disclosure capture, loan officer coverage routing, and a cleaner post-event handoff.</p>
+
+        <div class="promise-grid" aria-label="Fulfillment and pricing details">
+          <div class="promise-card">
+            <span class="mini">Delivery</span>
+            <b>Expected within 14 days</b>
+            <p>Your Open House Kit is prepared after checkout and expected to arrive within 14 days.</p>
+          </div>
+          <div class="promise-card">
+            <span class="mini">Local handoff</span>
+            <b>Moe may deliver sooner</b>
+            <p>When scheduling allows, Moe can personally deliver the kit sooner and help with the first handoff.</p>
+          </div>
+          <div class="promise-card">
+            <span class="mini">V1 price lock</span>
+            <b>Founder rate today</b>
+            <p>This is Version 1 pricing. More upgrades are coming, pricing is expected to rise, and this locks in the selected rate.</p>
+          </div>
+        </div>
 
         <div class="kit-preview" aria-label="Open House Kit contents">
           <div class="piece">
@@ -414,6 +505,14 @@
             <span class="plan-copy">If they do not upgrade, they keep the keychain and need the sponsoring loan officer to set up the next open house.</span>
           </a>
         </div>
+        <div class="included">
+          <b>Before you pay</b>
+          <ul>
+            <li>The kit is expected to arrive within 14 days, or sooner if Moe can deliver it personally.</li>
+            <li>This is Version 1 pricing with more hardware, software, and workflow improvements coming.</li>
+            <li>Selecting monthly or annual service today locks in this rate while future pricing continues to move up.</li>
+          </ul>
+        </div>
         <form id="checkoutForm">
           <label for="agentName">Agent or host</label>
           <input id="agentName" name="agentName" autocomplete="name" placeholder="Agent name">
@@ -451,15 +550,15 @@
       monthly: {
         button: 'Checkout Kit + Monthly',
         opening: 'Opening monthly checkout...',
-        success: 'Monthly service started. REL8TION will prepare the kit and keep the Event Pass/dashboard service active.',
-        note: "Checkout includes the one-time Open House Kit plus monthly service. Card details are entered on Stripe's secure checkout screen.",
+        success: 'Monthly service started. REL8TION will prepare the kit, expected within 14 days or sooner by Moe when possible, and keep the Event Pass/dashboard service active.',
+        note: "Checkout includes the one-time Open House Kit plus monthly service. This Version 1 rate is locked for the selected account while future pricing is expected to rise.",
         fallback: 'I want the Open House Kit with monthly REL8TION service'
       },
       annual: {
         button: 'Checkout Kit + Annual',
         opening: 'Opening annual checkout...',
-        success: 'Annual service started. REL8TION will prepare the kit and keep the Event Pass/dashboard service active for the year.',
-        note: "Checkout includes the one-time Open House Kit plus paid-for-the-year service. Card details are entered on Stripe's secure checkout screen.",
+        success: 'Annual service started. REL8TION will prepare the kit, expected within 14 days or sooner by Moe when possible, and keep the Event Pass/dashboard service active for the year.',
+        note: "Checkout includes the one-time Open House Kit plus paid-for-the-year service. This Version 1 rate is locked for the selected account while future pricing is expected to rise.",
         fallback: 'I want the Open House Kit with annual REL8TION service'
       }
     };

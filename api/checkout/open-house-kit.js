@@ -2,6 +2,8 @@ const STRIPE_API_VERSION = '2026-02-25.clover';
 const DEFAULT_OPEN_HOUSE_KIT_PRICE_ID = 'price_1TYtd12LIj1DZULXtTeeeYSm';
 const DEFAULT_EVENT_PASS_MONTHLY_PRICE_ID = 'price_1TYtd52LIj1DZULX8ipqLz9X';
 const DEFAULT_EVENT_PASS_ANNUAL_PRICE_ID = 'price_1TYtd62LIj1DZULXy58hBZ0I';
+const REL8TION_LOGO_URL = 'https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png';
+const FULFILLMENT_MESSAGE = 'Open House Kit fulfillment: expected arrival within 14 days. When local scheduling allows, Moe may personally deliver it sooner and help with the handoff. This is REL8TION Version 1 pricing. More upgrades and improvements are planned, and the selected service rate is intended to lock in this account as pricing rises.';
 const PLANS = {
   monthly: {
     key: 'monthly',
@@ -121,6 +123,17 @@ module.exports = async function handler(req, res) {
   checkoutParams.set('line_items[1][quantity]', '1');
   checkoutParams.set('billing_address_collection', 'auto');
   checkoutParams.set('allow_promotion_codes', 'true');
+  checkoutParams.set('phone_number_collection[enabled]', 'true');
+  checkoutParams.set('shipping_address_collection[allowed_countries][0]', 'US');
+  checkoutParams.set('branding_settings[display_name]', 'REL8TION Open House Kit');
+  checkoutParams.set('branding_settings[background_color]', '#eef8ff');
+  checkoutParams.set('branding_settings[button_color]', '#172c76');
+  checkoutParams.set('branding_settings[border_style]', 'pill');
+  checkoutParams.set('branding_settings[logo][type]', 'url');
+  checkoutParams.set('branding_settings[logo][url]', REL8TION_LOGO_URL);
+  checkoutParams.set('custom_text[submit][message]', FULFILLMENT_MESSAGE);
+  checkoutParams.set('custom_text[after_submit][message]', 'After payment, REL8TION will use the contact and shipping details from Checkout to prepare the kit and service handoff.');
+  checkoutParams.set('custom_text[shipping_address][message]', 'Use the best delivery address for the Open House Kit. Kits are expected to arrive within 14 days, or sooner when Moe can personally deliver.');
   checkoutParams.set('success_url', `${origin}/open-house-kit?success=1&plan=${encodeURIComponent(plan.key)}&session_id={CHECKOUT_SESSION_ID}`);
   checkoutParams.set('cancel_url', `${origin}/open-house-kit?canceled=1&plan=${encodeURIComponent(plan.key)}`);
   checkoutParams.set('metadata[plan]', plan.key);
