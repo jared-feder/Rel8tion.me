@@ -2494,13 +2494,15 @@
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
         { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
-        { label: 'Outreach queue', value: o.outreach_queue || state.command?.outreach?.recent?.length || 0, icon: 'list-checks', tone: 'sky', meter: o.outreach_queue ? 70 : 7, area: 'outreach', filter: 'all' },
         { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8, area: 'signs' },
         { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6, area: 'lo' },
         { label: 'Leads', value: o.leads || 0, icon: 'contact-round', tone: 'green', meter: o.leads ? 82 : 8, area: 'leads' },
         { label: 'Check-ins', value: o.checkins || 0, icon: 'badge-check', tone: 'sky', meter: o.checkins ? 86 : 12, area: 'leads' },
         { label: 'Pay setup', value: o.payments_needing_setup || 0, icon: 'credit-card', tone: o.payments_needing_setup ? 'orange' : 'green', meter: o.payments_needing_setup ? 62 : 7, area: 'payments' }
       ];
+      if (state.area !== 'outreach') {
+        stats.push({ label: 'Outreach queue', value: o.outreach_queue || state.command?.outreach?.recent?.length || 0, icon: 'list-checks', tone: 'sky', meter: o.outreach_queue ? 70 : 7, area: 'outreach', filter: 'all' });
+      }
       return `<section class="stats-grid">${stats.map((stat) => `
         <button type="button" class="stat-card ${esc(stat.tone)}" data-stat-area="${esc(stat.area)}"${stat.filter ? ` data-stat-filter="${esc(stat.filter)}"` : ''} aria-label="Open ${esc(stat.label)}">
           <div class="stat-top">
@@ -2528,7 +2530,6 @@
     function renderOutreach() {
       const rows = filteredInbox();
       return `
-        ${renderOutreachQueue()}
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
@@ -2547,13 +2548,16 @@
           ${!state.loading && rows.length === 0 ? '<div class="glass-card" style="padding:18px;font-weight:900;">No conversations in this view.</div>' : ''}
           ${rows.map(renderOutreachCard).join('')}
         </div>
+        ${renderOutreachQueue()}
       `;
     }
 
     function renderOutreachQueue() {
       const rows = filterByQuery(state.command?.outreach?.recent || []);
       const pendingCount = state.command?.overview?.outreach_queue_pending || 0;
-      return renderRows('Outreach queue', `${state.command?.overview?.outreach_queue || rows.length} queued records | ${pendingCount} pending initial send`, rows.slice(0, 80), (row) => `
+      const totalCount = state.command?.overview?.outreach_queue || rows.length;
+      const shownCount = Math.min(rows.length, 80);
+      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${totalCount} total`, rows.slice(0, 80), (row) => `
         <div>
           <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
           <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
