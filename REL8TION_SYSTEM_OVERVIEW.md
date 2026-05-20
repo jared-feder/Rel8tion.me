@@ -1072,7 +1072,7 @@ Observed behavior in reference source:
 
 - `sync-openhouses` pulls OneKey data and restores enriched agent contact data from `listing_agents`.
 - `generate-agent-outreach` queues and generates outreach rows.
-- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`; this source was deployed to Supabase on 2026-05-15 after the REL8TION COMMAND action-control update.
+- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`. The 2026-05-20 version fetches due pending initial/follow-up rows directly instead of scanning oldest generated/rendered history first, and supports `dry_run` / `diagnostic_no_send` output for no-SMS verification.
 - `send-agent-manual-reply` sends manual replies from outreach UI. `[IMPLEMENTED]` Deployable source exists under `supabase/functions/send-agent-manual-reply/index.ts`; the 2026-05-14 version requires service-role authorization and is intended to be called through the protected Vercel admin API, not directly from browser code.
 
 ### RPCs Used By Current Code

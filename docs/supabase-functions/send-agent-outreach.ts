@@ -247,7 +247,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
-    const limit = Number(body.limit || 25);
+    const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
+    const requestedLimit = Number(body.limit ?? 25);
+    const limit = Math.max(0, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 25, 50));
+    const inspectionLimit = dryRun ? Math.max(1, limit || 25) : limit;
+    const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
     const cooldownCutoff = new Date(now.getTime() - INITIAL_COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
@@ -282,8 +286,10 @@ serve(async (req) => {
       .eq("send_mode", "automatic")
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
-      .order("created_at", { ascending: true })
-      .limit(Math.max(limit * 200, 250));
+      .or(`and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
+      .order("initial_send_at", { ascending: true, nullsFirst: false })
+      .order("followup_send_at", { ascending: true, nullsFirst: false })
+      .limit(fetchLimit);
 
     if (error) throw error;
 
@@ -291,7 +297,8 @@ serve(async (req) => {
     let sendAttempts = 0;
 
     for (const row of rows || []) {
-      if (sendAttempts >= limit) break;
+      if (!dryRun && sendAttempts >= limit) break;
+      if (dryRun && results.length >= inspectionLimit) break;
 
       let attemptedStep: "initial" | "followup" | null = null;
 
@@ -325,6 +332,19 @@ serve(async (req) => {
         const isAdminScheduledDrip = row.review_status === "drip_scheduled";
         const initialStale = !isMissedOpenHouseCampaign && !!openEnd && openEnd <= now;
         const followupStale = !isAdminScheduledDrip && !!openStart && openStart <= now;
+
+        if (dryRun && (initialStale || followupStale)) {
+          results.push({
+            id: row.id,
+            agent_name: row.agent_name,
+            step: initialStale ? "initial" : "followup",
+            ok: true,
+            dry_run: true,
+            would_skip: true,
+            reason: initialStale ? "Open house already ended" : "Open house already started",
+          });
+          continue;
+        }
 
         if (row.initial_send_status === "pending" && initialStale) {
           await supabase
@@ -392,6 +412,25 @@ serve(async (req) => {
         const initialBody = initialDue ? buildInitialOutreachBody(row) : "";
         const followupBody = followupDue ? buildFollowupOutreachBody(row) : null;
         const storedFollowupBody = buildFollowupOutreachBody(row);
+
+        if (dryRun) {
+          results.push({
+            id: row.id,
+            agent_name: row.agent_name,
+            step: initialDue ? "initial" : followupDue ? "followup" : null,
+            ok: true,
+            dry_run: true,
+            would_send: initialDue || followupDue,
+            initial_send_status: row.initial_send_status,
+            followup_send_status: row.followup_send_status,
+            initial_send_at: row.initial_send_at,
+            followup_send_at: row.followup_send_at,
+            open_start: row.open_start,
+            open_end: row.open_end,
+            review_status: row.review_status,
+          });
+          continue;
+        }
 
         if (isBlockedReviewStatus(row.review_status)) {
           await supabase
@@ -567,6 +606,9 @@ serve(async (req) => {
         {
           ok: true,
           processed: results.length,
+          dry_run: dryRun,
+          candidate_rows: rows?.length || 0,
+          fetch_limit: fetchLimit,
           cooldown_hours: INITIAL_COOLDOWN_HOURS,
           results,
         },
