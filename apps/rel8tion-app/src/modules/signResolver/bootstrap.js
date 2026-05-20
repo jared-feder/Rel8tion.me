@@ -610,7 +610,19 @@ async function activateSignToHouse(sign, house) {
           activation_uid_primary: pageState.hostSession.uid || null,
           activation_method: 'host_chip_session_sign_activation',
           setup_confirmed_at: new Date().toISOString(),
-          last_activity_at: new Date().toISOString()
+          last_activity_at: new Date().toISOString(),
+          setup_context: {
+            source: 'host-chip-session-sign-activation',
+            agent_slug: pageState.hostSession.agentSlug,
+            address: house.address || null,
+            detected_brokerage: house.brokerage || null,
+            price: house.price || null,
+            beds: house.beds || null,
+            baths: house.baths || null,
+            sqft: house.sqft || house.square_feet || null,
+            listing_url: house.link || house.listing_url || house.mls_url || house.url || null,
+            listing_link: house.link || house.listing_url || house.mls_url || house.url || null
+          }
         });
       }
     }

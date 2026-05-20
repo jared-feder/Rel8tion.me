@@ -204,13 +204,15 @@ export async function sendBuyerConfirmationSMS({
   agentName,
   agentBrokerage,
   agentPhone,
-  propertyAddress
+  propertyAddress,
+  listingUrl
 }) {
   if (!buyerPhone) return;
 
   const message = [
     `Thanks${buyerName ? ` ${buyerName}` : ''}, your open house request was received.`,
     propertyAddress ? `Property: ${propertyAddress}` : '',
+    listingUrl ? `MLS page: ${listingUrl}` : '',
     agentName ? `Hosted by: ${agentName}` : '',
     agentBrokerage ? `Brokerage: ${agentBrokerage}` : '',
     agentPhone ? `Agent phone: ${agentPhone}` : '',

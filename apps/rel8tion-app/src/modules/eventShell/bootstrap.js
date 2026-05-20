@@ -2,7 +2,7 @@ import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUC
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
 import { applyBranding } from '../../api/brokerages.js';
 import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent } from '../../api/events.js?v=20260508-nys-pdf';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260503-lo-live';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260519-listing-link-sms';
 import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { state as appState } from '../../core/state.js';
 import { esc, money } from '../../core/utils.js';
@@ -285,6 +285,27 @@ function propertyImageUrl(house) {
     house?.media_url,
     Array.isArray(house?.media) ? house.media[0]?.url || house.media[0]?.MediaURL : ''
   );
+}
+
+function listingOriginalUrl() {
+  return firstPresent(
+    pageState.house?.link,
+    pageState.house?.listing_url,
+    pageState.house?.mls_url,
+    pageState.house?.url,
+    pageState.eventRow?.setup_context?.listing_url,
+    pageState.eventRow?.setup_context?.listing_link,
+    pageState.eventRow?.setup_context?.mls_url,
+    pageState.eventRow?.setup_context?.link
+  );
+}
+
+function listingShortUrl() {
+  const originalUrl = listingOriginalUrl();
+  const openHouseId = firstPresent(pageState.eventRow?.open_house_source_id, pageState.house?.id);
+  const redirectId = openHouseId || pageState.eventRow?.id || '';
+  if (!originalUrl || !redirectId || !window.location?.origin) return '';
+  return `${window.location.origin}/l/${encodeURIComponent(redirectId)}`;
 }
 
 function renderPropertyImage(house, classes = 'h-24 w-24') {
@@ -987,6 +1008,8 @@ function buildCheckinPayload(formData) {
   const nyDiscriminationDisclosure = disclosuresRequired ? buildNyDisclosureMetadata(values, signedAt) : null;
   const agencyDisclosure = disclosuresRequired ? buildAgencyDisclosureMetadata(values) : null;
   const courtesyNotice = disclosuresRequired ? buildCourtesyNoticeMetadata(values) : null;
+  const originalListingUrl = listingOriginalUrl();
+  const shortListingUrl = listingShortUrl();
 
   return {
     open_house_event_id: pageState.eventRow.id,
@@ -1018,6 +1041,9 @@ function buildCheckinPayload(formData) {
       nys_agency_disclosure: agencyDisclosure,
       rel8tion_courtesy_notice: courtesyNotice,
       ny_discrimination_disclosure: nyDiscriminationDisclosure,
+      listing_url: originalListingUrl || null,
+      listing_short_url: shortListingUrl || null,
+      listing_link_source: originalListingUrl ? 'open_houses.link' : null,
       financing_requested: financingRequested,
       second_opinion_ok: values.second_opinion_ok || null,
       loan_officer_contact_ok: loanOfficerContactOk
@@ -1441,7 +1467,8 @@ function attachEventHandlers() {
         agentName: pageState.agent?.name || 'Host Agent',
         agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || pageState.eventRow?.setup_context?.detected_brokerage || '',
         agentPhone: pageState.agent?.phone || '',
-        propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || ''
+        propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || '',
+        listingUrl: payload.metadata?.listing_short_url || ''
       });
 
       await sendAgentCheckinSMS({
