@@ -17,6 +17,16 @@ function readQuery(req, name) {
   }
 }
 
+function readHeader(req, name) {
+  return req.headers?.[name] || req.headers?.[name.toLowerCase()] || req.headers?.[name.toUpperCase()] || '';
+}
+
+function requestOrigin(req) {
+  const host = readHeader(req, 'x-forwarded-host') || readHeader(req, 'host') || 'app.rel8tion.me';
+  const proto = readHeader(req, 'x-forwarded-proto') || 'https';
+  return `${proto}://${host}`;
+}
+
 function cleanId(value) {
   return String(value || '')
     .trim()
@@ -43,6 +53,54 @@ function validExternalUrl(value) {
     return url.toString();
   } catch {
     return '';
+  }
+}
+
+async function checkExternalUrl(url) {
+  const target = validExternalUrl(url);
+  if (!target) {
+    return { available: false, status: null, final_url: '', reason: 'missing_url' };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+  };
+
+  try {
+    let response = await fetch(target, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers,
+      signal: controller.signal
+    });
+
+    if (response.status === 405 || response.status === 403) {
+      response = await fetch(target, {
+        method: 'GET',
+        redirect: 'follow',
+        headers,
+        signal: controller.signal
+      });
+    }
+
+    return {
+      available: response.status >= 200 && response.status < 400,
+      status: response.status,
+      final_url: response.url || target,
+      reason: response.status >= 200 && response.status < 400 ? 'ok' : 'http_status'
+    };
+  } catch (error) {
+    return {
+      available: false,
+      status: null,
+      final_url: '',
+      reason: error?.name === 'AbortError' ? 'timeout' : 'fetch_failed'
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -163,7 +221,7 @@ async function resolveListing(id) {
   };
 }
 
-function renderListingPage({ id, house, event, targetUrl }) {
+function renderListingPage({ id, house, event, targetUrl, externalCheck }) {
   const context = event?.setup_context || {};
   const address = firstPresent(house?.address, context.address, 'Open house listing');
   const price = money(firstPresent(house?.price, context.price));
@@ -174,6 +232,7 @@ function renderListingPage({ id, house, event, targetUrl }) {
   const agent = firstPresent(house?.agent, context.agent_name, event?.host_agent_slug);
   const windowText = eventWindow(house, event);
   const image = propertyImage(house);
+  const mlsAvailable = Boolean(targetUrl && externalCheck?.available);
   const details = [
     price,
     beds ? `${beds} beds` : '',
@@ -213,7 +272,7 @@ function renderListingPage({ id, house, event, targetUrl }) {
     .primary { background: linear-gradient(90deg, #1f2a5a, #2563eb); color: white; box-shadow: 0 18px 38px rgba(37,99,235,.22); }
     .secondary { background: #fff; color: #334155; border: 1px solid #e2e8f0; }
     .note { margin-top: 14px; font-size: 12px; font-weight: 800; color: #64748b; line-height: 1.4; }
-    @media (min-width: 720px) { .actions { grid-template-columns: ${targetUrl ? '1.1fr .9fr' : '1fr'}; } .body { padding: 34px; } }
+    @media (min-width: 720px) { .actions { grid-template-columns: ${mlsAvailable ? '1.1fr .9fr' : '1fr'}; } .body { padding: 34px; } }
   </style>
 </head>
 <body>
@@ -233,10 +292,10 @@ function renderListingPage({ id, house, event, targetUrl }) {
           <span class="chip">REL8TION link ${esc(id)}</span>
         </div>
         <div class="actions">
-          ${targetUrl ? `<a class="button primary" href="${esc(targetUrl)}" rel="noopener noreferrer">Open MLS Listing</a>` : ''}
-          <a class="button secondary" href="/" rel="noopener">REL8TION</a>
+          ${mlsAvailable ? `<a class="button primary" href="${esc(targetUrl)}" rel="noopener noreferrer">Open MLS Listing</a>` : ''}
+          <a class="button secondary" href="/" rel="noopener">${mlsAvailable ? 'REL8TION' : 'Back To REL8TION'}</a>
         </div>
-        <div class="note">${targetUrl ? 'If the MLS page is blocked or unavailable, this REL8TION page still preserves the open-house details from the check-in.' : 'No external MLS page is saved for this open house yet.'}</div>
+        <div class="note">${mlsAvailable ? 'The saved MLS/listing page responded successfully from REL8TION. If it later becomes unavailable, this REL8TION page still preserves the open-house details from the check-in.' : 'The external MLS/listing page could not be verified right now, so this REL8TION page is the reliable buyer link.'}</div>
       </div>
     </section>
   </main>
@@ -268,13 +327,31 @@ module.exports = async function handler(req, res) {
       return res.end();
     }
 
+    const externalCheck = await checkExternalUrl(targetUrl);
+
+    if (readQuery(req, 'format') === 'json') {
+      const shortUrl = `${requestOrigin(req)}/l/${encodeURIComponent(id)}`;
+      return sendJson(res, 200, {
+        ok: Boolean(listing.house || listing.event),
+        id,
+        short_url: shortUrl,
+        direct_url: targetUrl ? `${shortUrl}?direct=1` : '',
+        listing_url: targetUrl,
+        external_available: externalCheck.available,
+        external_status: externalCheck.status,
+        external_final_url: externalCheck.final_url,
+        external_reason: externalCheck.reason,
+        sms_label: targetUrl && externalCheck.available ? 'MLS page' : 'Property page'
+      });
+    }
+
     if (!listing.house && !listing.event) {
       return sendJson(res, 404, { ok: false, error: 'No open house was found for this link.' });
     }
 
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(renderListingPage({ id, ...listing }));
+    return res.status(200).send(renderListingPage({ id, ...listing, externalCheck }));
   } catch (error) {
     return sendJson(res, error.status || 500, {
       ok: false,

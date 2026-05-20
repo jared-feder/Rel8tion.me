@@ -1,7 +1,7 @@
 import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUCKET, SUPABASE_URL } from '../../core/config.js';
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
 import { applyBranding } from '../../api/brokerages.js';
-import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent } from '../../api/events.js?v=20260508-nys-pdf';
+import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260519-listing-link-health';
 import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260519-listing-link-sms';
 import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { state as appState } from '../../core/state.js';
@@ -301,11 +301,51 @@ function listingOriginalUrl() {
 }
 
 function listingShortUrl() {
-  const originalUrl = listingOriginalUrl();
   const openHouseId = firstPresent(pageState.eventRow?.open_house_source_id, pageState.house?.id);
   const redirectId = openHouseId || pageState.eventRow?.id || '';
-  if (!originalUrl || !redirectId || !window.location?.origin) return '';
+  if (!redirectId || !window.location?.origin) return '';
   return `${window.location.origin}/l/${encodeURIComponent(redirectId)}`;
+}
+
+async function resolveListingSmsLink() {
+  const openHouseId = firstPresent(pageState.eventRow?.open_house_source_id, pageState.house?.id);
+  const redirectId = openHouseId || pageState.eventRow?.id || '';
+  const fallbackShortUrl = listingShortUrl();
+  const originalUrl = listingOriginalUrl();
+  if (!redirectId || !fallbackShortUrl) return null;
+
+  try {
+    const response = await fetch(`/api/open-house-link?id=${encodeURIComponent(redirectId)}&format=json`, {
+      headers: { Accept: 'application/json' }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'Listing link lookup failed.');
+
+    return {
+      listing_url: data.listing_url || originalUrl || null,
+      listing_short_url: data.short_url || fallbackShortUrl,
+      listing_direct_url: data.direct_url || null,
+      listing_sms_url: data.short_url || fallbackShortUrl,
+      listing_sms_label: data.sms_label || (data.external_available ? 'MLS page' : 'Property page'),
+      listing_external_available: data.external_available === true,
+      listing_external_status: data.external_status || null,
+      listing_external_reason: data.external_reason || null,
+      listing_link_checked_at: new Date().toISOString()
+    };
+  } catch (error) {
+    console.log('listing link health check skipped', error);
+    return {
+      listing_url: originalUrl || null,
+      listing_short_url: fallbackShortUrl,
+      listing_direct_url: null,
+      listing_sms_url: fallbackShortUrl,
+      listing_sms_label: 'Property page',
+      listing_external_available: false,
+      listing_external_status: null,
+      listing_external_reason: 'lookup_failed',
+      listing_link_checked_at: new Date().toISOString()
+    };
+  }
 }
 
 function renderPropertyImage(house, classes = 'h-24 w-24') {
@@ -1044,6 +1084,7 @@ function buildCheckinPayload(formData) {
       listing_url: originalListingUrl || null,
       listing_short_url: shortListingUrl || null,
       listing_link_source: originalListingUrl ? 'open_houses.link' : null,
+      listing_link_checked_at: null,
       financing_requested: financingRequested,
       second_opinion_ok: values.second_opinion_ok || null,
       loan_officer_contact_ok: loanOfficerContactOk
@@ -1460,6 +1501,23 @@ function attachEventHandlers() {
         }
       }
 
+      const listingSmsLink = await resolveListingSmsLink();
+      if (listingSmsLink?.listing_short_url) {
+        const mergedMetadata = {
+          ...(createdCheckin?.metadata || payload.metadata || {}),
+          ...listingSmsLink
+        };
+        payload.metadata = mergedMetadata;
+        if (createdCheckin?.id) {
+          try {
+            const updatedCheckin = await updateCheckinMetadata(createdCheckin.id, mergedMetadata);
+            if (updatedCheckin) createdCheckin = updatedCheckin;
+          } catch (error) {
+            console.log('listing link metadata update skipped', error);
+          }
+        }
+      }
+
       const financingRequested = payload.metadata?.financing_requested === true;
       await sendBuyerConfirmationSMS({
         buyerPhone: payload.visitor_phone || '',
@@ -1468,7 +1526,8 @@ function attachEventHandlers() {
         agentBrokerage: pageState.agent?.brokerage || pageState.house?.brokerage || pageState.eventRow?.setup_context?.detected_brokerage || '',
         agentPhone: pageState.agent?.phone || '',
         propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || '',
-        listingUrl: payload.metadata?.listing_short_url || ''
+        listingUrl: payload.metadata?.listing_sms_url || payload.metadata?.listing_short_url || '',
+        listingLabel: payload.metadata?.listing_sms_label || 'Property page'
       });
 
       await sendAgentCheckinSMS({
