@@ -57,7 +57,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/key-reset` to `apps/rel8tion-app/key-reset.html`
 - `/s` and `/sign` to `apps/rel8tion-app/sign.html`; `/pass` to `apps/rel8tion-app/pass.html`, which reuses the same resolver module in Event Pass mode
 - `/event` to `apps/rel8tion-app/event.html`
-- `/l/:id` to `api/open-house-link.js`, which redirects short REL8TION listing links to the saved MLS/listing URL
+- `/l/:id` to `api/open-house-link.js`, which opens a REL8TION property landing page with an optional button to the saved MLS/listing URL
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
 - `/open-house-kit` to `apps/rel8tion-app/open-house-kit.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
@@ -353,7 +353,7 @@ Inputs:
 - Opens a server-generated prefilled disclosure PDF preview through `/api/compliance/ny-disclosure?event=...`.
 - Saves DOS-2156 `11/25` acknowledgement details in `event_checkins.metadata.ny_discrimination_disclosure` for MVP.
 - After check-in, attempts to generate a signed REL8TION disclosure packet PDF covering the NYS Agency Disclosure, NYS Housing and Anti-Discrimination acknowledgement, and Rel8tion Courtesy Notice. It attaches `signed_pdf` storage/download metadata under `event_checkins.metadata.ny_discrimination_disclosure`.
-- Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes. Buyer confirmation SMS includes a short `/l/<open_house_id-or-event_id>` listing link when a saved MLS/listing URL is available, and check-in metadata records both the original listing URL and the short REL8TION URL.
+- Sends buyer and agent SMS through `send-lead-sms` only after local check-in validation passes. Buyer confirmation SMS includes a short `/l/<open_house_id-or-event_id>` listing link when a saved MLS/listing URL is available; that link opens a REL8TION-hosted property page with an optional MLS button, and check-in metadata records both the original listing URL and the short REL8TION URL.
 - Asks for pre-approval status on buyer-facing paths. After disclosures, the guided modal shows the second-opinion lending prompt when the buyer selected `yes`; when the buyer selected `no`, the financing follow-up checkbox is optional. Selecting "not pre-approved" alone does not trigger financing SMS.
 - When financing help is requested, the code routes to a live loan officer if assigned or alerts Jared. The current buyer UI hides unfinished loan-officer support cards and uses a temporary post-check-in financing SMS prompt to `347-775-8059`.
 - After check-in, shows property snapshot, a short host agent bio/contact card, save-contact actions, SMS message links, and neighborhood/financing prompts. It no longer shows OneKey listing links, internal buyer status cards, loan-officer support cards, a second check-in button, or the one-of-three preferred property examples.
