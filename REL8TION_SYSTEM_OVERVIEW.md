@@ -1109,6 +1109,7 @@ Confirmed repo behavior:
 - Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the message prefilled, and the human must manually review and tap Send.
 - Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
 - `Mark Sent / Next` and `Skip` patch the queue row through service-role server code, setting only columns that exist. The optional SQL file adds temporary tracking fields: `manual_sms_sent`, `manual_sms_skipped`, `manual_sms_sent_at`, `last_outreach_at`, and `channel`.
+- REL8TION COMMAND's Outreach area includes a "Manual SMS Backup" link to this page.
 
 ### `/api/compliance/ny-disclosure`
 

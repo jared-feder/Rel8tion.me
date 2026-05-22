@@ -190,6 +190,7 @@ function isAlreadyHandled(row) {
 
 function isDue(row, now) {
   if (isDeliveryFailure(row)) return true;
+  if (normalizedStatus(row.initial_send_status) === 'pending') return true;
   if (!row.initial_send_at) return true;
   const due = new Date(row.initial_send_at);
   return Number.isFinite(due.getTime()) && due <= now;

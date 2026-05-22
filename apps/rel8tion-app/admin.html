@@ -2548,13 +2548,18 @@
             <h2>Outreach command</h2>
             <div class="sub">${rows.length} conversations in this view</div>
           </div>
-          <select id="outreachFilter" class="select" style="max-width:220px;">
-            <option value="needs_reply"${state.outreachFilter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
-            <option value="interested"${state.outreachFilter === 'interested' ? ' selected' : ''}>Interested / yes</option>
-            <option value="inbound"${state.outreachFilter === 'inbound' ? ' selected' : ''}>Inbound</option>
-            <option value="all"${state.outreachFilter === 'all' ? ' selected' : ''}>All threads</option>
-            <option value="opt_out"${state.outreachFilter === 'opt_out' ? ' selected' : ''}>Opt-outs</option>
-          </select>
+          <div class="header-actions">
+            <a class="btn primary" href="/manual-sms-outreach">
+              <i data-lucide="smartphone"></i><span>Manual SMS Backup</span>
+            </a>
+            <select id="outreachFilter" class="select" style="max-width:220px;">
+              <option value="needs_reply"${state.outreachFilter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
+              <option value="interested"${state.outreachFilter === 'interested' ? ' selected' : ''}>Interested / yes</option>
+              <option value="inbound"${state.outreachFilter === 'inbound' ? ' selected' : ''}>Inbound</option>
+              <option value="all"${state.outreachFilter === 'all' ? ' selected' : ''}>All threads</option>
+              <option value="opt_out"${state.outreachFilter === 'opt_out' ? ' selected' : ''}>Opt-outs</option>
+            </select>
+          </div>
         </div>
         <div class="outreach-grid">
           ${state.loading ? '<div class="glass-card" style="padding:18px;font-weight:900;">Loading...</div>' : ''}
