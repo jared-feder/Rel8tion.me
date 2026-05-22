@@ -656,6 +656,7 @@
 
     function statusLine(row) {
       return [
+        row.source ? `source: ${row.source}` : '',
         row.message_source ? `message: ${row.message_source}` : '',
         row.image_source ? `image: ${row.image_source}` : '',
         row.review_status ? `review: ${row.review_status}` : '',

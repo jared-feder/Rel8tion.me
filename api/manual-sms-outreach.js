@@ -22,9 +22,11 @@ const FULL_SELECT = [
   'open_start',
   'open_end',
   'template_key',
+  'source',
   'listing_photo_url',
   'agent_photo_url',
   'mockup_image_url',
+  'mockup_rendered_at',
   'selected_sms',
   'sms_variant_1',
   'sms_variant_2',
@@ -64,6 +66,8 @@ const BASE_SELECT = FULL_SELECT.filter((column) => ![
   'manual_sms_sent_at',
   'channel'
 ].includes(column));
+
+const NO_FALLBACK_RENDER_CUTOFF_MS = Date.parse('2026-05-22T06:36:00Z');
 
 function clean(value) {
   return String(value ?? '').trim();
@@ -128,7 +132,7 @@ function messageFor(row) {
 function imageFor(row) {
   const listingUrl = firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image);
   const mockupUrl = firstPresent(row.mockup_image_url);
-  const useMockup = Boolean(listingUrl && mockupUrl);
+  const useMockup = Boolean(listingUrl && mockupUrl && !isStaleCitysnapFallbackMockup(row));
   return {
     image_url: useMockup ? mockupUrl : FALLBACK_PLACEHOLDER,
     listing_image_url: listingUrl || '',
@@ -141,8 +145,18 @@ function imageFor(row) {
   };
 }
 
+function isStaleCitysnapFallbackMockup(row) {
+  if (normalizedStatus(row.source) !== 'citysnap') return false;
+  const renderedAt = new Date(row.mockup_rendered_at || 0).getTime();
+  return Number.isFinite(renderedAt) && renderedAt > 0 && renderedAt < NO_FALLBACK_RENDER_CUTOFF_MS;
+}
+
 function hasOutreachPhoto(row) {
-  return Boolean(firstPresent(row.mockup_image_url) && firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image));
+  return Boolean(
+    firstPresent(row.mockup_image_url) &&
+    firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image) &&
+    !isStaleCitysnapFallbackMockup(row)
+  );
 }
 
 function normalizedStatus(value) {

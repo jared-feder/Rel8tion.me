@@ -1106,6 +1106,7 @@ Confirmed repo behavior:
 - Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, already handled by the existing status fields, missing an actual listing image, or missing a rendered Rel8tion outreach photo.
 - Prioritizes upcoming open houses and preserves the existing outreach message priority: `selected_sms`, `sms_variant_1`, `sms_variant_2`, `sms_variant_3`, then a temporary fallback message with no setup link.
 - Shows only rows with the rendered outreach photo (`mockup_image_url`) and only when an actual listing image exists behind that rendered image.
+- Excludes stale Citysnap mockups rendered before the no-fallback renderer fix because those may be generic blue fallback images caused by Citysnap/CoStar image CDN `Access Denied` responses.
 - Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the editable message only; it does not append photo links to the draft.
 - Includes `Copy Outreach Photo`, which attempts to copy the actual rendered outreach image blob to the clipboard for manual paste into the native SMS thread. If the phone browser blocks image clipboard writes, it tells the operator to use the open-photo control for manual attachment instead of copying a URL into the SMS.
 - Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
@@ -1116,6 +1117,7 @@ Automatic outreach image guard:
 
 - The mockup renderer requires `listing_photo_url` and fails the queue row instead of generating a generic fallback background if the listing photo is missing or cannot be loaded.
 - `send-agent-outreach` only selects automatic send rows with `listing_photo_url`, so future MMS outreach should not use a non-listing image as the property background.
+- Citysnap/CoStar CDN image URLs may return `Access Denied` to server-side fetches. Pending future Citysnap rows with stale pre-fix blue fallback mockups were marked image-unavailable on 2026-05-22 rather than kept as sendable outreach.
 
 ### `/api/compliance/ny-disclosure`
 
