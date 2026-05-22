@@ -646,6 +646,13 @@
         : `sms:${cleanPhone}?body=${encodedMessage}`;
     }
 
+    function smsBodyWithListingImage(row, message) {
+      const body = String(message || '').trim();
+      const imageUrl = String(row?.listing_image_url || '').trim();
+      if (!imageUrl || body.includes(imageUrl)) return body;
+      return `${body}\n\nListing photo: ${imageUrl}`;
+    }
+
     function telLink(phone) {
       return `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
     }
@@ -711,6 +718,7 @@
       }
 
       const message = row.outreach_message || '';
+      const smsBody = smsBodyWithListingImage(row, message);
       const phone = row.agent_phone || row.agent_phone_normalized || '';
       content.innerHTML = `
         <article class="outreach-card">
@@ -741,10 +749,11 @@
             <div class="message-box">
               <label for="messagePreview">Message Preview</label>
               <textarea id="messagePreview">${esc(message)}</textarea>
+              ${row.listing_image_url ? `<p class="agent-meta">Text This Agent will include the verified listing photo link.</p>` : ''}
             </div>
 
             <div class="button-grid">
-              <a class="btn primary" id="textAgentButton" href="${esc(buildSmsLink(phone, message))}">
+              <a class="btn primary" id="textAgentButton" href="${esc(buildSmsLink(phone, smsBody))}">
                 <i data-lucide="message-square-text"></i>Text This Agent
               </a>
               <button class="btn success" type="button" onclick="markSent()">
@@ -780,7 +789,7 @@
       if (!row) return;
       const text = document.getElementById('messagePreview')?.value || row.outreach_message || '';
       const button = document.getElementById('textAgentButton');
-      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', text);
+      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', smsBodyWithListingImage(row, text));
     }
 
     async function loadNext() {
@@ -850,8 +859,8 @@
     async function copyMessage() {
       const text = document.getElementById('messagePreview')?.value || state.row?.outreach_message || '';
       try {
-        await navigator.clipboard.writeText(text);
-        showStatus('Message copied.', 'ok');
+        await navigator.clipboard.writeText(smsBodyWithListingImage(state.row, text));
+        showStatus('Message and listing photo link copied.', 'ok');
       } catch (_) {
         const field = document.getElementById('messagePreview');
         field?.focus();

@@ -1106,7 +1106,7 @@ Confirmed repo behavior:
 - Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, already handled by the existing status fields, or missing an actual listing image.
 - Prioritizes upcoming open houses and preserves the existing outreach message priority: `selected_sms`, `sms_variant_1`, `sms_variant_2`, `sms_variant_3`, then a temporary fallback message with no setup link.
 - Shows the actual listing photo first using `listing_photo_url`, then any property image fields if present. The generated mockup is not allowed to replace the listing photo in the manual backup preview.
-- Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the message prefilled, and the human must manually review and tap Send.
+- Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the editable message plus the verified listing-photo link prefilled, and the human must manually review and tap Send.
 - Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
 - `Mark Sent / Next` and `Skip` patch the queue row through service-role server code, setting only columns that exist. The optional SQL file adds temporary tracking fields: `manual_sms_sent`, `manual_sms_skipped`, `manual_sms_sent_at`, `last_outreach_at`, and `channel`.
 - REL8TION COMMAND's Outreach area includes a "Manual SMS Backup" link to this page.
