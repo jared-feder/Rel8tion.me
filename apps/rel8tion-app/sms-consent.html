@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rel8tion SMS Consent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #18235b;
+      --muted: #59657d;
+      --line: rgba(255, 255, 255, 0.68);
+      --panel: rgba(255, 255, 255, 0.76);
+      --panel-strong: rgba(255, 255, 255, 0.9);
+      --sky: #dff8ff;
+      --accent: #2957ff;
+      --violet: #6a54ff;
+      --good: #0f7b67;
+      --bad: #a2192f;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 0%, rgba(93, 218, 255, 0.55), transparent 34%),
+        radial-gradient(circle at 88% 12%, rgba(126, 105, 255, 0.26), transparent 30%),
+        linear-gradient(180deg, #cdf6ff 0%, #f4fbff 48%, #eef7ff 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -20vh -20vw auto -20vw;
+      height: 48vh;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 18% 58%, rgba(255,255,255,0.86) 0 18%, transparent 19%),
+        radial-gradient(ellipse at 33% 45%, rgba(255,255,255,0.72) 0 20%, transparent 21%),
+        radial-gradient(ellipse at 70% 54%, rgba(255,255,255,0.6) 0 17%, transparent 18%);
+      filter: blur(2px);
+      opacity: 0.82;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 26px 0 42px;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      letter-spacing: 0;
+      margin-bottom: 24px;
+    }
+
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent), var(--violet));
+      box-shadow: 0 18px 32px rgba(41, 87, 255, 0.22);
+    }
+
+    .hero,
+    .form-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 28px 70px rgba(24, 35, 91, 0.14), inset 0 1px 0 rgba(255,255,255,0.75);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+    }
+
+    .hero {
+      border-radius: 28px;
+      padding: clamp(24px, 4vw, 42px);
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 720px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(44px, 7vw, 78px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      margin: 22px 0 0;
+      max-width: 680px;
+      color: var(--muted);
+      font-size: clamp(17px, 2.2vw, 21px);
+      line-height: 1.55;
+      font-weight: 650;
+    }
+
+    .assurance-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 34px;
+    }
+
+    .assurance {
+      min-height: 92px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.56);
+      border: 1px solid rgba(255,255,255,0.72);
+      padding: 16px;
+    }
+
+    .assurance strong {
+      display: block;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .assurance span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 650;
+    }
+
+    .form-card {
+      border-radius: 28px;
+      padding: clamp(18px, 3.3vw, 34px);
+      background: var(--panel-strong);
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 52px;
+      border-radius: 14px;
+      border: 1px solid rgba(24, 35, 91, 0.16);
+      background: rgba(255,255,255,0.92);
+      color: var(--ink);
+      padding: 0 15px;
+      font: 700 16px/1 Inter, sans-serif;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(41, 87, 255, 0.72);
+      box-shadow: 0 0 0 4px rgba(41, 87, 255, 0.12);
+    }
+
+    .consent-box {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(24, 35, 91, 0.14);
+      background: rgba(244, 251, 255, 0.85);
+    }
+
+    .consent-box input {
+      width: 20px;
+      min-height: 20px;
+      height: 20px;
+      margin: 2px 0 0;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    .consent-text {
+      color: #2b365f;
+      font-size: 13.5px;
+      line-height: 1.55;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    button {
+      min-height: 56px;
+      border: 0;
+      border-radius: 16px;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--violet));
+      font: 900 16px/1 Inter, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 20px 38px rgba(41, 87, 255, 0.24);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: 0 24px 44px rgba(41, 87, 255, 0.3); }
+    button:disabled { cursor: wait; opacity: 0.68; transform: none; }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    a { color: var(--ink); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+    .status {
+      display: none;
+      padding: 14px 15px;
+      border-radius: 16px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .status.show { display: block; }
+    .status.ok { color: var(--good); background: rgba(15, 123, 103, 0.1); border: 1px solid rgba(15, 123, 103, 0.22); }
+    .status.bad { color: var(--bad); background: rgba(162, 25, 47, 0.09); border: 1px solid rgba(162, 25, 47, 0.2); }
+
+    .fine-print {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 650;
+    }
+
+    @media (max-width: 860px) {
+      .page { width: min(100% - 18px, 620px); padding-top: 10px; }
+      .shell { grid-template-columns: 1fr; }
+      .hero { border-radius: 24px; }
+      .form-card { border-radius: 24px; }
+      .assurance-grid { grid-template-columns: 1fr; margin-top: 24px; }
+      h1 { font-size: clamp(40px, 13vw, 62px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="brand" aria-label="Rel8tion">
+      <div class="mark">r8</div>
+      <span>Rel8tion</span>
+    </div>
+
+    <section class="shell">
+      <div class="hero">
+        <div>
+          <h1>Rel8tion SMS Consent</h1>
+          <p class="intro">Rel8tion uses SMS to send event-related notifications for real estate open house technology, including agent activation confirmations, buyer check-in alerts, disclosure confirmations, event recap links, open-house support notifications, and requested event support routing.</p>
+        </div>
+        <div class="assurance-grid" aria-label="SMS consent details">
+          <div class="assurance">
+            <strong>First-party consent</strong>
+            <span>This form records your direct opt-in for Rel8tion event-related messages.</span>
+          </div>
+          <div class="assurance">
+            <strong>Control</strong>
+            <span>Reply STOP to opt out at any time or HELP for help.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <form id="smsConsentForm" novalidate>
+          <label>
+            Full Name
+            <input id="fullName" name="full_name" autocomplete="name" required>
+          </label>
+
+          <label>
+            Mobile Phone Number
+            <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required>
+          </label>
+
+          <label>
+            Email Address, optional
+            <input id="email" name="email" type="email" autocomplete="email">
+          </label>
+
+          <label>
+            Role
+            <select id="role" name="role" required>
+              <option value="">Select role</option>
+              <option>Real Estate Agent</option>
+              <option>Loan Officer</option>
+              <option>Buyer / Open House Visitor</option>
+              <option>Broker / Manager</option>
+              <option>Other</option>
+            </select>
+          </label>
+
+          <label class="consent-box">
+            <input id="consent" name="consent" type="checkbox" required>
+            <span class="consent-text">By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of purchase.</span>
+          </label>
+
+          <div id="status" class="status" role="status" aria-live="polite"></div>
+
+          <button id="submitButton" type="submit">Opt In to Event-Related SMS</button>
+        </form>
+
+        <div class="links">
+          <span>Privacy Policy: <a href="/privacy-policy">/privacy-policy</a></span>
+          <span>Terms of Service: <a href="/terms">/terms</a></span>
+        </div>
+        <p class="fine-print">Rel8tion SMS is used for event operations and notifications. This page does not enroll you in unrelated marketing campaigns.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('smsConsentForm');
+    const statusEl = document.getElementById('status');
+    const submitButton = document.getElementById('submitButton');
+
+    function normalizePhone(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
+      return digits;
+    }
+
+    function showStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = `status show ${type}`;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const fullName = String(formData.get('full_name') || '').trim();
+      const phone = String(formData.get('phone') || '').trim();
+      const phoneNormalized = normalizePhone(phone);
+      const email = String(formData.get('email') || '').trim();
+      const role = String(formData.get('role') || '').trim();
+      const consent = document.getElementById('consent').checked;
+
+      if (fullName.length < 2) {
+        showStatus('Please enter your full name.', 'bad');
+        return;
+      }
+
+      if (phoneNormalized.length !== 10) {
+        showStatus('Please enter a valid 10-digit mobile phone number.', 'bad');
+        return;
+      }
+
+      if (!role) {
+        showStatus('Please select your role.', 'bad');
+        return;
+      }
+
+      if (!consent) {
+        showStatus('Please check the consent box to opt in.', 'bad');
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = 'Saving Consent...';
+      showStatus('Saving your SMS consent...', 'ok');
+
+      try {
+        const response = await fetch('/api/sms-consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: fullName,
+            phone,
+            phone_normalized: phoneNormalized,
+            email,
+            role,
+            consent
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Unable to save SMS consent.');
+        showStatus('You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.', 'ok');
+        form.reset();
+      } catch (error) {
+        showStatus(error.message || 'We could not save your SMS consent right now. Please try again.', 'bad');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Opt In to Event-Related SMS';
+      }
+    });
+  </script>
+</body>
+</html>

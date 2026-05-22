@@ -107,6 +107,7 @@ It uses:
 - `api/admin/outreach-action.js`
 - `api/admin/outreach-inbox.js`
 - `api/admin/outreach-reply.js`
+- `api/sms-consent.js`
 - `api/admin/reset-key.js`
 - `api/admin/sign-action.js`
 - `api/checkout/open-house-kit.js`
@@ -1008,6 +1009,7 @@ Important fields inferred from insert:
 - `agent_outreach_queue`
 - `agent_outreach_replies`
 - `agent_outreach_inbox` view
+- `sms_consent_records`
 
 Used for:
 
@@ -1076,6 +1078,20 @@ Still not confirmed:
 - `[IMPLEMENTED]` Local source is checked in at `supabase/functions/send-lead-sms/index.ts`.
 - `[PARTIAL]` User reports the deployed function has been active and working for months.
 - `[NEEDS VERIFICATION]` Supabase dashboard/source matching and Twilio payload behavior should be verified before changing the SMS contract.
+
+### `/sms-consent`
+
+Files: root `sms-consent.html`, `apps/rel8tion-app/sms-consent.html`, and `api/sms-consent.js`.
+
+`[IMPLEMENTED]` `/sms-consent` is a public, no-login Rel8tion SMS consent page for first-party event-related SMS documentation. It intentionally avoids loan marketing, lead-generation language, and buying/selling-leads claims.
+
+Submission path:
+
+- Browser posts to public Vercel API route `/api/sms-consent`.
+- Server validates full name, 10-digit mobile phone, role, optional email format, and unchecked-by-default consent checkbox.
+- Server stores the exact consent text, role, phone, normalized phone digits, email, user agent, IP address, source, and URL in `sms_consent_records`.
+- Migration `supabase/migrations/20260522002148_sms_consent_records.sql` creates the table with RLS enabled, service-role writes, timestamps, and a unique partial index on `phone_normalized`.
+- `/terms` is served by root `terms.html`, which redirects to the existing terms page, and `/privacy-policy` already exists at the root.
 
 ### `/api/compliance/ny-disclosure`
 
