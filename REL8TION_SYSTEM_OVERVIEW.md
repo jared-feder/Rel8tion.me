@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-19.
+Last inspected: 2026-05-21.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -59,6 +59,9 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/event` to `apps/rel8tion-app/event.html`
 - `/l/:id` to `api/open-house-link.js`, which opens a REL8TION property landing page with an optional button to the saved MLS/listing URL
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
+- `/get-open-house-kit` to `apps/rel8tion-app/get-open-house-kit.html`; `getrel8tion.com/` and `www.getrel8tion.com/` also host-rewrite to this Open House Kit landing
+- `/kit-confirm` to `apps/rel8tion-app/kit-confirm.html`
+- `/kit-intake` to `apps/rel8tion-app/kit-intake.html`
 - `/open-house-kit` to `apps/rel8tion-app/open-house-kit.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
 - `/lo-field-dashboard` to `apps/rel8tion-app/lo-field-dashboard.html`
@@ -156,21 +159,43 @@ Important localStorage keys:
 - `rel8tion_agent_dashboard_pending`
 - `rel8tion_loan_officer_pending`
 - `rel8tion_key_reset_pending`
+- `rel8tion_open_house_kit_pending`
 
 `[IMPLEMENTED]` Confirmed repo behavior:
 
 1. If reset mode is armed, route the scanned UID to `/key-reset.html?uid=...`.
-2. If UID matches an active sign front chip, route to the live sign route `/s?code=<publicCode>`.
-3. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
-4. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
-5. If the UID matches an active `verified_profiles` row outside a pending event sign-in, open `/lo-field-dashboard?uid=<uid>` so LO chips are operational and not buyer-facing.
-6. If the UID is a claimed agent keychain whose agent phone/email matches an active `verified_profiles` row, open the LO dashboard for that verified profile; this supports a physical keychain being used as the LO operations key without exposing a buyer-facing profile.
-7. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
-8. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
+2. If the Open House Kit landing has armed a valid 10-minute `rel8tion_open_house_kit_pending` session, route the scanned UID to `/kit-confirm?uid=...` before normal claimed keychain/sign/event routing. Expired kit sessions are removed and ignored.
+3. If UID matches an active sign front chip, route to the live sign route `/s?code=<publicCode>`.
+4. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
+5. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
+6. If the UID matches an active `verified_profiles` row outside a pending event sign-in, open `/lo-field-dashboard?uid=<uid>` so LO chips are operational and not buyer-facing.
+7. If the UID is a claimed agent keychain whose agent phone/email matches an active `verified_profiles` row, open the LO dashboard for that verified profile; this supports a physical keychain being used as the LO operations key without exposing a buyer-facing profile.
+8. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
+9. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
 
 `[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
 `[IMPLEMENTED]` Router priority rule: sign activation chip scans take precedence over backup-keychain linking. If a sign activation session is waiting for front/rear sign chips, `/k` continues sign activation before considering any pending backup-keychain session, so a fresh sign chip cannot be stored as an agent keychain.
+
+### `getrel8tion.com`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`
+
+Files:
+
+- `apps/rel8tion-app/get-open-house-kit.html`
+- `apps/rel8tion-app/kit-confirm.html`
+- `apps/rel8tion-app/kit-intake.html`
+- `api/checkout/open-house-kit.js`
+
+Role: agent-facing Open House Kit acquisition and Event Pass keychain prefill flow.
+
+`[PARTIAL]` Confirmed repo behavior:
+
+- `getrel8tion.com/` and `www.getrel8tion.com/` host-rewrite to the no-navigation Open House Kit landing when those domains are attached to the same Vercel project. `/get-open-house-kit` is the direct fallback route.
+- The landing has two primary actions: "I Have an Event Pass Keychain" and "I Need My Open House Kit".
+- The keychain action stores `rel8tion_open_house_kit_pending` in localStorage with purpose `open_house_kit_confirm`, the source host/path, and a 10-minute expiry. This keeps the same-domain NFC handoff at `getrel8tion.com/k?uid=...` eligible for kit confirmation.
+- `/kit-confirm` reads the scanned UID and looks up identity data from `keys` plus linked `agents`, `verified_profiles`, `smart_signs`, `smart_sign_inventory`, and linked live loan-officer session rows when available. It stores the resolved data in browser storage for `/kit-intake`.
+- `/kit-intake` supports keychain-prefilled and manual intake, collects agent/contact/shipping/sponsor/product details, searches for likely existing profiles by normalized phone, email, and close name-plus-brokerage match, and requires the user to confirm likely matches before checkout.
+- The browser intake does not create agent records directly. It passes source, flow, UID, agent, sponsor, and selected kit metadata into `/api/checkout/open-house-kit`, which creates Stripe Checkout Sessions for the physical kit plus monthly or annual service.
 
 ### `/claim`
 
@@ -392,7 +417,7 @@ Inputs:
 - Loads live `event_loan_officer_sessions`.
 - Shows stats for check-ins, financing needs, outreach, and relationship stage.
 - Shows lead cards with call/text actions, agency/housing/courtesy disclosure signed/missing status, and an `Open Disclosure Packet PDF` action when the signed disclosure packet can be generated or stored.
-- Shows loan officer coverage card.
+- Shows loan officer coverage card. If no real live loan officer session exists for the event, the card displays default NMB/Jared fallback coverage so the agent still sees financing support; real assigned/scanned loan officer coverage overrides the fallback.
 - Can email a current event summary from the dashboard.
 - Can end the current open house without deleting check-ins by marking the event ended, stamping `ended_at`, clearing the sign's `active_event_id`, setting the sign inactive, closing live loan officer sessions where possible, and rendering an event summary with buyer check-in count, signed disclosure count, financing-help count, email-summary action, a Get Open House Kit link to `/open-house-kit`, and next-coverage call/SMS action.
 - The dashboard request helper supports PATCH/POST/DELETE options, so End/Move controls perform live Supabase writes instead of read-only requests.
@@ -1033,7 +1058,17 @@ Still not confirmed:
 - Finds latest matching `agent_outreach_queue` row.
 - Marks opted-out or replied rows.
 - Blocks follow-up after reply/opt-out.
-- Sends owner alert through Twilio for new non-negative replies.
+- Sends a non-blocking owner alert through Twilio for inbound outreach replies after saving the reply and blocking follow-up.
+- The owner-alert behavior was deployed to Supabase project `nicanqrfqlbnlmnoernb` on 2026-05-21.
+
+`supabase/functions/twilio-message-status/index.ts`
+
+- Receives Twilio `StatusCallback` webhooks for outreach message delivery lifecycle events.
+- Requires `TWILIO_STATUS_CALLBACK_TOKEN` via query string or `x-rel8tion-status-token`.
+- Looks up the linked `agent_outreach_queue` row by callback `queue_id` or by `twilio_sid_initial` / `twilio_sid_followup`.
+- Inserts each status payload into `agent_outreach_delivery_events`.
+- Patches `initial_delivery_status`, `followup_delivery_status`, and last-delivery fields on `agent_outreach_queue`.
+- The function is deployed without JWT verification so Twilio can post to it, but the private callback token is required.
 
 ### `send-lead-sms`
 
@@ -1072,8 +1107,9 @@ Observed behavior in reference source:
 
 - `sync-openhouses` pulls OneKey data and restores enriched agent contact data from `listing_agents`.
 - `generate-agent-outreach` queues and generates outreach rows.
-- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`. The 2026-05-20 version fetches due pending initial/follow-up rows directly instead of scanning oldest generated/rendered history first, and supports `dry_run` / `diagnostic_no_send` output for no-SMS verification.
-- `send-agent-manual-reply` sends manual replies from outreach UI. `[IMPLEMENTED]` Deployable source exists under `supabase/functions/send-agent-manual-reply/index.ts`; the 2026-05-14 version requires service-role authorization and is intended to be called through the protected Vercel admin API, not directly from browser code.
+- `send-agent-outreach` sends outbound SMS with quiet hours, invalid phone handling, opt-out handling, follow-up status, expiration rules, and admin-scheduled drip follow-ups when `review_status = drip_scheduled`. The 2026-05-20 version fetches due pending initial/follow-up rows directly instead of scanning oldest generated/rendered history first, and supports `dry_run` / `diagnostic_no_send` output for no-SMS verification. The 2026-05-21 version passes Twilio `StatusCallback` URLs for initial and follow-up messages and initializes delivery status fields from Twilio's immediate response.
+- `send-agent-manual-reply` sends manual replies from outreach UI. `[IMPLEMENTED]` Deployable source exists under `supabase/functions/send-agent-manual-reply/index.ts`; the 2026-05-14 version requires service-role authorization and is intended to be called through the protected Vercel admin API, not directly from browser code. The 2026-05-21 version also passes Twilio delivery-status callbacks for manual replies.
+- `twilio-message-status` records Twilio delivery lifecycle callbacks in `agent_outreach_delivery_events` and patches delivery status/error fields on `agent_outreach_queue`.
 
 ### RPCs Used By Current Code
 
@@ -1279,6 +1315,8 @@ Confirmed or needs-verification gaps:
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
 - `[IMPLEMENTED]` Outreach mockup rendering now skips already-failed rows in normal queue selection and renders a branded fallback card when a listing photo cannot be fetched, so blocked external listing images should not keep newer generated outreach rows stuck at `mockup_status = pending`.
 - `[IMPLEMENTED]` Outreach generation copy now uses Event Pass sponsorship language: quick pre-approval support plus a sponsored Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture with no app needed. Follow-up and missed-open-house variants no longer use the older beta/custom-sign wording.
+- `[IMPLEMENTED]` Outreach delivery-status storage exists through `agent_outreach_queue` delivery fields, `agent_outreach_delivery_events`, and the `twilio-message-status` callback function. This shows carrier/Twilio lifecycle status going forward instead of treating Twilio API acceptance as final delivery.
+- `[RISK]` Twilio/A2P campaign state was user-reported as "campaign suspended" on 2026-05-21. Delivery tracking can expose resulting failed/undelivered statuses, but outbound campaign delivery should be considered unreliable until the Twilio campaign is restored.
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.

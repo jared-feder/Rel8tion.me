@@ -176,11 +176,15 @@ async function sendTwilioMessage(opts: {
   to: string;
   body: string;
   mediaUrls?: string[];
+  statusCallback?: string;
 }) {
   const form = new URLSearchParams();
   form.set("From", opts.from);
   form.set("To", opts.to);
   form.set("Body", opts.body);
+  if (opts.statusCallback) {
+    form.set("StatusCallback", opts.statusCallback);
+  }
   for (const mediaUrl of opts.mediaUrls || []) {
     if (mediaUrl) {
       form.append("MediaUrl", mediaUrl);
@@ -206,6 +210,17 @@ async function sendTwilioMessage(opts: {
   }
 
   return data;
+}
+
+function buildStatusCallbackUrl(supabaseUrl: string, queueId: string, step: "initial" | "followup"): string {
+  const override = Deno.env.get("TWILIO_STATUS_CALLBACK_URL");
+  const token = Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN") || "";
+  const base = override || `${supabaseUrl.replace(/\/$/, "")}/functions/v1/twilio-message-status`;
+  const url = new URL(base);
+  url.searchParams.set("queue_id", queueId);
+  url.searchParams.set("step", step);
+  if (token) url.searchParams.set("token", token);
+  return url.toString();
 }
 
 serve(async (req) => {
@@ -498,7 +513,11 @@ serve(async (req) => {
             to,
             body: initialBody,
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
+            statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "initial"),
           });
+
+          const sentAt = new Date().toISOString();
+          const initialDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
@@ -509,9 +528,17 @@ serve(async (req) => {
               followup_sms: storedFollowupBody,
               followup_sms_link: storedFollowupBody ? buildSmsLink(row.agent_phone, storedFollowupBody) : null,
               initial_send_status: "sent",
-              initial_sent_at: new Date().toISOString(),
+              initial_sent_at: sentAt,
               twilio_sid_initial: twilioRes.sid,
-              last_outreach_at: new Date().toISOString(),
+              initial_delivery_status: initialDeliveryStatus,
+              initial_delivery_status_updated_at: sentAt,
+              initial_delivery_error_code: null,
+              initial_delivery_error_message: null,
+              last_delivery_status: initialDeliveryStatus,
+              last_delivery_status_updated_at: sentAt,
+              last_delivery_error_code: null,
+              last_delivery_error_message: null,
+              last_outreach_at: sentAt,
               initial_block_reason: null,
               send_error: null,
             })
@@ -540,7 +567,11 @@ serve(async (req) => {
             to,
             body: followupBody || row.followup_sms || "",
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
+            statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "followup"),
           });
+
+          const sentAt = new Date().toISOString();
+          const followupDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
@@ -548,9 +579,17 @@ serve(async (req) => {
               followup_sms: followupBody || row.followup_sms || null,
               followup_sms_link: followupBody ? buildSmsLink(row.agent_phone, followupBody) : null,
               followup_send_status: "sent",
-              followup_sent_at: new Date().toISOString(),
+              followup_sent_at: sentAt,
               twilio_sid_followup: twilioRes.sid,
-              last_outreach_at: new Date().toISOString(),
+              followup_delivery_status: followupDeliveryStatus,
+              followup_delivery_status_updated_at: sentAt,
+              followup_delivery_error_code: null,
+              followup_delivery_error_message: null,
+              last_delivery_status: followupDeliveryStatus,
+              last_delivery_status_updated_at: sentAt,
+              last_delivery_error_code: null,
+              last_delivery_error_message: null,
+              last_outreach_at: sentAt,
               followup_block_reason: null,
               send_error: null,
             })

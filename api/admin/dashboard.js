@@ -430,7 +430,7 @@ module.exports = async function handler(req, res) {
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
       safeRest('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc&limit=250', [], warnings, 'field_demo_visits'),
       safeRest('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc&limit=500', [], warnings, 'field_demo_visit_participants'),
-      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,initial_send_status,initial_sent_at,followup_sms,followup_send_status,followup_send_at,followup_sent_at,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
+      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
       safeRest('agent_outreach_inbox?select=thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status&order=last_reply_at.desc&limit=250', [], warnings, 'agent_outreach_inbox')
     ]);
 
@@ -509,6 +509,7 @@ module.exports = async function handler(req, res) {
       outreach: {
         by_review_status: countBy(outreach, (row) => row.review_status || 'pending'),
         by_initial_status: countBy(outreach, (row) => row.initial_send_status || row.send_status || 'unknown'),
+        by_initial_delivery_status: countBy(outreach, (row) => row.initial_delivery_status || 'unknown'),
         recent: recent(outreach, 'created_at', 60)
       },
       billing: {

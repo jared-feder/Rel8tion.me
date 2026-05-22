@@ -38,11 +38,15 @@ async function sendTwilioMessage(opts: {
   from: string;
   to: string;
   body: string;
+  statusCallback?: string;
 }) {
   const form = new URLSearchParams();
   form.set("From", opts.from);
   form.set("To", opts.to);
   form.set("Body", opts.body);
+  if (opts.statusCallback) {
+    form.set("StatusCallback", opts.statusCallback);
+  }
 
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${opts.accountSid}/Messages.json`,
@@ -64,6 +68,17 @@ async function sendTwilioMessage(opts: {
   }
 
   return data;
+}
+
+function buildStatusCallbackUrl(supabaseUrl: string, queueId: string): string {
+  const override = Deno.env.get("TWILIO_STATUS_CALLBACK_URL");
+  const token = Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN") || "";
+  const base = override || `${supabaseUrl.replace(/\/$/, "")}/functions/v1/twilio-message-status`;
+  const url = new URL(base);
+  url.searchParams.set("queue_id", queueId);
+  url.searchParams.set("step", "manual_reply");
+  if (token) url.searchParams.set("token", token);
+  return url.toString();
 }
 
 serve(async (req) => {
@@ -162,9 +177,11 @@ serve(async (req) => {
       from: twilioFrom,
       to,
       body: messageBody,
+      statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id),
     });
 
     const sentAt = new Date().toISOString();
+    const followupDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
 
     const { error: replyInsertError } = await supabase
       .from("agent_outreach_replies")
@@ -194,6 +211,14 @@ serve(async (req) => {
         followup_send_status: "sent",
         followup_sent_at: sentAt,
         twilio_sid_followup: twilioRes.sid,
+        followup_delivery_status: followupDeliveryStatus,
+        followup_delivery_status_updated_at: sentAt,
+        followup_delivery_error_code: null,
+        followup_delivery_error_message: null,
+        last_delivery_status: followupDeliveryStatus,
+        last_delivery_status_updated_at: sentAt,
+        last_delivery_error_code: null,
+        last_delivery_error_message: null,
         followup_block_reason: null,
         send_error: null,
         last_error: null,

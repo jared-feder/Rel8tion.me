@@ -1479,6 +1479,19 @@
       return `<span class="badge ${type}">${esc(text)}</span>`;
     }
 
+    function deliveryBadge(row, step = 'initial') {
+      const status = row?.[`${step}_delivery_status`] || '';
+      const errorCode = row?.[`${step}_delivery_error_code`] || '';
+      if (!status) return row?.[`${step}_sent_at`] ? badge('delivery pending', 'warn') : '';
+      const normalized = String(status).toLowerCase();
+      const tone = ['delivered'].includes(normalized)
+        ? 'ok'
+        : ['failed', 'undelivered', 'canceled'].includes(normalized)
+          ? 'bad'
+          : 'info';
+      return badge(`${normalized}${errorCode ? ` ${errorCode}` : ''}`, tone);
+    }
+
     function statusBadge(thread) {
       if (isOptOutThread(thread)) return badge('Opted out', 'bad');
       if (thread.review_status === 'confirmed_open_house') return badge('Confirmed OH', 'ok');
@@ -2567,7 +2580,10 @@
           <div class="secondary">${esc([fmtDate(row.open_start), money(row.price)].filter(Boolean).join(' | '))}</div>
         </div>
         <div>${badge(row.review_status || 'pending', row.review_status === 'accepted_open_house' || row.review_status === 'confirmed_open_house' ? 'ok' : 'info')}</div>
-        <div>${badge(row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}</div>
+        <div class="badges">
+          ${badge(row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}
+          ${deliveryBadge(row, 'initial')}
+        </div>
         <div>
           <div class="secondary">${esc(row.selected_sms || 'No outreach copy stored.')}</div>
         </div>
@@ -2602,6 +2618,8 @@
               <div class="badges">
                 ${statusBadge(thread)}
                 ${thread.template_key ? badge(thread.template_key.replace(/_/g, ' '), 'info') : ''}
+                ${deliveryBadge(thread, 'initial')}
+                ${thread.followup_sent_at ? deliveryBadge(thread, 'followup') : ''}
               </div>
             </div>
 
@@ -3325,6 +3343,7 @@ ${rowsHtml}
         <div class="report-grid">
           ${renderBarCard('Review status', outreach.by_review_status || {})}
           ${renderBarCard('Initial status', outreach.by_initial_status || {})}
+          ${renderBarCard('Delivery status', outreach.by_initial_delivery_status || {})}
         </div>
       `;
     }
