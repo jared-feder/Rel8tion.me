@@ -764,6 +764,9 @@
                 <i data-lucide="copy"></i>Copy Message
               </button>
               ${row.outreach_photo_url ? `
+                <button class="btn" type="button" onclick="copyOutreachPhoto()">
+                  <i data-lucide="clipboard-copy"></i>Copy Outreach Photo
+                </button>
                 <a class="btn" href="${esc(row.outreach_photo_url)}" target="_blank" rel="noopener">
                   <i data-lucide="image"></i>Open ${esc(row.outreach_photo_label || 'Photo')}
                 </a>
@@ -872,6 +875,65 @@
         field?.focus();
         field?.select();
         showStatus('Message selected. Use your phone copy command.', 'ok');
+      }
+    }
+
+    async function blobToPng(blob) {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((pngBlob) => {
+          if (pngBlob) resolve(pngBlob);
+          else reject(new Error('Unable to prepare photo for clipboard.'));
+        }, 'image/png');
+      });
+    }
+
+    async function copyOutreachPhoto() {
+      const row = state.row;
+      const url = String(row?.outreach_photo_url || row?.listing_image_url || '').trim();
+      if (!url) {
+        showStatus('No outreach photo is available for this row.', 'bad');
+        return;
+      }
+
+      if (!navigator.clipboard) {
+        showStatus('Your browser cannot copy from this page. Open the photo and attach it manually.', 'bad');
+        return;
+      }
+
+      if (!window.ClipboardItem || !navigator.clipboard.write) {
+        await navigator.clipboard.writeText(url);
+        showStatus('This phone/browser cannot copy images here. Photo link copied instead.', 'bad');
+        return;
+      }
+
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) throw new Error(`Photo request failed: ${response.status}`);
+        const originalBlob = await response.blob();
+        const originalType = String(originalBlob.type || 'image/jpeg').split(';')[0];
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ [originalType]: originalBlob })
+          ]);
+        } catch (_) {
+          const pngBlob = await blobToPng(originalBlob);
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob })
+          ]);
+        }
+        showStatus('Outreach photo copied. Paste it into your text thread, then tap Send.', 'ok');
+      } catch (error) {
+        try {
+          await navigator.clipboard.writeText(url);
+          showStatus('Your phone blocked direct image copy. Photo link copied; use Open Photo to attach the image manually.', 'bad');
+        } catch (_) {
+          showStatus('Your phone blocked direct image copy. Open the photo and attach it manually.', 'bad');
+        }
       }
     }
 
