@@ -126,16 +126,23 @@ function messageFor(row) {
 }
 
 function imageFor(row) {
-  const url = firstPresent(row.mockup_image_url, row.listing_photo_url, row.image_url, row.property_image, row.image);
+  const listingUrl = firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image);
+  const url = firstPresent(listingUrl, row.mockup_image_url);
   return {
     image_url: url || FALLBACK_PLACEHOLDER,
-    image_source: row.mockup_image_url ? 'mockup_image_url' :
-      row.listing_photo_url ? 'listing_photo_url' :
+    listing_image_url: listingUrl || '',
+    has_listing_image: Boolean(listingUrl),
+    image_source: row.listing_photo_url ? 'listing_photo_url' :
       row.image_url ? 'image_url' :
       row.property_image ? 'property_image' :
       row.image ? 'image' :
+      row.mockup_image_url ? 'mockup_image_url' :
       'rel8tion_placeholder'
   };
+}
+
+function hasListingImage(row) {
+  return Boolean(firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image));
 }
 
 function normalizedStatus(value) {
@@ -209,6 +216,7 @@ function isReady(row, now) {
   if (isAlreadyHandled(row)) return false;
   if (isExpired(row, now)) return false;
   if (!isDue(row, now)) return false;
+  if (!hasListingImage(row)) return false;
   const { message } = messageFor(row);
   return Boolean(message);
 }

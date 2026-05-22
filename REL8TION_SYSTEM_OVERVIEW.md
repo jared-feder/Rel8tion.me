@@ -1103,13 +1103,18 @@ Files: root `manual-sms-outreach.html`, `api/manual-sms-outreach.js`, and `supab
 Confirmed repo behavior:
 
 - Loads the next ready `agent_outreach_queue` row through the protected Vercel API route `/api/manual-sms-outreach`.
-- Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, or already handled by the existing status fields.
+- Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, already handled by the existing status fields, or missing an actual listing image.
 - Prioritizes upcoming open houses and preserves the existing outreach message priority: `selected_sms`, `sms_variant_1`, `sms_variant_2`, `sms_variant_3`, then a temporary fallback message with no setup link.
-- Preserves outreach image priority: `mockup_image_url`, `listing_photo_url`, then any property image fields if present, then a Rel8tion placeholder.
+- Shows the actual listing photo first using `listing_photo_url`, then any property image fields if present. The generated mockup is not allowed to replace the listing photo in the manual backup preview.
 - Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the message prefilled, and the human must manually review and tap Send.
 - Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
 - `Mark Sent / Next` and `Skip` patch the queue row through service-role server code, setting only columns that exist. The optional SQL file adds temporary tracking fields: `manual_sms_sent`, `manual_sms_skipped`, `manual_sms_sent_at`, `last_outreach_at`, and `channel`.
 - REL8TION COMMAND's Outreach area includes a "Manual SMS Backup" link to this page.
+
+Automatic outreach image guard:
+
+- The mockup renderer requires `listing_photo_url` and fails the queue row instead of generating a generic fallback background if the listing photo is missing or cannot be loaded.
+- `send-agent-outreach` only selects automatic send rows with `listing_photo_url`, so future MMS outreach should not use a non-listing image as the property background.
 
 ### `/api/compliance/ny-disclosure`
 
@@ -1347,7 +1352,7 @@ Confirmed or needs-verification gaps:
 - `[PARTIAL]` In-app event conversation logging exists through `event_conversations`, `event_conversation_messages`, `/api/event-chat/*`, and `/field-dashboard`; realtime delivery, push/SMS relay, video, and hardened auth are not built.
 - `[PARTIAL]` REL8TION COMMAND exists as the protected admin dashboard and can view leads, reply to outreach, triage interested replies, confirm true open houses into field visits/reports, accept open houses into field visits, generate confirmed open house PDF-style reports, schedule drip follow-ups, end active sign events, detach smart signs to make them fresh again, assign/remove live LO coverage to active open house events, and soft-remove active LO profiles. The deeper action layer for broader sign inventory record edits, CRM updates, LO calendar/availability modification, billing automation, and full project controls is not complete.
 - `[PARTIAL]` `send-lead-sms` implementation is now checked in under `supabase/functions`; deployed source/version matching and Twilio behavior remain `[NEEDS VERIFICATION]`.
-- `[IMPLEMENTED]` Outreach mockup rendering now skips already-failed rows in normal queue selection and renders a branded fallback card when a listing photo cannot be fetched, so blocked external listing images should not keep newer generated outreach rows stuck at `mockup_status = pending`.
+- `[IMPLEMENTED]` Outreach mockup rendering now skips already-failed rows in normal queue selection and fails rows whose real listing photo is missing or cannot be fetched. It no longer renders branded fallback property cards for outreach MMS backgrounds.
 - `[IMPLEMENTED]` Outreach generation copy now uses Event Pass sponsorship language: quick pre-approval support plus a sponsored Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture with no app needed. Follow-up and missed-open-house variants no longer use the older beta/custom-sign wording.
 - `[IMPLEMENTED]` Outreach delivery-status storage exists through `agent_outreach_queue` delivery fields, `agent_outreach_delivery_events`, and the `twilio-message-status` callback function. This shows carrier/Twilio lifecycle status going forward instead of treating Twilio API acceptance as final delivery.
 - `[RISK]` Twilio/A2P campaign state was user-reported as "campaign suspended" on 2026-05-21. Delivery tracking can expose resulting failed/undelivered statuses, but outbound campaign delivery should be considered unreliable until the Twilio campaign is restored.

@@ -17,6 +17,7 @@ type OutreachRow = {
   agent_name?: string | null;
   agent_phone?: string | null;
   address?: string | null;
+  listing_photo_url?: string | null;
   open_start?: string | null;
   selected_sms?: string | null;
   followup_sms?: string | null;
@@ -283,6 +284,7 @@ serve(async (req) => {
         address,
         selected_sms,
         followup_sms,
+        listing_photo_url,
         mockup_image_url,
         open_start,
         open_end,
@@ -301,6 +303,7 @@ serve(async (req) => {
       .eq("send_mode", "automatic")
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
+      .not("listing_photo_url", "is", null)
       .or(`and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
       .order("initial_send_at", { ascending: true, nullsFirst: false })
       .order("followup_send_at", { ascending: true, nullsFirst: false })

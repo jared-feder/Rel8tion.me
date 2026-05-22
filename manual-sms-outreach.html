@@ -715,7 +715,7 @@
       content.innerHTML = `
         <article class="outreach-card">
           <div class="image-wrap">
-            <img src="${esc(row.image_url)}" alt="Outreach mockup for ${esc(row.property_address || row.address || 'open house')}" onerror="this.src='https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png'">
+            <img src="${esc(row.image_url)}" alt="Listing photo for ${esc(row.property_address || row.address || 'open house')}" onerror="this.src='https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png'">
             <div class="image-source">${esc(row.image_source || 'rel8tion')}</div>
           </div>
           <div class="card-body">
@@ -725,7 +725,7 @@
                 <div class="agent-meta">${esc(row.brokerage || 'Brokerage not available')}</div>
                 <div class="agent-meta">${esc(fmtPhone(phone))}</div>
               </div>
-              <span class="pill"><i data-lucide="${row.is_delivery_failure ? 'triangle-alert' : 'send'}"></i>${row.is_delivery_failure ? 'Delivery issue' : 'Manual'}</span>
+              <span class="pill"><i data-lucide="${row.has_listing_image ? 'image-check' : 'triangle-alert'}"></i>${row.has_listing_image ? 'Listing photo verified' : 'No listing photo'}</span>
             </div>
 
             <div>
@@ -753,6 +753,11 @@
               <button class="btn" type="button" onclick="copyMessage()">
                 <i data-lucide="copy"></i>Copy Message
               </button>
+              ${row.listing_image_url ? `
+                <a class="btn" href="${esc(row.listing_image_url)}" target="_blank" rel="noopener">
+                  <i data-lucide="image"></i>Open Listing Photo
+                </a>
+              ` : ''}
               <a class="btn" href="${esc(telLink(phone))}">
                 <i data-lucide="phone"></i>Call Agent
               </a>
