@@ -1,0 +1,408 @@
+<!--
+  WordPress page content for https://rel8tion.me/sms-consent.
+  Paste this into a WordPress Custom HTML block on a public page with slug: sms-consent.
+  The form posts consent records to the Vercel API at app.rel8tion.me.
+-->
+<section class="rel8tion-sms-consent" aria-labelledby="rel8tion-sms-consent-title">
+  <style>
+    .rel8tion-sms-consent {
+      --ink: #18235b;
+      --muted: #59657d;
+      --line: rgba(255,255,255,.68);
+      --panel: rgba(255,255,255,.82);
+      --accent: #2957ff;
+      --violet: #6a54ff;
+      --good: #0f7b67;
+      --bad: #a2192f;
+      min-height: 100vh;
+      margin: 0;
+      padding: 28px 14px 44px;
+      color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(93,218,255,.55), transparent 34%),
+        radial-gradient(circle at 88% 12%, rgba(126,105,255,.26), transparent 30%),
+        linear-gradient(180deg, #cdf6ff 0%, #f4fbff 50%, #eef7ff 100%);
+    }
+
+    .rel8tion-sms-consent * { box-sizing: border-box; }
+
+    .rel8tion-sms-consent__wrap {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    .rel8tion-sms-consent__brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      font-weight: 900;
+    }
+
+    .rel8tion-sms-consent__mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--violet));
+      box-shadow: 0 18px 32px rgba(41,87,255,.22);
+    }
+
+    .rel8tion-sms-consent__grid {
+      display: grid;
+      grid-template-columns: minmax(0,.95fr) minmax(360px,1.05fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .rel8tion-sms-consent__hero,
+    .rel8tion-sms-consent__card {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: 0 28px 70px rgba(24,35,91,.14), inset 0 1px 0 rgba(255,255,255,.75);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+    }
+
+    .rel8tion-sms-consent__hero {
+      padding: clamp(24px,4vw,42px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 520px;
+    }
+
+    .rel8tion-sms-consent h1 {
+      margin: 0;
+      max-width: 720px;
+      color: var(--ink);
+      font-size: clamp(42px,7vw,78px);
+      line-height: .95;
+      letter-spacing: 0;
+      font-weight: 900;
+    }
+
+    .rel8tion-sms-consent__intro {
+      margin: 22px 0 0;
+      max-width: 680px;
+      color: var(--muted);
+      font-size: clamp(17px,2.2vw,21px);
+      line-height: 1.55;
+      font-weight: 650;
+    }
+
+    .rel8tion-sms-consent__notes {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 10px;
+      margin-top: 34px;
+    }
+
+    .rel8tion-sms-consent__note {
+      min-height: 92px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.56);
+      border: 1px solid rgba(255,255,255,.72);
+      padding: 16px;
+    }
+
+    .rel8tion-sms-consent__note strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .rel8tion-sms-consent__note span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 650;
+    }
+
+    .rel8tion-sms-consent__card {
+      padding: clamp(18px,3.3vw,34px);
+      background: rgba(255,255,255,.9);
+    }
+
+    .rel8tion-sms-consent form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .rel8tion-sms-consent label {
+      display: grid;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .rel8tion-sms-consent input,
+    .rel8tion-sms-consent select {
+      width: 100%;
+      min-height: 52px;
+      border-radius: 14px;
+      border: 1px solid rgba(24,35,91,.16);
+      background: rgba(255,255,255,.94);
+      color: var(--ink);
+      padding: 0 15px;
+      font: 700 16px/1 Inter, system-ui, sans-serif;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+
+    .rel8tion-sms-consent input:focus,
+    .rel8tion-sms-consent select:focus {
+      border-color: rgba(41,87,255,.72);
+      box-shadow: 0 0 0 4px rgba(41,87,255,.12);
+    }
+
+    .rel8tion-sms-consent__check {
+      display: grid !important;
+      grid-template-columns: 22px minmax(0,1fr);
+      gap: 12px !important;
+      align-items: start;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(24,35,91,.14);
+      background: rgba(244,251,255,.85);
+    }
+
+    .rel8tion-sms-consent__check input {
+      width: 20px;
+      min-height: 20px;
+      height: 20px;
+      margin: 2px 0 0;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    .rel8tion-sms-consent__check span {
+      color: #2b365f;
+      font-size: 13.5px;
+      line-height: 1.55;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .rel8tion-sms-consent button {
+      min-height: 56px;
+      border: 0;
+      border-radius: 16px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--violet));
+      font: 900 16px/1 Inter, system-ui, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 20px 38px rgba(41,87,255,.24);
+    }
+
+    .rel8tion-sms-consent button:disabled {
+      cursor: wait;
+      opacity: .68;
+    }
+
+    .rel8tion-sms-consent__status {
+      display: none;
+      padding: 14px 15px;
+      border-radius: 16px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .rel8tion-sms-consent__status.is-visible { display: block; }
+    .rel8tion-sms-consent__status.is-ok {
+      color: var(--good);
+      background: rgba(15,123,103,.1);
+      border: 1px solid rgba(15,123,103,.22);
+    }
+    .rel8tion-sms-consent__status.is-bad {
+      color: var(--bad);
+      background: rgba(162,25,47,.09);
+      border: 1px solid rgba(162,25,47,.2);
+    }
+
+    .rel8tion-sms-consent__links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .rel8tion-sms-consent__links a {
+      color: var(--ink);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
+    }
+
+    .rel8tion-sms-consent__fine {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 650;
+    }
+
+    @media (max-width: 860px) {
+      .rel8tion-sms-consent { padding: 10px 9px 34px; }
+      .rel8tion-sms-consent__grid { grid-template-columns: 1fr; }
+      .rel8tion-sms-consent__hero { min-height: auto; border-radius: 24px; }
+      .rel8tion-sms-consent__card { border-radius: 24px; }
+      .rel8tion-sms-consent__notes { grid-template-columns: 1fr; margin-top: 24px; }
+      .rel8tion-sms-consent h1 { font-size: clamp(40px,13vw,62px); }
+    }
+  </style>
+
+  <div class="rel8tion-sms-consent__wrap">
+    <div class="rel8tion-sms-consent__brand" aria-label="Rel8tion">
+      <div class="rel8tion-sms-consent__mark">r8</div>
+      <span>Rel8tion</span>
+    </div>
+
+    <div class="rel8tion-sms-consent__grid">
+      <div class="rel8tion-sms-consent__hero">
+        <div>
+          <h1 id="rel8tion-sms-consent-title">Rel8tion SMS Consent</h1>
+          <p class="rel8tion-sms-consent__intro">Rel8tion uses SMS to send event-related notifications for real estate open house technology, including agent activation confirmations, buyer check-in alerts, disclosure confirmations, event recap links, open-house support notifications, and requested event support routing.</p>
+        </div>
+
+        <div class="rel8tion-sms-consent__notes" aria-label="SMS consent details">
+          <div class="rel8tion-sms-consent__note">
+            <strong>First-party consent</strong>
+            <span>This form records your direct opt-in for Rel8tion event-related messages.</span>
+          </div>
+          <div class="rel8tion-sms-consent__note">
+            <strong>Control</strong>
+            <span>Reply STOP to opt out at any time or HELP for help.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rel8tion-sms-consent__card">
+        <form id="rel8tionSmsConsentForm" action="https://app.rel8tion.me/api/sms-consent" method="post" novalidate>
+          <label>
+            Full Name
+            <input id="rel8tionFullName" name="full_name" autocomplete="name" required>
+          </label>
+
+          <label>
+            Mobile Phone Number
+            <input id="rel8tionPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required>
+          </label>
+
+          <label>
+            Email Address, optional
+            <input id="rel8tionEmail" name="email" type="email" autocomplete="email">
+          </label>
+
+          <label>
+            Role
+            <select id="rel8tionRole" name="role" required>
+              <option value="">Select role</option>
+              <option>Real Estate Agent</option>
+              <option>Loan Officer</option>
+              <option>Buyer / Open House Visitor</option>
+              <option>Broker / Manager</option>
+              <option>Other</option>
+            </select>
+          </label>
+
+          <label class="rel8tion-sms-consent__check">
+            <input id="rel8tionConsent" name="consent" type="checkbox" required>
+            <span>By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of purchase.</span>
+          </label>
+
+          <div id="rel8tionConsentStatus" class="rel8tion-sms-consent__status" role="status" aria-live="polite"></div>
+
+          <button id="rel8tionConsentSubmit" type="submit">Opt In to Event-Related SMS</button>
+        </form>
+
+        <div class="rel8tion-sms-consent__links">
+          <span>Privacy Policy: <a href="/privacy-policy">/privacy-policy</a></span>
+          <span>Terms of Service: <a href="/terms">/terms</a></span>
+        </div>
+        <p class="rel8tion-sms-consent__fine">Rel8tion SMS is used for event operations and notifications. This page does not enroll you in unrelated marketing campaigns.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var form = document.getElementById('rel8tionSmsConsentForm');
+      var statusEl = document.getElementById('rel8tionConsentStatus');
+      var submitButton = document.getElementById('rel8tionConsentSubmit');
+      if (!form || !statusEl || !submitButton) return;
+
+      function normalizePhone(value) {
+        var digits = String(value || '').replace(/\D/g, '');
+        if (digits.length === 11 && digits.charAt(0) === '1') return digits.slice(1);
+        return digits;
+      }
+
+      function showStatus(message, type) {
+        statusEl.textContent = message;
+        statusEl.className = 'rel8tion-sms-consent__status is-visible ' + type;
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var fullName = String(document.getElementById('rel8tionFullName').value || '').trim();
+        var phone = String(document.getElementById('rel8tionPhone').value || '').trim();
+        var phoneNormalized = normalizePhone(phone);
+        var email = String(document.getElementById('rel8tionEmail').value || '').trim();
+        var role = String(document.getElementById('rel8tionRole').value || '').trim();
+        var consent = document.getElementById('rel8tionConsent').checked;
+
+        if (fullName.length < 2) return showStatus('Please enter your full name.', 'is-bad');
+        if (phoneNormalized.length !== 10) return showStatus('Please enter a valid 10-digit mobile phone number.', 'is-bad');
+        if (!role) return showStatus('Please select your role.', 'is-bad');
+        if (!consent) return showStatus('Please check the consent box to opt in.', 'is-bad');
+
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving Consent...';
+        showStatus('Saving your SMS consent...', 'is-ok');
+
+        fetch('https://app.rel8tion.me/api/sms-consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: fullName,
+            phone: phone,
+            phone_normalized: phoneNormalized,
+            email: email,
+            role: role,
+            consent: consent
+          })
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+              if (!response.ok || !payload.ok) throw new Error(payload.error || 'Unable to save SMS consent.');
+              return payload;
+            });
+          })
+          .then(function () {
+            showStatus('You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.', 'is-ok');
+            form.reset();
+          })
+          .catch(function (error) {
+            showStatus(error.message || 'We could not save your SMS consent right now. Please try again.', 'is-bad');
+          })
+          .finally(function () {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Opt In to Event-Related SMS';
+          });
+      });
+    })();
+  </script>
+</section>

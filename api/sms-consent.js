@@ -11,6 +11,15 @@ const ALLOWED_ROLES = new Set([
   'Other'
 ]);
 
+const ALLOWED_ORIGINS = new Set([
+  'https://rel8tion.me',
+  'https://www.rel8tion.me',
+  'https://app.rel8tion.me',
+  'https://rel8tion-me.vercel.app',
+  'https://getrel8tion.com',
+  'https://www.getrel8tion.com'
+]);
+
 function clean(value) {
   return String(value || '').trim();
 }
@@ -35,11 +44,25 @@ function validEmail(email) {
 function readBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'object') return req.body;
+  const contentType = clean(req.headers['content-type']).toLowerCase();
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    return Object.fromEntries(new URLSearchParams(req.body));
+  }
   try {
     return JSON.parse(req.body);
   } catch {
     return {};
   }
+}
+
+function applyCors(req, res) {
+  const origin = clean(req.headers.origin);
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 async function findExistingByPhone(phoneNormalized) {
@@ -51,6 +74,13 @@ async function findExistingByPhone(phoneNormalized) {
 }
 
 module.exports = async function handler(req, res) {
+  applyCors(req, res);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
