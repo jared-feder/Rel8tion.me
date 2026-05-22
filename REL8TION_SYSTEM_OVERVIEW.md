@@ -69,7 +69,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/nmb-activate` and `/nmb-verified` to app pages
 - `/services/nmb/activate` and `/services/nmb/verified` to app pages
 
-The root also has static `a.html` and `b.html`. They are not explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/a` and `/b`. `/open-house-kit` also has a root wrapper that preserves query/hash values and forwards into the app page.
+The root also has static `a.html`, `b.html`, and `manual-sms-outreach.html`. They are not explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/a`, `/b`, and `/manual-sms-outreach`. `/open-house-kit` also has a root wrapper that preserves query/hash values and forwards into the app page.
 
 `[RISK]` Other root files include marketing/static pages and legacy/test pages. Examples:
 
@@ -108,6 +108,7 @@ It uses:
 - `api/admin/outreach-inbox.js`
 - `api/admin/outreach-reply.js`
 - `api/sms-consent.js`
+- `api/manual-sms-outreach.js`
 - `api/admin/reset-key.js`
 - `api/admin/sign-action.js`
 - `api/checkout/open-house-kit.js`
@@ -1092,6 +1093,22 @@ Submission path:
 - Server stores the exact consent text, role, phone, normalized phone digits, email, user agent, IP address, source, and URL in `sms_consent_records`.
 - Migration `supabase/migrations/20260522002148_sms_consent_records.sql` creates the table with RLS enabled, service-role writes, timestamps, and a unique partial index on `phone_normalized`.
 - `/terms` is served by root `terms.html`, which redirects to the existing terms page, and `/privacy-policy` already exists at the root.
+
+### `/manual-sms-outreach`
+
+Files: root `manual-sms-outreach.html`, `api/manual-sms-outreach.js`, and `supabase/sql/manual_sms_outreach_backup_columns.sql`.
+
+`[IMPLEMENTED]` `/manual-sms-outreach` is a temporary, admin-keychain/token-protected manual SMS backup for the period when Twilio/A2P outreach delivery is suspended or unreliable.
+
+Confirmed repo behavior:
+
+- Loads the next ready `agent_outreach_queue` row through the protected Vercel API route `/api/manual-sms-outreach`.
+- Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, or already handled by the existing status fields.
+- Prioritizes upcoming open houses and preserves the existing outreach message priority: `selected_sms`, `sms_variant_1`, `sms_variant_2`, `sms_variant_3`, then a temporary fallback message with no setup link.
+- Preserves outreach image priority: `mockup_image_url`, `listing_photo_url`, then any property image fields if present, then a Rel8tion placeholder.
+- Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the message prefilled, and the human must manually review and tap Send.
+- Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
+- `Mark Sent / Next` and `Skip` patch the queue row through service-role server code, setting only columns that exist. The optional SQL file adds temporary tracking fields: `manual_sms_sent`, `manual_sms_skipped`, `manual_sms_sent_at`, `last_outreach_at`, and `channel`.
 
 ### `/api/compliance/ny-disclosure`
 
