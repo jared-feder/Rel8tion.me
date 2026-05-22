@@ -646,11 +646,12 @@
         : `sms:${cleanPhone}?body=${encodedMessage}`;
     }
 
-    function smsBodyWithListingImage(row, message) {
+    function smsBodyWithOutreachPhoto(row, message) {
       const body = String(message || '').trim();
-      const imageUrl = String(row?.listing_image_url || '').trim();
+      const imageUrl = String(row?.outreach_photo_url || row?.listing_image_url || '').trim();
       if (!imageUrl || body.includes(imageUrl)) return body;
-      return `${body}\n\nListing photo: ${imageUrl}`;
+      const label = String(row?.outreach_photo_label || 'Listing photo').trim();
+      return `${body}\n\n${label}: ${imageUrl}`;
     }
 
     function telLink(phone) {
@@ -718,12 +719,12 @@
       }
 
       const message = row.outreach_message || '';
-      const smsBody = smsBodyWithListingImage(row, message);
+      const smsBody = smsBodyWithOutreachPhoto(row, message);
       const phone = row.agent_phone || row.agent_phone_normalized || '';
       content.innerHTML = `
         <article class="outreach-card">
           <div class="image-wrap">
-            <img src="${esc(row.image_url)}" alt="Listing photo for ${esc(row.property_address || row.address || 'open house')}" onerror="this.src='https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png'">
+            <img src="${esc(row.image_url)}" alt="${esc(row.outreach_photo_label || 'Listing photo')} for ${esc(row.property_address || row.address || 'open house')}" onerror="this.src='https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png'">
             <div class="image-source">${esc(row.image_source || 'rel8tion')}</div>
           </div>
           <div class="card-body">
@@ -733,7 +734,7 @@
                 <div class="agent-meta">${esc(row.brokerage || 'Brokerage not available')}</div>
                 <div class="agent-meta">${esc(fmtPhone(phone))}</div>
               </div>
-              <span class="pill"><i data-lucide="${row.has_listing_image ? 'image-check' : 'triangle-alert'}"></i>${row.has_listing_image ? 'Listing photo verified' : 'No listing photo'}</span>
+              <span class="pill"><i data-lucide="${row.image_source === 'mockup_image_url' ? 'badge-check' : row.has_listing_image ? 'image-check' : 'triangle-alert'}"></i>${row.image_source === 'mockup_image_url' ? 'Outreach photo ready' : row.has_listing_image ? 'Listing photo verified' : 'No listing photo'}</span>
             </div>
 
             <div>
@@ -749,7 +750,7 @@
             <div class="message-box">
               <label for="messagePreview">Message Preview</label>
               <textarea id="messagePreview">${esc(message)}</textarea>
-              ${row.listing_image_url ? `<p class="agent-meta">Text This Agent will include the verified listing photo link.</p>` : ''}
+              ${row.outreach_photo_url ? `<p class="agent-meta">Text This Agent will include the ${esc((row.outreach_photo_label || 'listing photo').toLowerCase())} link.</p>` : ''}
             </div>
 
             <div class="button-grid">
@@ -762,9 +763,14 @@
               <button class="btn" type="button" onclick="copyMessage()">
                 <i data-lucide="copy"></i>Copy Message
               </button>
-              ${row.listing_image_url ? `
+              ${row.outreach_photo_url ? `
+                <a class="btn" href="${esc(row.outreach_photo_url)}" target="_blank" rel="noopener">
+                  <i data-lucide="image"></i>Open ${esc(row.outreach_photo_label || 'Photo')}
+                </a>
+              ` : ''}
+              ${row.listing_image_url && row.outreach_photo_url !== row.listing_image_url ? `
                 <a class="btn" href="${esc(row.listing_image_url)}" target="_blank" rel="noopener">
-                  <i data-lucide="image"></i>Open Listing Photo
+                  <i data-lucide="images"></i>Open Listing Photo
                 </a>
               ` : ''}
               <a class="btn" href="${esc(telLink(phone))}">
@@ -789,7 +795,7 @@
       if (!row) return;
       const text = document.getElementById('messagePreview')?.value || row.outreach_message || '';
       const button = document.getElementById('textAgentButton');
-      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', smsBodyWithListingImage(row, text));
+      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', smsBodyWithOutreachPhoto(row, text));
     }
 
     async function loadNext() {
@@ -859,8 +865,8 @@
     async function copyMessage() {
       const text = document.getElementById('messagePreview')?.value || state.row?.outreach_message || '';
       try {
-        await navigator.clipboard.writeText(smsBodyWithListingImage(state.row, text));
-        showStatus('Message and listing photo link copied.', 'ok');
+        await navigator.clipboard.writeText(smsBodyWithOutreachPhoto(state.row, text));
+        showStatus('Message and photo link copied.', 'ok');
       } catch (_) {
         const field = document.getElementById('messagePreview');
         field?.focus();

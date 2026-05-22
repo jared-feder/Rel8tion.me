@@ -127,16 +127,21 @@ function messageFor(row) {
 
 function imageFor(row) {
   const listingUrl = firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image);
-  const url = firstPresent(listingUrl, row.mockup_image_url);
+  const mockupUrl = firstPresent(row.mockup_image_url);
+  const useMockup = Boolean(listingUrl && mockupUrl);
+  const url = useMockup ? mockupUrl : listingUrl;
   return {
     image_url: url || FALLBACK_PLACEHOLDER,
     listing_image_url: listingUrl || '',
+    outreach_photo_url: url || '',
+    outreach_photo_label: useMockup ? 'Outreach photo' : 'Listing photo',
     has_listing_image: Boolean(listingUrl),
-    image_source: row.listing_photo_url ? 'listing_photo_url' :
+    has_outreach_photo: Boolean(url),
+    image_source: useMockup ? 'mockup_image_url' :
+      row.listing_photo_url ? 'listing_photo_url' :
       row.image_url ? 'image_url' :
       row.property_image ? 'property_image' :
       row.image ? 'image' :
-      row.mockup_image_url ? 'mockup_image_url' :
       'rel8tion_placeholder'
   };
 }
