@@ -129,25 +129,20 @@ function imageFor(row) {
   const listingUrl = firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image);
   const mockupUrl = firstPresent(row.mockup_image_url);
   const useMockup = Boolean(listingUrl && mockupUrl);
-  const url = useMockup ? mockupUrl : listingUrl;
   return {
-    image_url: url || FALLBACK_PLACEHOLDER,
+    image_url: useMockup ? mockupUrl : FALLBACK_PLACEHOLDER,
     listing_image_url: listingUrl || '',
-    outreach_photo_url: url || '',
-    outreach_photo_label: useMockup ? 'Outreach photo' : 'Listing photo',
+    outreach_photo_url: useMockup ? mockupUrl : '',
+    outreach_photo_label: 'Rel8tion outreach photo',
     has_listing_image: Boolean(listingUrl),
-    has_outreach_photo: Boolean(url),
+    has_outreach_photo: useMockup,
     image_source: useMockup ? 'mockup_image_url' :
-      row.listing_photo_url ? 'listing_photo_url' :
-      row.image_url ? 'image_url' :
-      row.property_image ? 'property_image' :
-      row.image ? 'image' :
       'rel8tion_placeholder'
   };
 }
 
-function hasListingImage(row) {
-  return Boolean(firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image));
+function hasOutreachPhoto(row) {
+  return Boolean(firstPresent(row.mockup_image_url) && firstPresent(row.listing_photo_url, row.image_url, row.property_image, row.image));
 }
 
 function normalizedStatus(value) {
@@ -221,7 +216,7 @@ function isReady(row, now) {
   if (isAlreadyHandled(row)) return false;
   if (isExpired(row, now)) return false;
   if (!isDue(row, now)) return false;
-  if (!hasListingImage(row)) return false;
+  if (!hasOutreachPhoto(row)) return false;
   const { message } = messageFor(row);
   return Boolean(message);
 }

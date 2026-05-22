@@ -1103,11 +1103,11 @@ Files: root `manual-sms-outreach.html`, `api/manual-sms-outreach.js`, and `supab
 Confirmed repo behavior:
 
 - Loads the next ready `agent_outreach_queue` row through the protected Vercel API route `/api/manual-sms-outreach`.
-- Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, already handled by the existing status fields, or missing an actual listing image.
+- Excludes rows that appear opted out, manually sent, manually skipped, blocked, expired, already handled by the existing status fields, missing an actual listing image, or missing a rendered Rel8tion outreach photo.
 - Prioritizes upcoming open houses and preserves the existing outreach message priority: `selected_sms`, `sms_variant_1`, `sms_variant_2`, `sms_variant_3`, then a temporary fallback message with no setup link.
-- Shows the rendered outreach photo (`mockup_image_url`) when available and only when an actual listing image exists; otherwise it shows the real listing photo using `listing_photo_url`.
-- Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the editable message plus the rendered outreach-photo link when available, or the verified listing-photo link otherwise, and the human must manually review and tap Send.
-- Includes `Copy Outreach Photo`, which attempts to copy the actual rendered/listing image blob to the clipboard for manual paste into the native SMS thread. If the phone browser blocks image clipboard writes, it falls back to copying the photo URL and the open-photo control remains available for manual attachment.
+- Shows only rows with the rendered outreach photo (`mockup_image_url`) and only when an actual listing image exists behind that rendered image.
+- Builds a native `sms:` URL only. The browser opens the operator's phone SMS app with the editable message only; it does not append photo links to the draft.
+- Includes `Copy Outreach Photo`, which attempts to copy the actual rendered outreach image blob to the clipboard for manual paste into the native SMS thread. If the phone browser blocks image clipboard writes, it tells the operator to use the open-photo control for manual attachment instead of copying a URL into the SMS.
 - Does not call Twilio, does not call any SMS API, and is not linked as the default sending method.
 - `Mark Sent / Next` and `Skip` patch the queue row through service-role server code, setting only columns that exist. The optional SQL file adds temporary tracking fields: `manual_sms_sent`, `manual_sms_skipped`, `manual_sms_sent_at`, `last_outreach_at`, and `channel`.
 - REL8TION COMMAND's Outreach area includes a "Manual SMS Backup" link to this page.

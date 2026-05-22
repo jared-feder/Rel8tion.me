@@ -646,14 +646,6 @@
         : `sms:${cleanPhone}?body=${encodedMessage}`;
     }
 
-    function smsBodyWithOutreachPhoto(row, message) {
-      const body = String(message || '').trim();
-      const imageUrl = String(row?.outreach_photo_url || row?.listing_image_url || '').trim();
-      if (!imageUrl || body.includes(imageUrl)) return body;
-      const label = String(row?.outreach_photo_label || 'Listing photo').trim();
-      return `${body}\n\n${label}: ${imageUrl}`;
-    }
-
     function telLink(phone) {
       return `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
     }
@@ -711,7 +703,7 @@
           <div class="panel empty">
             <div class="status-icon"><i data-lucide="check-check"></i></div>
             <h2>No ready manual SMS rows</h2>
-            <p class="agent-meta">No outreach rows matched the ready, not-sent, not-skipped, not-opted-out backup filters.</p>
+            <p class="agent-meta">No outreach rows matched the ready, not-sent, not-skipped, not-opted-out filters with rendered Rel8tion outreach photos.</p>
             <button class="btn" type="button" onclick="loadNext()"><i data-lucide="refresh-cw"></i>Refresh Queue</button>
           </div>`;
         renderIcons();
@@ -719,7 +711,6 @@
       }
 
       const message = row.outreach_message || '';
-      const smsBody = smsBodyWithOutreachPhoto(row, message);
       const phone = row.agent_phone || row.agent_phone_normalized || '';
       content.innerHTML = `
         <article class="outreach-card">
@@ -750,11 +741,11 @@
             <div class="message-box">
               <label for="messagePreview">Message Preview</label>
               <textarea id="messagePreview">${esc(message)}</textarea>
-              ${row.outreach_photo_url ? `<p class="agent-meta">Text This Agent will include the ${esc((row.outreach_photo_label || 'listing photo').toLowerCase())} link.</p>` : ''}
+              <p class="agent-meta">Text This Agent opens the message only. Use Copy Outreach Photo to paste the actual image.</p>
             </div>
 
             <div class="button-grid">
-              <a class="btn primary" id="textAgentButton" href="${esc(buildSmsLink(phone, smsBody))}">
+              <a class="btn primary" id="textAgentButton" href="${esc(buildSmsLink(phone, message))}">
                 <i data-lucide="message-square-text"></i>Text This Agent
               </a>
               <button class="btn success" type="button" onclick="markSent()">
@@ -769,11 +760,6 @@
                 </button>
                 <a class="btn" href="${esc(row.outreach_photo_url)}" target="_blank" rel="noopener">
                   <i data-lucide="image"></i>Open ${esc(row.outreach_photo_label || 'Photo')}
-                </a>
-              ` : ''}
-              ${row.listing_image_url && row.outreach_photo_url !== row.listing_image_url ? `
-                <a class="btn" href="${esc(row.listing_image_url)}" target="_blank" rel="noopener">
-                  <i data-lucide="images"></i>Open Listing Photo
                 </a>
               ` : ''}
               <a class="btn" href="${esc(telLink(phone))}">
@@ -798,7 +784,7 @@
       if (!row) return;
       const text = document.getElementById('messagePreview')?.value || row.outreach_message || '';
       const button = document.getElementById('textAgentButton');
-      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', smsBodyWithOutreachPhoto(row, text));
+      if (button) button.href = buildSmsLink(row.agent_phone || row.agent_phone_normalized || '', text);
     }
 
     async function loadNext() {
@@ -868,8 +854,8 @@
     async function copyMessage() {
       const text = document.getElementById('messagePreview')?.value || state.row?.outreach_message || '';
       try {
-        await navigator.clipboard.writeText(smsBodyWithOutreachPhoto(state.row, text));
-        showStatus('Message and photo link copied.', 'ok');
+        await navigator.clipboard.writeText(text);
+        showStatus('Message copied.', 'ok');
       } catch (_) {
         const field = document.getElementById('messagePreview');
         field?.focus();
@@ -894,7 +880,7 @@
 
     async function copyOutreachPhoto() {
       const row = state.row;
-      const url = String(row?.outreach_photo_url || row?.listing_image_url || '').trim();
+      const url = String(row?.outreach_photo_url || '').trim();
       if (!url) {
         showStatus('No outreach photo is available for this row.', 'bad');
         return;
@@ -906,8 +892,7 @@
       }
 
       if (!window.ClipboardItem || !navigator.clipboard.write) {
-        await navigator.clipboard.writeText(url);
-        showStatus('This phone/browser cannot copy images here. Photo link copied instead.', 'bad');
+        showStatus('This phone/browser cannot copy images here. Use Open Outreach Photo and attach it manually.', 'bad');
         return;
       }
 
@@ -928,12 +913,7 @@
         }
         showStatus('Outreach photo copied. Paste it into your text thread, then tap Send.', 'ok');
       } catch (error) {
-        try {
-          await navigator.clipboard.writeText(url);
-          showStatus('Your phone blocked direct image copy. Photo link copied; use Open Photo to attach the image manually.', 'bad');
-        } catch (_) {
-          showStatus('Your phone blocked direct image copy. Open the photo and attach it manually.', 'bad');
-        }
+        showStatus('Your phone blocked direct image copy. Open the outreach photo and attach it manually.', 'bad');
       }
     }
 
