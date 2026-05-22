@@ -138,7 +138,7 @@ It has:
 - `api/render-agent-mockup.ts`
 - `lib/*`
 - Vitest tests for phone utilities
-- its own `vercel.json` with cron schedules
+- its own `vercel.json` with generate/render cron schedules; cron-send is intentionally not scheduled while automatic sending is paused
 
 ## Route And Page Map
 
@@ -1041,7 +1041,7 @@ Still not confirmed:
 - RPC definitions for `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
 - `send-lead-sms`; local source is present, but the verifier intentionally does not call SMS functions.
 - Edge Function deployment for source under `docs/supabase-functions`.
-- Vercel Cron state; root `vercel.json` has no `crons` block, so dashboard verification is still required.
+- Vercel Cron state after deployment; root `vercel.json` should schedule refresh/generate/render only, and `apps/mockup-renderer/vercel.json` should schedule generate/render only.
 - Full production data quality and write-path health.
 - Vercel dashboard Git production-branch setting.
 
@@ -1362,7 +1362,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
-- `[NEEDS VERIFICATION]` Vercel API reports `crons.definitions = 0`; the enrichment endpoint exists, but no root Vercel cron schedule is configured from the project response.
+- `[NEEDS VERIFICATION]` After cron config deployments, verify Vercel reports refresh/generate/render cron definitions and no send cron.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.

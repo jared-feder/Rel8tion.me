@@ -21,7 +21,6 @@
   },
   "crons": [
     { "path": "/api/cron-generate", "schedule": "1,11,21,31,41,51 * * * *" },
-    { "path": "/api/cron-render",   "schedule": "3,13,23,33,43,53 * * * *" },
-    { "path": "/api/cron-send",     "schedule": "5,15,25,35,45,55 * * * *" }
+    { "path": "/api/cron-render",   "schedule": "3,13,23,33,43,53 * * * *" }
   ]
 }

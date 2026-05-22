@@ -13,10 +13,6 @@
     {
       "path": "/api/cron/render-agent-mockups",
       "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/send-agent-outreach",
-      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [
