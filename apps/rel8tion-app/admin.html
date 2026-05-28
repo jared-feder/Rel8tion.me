@@ -1315,6 +1315,8 @@
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
+      health: null,
+      outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
       drafts: readDrafts()
     };
@@ -1445,7 +1447,11 @@
     }
 
     function isOptOutThread(thread) {
-      return Boolean(thread?.any_opt_out || thread?.latest_reply_opt_out || thread?.review_status === 'opted_out');
+      return Boolean(thread?.any_opt_out || thread?.latest_reply_opt_out || ['opted_out', 'android_opted_out'].includes(thread?.review_status));
+    }
+
+    function isLinkedOutreachThread(thread) {
+      return Boolean(thread?.queue_row_id || thread?.agent_name || thread?.agent_phone || thread?.agent_phone_normalized);
     }
 
     function isHandledThread(thread) {
@@ -1453,7 +1459,7 @@
     }
 
     function needsReply(thread) {
-      return thread?.direction !== 'outbound' && !isOptOutThread(thread) && !isHandledThread(thread);
+      return isLinkedOutreachThread(thread) && thread?.direction !== 'outbound' && !isOptOutThread(thread) && !isHandledThread(thread);
     }
 
     function threadText(thread) {
@@ -1499,34 +1505,58 @@
       if (thread.review_status === 'drip_scheduled') return badge('Drip scheduled', 'ok');
       if (thread.review_status === 'interested' || isInterestedThread(thread)) return badge('Interested', 'ok');
       if (needsReply(thread)) return badge('Needs reply', 'warn');
-      if (thread.direction === 'outbound') return badge('Replied', 'ok');
+      if (thread.direction === 'outbound') return badge('Sent', 'info');
       return badge('Inbound', 'info');
+    }
+
+    function outreachThreadHaystack(thread) {
+      const messages = Array.isArray(thread.messages) ? thread.messages : [];
+      return [
+        thread.agent_name,
+        thread.brokerage,
+        thread.address,
+        thread.agent_phone,
+        thread.from_phone,
+        thread.to_phone,
+        thread.selected_sms,
+        thread.latest_reply_body,
+        thread.report_note,
+        thread.outreach_code,
+        thread.queue_row_id,
+        ...messages.map((message) => message.body)
+      ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function passesOutreachFilter(thread) {
+      if (state.outreachFilter === 'all') return true;
+      if (state.outreachFilter === 'inbound') return thread.direction !== 'outbound';
+      if (state.outreachFilter === 'needs_reply') return needsReply(thread);
+      if (state.outreachFilter === 'interested') return isInterestedThread(thread);
+      if (state.outreachFilter === 'opt_out') return isOptOutThread(thread);
+      return true;
     }
 
     function filteredInbox() {
       const query = state.query.trim().toLowerCase();
       return state.inbox.filter((thread) => {
-        if (state.outreachFilter === 'all') return true;
-        if (state.outreachFilter === 'inbound') return thread.direction !== 'outbound';
-        if (state.outreachFilter === 'needs_reply') return needsReply(thread);
-        if (state.outreachFilter === 'interested') return isInterestedThread(thread);
-        if (state.outreachFilter === 'opt_out') return isOptOutThread(thread);
-        return true;
-      }).filter((thread) => {
-        if (!query) return true;
-        const messages = Array.isArray(thread.messages) ? thread.messages : [];
-        const haystack = [
-          thread.agent_name,
-          thread.brokerage,
-          thread.address,
-          thread.agent_phone,
-          thread.from_phone,
-          thread.selected_sms,
-          thread.latest_reply_body,
-          ...messages.map((message) => message.body)
-        ].filter(Boolean).join(' ').toLowerCase();
-        return haystack.includes(query);
+        if (query) return outreachThreadHaystack(thread).includes(query);
+        return passesOutreachFilter(thread);
       });
+    }
+
+    function newestFirst(a, b) {
+      return new Date(b?.last_reply_at || 0) - new Date(a?.last_reply_at || 0);
+    }
+
+    function latestInboundThreads(limit = 8) {
+      return [...(state.inbox || [])]
+        .filter((thread) => thread.direction !== 'outbound' && (isLinkedOutreachThread(thread) || thread.raw_inbound))
+        .sort(newestFirst)
+        .slice(0, limit);
+    }
+
+    function healthTone(status) {
+      return status === 'ok' ? 'ok' : status === 'bad' ? 'bad' : 'warn';
     }
 
     function filterByQuery(rows) {
@@ -1541,9 +1571,79 @@
       });
     }
 
+    function outreachQueueHaystack(row) {
+      return [
+        row.id,
+        row.agent_name,
+        row.brokerage,
+        row.address,
+        row.agent_phone,
+        row.agent_phone_normalized,
+        row.open_house_id,
+        row.selected_sms,
+        row.report_note,
+        row.outreach_code,
+        row.initial_send_status,
+        row.followup_send_status,
+        row.review_status
+      ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function outreachQueueSearchMatches(limit = 12) {
+      const query = state.query.trim().toLowerCase();
+      if (!query) return [];
+      const found = new Map();
+      for (const row of (state.command?.outreach?.recent || [])) {
+        if (outreachQueueHaystack(row).includes(query)) found.set(row.id, row);
+      }
+      if (state.outreachSearch?.query === state.query.trim()) {
+        for (const row of (state.outreachSearch.rows || [])) {
+          if (row?.id) found.set(row.id, row);
+        }
+      }
+      return [...found.values()].slice(0, limit);
+    }
+
+    function queueThreadKey(row) {
+      return `queue:${row?.id || ''}`;
+    }
+
+    function queueRowToThread(row) {
+      if (!row?.id) return null;
+      return {
+        ...row,
+        thread_key: queueThreadKey(row),
+        queue_row_id: row.id,
+        direction: row.initial_sent_at ? 'outbound' : 'queued',
+        last_reply_at: row.initial_sent_at || row.last_outreach_at || row.created_at || '',
+        messages: []
+      };
+    }
+
+    function reportRowToThread(row) {
+      if (!row?.queue_row_id) return null;
+      return {
+        ...row,
+        id: row.queue_row_id,
+        thread_key: queueThreadKey({ id: row.queue_row_id }),
+        queue_row_id: row.queue_row_id,
+        address: row.property_address || row.address || '',
+        open_house_id: row.open_house_id || '',
+        open_start: row.confirmed_coverage_start || row.scheduled_start || row.listed_open_start || '',
+        open_end: row.confirmed_coverage_end || row.scheduled_end || row.listed_open_end || '',
+        initial_sent_at: row.initial_sent_at || row.confirmed_at || '',
+        last_reply_at: row.confirmed_at || row.scheduled_start || '',
+        direction: 'outbound',
+        messages: []
+      };
+    }
+
     async function api(path, options = {}) {
-      const response = await fetch(path, {
+      const method = String(options.method || 'GET').toUpperCase();
+      const requestPath = method === 'GET' ? cacheBust(path) : path;
+      const response = await fetch(requestPath, {
         ...options,
+        cache: 'no-store',
         headers: {
           ...authHeaders(),
           ...(options.headers || {})
@@ -1554,6 +1654,17 @@
         throw new Error(data.error || `Request failed: ${response.status}`);
       }
       return data;
+    }
+
+    function cacheBust(path) {
+      try {
+        const url = new URL(path, window.location.origin);
+        url.searchParams.set('_rel8tion_ts', String(Date.now()));
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch (_) {
+        const joiner = String(path || '').includes('?') ? '&' : '?';
+        return `${path}${joiner}_rel8tion_ts=${Date.now()}`;
+      }
     }
 
     async function verify() {
@@ -1584,13 +1695,15 @@
         restoreUiState(uiSnapshot);
       }
       try {
-        const [dashboard, inbox] = await Promise.all([
+        const [dashboard, inbox, health] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
-          api('/api/admin/outreach-inbox?limit=120')
+          api('/api/admin/outreach-inbox?limit=120'),
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
         ]);
         state.command = dashboard.ok === false ? null : dashboard;
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
+        state.health = health;
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -1605,10 +1718,32 @@
       }
     }
 
+    async function loadOutreachSearch() {
+      const query = state.query.trim();
+      if (state.area !== 'outreach' || query.length < 2) {
+        state.outreachSearch = { query: '', rows: [], loading: false, error: '' };
+        refreshAreaContent();
+        return;
+      }
+      state.outreachSearch = { query, rows: state.outreachSearch?.query === query ? state.outreachSearch.rows || [] : [], loading: true, error: '' };
+      refreshAreaContent();
+      try {
+        const result = await api(`/api/admin/outreach-search?q=${encodeURIComponent(query)}&limit=40`);
+        if (state.query.trim() !== query) return;
+        state.outreachSearch = { query, rows: result.rows || [], loading: false, error: '' };
+        refreshAreaContent();
+      } catch (error) {
+        if (state.query.trim() !== query) return;
+        state.outreachSearch = { query, rows: [], loading: false, error: error.message || 'Search failed.' };
+        refreshAreaContent();
+      }
+    }
+
     function setArea(area) {
       state.area = area;
       window.localStorage.setItem(AREA_KEY, area);
       render();
+      if (area === 'outreach' && state.query.trim().length >= 2) loadOutreachSearch().catch(() => null);
     }
 
     function setOutreachFilter(filter) {
@@ -1676,6 +1811,30 @@
       }
     }
 
+    async function replayAndroidInbox() {
+      if (!window.confirm('Replay the last 36 hours of the Android outreach phone inbox into Rel8tion? This does not send any SMS.')) {
+        return;
+      }
+
+      state.actionKey = 'android_replay';
+      render();
+      try {
+        const result = await api('/api/admin/android-inbox-replay?route=outreach&hours=36', {
+          method: 'POST',
+          body: JSON.stringify({ route: 'outreach', hours: 36 })
+        });
+        const okRoutes = (result.results || []).filter((item) => item.ok).map((item) => item.route).join(', ');
+        showToast(okRoutes ? `Replay requested for ${okRoutes}. Refreshing shortly.` : 'Replay requested.');
+        await new Promise((resolve) => window.setTimeout(resolve, 2500));
+        state.actionKey = '';
+        await loadAll({ showLoading: false });
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to replay Android inbox.');
+        render();
+      }
+    }
+
     function eventAddress(event) {
       const context = event?.setup_context || {};
       return context.address || context.property_address || context.listing_address || context.open_house_address || event?.open_house_source_id || event?.id || 'Open house';
@@ -1736,7 +1895,18 @@
     }
 
     function findThread(key) {
-      return state.inbox.find((item) => item.thread_key === key);
+      const inboxThread = state.inbox.find((item) => item.thread_key === key || item.queue_row_id === key);
+      if (inboxThread) return inboxThread;
+
+      const queueId = String(key || '').replace(/^queue:/, '');
+      const searchRow = (state.outreachSearch?.rows || []).find((item) => item.id === queueId);
+      if (searchRow) return queueRowToThread(searchRow);
+
+      const recentRow = (state.command?.outreach?.recent || []).find((item) => item.id === queueId);
+      if (recentRow) return queueRowToThread(recentRow);
+
+      const reportRow = (state.command?.confirmed_open_houses || []).find((item) => item.queue_row_id === queueId);
+      return reportRowToThread(reportRow);
     }
 
     function actionId(action, key) {
@@ -1946,6 +2116,9 @@
         state.actionKey = '';
         showToast(message);
         await loadAll();
+        if (state.area === 'outreach' && state.query.trim().length >= 2) {
+          await loadOutreachSearch();
+        }
       } catch (error) {
         state.actionKey = '';
         showToast(error.message || 'Unable to update outreach workflow.');
@@ -1982,9 +2155,14 @@
       const key = state.coveragePickerKey;
       if (!thread || !key || !coverage) return;
       const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
-      if (!window.confirm(`Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`)) return;
+      const assignment = outreachAssignment(thread);
+      const alreadyConfirmed = Boolean(assignment.visit || assignment.report || thread.review_status === 'confirmed_open_house' || thread.review_status === 'accepted_open_house');
+      const prompt = alreadyConfirmed
+        ? `Update ${target} to ${coverage.coverage_label} in Reports?`
+        : `Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`;
+      if (!window.confirm(prompt)) return;
       state.coveragePickerKey = '';
-      runOutreachAction(key, 'confirm_open_house', coverage, 'Open house confirmed for Reports.');
+      runOutreachAction(key, 'confirm_open_house', coverage, alreadyConfirmed ? 'Open house date updated.' : 'Open house confirmed for Reports.');
     }
 
     function confirmCoverageChoice(index) {
@@ -2085,6 +2263,35 @@
       runOutreachAction(key, 'schedule_drip', { body, send_at: sendAtDate.toISOString() }, 'Drip scheduled.');
     }
 
+    async function saveReportNote(queueId) {
+      const textarea = document.getElementById(`report_note_${domId(queueId)}`);
+      const reportNote = textarea?.value?.trim() || '';
+      if (!queueId) {
+        showToast('No outreach queue row is linked to this note.');
+        return;
+      }
+
+      state.actionKey = actionId('save_report_note', queueId);
+      render();
+      try {
+        await api('/api/admin/outreach-action', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'save_report_note',
+            queue_row_id: queueId,
+            report_note: reportNote
+          })
+        });
+        state.actionKey = '';
+        showToast(reportNote ? 'Report note saved.' : 'Report note cleared.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to save report note.');
+        render();
+      }
+    }
+
     async function endEvent(eventId) {
       const event = (state.command?.events || []).find((row) => row.id === eventId);
       if (!event) {
@@ -2175,6 +2382,171 @@
       }
     }
 
+    async function setSponsoredPassReuse(inventoryId, reuseStatus) {
+      const pass = (state.command?.sponsored_event_passes || []).find((row) => row.id === inventoryId) || null;
+      state.actionKey = `sponsored_reuse:${inventoryId}:${reuseStatus}`;
+      render();
+      try {
+        await api('/api/sponsored-pass/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'set_reuse_status', inventory_id: inventoryId, reuse_status: reuseStatus })
+        });
+        state.actionKey = '';
+        showToast(`Sponsored Event Pass marked ${reuseStatus}.`);
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || `Unable to update ${pass?.public_code || 'Sponsored Event Pass'}.`);
+        render();
+      }
+    }
+
+    async function endSponsoredPassEvent(inventoryId) {
+      const pass = (state.command?.sponsored_event_passes || []).find((row) => row.id === inventoryId) || null;
+      if (!pass?.current_event_id && !pass?.active_event_id) {
+        showToast('No live event is linked to this Sponsored Event Pass.');
+        return;
+      }
+      if (!window.confirm(`End active Sponsored Event Pass event for ${pass.public_code}? Check-ins and disclosures will stay saved.`)) return;
+      state.actionKey = `sponsored_end:${inventoryId}`;
+      render();
+      try {
+        await api('/api/sponsored-pass/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'end_sponsored_pass_event', inventory_id: inventoryId, event_id: pass.current_event_id || pass.active_event_id })
+        });
+        state.actionKey = '';
+        showToast('Sponsored Event Pass event ended.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to end Sponsored Event Pass event.');
+        render();
+      }
+    }
+
+    async function resetSponsoredPass(inventoryId) {
+      const pass = (state.command?.sponsored_event_passes || []).find((row) => row.id === inventoryId) || null;
+      const typed = window.prompt(`Reset Sponsored Event Pass ${pass?.public_code || inventoryId}?\n\nThis ends active coverage and clears active links only. Buyer check-ins, disclosures, consent rows, and historical events are not deleted.\n\nType REL8TION to continue.`);
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Sponsored Event Pass reset cancelled.');
+        return;
+      }
+      state.actionKey = `sponsored_reset:${inventoryId}`;
+      render();
+      try {
+        await api('/api/sponsored-pass/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'reset_sponsored_pass', inventory_id: inventoryId, confirmation: typed.trim() })
+        });
+        state.actionKey = '';
+        showToast('Sponsored Event Pass reset.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to reset Sponsored Event Pass.');
+        render();
+      }
+    }
+
+    async function assignSponsoredPassSponsor(inventoryId) {
+      const pass = (state.command?.sponsored_event_passes || state.command?.event_passes || []).find((row) => row.id === inventoryId) || null;
+      const uid = window.prompt(`Assign sponsor LO UID/profile id for ${pass?.public_code || inventoryId}:`, pass?.sponsor_loan_officer_uid || pass?.sponsor_loan_officer_profile_id || '');
+      if (uid === null) return;
+      if (!uid.trim()) {
+        showToast('Sponsor assignment cancelled.');
+        return;
+      }
+      state.actionKey = `sponsored_assign_sponsor:${inventoryId}`;
+      render();
+      try {
+        await api('/api/sponsored-pass/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'assign_sponsor', inventory_id: inventoryId, sponsor_loan_officer_uid: uid.trim() })
+        });
+        state.actionKey = '';
+        showToast('Sponsor assigned.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to assign sponsor.');
+        render();
+      }
+    }
+
+    async function assignSponsoredPassAgent(inventoryId) {
+      const pass = (state.command?.sponsored_event_passes || []).find((row) => row.id === inventoryId) || null;
+      const slug = window.prompt(`Assign agent slug for ${pass?.public_code || inventoryId}:`, pass?.assigned_agent_slug || '');
+      if (slug === null) return;
+      const phone = window.prompt('Agent phone optional:', pass?.assigned_agent_phone || '');
+      if (phone === null) return;
+      state.actionKey = `sponsored_assign_agent:${inventoryId}`;
+      render();
+      try {
+        await api('/api/sponsored-pass/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'assign_agent', inventory_id: inventoryId, agent_slug: slug.trim(), agent_phone: phone.trim() })
+        });
+        state.actionKey = '';
+        showToast('Agent assignment saved.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to assign agent.');
+        render();
+      }
+    }
+
+    async function endLoanOfficerCoverageSign(signId) {
+      const sign = (state.command?.loan_officer_coverage_signs || []).find((row) => row.id === signId) || null;
+      if (!sign?.active_event_id) {
+        showToast('No live event is linked to this Coverage Sign.');
+        return;
+      }
+      if (!window.confirm(`End active coverage for LO sign ${sign.public_code}? Check-ins and disclosures will stay saved.`)) return;
+      state.actionKey = `lo_sign_end:${signId}`;
+      render();
+      try {
+        await api('/api/lo-sign/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'end_coverage', public_code: sign.public_code, event_id: sign.active_event_id })
+        });
+        state.actionKey = '';
+        showToast('Coverage ended.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to end coverage.');
+        render();
+      }
+    }
+
+    async function resetLoanOfficerCoverageSign(signId) {
+      const sign = (state.command?.loan_officer_coverage_signs || []).find((row) => row.id === signId) || null;
+      const typed = window.prompt(`Reset Loan Officer Coverage Sign ${sign?.public_code || signId}?\n\nThis ends active coverage and clears active links only. Buyer check-ins, disclosures, and history are not deleted.\n\nType REL8TION to continue.`);
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Coverage Sign reset cancelled.');
+        return;
+      }
+      state.actionKey = `lo_sign_reset:${signId}`;
+      render();
+      try {
+        await api('/api/lo-sign/action', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'reset_sign', public_code: sign?.public_code || '', uid: sign?.uid || '', confirmation: typed.trim() })
+        });
+        state.actionKey = '';
+        showToast('Coverage Sign reset.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to reset Coverage Sign.');
+        render();
+      }
+    }
+
     function signOut() {
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -2251,6 +2623,8 @@
       if (!thread) return '';
       const choices = coverageChoices(thread);
       const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
+      const assignment = outreachAssignment(thread);
+      const alreadyConfirmed = Boolean(assignment.visit || assignment.report || thread.review_status === 'confirmed_open_house' || thread.review_status === 'accepted_open_house');
       const startDate = dateInputValue(thread.open_start || Date.now()) || dateInputValue(Date.now());
       const endDate = startDate;
       const endFallback = thread.open_start ? timeInputValue(fallbackCoverageEnd(thread.open_start), '15:00') : '15:00';
@@ -2261,8 +2635,8 @@
           <section class="coverage-modal" role="dialog" aria-modal="true" aria-labelledby="coverageTitle">
             <div class="coverage-head">
               <div>
-                <div class="mini-title">Confirm open house</div>
-                <h2 id="coverageTitle">Choose coverage date</h2>
+                <div class="mini-title">${alreadyConfirmed ? 'Update confirmed open house' : 'Confirm open house'}</div>
+                <h2 id="coverageTitle">${alreadyConfirmed ? 'Choose the new date' : 'Choose coverage date'}</h2>
                 <div class="small">${esc(target)}</div>
               </div>
               <button type="button" class="btn soft" data-coverage-cancel aria-label="Close coverage picker">
@@ -2289,7 +2663,7 @@
             <div class="coverage-form">
               <div>
                 <div class="mini-title">Calendar override</div>
-                <div class="small">Use this when the agent confirmed only one day, changed the time, or the listing dates are missing.</div>
+                <div class="small">${alreadyConfirmed ? 'Use this to move an old confirmed open house back into upcoming reports with the new date/time.' : 'Use this when the agent confirmed only one day, changed the time, or the listing dates are missing.'}</div>
               </div>
               <div class="coverage-form-grid">
                 <div class="coverage-field">
@@ -2417,7 +2791,10 @@
       document.getElementById('globalSearch')?.addEventListener('input', (event) => {
         state.query = event.target.value;
         window.clearTimeout(renderShell.searchTimer);
-        renderShell.searchTimer = window.setTimeout(refreshAreaContent, 180);
+        renderShell.searchTimer = window.setTimeout(() => {
+          refreshAreaContent();
+          loadOutreachSearch().catch(() => null);
+        }, 220);
       });
       bindAreaActions();
       window.lucide?.createIcons();
@@ -2436,11 +2813,15 @@
 
     function bindAreaActions() {
       document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
+      document.getElementById('replayAndroidInbox')?.addEventListener('click', replayAndroidInbox);
       document.querySelectorAll('[data-draft-key]').forEach((textarea) => {
         textarea.addEventListener('input', () => updateDraft(textarea.dataset.draftKey, textarea.value));
       });
       document.querySelectorAll('[data-send-key]').forEach((button) => {
         button.addEventListener('click', () => sendReply(button.dataset.sendKey));
+      });
+      document.querySelectorAll('[data-save-report-note]').forEach((button) => {
+        button.addEventListener('click', () => saveReportNote(button.dataset.saveReportNote));
       });
       document.querySelectorAll('[data-mark-interested]').forEach((button) => {
         button.addEventListener('click', () => markInterested(button.dataset.markInterested));
@@ -2485,6 +2866,27 @@
       });
       document.querySelectorAll('[data-reset-event-pass]').forEach((button) => {
         button.addEventListener('click', () => resetEventPass(button.dataset.resetEventPass));
+      });
+      document.querySelectorAll('[data-sponsored-reuse]').forEach((button) => {
+        button.addEventListener('click', () => setSponsoredPassReuse(button.dataset.sponsoredReuse, button.dataset.reuseStatus));
+      });
+      document.querySelectorAll('[data-sponsored-end]').forEach((button) => {
+        button.addEventListener('click', () => endSponsoredPassEvent(button.dataset.sponsoredEnd));
+      });
+      document.querySelectorAll('[data-sponsored-reset]').forEach((button) => {
+        button.addEventListener('click', () => resetSponsoredPass(button.dataset.sponsoredReset));
+      });
+      document.querySelectorAll('[data-sponsored-assign-sponsor]').forEach((button) => {
+        button.addEventListener('click', () => assignSponsoredPassSponsor(button.dataset.sponsoredAssignSponsor));
+      });
+      document.querySelectorAll('[data-sponsored-assign-agent]').forEach((button) => {
+        button.addEventListener('click', () => assignSponsoredPassAgent(button.dataset.sponsoredAssignAgent));
+      });
+      document.querySelectorAll('[data-lo-sign-end]').forEach((button) => {
+        button.addEventListener('click', () => endLoanOfficerCoverageSign(button.dataset.loSignEnd));
+      });
+      document.querySelectorAll('[data-lo-sign-reset]').forEach((button) => {
+        button.addEventListener('click', () => resetLoanOfficerCoverageSign(button.dataset.loSignReset));
       });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
       document.getElementById('reportWindow')?.addEventListener('change', (event) => {
@@ -2542,16 +2944,20 @@
 
     function renderOutreach() {
       const rows = filteredInbox();
+      const latestInbound = latestInboundThreads(8);
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view</div>
+            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply</div>
           </div>
           <div class="header-actions">
             <a class="btn primary" href="/manual-sms-outreach">
               <i data-lucide="smartphone"></i><span>Manual SMS Backup</span>
             </a>
+            <button class="btn soft" id="replayAndroidInbox" ${state.actionKey === 'android_replay' ? 'disabled' : ''}>
+              <i data-lucide="rotate-cw"></i><span>${state.actionKey === 'android_replay' ? 'Replaying...' : 'Replay Android inbox'}</span>
+            </button>
             <select id="outreachFilter" class="select" style="max-width:220px;">
               <option value="needs_reply"${state.outreachFilter === 'needs_reply' ? ' selected' : ''}>Needs reply</option>
               <option value="interested"${state.outreachFilter === 'interested' ? ' selected' : ''}>Interested / yes</option>
@@ -2561,12 +2967,138 @@
             </select>
           </div>
         </div>
+        ${renderOutreachHealth()}
+        ${renderLatestInboundReplies(latestInbound)}
+        ${renderOutreachSearchMatches()}
         <div class="outreach-grid">
           ${state.loading ? '<div class="glass-card" style="padding:18px;font-weight:900;">Loading...</div>' : ''}
           ${!state.loading && rows.length === 0 ? '<div class="glass-card" style="padding:18px;font-weight:900;">No conversations in this view.</div>' : ''}
           ${rows.map(renderOutreachCard).join('')}
         </div>
         ${renderOutreachQueue()}
+      `;
+    }
+
+    function renderOutreachSearchMatches() {
+      const query = state.query.trim();
+      if (!query) return '';
+      const rows = outreachQueueSearchMatches(12);
+      const serverSearch = state.outreachSearch || {};
+      const searchStatus = serverSearch.loading
+        ? badge('Searching database', 'info')
+        : serverSearch.error
+          ? badge(serverSearch.error, 'bad')
+          : serverSearch.query === query
+            ? badge(`${serverSearch.rows?.length || 0} database`, (serverSearch.rows || []).length ? 'ok' : 'warn')
+            : badge('Local slice', 'info');
+      return `
+        <div class="glass-card" style="padding:14px; display:grid; gap:10px;">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">Database matches for "${esc(query)}"</div>
+              <div class="small">Searches the full outreach queue, not just the currently loaded dashboard slice.</div>
+            </div>
+            ${searchStatus}
+          </div>
+          <div class="rows">
+            ${rows.length ? rows.map(renderOutreachSearchRow).join('') : '<div class="data-row"><div class="primary">No outreach records matched this search.</div><div class="secondary">Try phone, agent name, address, open-house id, or outreach code.</div><div></div><div></div><div></div></div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOutreachSearchRow(row) {
+      const thread = queueRowToThread(row);
+      const key = thread.thread_key;
+      const optedOut = isOptOutThread(thread);
+      const confirmed = row.review_status === 'confirmed_open_house' || row.review_status === 'accepted_open_house';
+      const confirmBusy = state.actionKey === actionId('confirm_open_house', key);
+      const markBusy = state.actionKey === actionId('mark_interested', key);
+      const confirmLabel = confirmed ? 'Update date' : 'Confirm OH';
+      return `
+        <div class="data-row">
+          <div>
+            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>
+            <div class="primary">${esc(row.address || row.open_house_id || 'No property')}</div>
+            <div class="secondary">${esc([fmtDate(row.open_start), money(row.price)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${badge(row.review_status || 'pending', confirmed ? 'ok' : optedOut ? 'bad' : 'info')}</div>
+          <div class="badges">
+            ${badge(row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}
+            ${row.initial_sent_at ? badge(fmtDate(row.initial_sent_at), 'info') : ''}
+          </div>
+          <div>
+            <div class="row-actions">
+              <button class="btn soft" data-mark-interested="${esc(key)}" ${optedOut || markBusy ? 'disabled' : ''}>
+                <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Interested'}</span>
+              </button>
+              <button class="btn primary" data-confirm-open-house="${esc(key)}" ${optedOut || confirmBusy ? 'disabled' : ''}>
+                <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Saving...' : confirmLabel}</span>
+              </button>
+            </div>
+            <div class="secondary" style="margin-top:6px;">${esc(row.report_note || row.selected_sms || 'No outreach copy stored.')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOutreachHealth() {
+      const health = state.health || {};
+      const checks = Array.isArray(health.checks) ? health.checks : [];
+      const counts = health.counts || {};
+      const status = health.status || (health.ok === false ? 'bad' : 'warn');
+      return `
+        <div class="glass-card" style="padding:14px; display:grid; gap:10px;">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">Outreach health</div>
+              <div class="small">${health.ok === false ? esc(health.error || 'Health check failed.') : esc(`${counts.linked_inbox || 0} linked inbound visible | ${counts.needs_reply || 0} need reply | ${counts.linked_replies || 0} linked replies | ${counts.unlinked_android_inbound || 0} raw Android unlinked`)}</div>
+            </div>
+            ${badge(status.toUpperCase(), healthTone(status))}
+          </div>
+          ${checks.length ? `
+            <div class="badges">
+              ${checks.map((item) => badge(`${item.label}: ${item.status}`, healthTone(item.status))).join('')}
+            </div>
+          ` : ''}
+          ${status !== 'ok' ? `<div class="small">${esc(checks.find((item) => item.status === 'bad')?.message || checks.find((item) => item.status === 'warn')?.message || 'Outreach health needs attention.')}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderLatestInboundReplies(rows) {
+      return `
+        <div class="glass-card" style="padding:14px; display:grid; gap:10px;">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">Latest incoming replies</div>
+              <div class="small">Fresh agent replies from Android/Twilio, including raw Android rows that have not linked yet.</div>
+            </div>
+            ${badge(`${rows.length} shown`, rows.length ? 'ok' : 'warn')}
+          </div>
+          <div class="rows">
+            ${rows.length ? rows.map((thread) => `
+              <div class="data-row">
+                <div>
+                  <div class="primary">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown agent')}</div>
+                  <div class="secondary">${esc([thread.brokerage, fmtPhone(thread.agent_phone || thread.from_phone)].filter(Boolean).join(' | '))}</div>
+                </div>
+                <div>
+                  <div class="primary">${esc(thread.address || 'No property')}</div>
+                  <div class="secondary">${esc(fmtDate(thread.open_start) || '')}</div>
+                </div>
+                <div class="badges">${statusBadge(thread)}${thread.raw_inbound_only ? badge('Raw Android', 'warn') : thread.raw_inbound ? badge('Android raw', 'info') : ''}</div>
+                <div>${badge(fmtDate(thread.last_reply_at) || 'new', 'info')}</div>
+                <div>
+                  <div class="secondary">${esc(thread.latest_reply_body || 'No reply text loaded.')}</div>
+                </div>
+              </div>
+            `).join('') : '<div class="data-row"><div class="primary">No linked incoming replies loaded.</div><div class="secondary">Use Refresh after a new text comes in.</div><div></div><div></div><div></div></div>'}
+          </div>
+        </div>
       `;
     }
 
@@ -2593,6 +3125,29 @@
           <div class="secondary">${esc(row.selected_sms || 'No outreach copy stored.')}</div>
         </div>
       `);
+    }
+
+    function renderReportNoteEditor(queueId, value = '', updatedAt = '') {
+      if (!queueId) return '';
+      const busy = state.actionKey === actionId('save_report_note', queueId);
+      return `
+        <div class="mini-panel reply-box">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">Report note</div>
+              <div class="small">Use this for missing/manual replies or open-house context that should print in reports.</div>
+            </div>
+            ${updatedAt ? badge(`Updated ${fmtDate(updatedAt)}`, 'info') : badge('Report visible', 'info')}
+          </div>
+          <textarea id="report_note_${domId(queueId)}" maxlength="1800" placeholder="Example: Ruth replied that she is interested but the SMS webhook missed it.">${esc(value || '')}</textarea>
+          <div class="reply-footer">
+            <button class="btn primary" data-save-report-note="${esc(queueId)}" ${busy ? 'disabled' : ''}>
+              <i data-lucide="notebook-pen"></i><span>${busy ? 'Saving...' : 'Save note'}</span>
+            </button>
+            <span class="small">Shows on the report card and PDF-style report.</span>
+          </div>
+        </div>
+      `;
     }
 
     function renderOutreachCard(thread) {
@@ -2622,6 +3177,7 @@
               </div>
               <div class="badges">
                 ${statusBadge(thread)}
+                ${thread.raw_inbound_only ? badge('Raw Android unlinked', 'warn') : thread.raw_inbound ? badge('Android raw', 'info') : ''}
                 ${thread.template_key ? badge(thread.template_key.replace(/_/g, ' '), 'info') : ''}
                 ${deliveryBadge(thread, 'initial')}
                 ${thread.followup_sent_at ? deliveryBadge(thread, 'followup') : ''}
@@ -2648,6 +3204,8 @@
                   ${messages.length ? messages.map(renderMessage).join('') : `<div class="msg"><div class="msg-body">${esc(thread.latest_reply_body || 'No messages loaded.')}</div></div>`}
                 </div>
               </div>
+
+              ${renderReportNoteEditor(thread.queue_row_id, thread.report_note, thread.report_note_updated_at)}
 
               ${renderOutreachActions(thread)}
 
@@ -2720,10 +3278,10 @@
       const hasVisit = Boolean(assignment.visit || assignment.report);
       const accepted = thread.review_status === 'accepted_open_house' || Boolean(assignment.participant);
       const confirmed = thread.review_status === 'confirmed_open_house' || (hasVisit && !accepted);
-      const confirmDone = accepted || confirmed || hasVisit;
       const acceptDisabled = disabled || acceptBusy || (accepted && !profiles.length);
       const assignedIsActive = profiles.some((profile) => profile.uid === assignment.assignedUid);
       const selectedUid = assignedIsActive ? assignment.assignedUid : profiles[0]?.uid || '';
+      const confirmLabel = accepted || confirmed || hasVisit ? 'Update date' : 'Confirm true OH';
       const dripText = thread.followup_sms || defaultDripText(thread);
       const dripAt = defaultDripSendAt(thread);
       return `
@@ -2739,8 +3297,8 @@
           </div>
           ${renderAcceptedSummary(thread)}
           <div class="action-grid">
-            <button class="btn soft" data-confirm-open-house="${esc(key)}" ${disabled || confirmBusy || confirmDone ? 'disabled' : ''}>
-              <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Confirming...' : accepted ? 'Accepted OH' : confirmed ? 'Confirmed true OH' : 'Confirm true OH'}</span>
+            <button class="btn soft" data-confirm-open-house="${esc(key)}" ${disabled || confirmBusy ? 'disabled' : ''}>
+              <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Saving...' : confirmLabel}</span>
             </button>
             <select id="accept_lo_${domId(key)}" class="select" ${disabled || !profiles.length ? 'disabled' : ''}>
               ${profiles.length ? profiles.map((profile) => `
@@ -2841,6 +3399,36 @@
       `;
     }
 
+    function renderSponsoredPassActions(row) {
+      const endKey = `sponsored_end:${row.id}`;
+      const resetKey = `sponsored_reset:${row.id}`;
+      const activeKey = `sponsored_reuse:${row.id}:active`;
+      const inactiveKey = `sponsored_reuse:${row.id}:inactive`;
+      return `
+        <div class="row-actions">
+          <a class="btn soft" href="/pass?code=${esc(row.public_code || '')}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open</span></a>
+          <button class="btn soft" data-sponsored-assign-sponsor="${esc(row.id)}"><i data-lucide="user-check"></i><span>Sponsor</span></button>
+          <button class="btn soft" data-sponsored-assign-agent="${esc(row.id)}"><i data-lucide="user-round"></i><span>Agent</span></button>
+          <button class="btn soft" data-sponsored-reuse="${esc(row.id)}" data-reuse-status="${row.reuse_status === 'active' ? 'inactive' : 'active'}" ${state.actionKey === activeKey || state.actionKey === inactiveKey ? 'disabled' : ''}><i data-lucide="toggle-left"></i><span>${row.reuse_status === 'active' ? 'Pause' : 'Activate'}</span></button>
+          ${row.current_event_id ? `<button class="btn bad" data-sponsored-end="${esc(row.id)}" ${state.actionKey === endKey ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === endKey ? 'Ending...' : 'End'}</span></button>` : ''}
+          <button class="btn bad" data-sponsored-reset="${esc(row.id)}" ${state.actionKey === resetKey ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset'}</span></button>
+        </div>
+      `;
+    }
+
+    function renderLoanOfficerCoverageSignActions(row) {
+      const endKey = `lo_sign_end:${row.id}`;
+      const resetKey = `lo_sign_reset:${row.id}`;
+      return `
+        <div class="row-actions">
+          <a class="btn soft" href="/lo-sign?code=${esc(row.public_code || '')}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open</span></a>
+          <a class="btn soft" href="/lo-sign-activate?code=${esc(row.public_code || '')}${row.uid ? `&uid=${esc(row.uid)}` : ''}" target="_blank" rel="noopener"><i data-lucide="play"></i><span>Activate</span></a>
+          ${row.active_event_id ? `<button class="btn bad" data-lo-sign-end="${esc(row.id)}" ${state.actionKey === endKey ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === endKey ? 'Ending...' : 'End'}</span></button>` : ''}
+          <button class="btn bad" data-lo-sign-reset="${esc(row.id)}" ${state.actionKey === resetKey ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset'}</span></button>
+        </div>
+      `;
+    }
+
     function eventPassTone(row) {
       if (row.pass_state === 'live') return 'ok';
       if (row.pass_state === 'linked') return 'warn';
@@ -2850,6 +3438,8 @@
     function renderSigns() {
       const signs = filterByQuery(state.command?.signs || []);
       const events = filterByQuery(state.command?.events || []);
+      const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
+      const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
       return `
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
@@ -2860,6 +3450,35 @@
           <div>${badge(`${row.inventory_alias_count || 0} QR`, 'info')}</div>
           <div>${badge(row.active_event_host || 'No event', row.active_event_host ? 'ok' : 'info')}</div>
           <div>${renderSignActions(row)}</div>
+        `)}
+        ${renderRows('Sponsored Event Passes', `${sponsoredPasses.length} reusable sponsored passes`, sponsoredPasses.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.public_code || row.id)}</div>
+            <div class="secondary">${esc(row.sponsor_loan_officer_name || row.sponsor_loan_officer_uid || row.sponsor_loan_officer_profile_id || 'No sponsor assigned')}</div>
+          </div>
+          <div>${badge(row.reuse_status || 'not_reusable', row.reuse_status === 'active' ? 'ok' : 'warn')}</div>
+          <div>
+            <div class="primary">${esc(row.assigned_agent_slug || row.active_event_host || 'No agent assigned')}</div>
+            <div class="secondary">${esc(fmtPhone(row.assigned_agent_phone) || `${row.event_count || 0} events`)}</div>
+          </div>
+          <div>${badge(row.current_event_id ? `Live ${row.current_event_id.slice(0, 8)}` : 'No live event', row.current_event_id ? 'ok' : 'info')}</div>
+          <div>${renderSponsoredPassActions(row)}</div>
+        `)}
+        ${renderRows('Loan Officer Coverage Signs', `${coverageSigns.length} reusable LO-owned coverage signs`, coverageSigns.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.public_code || row.id)}</div>
+            <div class="secondary">${esc(row.uid || 'No NFC UID')}</div>
+          </div>
+          <div>${badge(row.status || 'available', row.active_event_id ? 'ok' : 'info')}</div>
+          <div>
+            <div class="primary">${esc(row.loan_officer_name || row.loan_officer_uid || 'No LO assigned')}</div>
+            <div class="secondary">${esc([row.loan_officer_company, fmtPhone(row.loan_officer_phone)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>
+            <div class="primary">${esc(row.active_event_address || row.active_event_id || 'No active event')}</div>
+            <div class="secondary">${esc([row.active_event_pass_code ? `Pass ${row.active_event_pass_code}` : '', row.last_used_at ? fmtDate(row.last_used_at) : ''].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${renderLoanOfficerCoverageSignActions(row)}</div>
         `)}
         ${renderRows('Live and recent events', `${events.length} events`, events.slice(0, 80), (row) => `
           <div>
@@ -2881,6 +3500,8 @@
       const profiles = filterByQuery(state.command?.loan_officers || []);
       const sessions = filterByQuery(state.command?.loan_sessions || []);
       const visits = filterByQuery(state.command?.field_visits || []);
+      const requests = filterByQuery(state.command?.loan_officer_requests || []);
+      const newRequests = requests.filter((row) => (row.status || 'new') === 'new');
       const activeProfiles = profiles.filter((row) => row.is_active !== false);
       const events = filterByQuery(state.command?.events || [])
         .filter((row) => row.status === 'active' && !row.ended_at)
@@ -2889,12 +3510,26 @@
         <div class="section-head">
           <div>
             <h2>LO assignments</h2>
-            <div class="sub">${events.length} active open houses, ${activeProfiles.length} active loan officers</div>
+            <div class="sub">${events.length} active open houses, ${activeProfiles.length} active loan officers, ${newRequests.length} new support requests</div>
           </div>
           <button class="btn primary" id="autoAssignLo" ${activeProfiles.length && events.length ? '' : 'disabled'}>
             <i data-lucide="wand-sparkles"></i><span>${state.actionKey === 'auto_assign' ? 'Assigning...' : 'Auto assign open houses'}</span>
           </button>
         </div>
+        ${renderRows('LO support requests', `${requests.length} recent requests from loan officers available for open house support`, requests.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.full_name || 'Loan officer request')}</div>
+            <div class="secondary">${esc([row.company_name, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+            <div class="secondary">${esc(row.experience || '')}</div>
+          </div>
+          <div>${badge(row.status || 'new', (row.status || 'new') === 'new' ? 'warn' : 'info')}</div>
+          <div>${badge(fmtDate(row.created_at) || 'no date', 'info')}</div>
+          <div>
+            <div class="secondary">${esc(row.coverage_areas || 'No area listed')}</div>
+            <div class="secondary">${esc(row.availability || 'No availability listed')}</div>
+          </div>
+          <div>${contactActions(row.phone, row.email)}</div>
+        `)}
         <div class="assignment-grid">
           ${events.length ? events.map((event) => renderLoanOfficerAssignment(event, activeProfiles)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No active open house events are ready for LO assignment.</div>'}
         </div>
@@ -3122,13 +3757,14 @@
     function reportAgentBlocks(row) {
       const inbound = (Array.isArray(row.messages) ? row.messages : [])
         .filter((message) => message.direction !== 'outbound');
-      if (!inbound.length) return '<div class="muted">No inbound body in reply table.</div>';
-      return inbound.map((message) => {
+      const note = row.report_note ? `<div class="note"><b>Admin note:</b> ${esc(row.report_note)}</div>` : '';
+      if (!inbound.length) return note || '<div class="muted">No inbound body in reply table.</div>';
+      return `${note}${inbound.map((message) => {
         const label = [compactReportDate(message.received_at || message.created_at), message.opt_out ? '[OPT OUT]' : '']
           .filter(Boolean)
           .join(' ');
         return `<div><b>${esc(label)} </b>${esc(message.body || '')}</div>`;
-      }).join('');
+      }).join('')}`;
     }
 
     function compactReportHtml(rows) {
@@ -3198,6 +3834,7 @@ th { background:#f8fafc; text-align:left; font-weight:bold; }
 .me { width:420px; line-height:1.18; word-wrap:break-word; }
 .agent { line-height:1.19; word-wrap:break-word; }
 .me div,.agent div { margin-bottom:3px; }
+.note { background:#fff7ed; border:0.5px solid #fed7aa; padding:3px 4px; }
 .muted { color:#64748b; }
 .report-line { display:block; margin-top:2px; }
 .confirm-line { color:#0f766e; }
@@ -3252,6 +3889,8 @@ ${rowsHtml}
       const photo = row.listing_photo_url || row.mockup_image_url || '';
       const conversation = row.conversation_snapshot || 'No conversation snapshot loaded.';
       const facts = [money(row.price), row.beds ? `${row.beds} beds` : '', row.baths ? `${row.baths} baths` : ''].filter(Boolean).join(' | ');
+      const updateKey = row.queue_row_id ? queueThreadKey({ id: row.queue_row_id }) : '';
+      const updateBusy = updateKey && state.actionKey === actionId('confirm_open_house', updateKey);
       const listedWindow = reportDisplayWindow(
         row.listed_open_start || (!row.confirmed_coverage_start ? row.scheduled_start : ''),
         row.listed_open_end || (!row.confirmed_coverage_end ? row.scheduled_end : '')
@@ -3275,6 +3914,7 @@ ${rowsHtml}
               ${badge(row.visit_status || 'confirmed', row.visit_status === 'cancelled' ? 'bad' : 'ok')}
               ${badge(row.review_status || 'confirmed open house', 'info')}
               ${badge(`${row.message_count || 0} messages`, row.message_count ? 'ok' : 'warn')}
+              ${updateKey ? `<button class="btn soft" data-confirm-open-house="${esc(updateKey)}" ${updateBusy ? 'disabled' : ''}><i data-lucide="calendar-days"></i><span>${updateBusy ? 'Saving...' : 'Update date'}</span></button>` : ''}
             </div>
             <div class="report-detail-grid">
               <div class="report-detail">
@@ -3297,6 +3937,7 @@ ${rowsHtml}
                 <div class="secondary">${esc([row.listing_photo_url ? 'listing' : '', row.agent_photo_url ? 'agent' : '', row.mockup_image_url ? 'mockup' : ''].filter(Boolean).join(' | ') || 'No photo URLs')}</div>
               </div>
             </div>
+            ${renderReportNoteEditor(row.queue_row_id, row.report_note, row.report_note_updated_at)}
             <div>
               <div class="mini-title">Conversation snapshot</div>
               <div class="conversation-preview">${esc(conversation)}</div>

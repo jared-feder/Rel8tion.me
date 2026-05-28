@@ -17,7 +17,7 @@
   </div>
   <script type="module">
     import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260426-1108';
-    import { saveHostSession, savePendingSignActivation } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260426-1108';
+    import { saveHostSession, savePendingSignActivation } from '/apps/rel8tion-app/src/core/hostSession.js?v=20260527-eventpass-uid-bind';
 
     const SIGN_DEMO_SESSION_KEY = 'rel8tion_sign_demo_session';
     const AGENT_DASHBOARD_SESSION_KEY = 'rel8tion_agent_dashboard_pending';
@@ -25,7 +25,10 @@
     const KEY_RESET_SESSION_KEY = 'rel8tion_key_reset_pending';
     const ADD_KEYCHAIN_SESSION_KEY = 'rel8tion_add_keychain_pending';
     const EXTRA_SIGN_CHIP_SESSION_KEY = 'rel8tion_extra_sign_chip_pending';
+    const OPEN_HOUSE_KIT_PENDING_KEY = 'rel8tion_open_house_kit_pending';
+    const CHIP_QR_PENDING_KEY = 'rel8tion_chip_qr_pending';
     const ADD_KEYCHAIN_REMOTE_PREFIX = 'backup-keychain-';
+    const EVENT_PASS_UNBOUND_WINDOW_MS = 10 * 60 * 1000;
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
     const BETA_SIGN_PUBLIC_CODE = '0e4b015f3782';
     const BETA_SIGN_FRONT_UID = 'f005e166-70b3-407c-ba24-b91464a3d22a';
@@ -49,8 +52,41 @@
       return chipUid === BETA_SIGN_FRONT_UID || chipUid === BETA_SIGN_REAR_UID;
     }
 
+    function normalizeChipQrInput(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      let candidate = raw;
+      try {
+        const url = new URL(raw, window.location.origin);
+        const parts = url.pathname.split('/').filter(Boolean);
+        candidate = parts[parts.length - 1] || url.searchParams.get('code') || raw;
+      } catch (_) {}
+      return String(candidate || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
+    function readChipQrPendingSession() {
+      try {
+        const raw = window.localStorage.getItem(CHIP_QR_PENDING_KEY);
+        if (!raw) return '';
+        const parsed = JSON.parse(raw);
+        const expiresAt = new Date(parsed.expiresAt || 0).getTime();
+        if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          window.localStorage.removeItem(CHIP_QR_PENDING_KEY);
+          return '';
+        }
+        return normalizeChipQrInput(parsed.chipCode || parsed.code || '');
+      } catch (_) {
+        window.localStorage.removeItem(CHIP_QR_PENDING_KEY);
+        return '';
+      }
+    }
+
     function goToClaim() {
-      window.location.href = `./claim?uid=${encodeURIComponent(uid)}`;
+      const url = new URL('./claim', window.location.href);
+      url.searchParams.set('uid', uid);
+      const chipQrCode = readChipQrPendingSession();
+      if (chipQrCode) url.searchParams.set('chip_code', chipQrCode);
+      window.location.href = `${url.pathname}${url.search}`;
     }
 
     function readSignActivationSession() {
@@ -115,6 +151,23 @@
         return parsed;
       } catch (_) {
         window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
+        return null;
+      }
+    }
+
+    function readOpenHouseKitPendingSession() {
+      try {
+        const raw = window.localStorage.getItem(OPEN_HOUSE_KIT_PENDING_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const expiresAt = new Date(parsed.expiresAt || 0).getTime();
+        if (parsed.purpose !== 'open_house_kit_confirm' || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          window.localStorage.removeItem(OPEN_HOUSE_KIT_PENDING_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(OPEN_HOUSE_KIT_PENDING_KEY);
         return null;
       }
     }
@@ -251,6 +304,16 @@
       window.location.href = `${window.location.origin}/agent-dashboard?${next.toString()}`;
     }
 
+    function goToAgentHome({ agentSlug, activeEventId = '' }) {
+      if (!agentSlug) return;
+      const next = new URLSearchParams();
+      next.set('agent', agentSlug);
+      if (uid) next.set('uid', uid);
+      if (activeEventId) next.set('active_event', activeEventId);
+      window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+      window.location.href = `${window.location.origin}/agent-home?${next.toString()}`;
+    }
+
     function goToLoanOfficerDashboard(profile = {}) {
       const next = new URLSearchParams();
       next.set('uid', profile.uid || uid);
@@ -322,6 +385,29 @@
       return pending?.publicCode && pending?.source === 'event_pass' && pending.stage === 'waiting_for_agent_keychain';
     }
 
+    function isFreshUnboundEventPassPending(pending) {
+      const ageMs = Date.now() - sessionTimeMs(pending?.updatedAt || pending?.createdAt || pending?.qrArmedAt);
+      return Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= EVENT_PASS_UNBOUND_WINDOW_MS;
+    }
+
+    async function isUsablePendingEventPassActivation(pending, chipUid = '') {
+      if (!isPendingEventPassActivation(pending)) return false;
+      if (pending.uid && chipUid && pending.uid !== chipUid) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        return false;
+      }
+      if (!pending.uid && !isFreshUnboundEventPassPending(pending)) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        return false;
+      }
+      const inventory = await loadInventoryByPublicCode(pending.publicCode);
+      if (await eventPassInventoryAlreadyUsed(inventory)) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        return false;
+      }
+      return true;
+    }
+
     function isEventPassKeychain(row) {
       return String(row?.device_role || '').trim().toLowerCase() === 'event_pass_keychain';
     }
@@ -351,14 +437,29 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
-    async function findRemoteEventPassActivationSession(agentSlug = '') {
+    async function eventPassInventoryAlreadyUsed(inventory = {}) {
+      if (!inventory?.smart_sign_id) return false;
+      const signRows = await request(`smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=id,status,active_event_id&limit=1`).catch(() => []);
+      const sign = Array.isArray(signRows) ? signRows[0] : null;
+      if (sign?.active_event_id || sign?.status === 'active') return true;
+      const eventRows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=id&order=created_at.desc&limit=1`).catch(() => []);
+      return Array.isArray(eventRows) && eventRows.length > 0;
+    }
+
+    async function findRemoteEventPassActivationSession(agentSlug = '', chipUid = '') {
       const now = new Date().toISOString();
       const rows = await request(
         `smart_sign_activation_sessions?status=eq.pending&stage=eq.waiting_for_agent_keychain&expires_at=gt.${encodeURIComponent(now)}&select=*&order=updated_at.desc&limit=12`
       ).catch(() => []);
       for (const row of Array.isArray(rows) ? rows : []) {
         if (agentSlug && row.agent_slug && row.agent_slug !== agentSlug) continue;
+        if (chipUid && row.agent_key_uid && row.agent_key_uid !== chipUid) continue;
+        if (chipUid && !row.agent_key_uid) {
+          const ageMs = Date.now() - sessionTimeMs(row.updated_at || row.started_at || row.created_at);
+          if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > EVENT_PASS_UNBOUND_WINDOW_MS) continue;
+        }
         const inventory = await loadInventoryByPublicCode(row.public_code);
+        if (await eventPassInventoryAlreadyUsed(inventory)) continue;
         if (inventory?.inventory_type === 'event_pass') {
           return { ...row, inventory };
         }
@@ -427,10 +528,21 @@
       return null;
     }
 
+    function isVerifiedProfileKeyRole(keyRecord = {}) {
+      const role = String(keyRecord?.device_role || '').trim().toLowerCase();
+      return [
+        'verified_profile_keychain',
+        'verified_keychain',
+        'nmb_verified_keychain',
+        'loan_officer_keychain',
+        'field_keychain'
+      ].includes(role);
+    }
+
     async function loadVerifiedProfileForScan(chipUid, keyRecord = null) {
       const directProfile = await loadVerifiedProfile(chipUid).catch(() => null);
       if (directProfile?.uid) return directProfile;
-      if (keyRecord?.claimed === true && keyRecord.agent_slug) {
+      if (keyRecord?.claimed === true && keyRecord.agent_slug && isVerifiedProfileKeyRole(keyRecord)) {
         return await loadVerifiedProfileByAgent(keyRecord.agent_slug).catch(() => null);
       }
       return null;
@@ -506,6 +618,16 @@
       setStatus('Loan Officer Keychain', 'Opening your coverage dashboard.');
       goToLoanOfficerDashboard(profile);
       return true;
+    }
+
+    async function findLoanOfficerCoverageSignByUid(chipUid) {
+      if (!chipUid) return null;
+      const response = await fetch(`/api/lo-sign/action?uid=${encodeURIComponent(chipUid)}`, {
+        cache: 'no-store'
+      }).catch(() => null);
+      if (!response?.ok) return null;
+      const data = await response.json().catch(() => null);
+      return data?.coverage_sign ? data : null;
     }
 
     async function findActiveSignByChipUid(chipUid) {
@@ -818,6 +940,13 @@
         return;
       }
 
+      // Open House Kit scans are armed by getrel8tion.com so a fresh NFC handoff can confirm the keychain before normal chip routing runs.
+      if (readOpenHouseKitPendingSession()) {
+        setStatus('Open House Kit Keychain Found', 'Confirming your kit details.');
+        window.location.href = `${window.location.origin}/kit-confirm?uid=${encodeURIComponent(uid)}`;
+        return;
+      }
+
       if (readKeyResetSession()) {
         setStatus('Key Reset Scanner', 'Opening the reset page for this scanned UID.');
         window.location.href = `${window.location.origin}/key-reset.html?uid=${encodeURIComponent(uid)}`;
@@ -831,6 +960,21 @@
         window.localStorage.setItem('rel8tion_admin_uid', uid);
         setStatus('Admin Keychain', 'Opening the admin dashboard.');
         window.location.href = `${window.location.origin}/admin?uid=${encodeURIComponent(uid)}`;
+        return;
+      }
+
+      const loCoverageSign = await findLoanOfficerCoverageSignByUid(uid);
+      if (loCoverageSign?.coverage_sign?.public_code) {
+        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+        window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+        if (loCoverageSign.live && loCoverageSign.event?.id) {
+          setStatus('Coverage Sign Found', 'Opening the loan officer field dashboard.');
+          window.location.href = `${window.location.origin}/lo-field-dashboard?uid=${encodeURIComponent(uid)}&event=${encodeURIComponent(loCoverageSign.event.id)}`;
+          return;
+        }
+        setStatus('Coverage Sign Ready', 'Opening coverage activation.');
+        window.location.href = `${window.location.origin}/lo-sign-activate?code=${encodeURIComponent(loCoverageSign.coverage_sign.public_code)}&uid=${encodeURIComponent(uid)}`;
         return;
       }
 
@@ -908,25 +1052,36 @@
 
         const pendingSignActivation = readSignActivationSession();
         if (pendingSignActivation?.publicCode && pendingSignActivation.stage === 'waiting_for_agent_keychain') {
+          if (pendingSignActivation.source !== 'event_pass') {
+            savePendingSignActivation({
+              code: pendingSignActivation.publicCode,
+              signId: pendingSignActivation.signId || '',
+              inventoryId: pendingSignActivation.inventoryId || '',
+              uid,
+              source: pendingSignActivation.source || 'sign-qr'
+            });
+          }
+        }
+        if (await isUsablePendingEventPassActivation(pendingSignActivation, uid)) {
           savePendingSignActivation({
             code: pendingSignActivation.publicCode,
             signId: pendingSignActivation.signId || '',
             inventoryId: pendingSignActivation.inventoryId || '',
-            source: pendingSignActivation.source || 'sign-qr'
+            uid,
+            source: 'event_pass'
           });
-        }
-        if (isPendingEventPassActivation(pendingSignActivation)) {
           setStatus('Event Pass NFC Found', 'Activating this Event Pass keychain for the selected open house.');
           goToClaim();
           return;
         }
 
-        const remoteEventPassActivation = await findRemoteEventPassActivationSession();
+        const remoteEventPassActivation = await findRemoteEventPassActivationSession('', uid);
         if (remoteEventPassActivation?.public_code) {
           savePendingSignActivation({
             code: remoteEventPassActivation.public_code,
             signId: remoteEventPassActivation.sign_id || '',
             inventoryId: remoteEventPassActivation.inventory_id || remoteEventPassActivation.inventory?.id || '',
+            uid,
             source: 'event_pass'
           });
           setStatus('Event Pass NFC Found', 'Activating this Event Pass keychain for the selected open house.');
@@ -1018,6 +1173,9 @@
             return;
           }
           const eventPassPending = pendingSignActivation.source === 'event_pass';
+          if (eventPassPending && !(await isUsablePendingEventPassActivation(pendingSignActivation, uid))) {
+            window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          } else {
           if (eventPassPending) await markEventPassKeychain(uid, record.agent_slug);
           setStatus(eventPassPending ? 'Event Pass NFC Confirmed' : 'Keychain Confirmed', eventPassPending ? 'Opening Event Pass activation.' : 'Opening sign activation.');
           continueSignActivation({
@@ -1029,9 +1187,10 @@
             source: pendingSignActivation.source || ''
           });
           return;
+          }
         }
 
-        const remoteEventPassActivation = await findRemoteEventPassActivationSession(record.agent_slug);
+        const remoteEventPassActivation = await findRemoteEventPassActivationSession(record.agent_slug, uid);
         if (remoteEventPassActivation?.public_code) {
           await markEventPassKeychain(uid, record.agent_slug);
           if (remoteEventPassActivation.id) {
@@ -1163,26 +1322,26 @@
         const activeAgentEvent = await findActiveAgentEvent(record.agent_slug);
         if (activeAgentEvent?.id) {
           saveHostSession({ agentSlug: record.agent_slug, uid, source: 'claimed-chip-dashboard' });
-          setStatus('Event Dashboard', 'Opening your live open house dashboard.');
-          goToAgentDashboard({
+          setStatus('Agent Dashboard', 'Opening your permanent Rel8tion dashboard.');
+          goToAgentHome({
             agentSlug: record.agent_slug,
-            eventId: activeAgentEvent.id,
-            signId: activeAgentEvent.smart_sign_id || ''
+            activeEventId: activeAgentEvent.id
           });
           return;
         }
 
-        setStatus('Already Active', 'Opening the live profile.');
-        goToLiveProfile(record.agent_slug);
+        setStatus('Agent Dashboard', 'Opening your permanent Rel8tion dashboard.');
+        goToAgentHome({ agentSlug: record.agent_slug });
         return;
       }
 
       const pendingEventPassActivation = readSignActivationSession();
-      if (isPendingEventPassActivation(pendingEventPassActivation)) {
+      if (await isUsablePendingEventPassActivation(pendingEventPassActivation, uid)) {
         savePendingSignActivation({
           code: pendingEventPassActivation.publicCode,
           signId: pendingEventPassActivation.signId || '',
           inventoryId: pendingEventPassActivation.inventoryId || '',
+          uid,
           source: 'event_pass'
         });
         setStatus('Event Pass NFC Found', 'Finishing Event Pass activation.');
@@ -1190,12 +1349,13 @@
         return;
       }
 
-      const remoteEventPassActivation = await findRemoteEventPassActivationSession();
+      const remoteEventPassActivation = await findRemoteEventPassActivationSession('', uid);
       if (remoteEventPassActivation?.public_code) {
         savePendingSignActivation({
           code: remoteEventPassActivation.public_code,
           signId: remoteEventPassActivation.sign_id || '',
           inventoryId: remoteEventPassActivation.inventory_id || remoteEventPassActivation.inventory?.id || '',
+          uid,
           source: 'event_pass'
         });
         setStatus('Event Pass NFC Found', 'Finishing Event Pass activation.');

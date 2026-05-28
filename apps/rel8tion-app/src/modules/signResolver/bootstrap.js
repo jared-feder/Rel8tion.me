@@ -459,6 +459,86 @@ function eventPassInactiveView(sign, inventory) {
   `);
 }
 
+async function loadSponsoredPassDetails(code) {
+  const res = await fetch(`/api/sponsored-pass/action?code=${encodeURIComponent(code)}`, {
+    cache: 'no-store'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.error || 'Unable to load Sponsored Event Pass details.');
+  }
+  return data;
+}
+
+function sponsoredEventPassUnavailableView(details, inventory) {
+  const code = inventory?.public_code || getCodeFromUrl();
+  shell(`
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Sponsored Event Pass</div>
+    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Pass Not Available</h1>
+    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">${esc(details?.blocked_reason || 'This Sponsored Event Pass is not currently reusable. Contact the sponsor or Rel8tion.')}</p>
+    <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">Reusable Sponsored Event Passes can be activated again only when reuse is active.</p>
+    <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
+      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass</div>
+      <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
+      <div class="text-slate-600 font-semibold">Reuse status: ${esc(inventory?.reuse_status || 'not_reusable')}</div>
+    </div>
+    <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
+  `);
+}
+
+function sponsoredEventPassReadyView(details, inventory) {
+  const code = inventory?.public_code || getCodeFromUrl();
+  const sponsor = details?.sponsor || {};
+  const sponsorLabel = [sponsor.full_name || sponsor.slug, sponsor.company_name].filter(Boolean).join(', ') || 'the sponsoring loan officer';
+  const activationUrl = `/sponsored-pass-activate?code=${encodeURIComponent(code)}`;
+
+  shell(`
+    <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Sponsored Event Pass</div>
+    <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Activate Sponsored Event Pass</h1>
+    <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Event Pass was issued by ${esc(sponsorLabel)} and can be used to activate this open house with live event coverage.</p>
+    <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">A simple open-house technology pass issued by a verified loan officer and used by an agent to activate a paperless, support-ready open house. Financing help is only provided when requested by a buyer.</p>
+    <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
+      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
+      <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
+      <div class="text-slate-600 font-semibold">Reuse status: ${esc(inventory?.reuse_status || 'active')}</div>
+    </div>
+    <div class="flex flex-col md:flex-row gap-3 justify-center">
+      <a href="${activationUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Sponsored Event Pass</a>
+      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
+    </div>
+  `);
+}
+
+async function loadSponsoredEventPassExperience(code, inventory, resolution) {
+  const details = await loadSponsoredPassDetails(inventory.public_code || code);
+  if (details.live && details.event_url) {
+    window.location.replace(details.event_url);
+    return;
+  }
+
+  const sign = resolution.sign || null;
+  if (sign?.active_event_id) {
+    window.location.replace(`${ROUTES.event}?event=${encodeURIComponent(sign.active_event_id)}`);
+    return;
+  }
+
+  if (sign?.id) {
+    loading('Checking for a current live event...');
+    const eventRow = await getActiveSmartSignEvent(sign.id);
+    if (eventRow?.id) {
+      window.location.replace(`${ROUTES.event}?event=${encodeURIComponent(eventRow.id)}`);
+      return;
+    }
+  }
+
+  if (inventory.reuse_allowed !== true || inventory.reuse_status !== 'active' || details.blocked_reason) {
+    sponsoredEventPassUnavailableView(details, inventory);
+    return;
+  }
+
+  sponsoredEventPassReadyView(details, inventory);
+}
+
 function activeView(sign, eventRow, house) {
   const image = propertyImageUrl(house);
   shell(`
@@ -698,6 +778,11 @@ async function loadEventPassExperience(code) {
       ? resolution
       : await resolveSmartSignPublicCode(code, { allowSignPublicCodeFallback: true });
     await loadSmartSignExperience(code, smartSignResolution);
+    return;
+  }
+
+  if (inventory.pass_model === 'sponsored_agent_pass') {
+    await loadSponsoredEventPassExperience(code, inventory, resolution);
     return;
   }
 

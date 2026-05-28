@@ -10,6 +10,29 @@ const SMART_SIGN_INVENTORY_SELECT = [
   'is_printed',
   'claimed_at',
   'smart_sign_id',
+  'sponsor_loan_officer_profile_id',
+  'sponsor_loan_officer_uid',
+  'assigned_agent_slug',
+  'assigned_agent_phone',
+  'pass_model',
+  'sponsor_coverage_required',
+  'sponsor_coverage_consent_required',
+  'reuse_allowed',
+  'reuse_status',
+  'last_activated_at',
+  'metadata',
+  'notes',
+  'created_at'
+].join(',');
+
+const SMART_SIGN_INVENTORY_LEGACY_SELECT = [
+  'id',
+  'public_code',
+  'inventory_type',
+  'qr_url',
+  'is_printed',
+  'claimed_at',
+  'smart_sign_id',
   'notes',
   'created_at'
 ].join(',');
@@ -32,10 +55,19 @@ function withInventoryAlias(sign, inventory, publicCode) {
 
 export async function getSmartSignInventoryByPublicCode(publicCode) {
   if (!publicCode) return null;
+  const path = `${SUPABASE_URL}/rest/v1/smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}`;
   const rows = await fetchJson(
-    `${SUPABASE_URL}/rest/v1/smart_sign_inventory?public_code=eq.${encodeURIComponent(publicCode)}&select=${SMART_SIGN_INVENTORY_SELECT}&limit=1`,
+    `${path}&select=${SMART_SIGN_INVENTORY_SELECT}&limit=1`,
     { headers: authHeaders(KEY) }
-  );
+  ).catch((error) => {
+    if (!/PGRST204|schema cache|sponsor_loan_officer|pass_model|reuse_status|metadata/i.test(error?.message || '')) {
+      throw error;
+    }
+    return fetchJson(
+      `${path}&select=${SMART_SIGN_INVENTORY_LEGACY_SELECT}&limit=1`,
+      { headers: authHeaders(KEY) }
+    );
+  });
   const inventory = Array.isArray(rows) && rows.length ? rows[0] : null;
   return inventory
     ? {

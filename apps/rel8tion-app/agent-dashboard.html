@@ -47,6 +47,7 @@
       checkins: [],
       outreach: [],
       loanOfficer: null,
+      affordability: { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: '' },
       error: ''
     };
 
@@ -68,6 +69,22 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+    const DEFAULT_LOAN_OFFICER = {
+      loan_officer_uid: 'default-nmb-jared',
+      verified_profile_uid: '',
+      loan_officer_slug: 'default-nmb-jared',
+      loan_officer_name: 'Jared Feder',
+      loan_officer_title: 'Loan Officer',
+      loan_officer_company: 'Nationwide Mortgage Bankers',
+      loan_officer_phone: '3477758059',
+      loan_officer_email: 'jfeder@nmbnow.com',
+      loan_officer_photo_url: 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png',
+      loan_officer_calendar_url: '',
+      status: 'default',
+      is_default_fallback: true
+    };
+    const FIT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
+    const defaultLoanOfficer = () => ({ ...DEFAULT_LOAN_OFFICER });
     function openHouseKitHref(address = '') {
       const kitParams = new URLSearchParams();
       const agentSlug = state.event?.host_agent_slug || state.agent || '';
@@ -77,7 +94,13 @@
       if (address) kitParams.set('address', address);
       if (state.loanOfficer?.loan_officer_phone) kitParams.set('lo_phone', state.loanOfficer.loan_officer_phone);
       if (state.loanOfficer?.loan_officer_name) kitParams.set('lo_name', state.loanOfficer.loan_officer_name);
-      kitParams.set('source', isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
+      const sponsor = state.event?.setup_context?.sponsor_loan_officer_uid
+        || state.event?.setup_context?.sponsor_loan_officer_profile_id
+        || state.loanOfficer?.verified_profile_uid
+        || state.loanOfficer?.loan_officer_uid
+        || '';
+      if (sponsor) kitParams.set('sponsor', sponsor);
+      kitParams.set('source', isSponsoredEventPassEvent() ? 'sponsored_event_pass' : isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
       return `/open-house-kit?${kitParams.toString()}`;
     }
 
@@ -152,6 +175,25 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
+    async function loadAffordability(eventId, agentSlug) {
+      if (!eventId || !agentSlug) return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
+      const url = `/api/buyer-affordability?mode=event_fit_data&event_id=${encodeURIComponent(eventId)}&agent_slug=${encodeURIComponent(agentSlug)}`;
+      const response = await fetch(url, { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Property fit data unavailable.');
+      const guidanceByBuyerId = {};
+      const scenariosByBuyerId = {};
+      for (const guidance of data.guidance || []) {
+        if (guidance.buyer_id) guidanceByBuyerId[guidance.buyer_id] = guidance;
+      }
+      for (const scenario of data.scenarios || []) {
+        if (!scenario.buyer_id) continue;
+        if (!scenariosByBuyerId[scenario.buyer_id]) scenariosByBuyerId[scenario.buyer_id] = [];
+        scenariosByBuyerId[scenario.buyer_id].push(scenario);
+      }
+      return { guidanceByBuyerId, scenariosByBuyerId, disclaimer: data.disclaimer || FIT_DISCLAIMER };
+    }
+
     function stat(label, value, tone = 'slate') {
       const colors = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-blue-700' : 'text-slate-900';
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-5"><div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-black ${colors}">${esc(value)}</div></div>`;
@@ -200,10 +242,118 @@
       </div>`;
     }
 
+    function formatMoney(value) {
+      const number = Number(value || 0);
+      return number ? `$${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-';
+    }
+
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+    }
+
+    function guidanceRequestHref(checkin) {
+      const buyerId = checkin.buyer_id || '';
+      const uid = state.loanOfficer?.verified_profile_uid || state.loanOfficer?.loan_officer_uid || '';
+      const name = checkin.visitor_name || checkin.name || checkin.metadata?.name || 'Buyer';
+      const phone = checkin.visitor_phone || checkin.phone || checkin.metadata?.phone || '';
+      const agentSlug = state.event?.host_agent_slug || state.agent || '';
+      if (isUuid(uid)) {
+        const params = new URLSearchParams({
+          uid,
+          checkin_id: checkin.id || '',
+          buyer_id: buyerId,
+          agent: agentSlug,
+          event: state.event?.id || ''
+        });
+        return { href: `/lo-affordability-guidance?${params.toString()}`, label: 'Request LO Guidance' };
+      }
+      const message = [
+        `Please add Rel8tion affordability guidance for ${name}.`,
+        phone ? `Buyer phone: ${phone}` : '',
+        state.house?.address ? `Property: ${state.house.address}` : '',
+        `Event: ${state.event?.id || ''}`
+      ].filter(Boolean).join('\n');
+      return {
+        href: smsHref(state.loanOfficer?.loan_officer_phone || '3477758059', message),
+        label: 'Request LO Guidance'
+      };
+    }
+
+    function resultTone(status) {
+      if (status === 'within_guidance') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      if (status === 'close_review_recommended') return 'border-amber-200 bg-amber-50 text-amber-800';
+      if (status === 'outside_guidance') return 'border-rose-200 bg-rose-50 text-rose-800';
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+    }
+
+    function renderScenario(scenario) {
+      return `<div class="rounded-2xl border ${resultTone(scenario.result_status)} p-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-sm font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
+            <div class="mt-1 text-xs font-bold opacity-80">Net estimate: ${esc(formatMoney(scenario.estimated_net_monthly_payment))} / cap ${esc(formatMoney(scenario.monthly_cap))}</div>
+          </div>
+          <div class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
+        </div>
+        <div class="mt-2 text-xs font-bold opacity-80">Price ${esc(formatMoney(scenario.purchase_price))} • Taxes ${esc(formatMoney(scenario.annual_taxes))}/yr • HOA ${esc(formatMoney(scenario.monthly_hoa))}/mo</div>
+        ${scenario.review_notes ? `<div class="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-bold">${esc(scenario.review_notes)}</div>` : ''}
+        <p class="mt-2 text-[11px] font-semibold leading-relaxed opacity-80">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
+      </div>`;
+    }
+
+    function renderPropertyFit(checkin) {
+      const buyerId = checkin.buyer_id || '';
+      const guidance = buyerId ? state.affordability.guidanceByBuyerId[buyerId] : null;
+      const scenarios = buyerId ? (state.affordability.scenariosByBuyerId[buyerId] || []) : [];
+      if (!guidance) {
+        const request = guidanceRequestHref(checkin);
+        return `<div class="mt-4 rounded-2xl border border-sky-200 bg-sky-50/85 p-4">
+          <div class="text-xs font-black uppercase tracking-[.14em] text-sky-700">Property Fit Checker</div>
+          <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance needed</h3>
+          <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">A licensed loan officer can add guidance after completing their own preapproval workflow outside Rel8tion.</p>
+          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white">${esc(request.label)}</a>
+          <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(FIT_DISCLAIMER)}</p>
+        </div>`;
+      }
+      const defaultPrice = Number(state.house?.price || state.event?.setup_context?.price || guidance.max_purchase_price_guidance || 0);
+      const defaultTaxes = Number(state.house?.taxes || state.house?.annual_taxes || 0);
+      return `<div class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-black uppercase tracking-[.14em] text-indigo-700">Property Fit Checker</div>
+            <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance on file</h3>
+          </div>
+          <div class="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700">${esc(formatMoney(guidance.max_monthly_housing_payment))}/mo cap</div>
+        </div>
+        <div class="mt-3 grid gap-2 text-xs font-bold text-slate-600 md:grid-cols-3">
+          <div class="rounded-xl bg-white/75 px-3 py-2">Max price: ${esc(formatMoney(guidance.max_purchase_price_guidance))}</div>
+          <div class="rounded-xl bg-white/75 px-3 py-2">Rate: ${guidance.rate_assumption_percent ? `${esc(guidance.rate_assumption_percent)}%` : '-'}</div>
+          <div class="rounded-xl bg-white/75 px-3 py-2">Term: ${guidance.loan_term_years ? `${esc(guidance.loan_term_years)} yrs` : '-'}</div>
+        </div>
+        <form data-fit-form data-checkin-id="${esc(checkin.id || '')}" data-buyer-id="${esc(buyerId)}" class="mt-4 grid gap-3 rounded-2xl bg-white/75 p-3 md:grid-cols-2">
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Purchase Price<input name="purchase_price" type="number" min="1" step="1000" value="${esc(defaultPrice || '')}" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Taxes<input name="annual_taxes" type="number" min="0" step="100" value="${esc(defaultTaxes || '')}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Insurance<input name="annual_insurance" type="number" min="0" step="50" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Monthly HOA<input name="monthly_hoa" type="number" min="0" step="25" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700"><input name="apartment_present" type="checkbox" class="h-4 w-4"> Apartment present</label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Estimated Rent<input name="estimated_monthly_rent" type="number" min="0" step="50" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <button type="submit" class="rounded-full bg-indigo-600 px-4 py-3 text-sm font-black text-white md:col-span-2">Check Property Fit</button>
+        </form>
+        <div class="mt-3 grid gap-2">${scenarios.length ? scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-indigo-200 bg-white/55 p-3 text-sm font-bold text-slate-500">No saved property scenarios yet.</div>'}</div>
+        <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
+      </div>`;
+    }
+
     function isEventPassEvent() {
       return state.event?.setup_context?.flow === 'event-pass'
         || state.event?.setup_context?.qr_source === 'event_pass'
         || Boolean(state.event?.setup_context?.event_pass_inventory_id);
+    }
+
+    function isSponsoredEventPassEvent() {
+      return state.event?.setup_context?.source === 'sponsored_event_pass'
+        || state.event?.setup_context?.qr_source === 'sponsored_event_pass'
+        || state.event?.setup_context?.pass_model === 'sponsored_agent_pass';
     }
 
     function eventSummaryStats() {
@@ -246,7 +396,7 @@
       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
       const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
       const email = checkin.visitor_email || checkin.email || meta.email || '';
-      const preApproved = checkin.pre_approved === true ? 'Pre-approved' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
+      const financingStatus = checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
       const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
       const disclosure = disclosureSummary(checkin);
       const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
@@ -256,7 +406,7 @@
             <div class="text-lg font-black">${esc(name)}</div>
             <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
           </div>
-          <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(preApproved)}</div>
+          <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(financingStatus)}</div>
         </div>
         <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -270,6 +420,7 @@
           </div>
           ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Disclosure Packet PDF</a>` : ''}
         </div>
+        ${renderPropertyFit(checkin)}
         ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>
           <a href="${esc(smsHref(phone, introBody))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text Buyer</a>
@@ -292,8 +443,13 @@
       const company = lo.loan_officer_company || 'NMB';
       const phone = lo.loan_officer_phone || '';
       const photo = lo.loan_officer_photo_url || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png';
+      const isDefault = lo.is_default_fallback === true;
+      const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
+      const note = isDefault
+        ? 'Default Rel8tion coverage contact. Assign a specific loan officer or have them scan their verified keychain to replace this.'
+        : 'This loan officer is assigned live to this open house.';
       return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
-        <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">NMB Coverage Live</div>
+        <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
         <div class="mt-4 flex items-center gap-4">
           <img src="${esc(photo)}" alt="${esc(name)}" class="h-16 w-16 rounded-full object-cover ring-4 ring-white">
           <div>
@@ -302,12 +458,67 @@
             <p class="text-sm font-bold text-emerald-800">${esc(phone)}</p>
           </div>
         </div>
+        <p class="mt-3 text-sm font-bold leading-relaxed text-emerald-900">${esc(note)}</p>
         <div class="mt-4 grid grid-cols-2 gap-2">
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
           <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
         </div>
-        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">Replace Loan Officer</button>
+        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</button>
       </div>`;
+    }
+
+    async function submitFitScenario(form) {
+      const button = form.querySelector('button[type="submit"]');
+      const originalText = button?.textContent || 'Check Property Fit';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Saving Scenario...';
+      }
+      try {
+        const formData = new FormData(form);
+        const payload = {
+          action: 'create_scenario',
+          event_id: state.event?.id || '',
+          agent_slug: state.event?.host_agent_slug || state.agent || '',
+          checkin_id: form.dataset.checkinId || '',
+          buyer_id: form.dataset.buyerId || '',
+          purchase_price: formData.get('purchase_price') || '',
+          annual_taxes: formData.get('annual_taxes') || '',
+          annual_insurance: formData.get('annual_insurance') || '',
+          monthly_hoa: formData.get('monthly_hoa') || '',
+          apartment_present: formData.get('apartment_present') === 'on',
+          estimated_monthly_rent: formData.get('estimated_monthly_rent') || ''
+        };
+        const response = await fetch('/api/buyer-affordability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.error || 'Could not save property scenario.');
+        const buyerId = data.scenario?.buyer_id || payload.buyer_id;
+        if (buyerId) {
+          if (!state.affordability.scenariosByBuyerId[buyerId]) state.affordability.scenariosByBuyerId[buyerId] = [];
+          state.affordability.scenariosByBuyerId[buyerId].unshift(data.scenario);
+        }
+        render();
+      } catch (error) {
+        window.alert(error.message || 'Could not save property scenario.');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+    }
+
+    function attachFitCheckerHandlers() {
+      document.querySelectorAll('[data-fit-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          submitFitScenario(form);
+        });
+      });
     }
 
     function render() {
@@ -372,16 +583,19 @@
           </aside>
         </section>
       `;
+      attachFitCheckerHandlers();
     }
 
     function renderEndedSummary() {
       const stats = eventSummaryStats();
       const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
-      const passLabel = isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
+      const sponsored = isSponsoredEventPassEvent();
+      const passLabel = sponsored ? 'Sponsored Event Pass' : isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
       const kitUrl = openHouseKitHref(address);
       const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
       const loPhone = state.loanOfficer?.loan_officer_phone || '';
+      const secondaryCta = loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody);
       app.innerHTML = `<div class="py-10">
         <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
@@ -395,12 +609,12 @@
 
         <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
-          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Keep the keychain. The next activation is sponsored by the loan officer.</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-slate-600">For the next open house, the agent keeps the keychain on their keys and calls the sponsoring loan officer to activate the next Event Pass or service kit.</p>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${sponsored ? 'Your Sponsored Event Pass made this open house easier.' : 'Keep the keychain. The next activation is sponsored by the loan officer.'}</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${sponsored ? 'Check-ins were captured, event records stayed organized, disclosure records stayed together, and live loan officer support was available with no apps, no passwords, and no technical setup.' : 'For the next open house, the agent keeps the keychain on their keys and calls the sponsoring loan officer to activate the next Event Pass or service kit.'}</p>
           <div class="mt-4 grid gap-2 md:grid-cols-2">
             <a href="${esc(summaryMail)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Email Summary</a>
-            <a href="${esc(kitUrl)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Get Open House Kit</a>
-            <a href="${esc(loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody))}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
+            <a href="${esc(kitUrl)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Get My Rel8tion Open House Kit</a>
+            <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
             <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
           </div>
         </div>
@@ -504,7 +718,11 @@
       state.house = await loadHouse(state.event.open_house_source_id);
       state.checkins = await loadCheckins(state.event.id).catch(() => []);
       state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
-      state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
+      state.loanOfficer = (await loadLoanOfficer(state.event.id).catch(() => null)) || defaultLoanOfficer();
+      state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
+        console.log('affordability fit data skipped', error);
+        return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
+      });
       render();
     }
 

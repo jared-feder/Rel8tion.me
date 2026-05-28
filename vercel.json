@@ -13,9 +13,39 @@
     {
       "path": "/api/cron/render-agent-mockups",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/send-agent-outreach",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/replay-android-inbox",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "getrel8tion.com" }],
+      "destination": "/get-open-house-kit",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.getrel8tion.com" }],
+      "destination": "/get-open-house-kit",
+      "permanent": false
     }
   ],
   "rewrites": [
+    { "source": "/", "has": [{ "type": "host", "value": "getrel8tion.com" }], "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
+    { "source": "/", "has": [{ "type": "host", "value": "www.getrel8tion.com" }], "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
+    { "source": "/get-open-house-kit", "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
+    { "source": "/get-open-house-kit.html", "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
+    { "source": "/kit-confirm", "destination": "/apps/rel8tion-app/kit-confirm.html" },
+    { "source": "/kit-confirm.html", "destination": "/apps/rel8tion-app/kit-confirm.html" },
+    { "source": "/kit-intake", "destination": "/apps/rel8tion-app/kit-intake.html" },
+    { "source": "/kit-intake.html", "destination": "/apps/rel8tion-app/kit-intake.html" },
     { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim.html", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim-test-styled.html", "destination": "/apps/rel8tion-app/claim.html" },
@@ -33,13 +63,28 @@
     { "source": "/sign", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/pass", "destination": "/apps/rel8tion-app/pass.html" },
     { "source": "/pass.html", "destination": "/apps/rel8tion-app/pass.html" },
+    { "source": "/sponsored-pass-activate", "destination": "/apps/rel8tion-app/sponsored-pass-activate.html" },
+    { "source": "/sponsored-pass-activate.html", "destination": "/apps/rel8tion-app/sponsored-pass-activate.html" },
+    { "source": "/lo-sign", "destination": "/apps/rel8tion-app/lo-sign.html" },
+    { "source": "/lo-sign.html", "destination": "/apps/rel8tion-app/lo-sign.html" },
+    { "source": "/lo-sign-activate", "destination": "/apps/rel8tion-app/lo-sign-activate.html" },
+    { "source": "/lo-sign-activate.html", "destination": "/apps/rel8tion-app/lo-sign-activate.html" },
     { "source": "/l/:id", "destination": "/api/open-house-link?id=:id" },
+    { "source": "/o/:id", "destination": "/api/outreach-preview?id=:id" },
+    { "source": "/c/:code", "destination": "/api/chip-qr?code=:code" },
+    { "source": "/chip/:code", "destination": "/api/chip-qr?code=:code" },
     { "source": "/smart-sign-event.html", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/sign-view-test.html", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/event", "destination": "/apps/rel8tion-app/event.html" },
     { "source": "/event-shell-test.html", "destination": "/apps/rel8tion-app/event.html" },
+    { "source": "/agent-home", "destination": "/apps/rel8tion-app/agent-home.html" },
+    { "source": "/agent-home.html", "destination": "/apps/rel8tion-app/agent-home.html" },
     { "source": "/agent-dashboard", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
     { "source": "/agent-dashboard.html", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
+    { "source": "/lo-affordability-guidance", "destination": "/apps/rel8tion-app/lo-affordability-guidance.html" },
+    { "source": "/lo-affordability-guidance.html", "destination": "/apps/rel8tion-app/lo-affordability-guidance.html" },
+    { "source": "/loan-officer-support", "destination": "/apps/rel8tion-app/loan-officer-support.html" },
+    { "source": "/loan-officer-support.html", "destination": "/apps/rel8tion-app/loan-officer-support.html" },
     { "source": "/open-house-kit", "destination": "/apps/rel8tion-app/open-house-kit.html" },
     { "source": "/open-house-kit.html", "destination": "/apps/rel8tion-app/open-house-kit.html" },
     { "source": "/field-dashboard", "destination": "/apps/rel8tion-app/field-dashboard.html" },

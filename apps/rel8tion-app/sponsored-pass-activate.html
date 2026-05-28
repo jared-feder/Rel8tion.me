@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Activate Sponsored Event Pass | Rel8tion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 8%, rgba(125, 211, 252, .42), transparent 28%),
+        radial-gradient(circle at 82% 16%, rgba(196, 181, 253, .34), transparent 30%),
+        linear-gradient(135deg, #eef8ff 0%, #f8fbff 45%, #eefdf7 100%);
+      color: #0f172a;
+    }
+    .glass {
+      border: 1px solid rgba(255,255,255,.72);
+      background: rgba(255,255,255,.66);
+      box-shadow: 0 24px 70px rgba(31,42,90,.12);
+      backdrop-filter: blur(18px);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1rem 1.25rem;
+      font-weight: 900;
+      min-height: 56px;
+      transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      color: white;
+      background: linear-gradient(90deg, #06b6d4, #2563eb);
+      box-shadow: 0 18px 38px rgba(37,99,235,.22);
+    }
+    .btn-soft {
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(255,255,255,.9);
+      color: #334155;
+    }
+    .field {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid rgba(203,213,225,.9);
+      background: rgba(255,255,255,.9);
+      padding: .95rem 1rem;
+      font-weight: 800;
+      outline: none;
+    }
+    .field:focus { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(56,189,248,.14); }
+  </style>
+</head>
+<body>
+  <main id="app" class="min-h-screen flex items-center justify-center px-4 py-7"></main>
+
+  <script type="module">
+    import { ASSETS } from '/apps/rel8tion-app/src/core/config.js';
+    import { esc, money } from '/apps/rel8tion-app/src/core/utils.js';
+    import { findNearestOpenHouses, searchOpenHouses } from '/apps/rel8tion-app/src/api/openHouses.js?v=20260528-sponsored-pass';
+    import { findListingAgentsByOpenHouse } from '/apps/rel8tion-app/src/api/agents.js?v=20260528-sponsored-pass';
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code') || '';
+    const state = {
+      loading: true,
+      busy: false,
+      error: '',
+      notice: '',
+      resolved: null,
+      houses: [],
+      selectedHouse: null,
+      manual: false,
+      agent: {
+        name: '',
+        phone: '',
+        email: '',
+        brokerage: ''
+      }
+    };
+
+    function app(html) {
+      document.getElementById('app').innerHTML = html;
+      bind();
+    }
+
+    function logo() {
+      return `<img src="${ASSETS.rel8tionLogo}" alt="Rel8tion" class="h-16 w-auto mx-auto">`;
+    }
+
+    function shell(content) {
+      app(`
+        <section class="w-full max-w-3xl glass rounded-[34px] p-5 sm:p-8">
+          <div class="text-center mb-6">${logo()}</div>
+          ${content}
+        </section>
+      `);
+    }
+
+    function label(text) {
+      return `<div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">${esc(text)}</div>`;
+    }
+
+    function houseImage(house) {
+      return house?.listing_photo_url || house?.primary_photo_url || house?.photo_url || house?.image_url || '';
+    }
+
+    function houseFacts(house) {
+      return [
+        house?.price ? money(house.price) : '',
+        house?.beds ? `${house.beds} beds` : '',
+        house?.baths ? `${house.baths} baths` : ''
+      ].filter(Boolean).join(' | ');
+    }
+
+    function timeText(house) {
+      const start = house?.open_start ? new Date(house.open_start) : null;
+      const end = house?.open_end ? new Date(house.open_end) : null;
+      if (!start || Number.isNaN(start.getTime())) return '';
+      const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      return end && !Number.isNaN(end.getTime()) ? `${fmt.format(start)} - ${fmt.format(end)}` : fmt.format(start);
+    }
+
+    function sponsorLine() {
+      const sponsor = state.resolved?.sponsor || {};
+      return [sponsor.full_name || sponsor.slug, sponsor.company_name].filter(Boolean).join(', ') || 'Verified loan officer sponsor';
+    }
+
+    function updateAgentFromInputs() {
+      state.agent = {
+        name: document.getElementById('agentName')?.value?.trim() || '',
+        phone: document.getElementById('agentPhone')?.value?.trim() || '',
+        email: document.getElementById('agentEmail')?.value?.trim() || '',
+        brokerage: document.getElementById('brokerage')?.value?.trim() || ''
+      };
+    }
+
+    function selectedOrManualHouse() {
+      if (state.selectedHouse) return state.selectedHouse;
+      return {
+        id: '',
+        address: document.getElementById('manualAddress')?.value?.trim() || '',
+        open_start: document.getElementById('manualStart')?.value || '',
+        open_end: document.getElementById('manualEnd')?.value || '',
+        price: document.getElementById('manualPrice')?.value || '',
+        beds: document.getElementById('manualBeds')?.value || '',
+        baths: document.getElementById('manualBaths')?.value || '',
+        brokerage: state.agent.brokerage
+      };
+    }
+
+    async function resolvePass() {
+      if (!code) {
+        state.loading = false;
+        state.error = 'This activation link needs a Sponsored Event Pass code.';
+        render();
+        return;
+      }
+      try {
+        const res = await fetch(`/api/sponsored-pass/action?code=${encodeURIComponent(code)}`, { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || 'Unable to load this Sponsored Event Pass.');
+        if (data.live && data.event_url) {
+          window.location.replace(data.event_url);
+          return;
+        }
+        state.resolved = data;
+        state.loading = false;
+        render();
+      } catch (error) {
+        state.loading = false;
+        state.error = error.message || 'Unable to load this Sponsored Event Pass.';
+        render();
+      }
+    }
+
+    async function prefillAgentFromHouse(house) {
+      if (!house?.id) return;
+      const agents = await findListingAgentsByOpenHouse(house.id).catch(() => []);
+      const agent = agents.find((row) => row.name || row.phone || row.email) || null;
+      if (!agent) return;
+      state.agent = {
+        name: state.agent.name || agent.name || '',
+        phone: state.agent.phone || agent.phone || '',
+        email: state.agent.email || agent.email || '',
+        brokerage: state.agent.brokerage || agent.brokerage || house.brokerage || ''
+      };
+    }
+
+    function blocked() {
+      if (state.resolved?.blocked_reason) {
+        shell(`
+          ${label('Sponsored Event Pass')}
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-4">Pass Paused</h1>
+          <p class="text-slate-700 text-lg font-bold leading-relaxed mb-6">${esc(state.resolved.blocked_reason)}</p>
+          <a class="btn btn-soft w-full" href="/pass?code=${encodeURIComponent(code)}">Back To Event Pass</a>
+        `);
+        return true;
+      }
+      if (!state.resolved?.sponsor) {
+        shell(`
+          ${label('Sponsored Event Pass')}
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-4">Sponsor Needed</h1>
+          <p class="text-slate-700 text-lg font-bold leading-relaxed mb-6">This Sponsored Event Pass needs an active sponsor before it can be used.</p>
+          <a class="btn btn-soft w-full" href="https://rel8tion.me">Contact Rel8tion</a>
+        `);
+        return true;
+      }
+      return false;
+    }
+
+    function renderHouseCard(house, index) {
+      const image = houseImage(house);
+      const selected = state.selectedHouse?.id && String(state.selectedHouse.id) === String(house.id);
+      return `
+        <button type="button" data-select-house="${esc(house.id || index)}" class="w-full text-left rounded-[24px] border ${selected ? 'border-sky-400 bg-sky-50/90' : 'border-white/80 bg-white/78'} overflow-hidden shadow-sm">
+          ${image ? `<img src="${esc(image)}" alt="${esc(house.address || 'Open house')}" class="h-44 w-full object-cover bg-slate-100">` : ''}
+          <div class="p-4">
+            <div class="text-slate-950 font-black text-xl leading-tight">${esc(house.address || 'Open House')}</div>
+            <div class="text-sky-700 font-black mt-1">${esc(houseFacts(house) || timeText(house) || 'Nearby open house')}</div>
+            <div class="text-slate-500 font-bold text-sm mt-1">${esc([timeText(house), house.brokerage].filter(Boolean).join(' | '))}</div>
+          </div>
+        </button>
+      `;
+    }
+
+    function renderForm() {
+      const house = state.selectedHouse;
+      const consentText = state.resolved?.consent_text || '';
+      return `
+        <div class="grid gap-4">
+          ${house ? `
+            <div class="rounded-[26px] border border-white/80 bg-white/78 overflow-hidden">
+              ${houseImage(house) ? `<img src="${esc(houseImage(house))}" alt="${esc(house.address || 'Open house')}" class="h-52 w-full object-cover bg-slate-100">` : ''}
+              <div class="p-5">
+                ${label('Selected Open House')}
+                <div class="text-slate-950 font-black text-2xl leading-tight">${esc(house.address || 'Open House')}</div>
+                <div class="text-sky-700 font-black mt-1">${esc(houseFacts(house) || timeText(house) || '')}</div>
+                <button type="button" id="wrongHouse" class="btn btn-soft w-full mt-4">Wrong Open House</button>
+              </div>
+            </div>
+          ` : `
+            <div class="rounded-[24px] border border-white/80 bg-white/72 p-4">
+              ${label('Open House')}
+              <input id="manualAddress" class="field mb-3" placeholder="Property address">
+              <div class="grid grid-cols-2 gap-3">
+                <input id="manualStart" class="field" type="datetime-local" aria-label="Open house start">
+                <input id="manualEnd" class="field" type="datetime-local" aria-label="Open house end">
+                <input id="manualPrice" class="field" inputmode="numeric" placeholder="Price">
+                <div class="grid grid-cols-2 gap-3">
+                  <input id="manualBeds" class="field" inputmode="decimal" placeholder="Beds">
+                  <input id="manualBaths" class="field" inputmode="decimal" placeholder="Baths">
+                </div>
+              </div>
+            </div>
+          `}
+
+          <div class="rounded-[24px] border border-white/80 bg-white/72 p-4">
+            ${label('Host Agent')}
+            <div class="grid gap-3">
+              <input id="agentName" class="field" value="${esc(state.agent.name)}" placeholder="Agent name">
+              <input id="agentPhone" class="field" value="${esc(state.agent.phone)}" placeholder="Agent phone">
+              <input id="agentEmail" class="field" value="${esc(state.agent.email)}" placeholder="Agent email optional">
+              <input id="brokerage" class="field" value="${esc(state.agent.brokerage)}" placeholder="Brokerage">
+            </div>
+          </div>
+
+          <div class="rounded-[24px] border border-emerald-200 bg-emerald-50/86 p-5">
+            ${label('Live Coverage Sponsor')}
+            <div class="text-slate-950 font-black text-2xl mb-3">Live Coverage Sponsor</div>
+            <p class="text-slate-700 font-bold leading-relaxed">${esc(consentText)}</p>
+            <label class="mt-5 flex gap-3 rounded-[18px] border border-emerald-200 bg-white/75 p-4 text-left">
+              <input id="consentCheck" type="checkbox" class="mt-1 h-5 w-5 rounded border-emerald-300">
+              <span class="text-slate-800 font-black">I agree to activate this Event Pass with live loan officer coverage for this open house.</span>
+            </label>
+          </div>
+
+          ${state.error ? `<div class="rounded-[18px] border border-rose-200 bg-rose-50 p-4 font-black text-rose-700">${esc(state.error)}</div>` : ''}
+          ${state.notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50 p-4 font-black text-sky-700">${esc(state.notice)}</div>` : ''}
+          <button id="activateBtn" type="button" class="btn btn-primary w-full" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Activating...' : 'Activate Event Pass'}</button>
+        </div>
+      `;
+    }
+
+    function renderMain() {
+      const sponsor = sponsorLine();
+      shell(`
+        ${label('Sponsored Event Pass')}
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-3">Activate Sponsored Event Pass</h1>
+        <p class="text-slate-700 text-lg font-bold leading-relaxed mb-5">This Event Pass was issued by ${esc(sponsor)} and can be used to activate this open house with live event coverage.</p>
+        <p class="text-slate-500 text-sm font-bold mb-6">No app. No password. No tech setup. Activate your open house in seconds. Rel8tion is not a lender, mortgage broker, or pre-approval provider.</p>
+
+        ${!state.selectedHouse && !state.manual ? `
+          <div class="grid sm:grid-cols-3 gap-3 mb-5">
+            <button id="useLocation" class="btn btn-primary sm:col-span-2" type="button">Use My Location</button>
+            <button id="manualBtn" class="btn btn-soft" type="button">Search / Enter Manually</button>
+          </div>
+          <form id="searchForm" class="flex gap-2 mb-5">
+            <input id="searchTerm" class="field" placeholder="Search by address">
+            <button class="btn btn-soft shrink-0" type="submit">Search</button>
+          </form>
+          ${state.notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50 p-4 mb-5 font-black text-sky-700">${esc(state.notice)}</div>` : ''}
+          <div class="grid gap-3">${state.houses.map(renderHouseCard).join('')}</div>
+        ` : renderForm()}
+      `);
+    }
+
+    function render() {
+      if (state.loading) {
+        shell(`
+          ${label('Sponsored Event Pass')}
+          <div class="mx-auto mb-5 h-14 w-14 rounded-full border-[6px] border-slate-200 border-t-sky-500 animate-spin"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold text-slate-950">Opening Event Pass</h1>
+          <p class="mt-3 text-slate-600 font-bold">Looking up the sponsor and pass status.</p>
+        `);
+        return;
+      }
+      if (state.error && !state.resolved) {
+        shell(`
+          ${label('Sponsored Event Pass')}
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold text-slate-950 mb-3">Activation Unavailable</h1>
+          <p class="text-slate-700 font-bold mb-6">${esc(state.error)}</p>
+          <a class="btn btn-soft w-full" href="/">Go Home</a>
+        `);
+        return;
+      }
+      if (blocked()) return;
+      renderMain();
+    }
+
+    async function useLocation() {
+      if (!navigator.geolocation) {
+        state.notice = 'Location is not available on this device. Search or enter the address manually.';
+        state.manual = true;
+        render();
+        return;
+      }
+      state.notice = 'Checking nearby open houses...';
+      state.error = '';
+      render();
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        try {
+          const rows = await findNearestOpenHouses(position.coords.latitude, position.coords.longitude);
+          state.houses = Array.isArray(rows) ? rows : [];
+          state.notice = state.houses.length ? 'Select the open house you want to activate.' : 'No nearby listing was found. Enter the open house manually.';
+          if (!state.houses.length) state.manual = true;
+          render();
+        } catch (error) {
+          state.notice = '';
+          state.error = error.message || 'Unable to search nearby open houses.';
+          state.manual = true;
+          render();
+        }
+      }, () => {
+        state.notice = 'Location permission was not granted. Search or enter the open house manually.';
+        state.manual = true;
+        render();
+      }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 });
+    }
+
+    async function activate() {
+      updateAgentFromInputs();
+      const consent = document.getElementById('consentCheck')?.checked;
+      if (!consent) {
+        state.error = 'Check the consent box before activating this Sponsored Event Pass.';
+        render();
+        return;
+      }
+      const house = selectedOrManualHouse();
+      if (!house.address && !house.id) {
+        state.error = 'Choose or enter the open house before activating.';
+        render();
+        return;
+      }
+      if (!state.agent.name || !state.agent.phone) {
+        state.error = 'Add the host agent name and phone before activating.';
+        render();
+        return;
+      }
+
+      state.busy = true;
+      state.error = '';
+      render();
+      try {
+        const res = await fetch('/api/sponsored-pass/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'activate_sponsored_pass',
+            public_code: code,
+            open_house_id: house.id || '',
+            open_house: house,
+            agent: state.agent,
+            consent_accepted: true
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || 'Unable to activate this Sponsored Event Pass.');
+        window.location.replace(data.dashboard_url || `/agent-dashboard?event=${encodeURIComponent(data.event?.id || '')}&agent=${encodeURIComponent(data.agent?.slug || '')}`);
+      } catch (error) {
+        state.busy = false;
+        state.error = error.message || 'Unable to activate this Sponsored Event Pass.';
+        render();
+      }
+    }
+
+    function bind() {
+      document.getElementById('useLocation')?.addEventListener('click', useLocation);
+      document.getElementById('manualBtn')?.addEventListener('click', () => {
+        state.manual = true;
+        state.notice = '';
+        render();
+      });
+      document.getElementById('wrongHouse')?.addEventListener('click', () => {
+        state.selectedHouse = null;
+        state.manual = false;
+        render();
+      });
+      document.getElementById('activateBtn')?.addEventListener('click', activate);
+      document.getElementById('searchForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const term = document.getElementById('searchTerm')?.value?.trim() || '';
+        if (!term) return;
+        state.notice = 'Searching open houses...';
+        state.error = '';
+        render();
+        try {
+          const rows = await searchOpenHouses(term);
+          state.houses = Array.isArray(rows) ? rows : [];
+          state.notice = state.houses.length ? 'Select the matching open house.' : 'No listing matched. Enter it manually.';
+          if (!state.houses.length) state.manual = true;
+          render();
+        } catch (error) {
+          state.error = error.message || 'Search failed.';
+          state.notice = '';
+          state.manual = true;
+          render();
+        }
+      });
+      document.querySelectorAll('[data-select-house]').forEach((button, index) => {
+        button.addEventListener('click', async () => {
+          state.selectedHouse = state.houses[index] || null;
+          state.notice = '';
+          await prefillAgentFromHouse(state.selectedHouse);
+          render();
+        });
+      });
+    }
+
+    resolvePass();
+  </script>
+</body>
+</html>

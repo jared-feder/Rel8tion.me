@@ -1,5 +1,5 @@
 import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUCKET, SUPABASE_URL } from '../../core/config.js';
-import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260427-3props';
+import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260527-agent-photo-fallback';
 import { applyBranding } from '../../api/brokerages.js';
 import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260519-listing-link-health';
 import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260519-listing-link-sms';
@@ -346,6 +346,21 @@ async function resolveListingSmsLink() {
       listing_link_checked_at: new Date().toISOString()
     };
   }
+}
+
+async function syncBuyerFromCheckin(checkinId) {
+  if (!checkinId) return null;
+  const response = await fetch('/api/buyer-affordability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'sync_checkin_buyer',
+      checkin_id: checkinId
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'Buyer sync failed.');
+  return data;
 }
 
 function renderPropertyImage(house, classes = 'h-24 w-24') {
@@ -754,7 +769,7 @@ function renderLendingDisclosureStep() {
         <div>
           <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500 mb-2">Financing Option</div>
           <p class="text-slate-700 font-medium leading-relaxed">
-            Rel8tion strongly believes it is all about who you know. We have amazing professionals willing to give you a second opinion with no impact to your credit, potentially saving you thousands.
+            If you would like financing or pre-approval help, you can ask the sponsoring loan officer to contact you. Rel8tion does not collect mortgage application information and is not a lender, mortgage broker, or pre-approval provider.
           </p>
         </div>
         <fieldset>
@@ -783,7 +798,7 @@ function renderLendingDisclosureStep() {
         </p>
         <label class="mt-3 flex items-start gap-3 text-emerald-950 font-black">
           <input form="checkin-form" type="checkbox" name="loan_officer_contact_ok" value="true" class="mt-1 h-4 w-4 rounded border-emerald-300">
-          <span>Optional: I am open to a discreet financing follow-up.</span>
+          <span>I would like financing or pre-approval help from the sponsoring loan officer.</span>
         </label>
       </div>
 
@@ -1481,6 +1496,12 @@ function attachEventHandlers() {
       } catch (error) {
         console.log('touchEvent after checkin skipped', error);
       }
+      try {
+        const buyerSync = await syncBuyerFromCheckin(createdCheckin?.id);
+        if (buyerSync?.buyer?.id) createdCheckin = { ...createdCheckin, buyer_id: buyerSync.buyer.id };
+      } catch (error) {
+        console.log('buyer sync after checkin skipped', error);
+      }
 
       if (payload.metadata?.disclosure_accepted) {
         try {
@@ -1648,6 +1669,9 @@ function renderEventShell() {
           <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">CHECK IN HERE</div>
           <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Enjoy Your Stay!</h2>
           <p class="text-slate-600 font-semibold leading-relaxed">Please enter your info to begin.</p>
+          <div class="mt-4 rounded-[18px] border border-sky-100 bg-sky-50/90 px-4 py-3 text-sm font-bold leading-relaxed text-slate-600">
+            Your check-in information will be shared with the hosting real estate professional and Rel8tion event support. If this event has a sponsoring loan officer, they may receive your event check-in details to help support this open house. Financing help is only provided when requested.
+          </div>
         </div>
 
         ${pageState.mode === 'guest' ? `
