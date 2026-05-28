@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-21.
+Last inspected: 2026-05-27.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -16,7 +16,7 @@ Status labels used in this file:
 
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
-- `[IMPLEMENTED]` Latest inspected production deployment includes REL8TION COMMAND confirmed open house reporting and Tailwind runtime support across active app pages. Vercel reports the production alias ready at `app.rel8tion.me`; `/admin` is served by a root shell that hydrates `apps/rel8tion-app/admin.html` in place so the browser URL stays `app.rel8tion.me/admin` instead of redirecting to the app file path. The admin route served the confirm-open-house action, confirmed report cards, printable report export with explicit listed-open-house, confirmed-coverage, confirmed-on, and assigned-loan-officer labels, focus guard, quiet auto-refresh, scroll/focus restore, sign detach-to-fresh controls, and prior outreach card/style cleanup.
+- `[IMPLEMENTED]` Latest inspected production deployment includes REL8TION COMMAND confirmed open house reporting, Tailwind runtime support across active app pages, Event Pass/admin cleanup fixes, and the Rel8tionChip QR inventory/linking flow. Vercel reports the production aliases ready at `app.rel8tion.me`, `irel8.me`, `getrel8tion.com`, and `www.getrel8tion.com`; `/admin` is served by a root shell that hydrates `apps/rel8tion-app/admin.html` in place so the browser URL stays `app.rel8tion.me/admin` instead of redirecting to the app file path. The admin route served the confirm-open-house action, confirmed report cards, printable report export with explicit listed-open-house, confirmed-coverage, confirmed-on, and assigned-loan-officer labels, focus guard, quiet auto-refresh, scroll/focus restore, sign detach-to-fresh controls, and prior outreach card/style cleanup.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
@@ -30,12 +30,15 @@ The current product connects:
 - `[IMPLEMENTED]` agent Rel8tionChip/keychain identity
 - `[IMPLEMENTED]` smart signs with a printed QR code/public code
 - `[IMPLEMENTED]` Event Pass printed QR codes that resolve through `smart_sign_inventory.public_code` at `/pass`
+- `[IMPLEMENTED]` Sponsored Event Passes that are reusable Event Pass inventory rows issued by a verified loan officer, activated by an agent per open house, and gated by per-event agent consent before sponsor visibility
+- `[IMPLEMENTED]` Loan Officer Coverage Signs that stay with the loan officer, resolve through `/lo-sign?code=PUBLIC_CODE`, and route to the current live event or LO coverage activation
 - `[IMPLEMENTED]` front NFC buyer check-in chip
 - `[IMPLEMENTED]` rear NFC agent dashboard challenge chip
 - `[IMPLEMENTED]` live open house event records
 - `[IMPLEMENTED]` buyer check-ins and preapproval routing
-- `[PARTIAL]` SMS follow-up through Twilio/Supabase functions; `send-lead-sms` source is checked in and user-reported active, but deployed source/version matching and SMS behavior still need live verification
+- `[PARTIAL]` SMS follow-up through Supabase functions with a provider switch for Twilio or temporary Android SMS Gateway fallback; `send-lead-sms` source is checked in, but deployed source/version matching, provider env, and live SMS behavior still need verification
 - `[PARTIAL]` local/present NMB loan officer tag scan and live event coverage
+- `[IMPLEMENTED]` buyer affordability guidance / Property Fit Checker code that lets a licensed loan officer store limited guidance and lets an agent test property scenarios without Rel8tion collecting borrower financial/application data or making credit/approval decisions
 - `[PARTIAL]` agent outreach/enrichment data for booking demos and appointments
 - `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
 - `[NEEDS VERIFICATION]` Browserless/Trulia enrichment was not found in tracked source during the 2026-05-09 audit. The current tracked enrichment implementation is Estately + Cheerio.
@@ -56,10 +59,19 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/k` to `apps/rel8tion-app/k.html`
 - `/key-reset` to `apps/rel8tion-app/key-reset.html`
 - `/s` and `/sign` to `apps/rel8tion-app/sign.html`; `/pass` to `apps/rel8tion-app/pass.html`, which reuses the same resolver module in Event Pass mode
+- `/sponsored-pass-activate` to `apps/rel8tion-app/sponsored-pass-activate.html`
+- `/lo-sign` to `apps/rel8tion-app/lo-sign.html`
+- `/lo-sign-activate` to `apps/rel8tion-app/lo-sign-activate.html`
 - `/event` to `apps/rel8tion-app/event.html`
 - `/l/:id` to `api/open-house-link.js`, which opens a REL8TION property landing page with an optional button to the saved MLS/listing URL
+- `/o/:id` to `api/outreach-preview.js`, which opens a public outreach preview page with Open Graph image tags for rendered outreach mockups
+- `/c/:code` and `/chip/:code` to `api/chip-qr.js`, which resolves printed Rel8tionChip QR inventory. Linked agent QR rows redirect to `/b?agent=<slug>`; unlinked rows show a branded not-linked state and can carry the QR code into the NFC claim/dashboard linking flow.
+- `/` on `app.rel8tion.me` serves the root `index.html` production entry page with public Rel8tion CTAs only. It must not be reverted to a deployment smoke-test page or expose an admin dashboard CTA.
+- `/agent-home` to `apps/rel8tion-app/agent-home.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
-- `/get-open-house-kit` to `apps/rel8tion-app/get-open-house-kit.html`; `getrel8tion.com/` and `www.getrel8tion.com/` also host-rewrite to this Open House Kit landing
+- `/lo-affordability-guidance` to `apps/rel8tion-app/lo-affordability-guidance.html`
+- `/loan-officer-support` to `apps/rel8tion-app/loan-officer-support.html`
+- `/get-open-house-kit` to `apps/rel8tion-app/get-open-house-kit.html`; `getrel8tion.com/` and `www.getrel8tion.com/` redirect to this Open House Kit landing
 - `/kit-confirm` to `apps/rel8tion-app/kit-confirm.html`
 - `/kit-intake` to `apps/rel8tion-app/kit-intake.html`
 - `/open-house-kit` to `apps/rel8tion-app/open-house-kit.html`
@@ -69,7 +81,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/nmb-activate` and `/nmb-verified` to app pages
 - `/services/nmb/activate` and `/services/nmb/verified` to app pages
 
-The root also has static `a.html`, `b.html`, and `manual-sms-outreach.html`. They are not explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/a`, `/b`, and `/manual-sms-outreach`. `/open-house-kit` also has a root wrapper that preserves query/hash values and forwards into the app page.
+The root also has static `index.html`, `a.html`, `b.html`, `agent-home.html`, `get-open-house-kit.html`, `kit-confirm.html`, `kit-intake.html`, `lo-affordability-guidance.html`, `loan-officer-support.html`, and `manual-sms-outreach.html`. They are not all explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/`, `/a`, `/b`, `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/lo-affordability-guidance`, `/loan-officer-support`, and `/manual-sms-outreach`. `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/open-house-kit`, `/lo-affordability-guidance`, and `/loan-officer-support` have root wrappers that preserve query/hash values and forward into the app page.
 
 `[RISK]` Other root files include marketing/static pages and legacy/test pages. Examples:
 
@@ -107,10 +119,16 @@ It uses:
 - `api/admin/outreach-action.js`
 - `api/admin/outreach-inbox.js`
 - `api/admin/outreach-reply.js`
+- `api/admin/key-action.js`
+- `api/chip-qr.js`
+- `api/sms/android-inbound.js`
 - `api/sms-consent.js`
 - `api/manual-sms-outreach.js`
+- `api/buyer-affordability.js`
 - `api/admin/reset-key.js`
 - `api/admin/sign-action.js`
+- `api/sponsored-pass/action.js`
+- `api/lo-sign/action.js`
 - `api/checkout/open-house-kit.js`
 - `api/cron/enrich-agents.js`
 - `api/event-chat/list.js`
@@ -121,8 +139,12 @@ It uses:
 
 `[IMPLEMENTED]` Confirmed checked-in Edge Functions under `supabase/functions`:
 
+- `send-lead-sms`
+- `send-agent-outreach`
+- `send-agent-manual-reply`
 - `twilio-inbound-router`
 - `twilio-inbound-reply`
+- `twilio-message-status`
 
 `[NEEDS VERIFICATION]` Reference function source exists under `docs/supabase-functions`, but deployment is not confirmed from the repo alone.
 
@@ -171,9 +193,9 @@ Important localStorage keys:
 4. If UID matches an active sign rear chip, store an agent dashboard challenge and ask the user to tap the agent keychain.
 5. If a loan officer dashboard sign-in is pending and no rear-sign agent dashboard challenge is being satisfied, verify the UID against `verified_profiles` and create or update `event_loan_officer_sessions`.
 6. If the UID matches an active `verified_profiles` row outside a pending event sign-in, open `/lo-field-dashboard?uid=<uid>` so LO chips are operational and not buyer-facing.
-7. If the UID is a claimed agent keychain whose agent phone/email matches an active `verified_profiles` row, open the LO dashboard for that verified profile; this supports a physical keychain being used as the LO operations key without exposing a buyer-facing profile.
+7. If the UID directly matches an active `verified_profiles.uid`, or the claimed key row has an explicit verified/loan-officer device role and matches a verified profile, open the LO dashboard. Normal agent `device_role = keychain` rows do not auto-promote into LO dashboards through matching phone/email.
 8. If no `keys` row exists, treat the UID as an unclaimed keychain/sign chip depending on sign activation session state.
-9. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy dashboard challenge, open the active open-house dashboard when that agent has a live event, or otherwise route the agent to `/a?agent=<slug>&uid=<uid>`.
+9. If a claimed keychain exists, resume pending sign/Event Pass activation, satisfy rear-sign dashboard challenges, handle LO/backup-keychain flows, or route a normal claimed agent keychain to the permanent `/agent-home?agent=<slug>&uid=<uid>` dashboard. Public/share profile behavior stays on the QR path at `/b?agent=<slug>`.
 
 `[IMPLEMENTED]` Router priority rule: rear-sign agent dashboard verification takes precedence over loan-officer sign-in state. When a rear sign chip is tapped, `/k` clears stale `rel8tion_loan_officer_pending` browser state before asking for the agent keychain, so the agent keychain cannot be hijacked into `/nmb-activate` during dashboard verification.
 
@@ -192,12 +214,28 @@ Role: agent-facing Open House Kit acquisition and Event Pass keychain prefill fl
 
 `[PARTIAL]` Confirmed repo behavior:
 
-- `getrel8tion.com/` and `www.getrel8tion.com/` host-rewrite to the no-navigation Open House Kit landing when those domains are attached to the same Vercel project. `/get-open-house-kit` is the direct fallback route.
-- The landing has two primary actions: "I Have an Event Pass Keychain" and "I Need My Open House Kit".
+- `getrel8tion.com/` and `www.getrel8tion.com/` redirect to the no-navigation Open House Kit landing when those domains are attached to the same Vercel project. `/get-open-house-kit` is the direct fallback route.
+- The landing is a no-navigation one-page agent offer with Open House Kit feature cards, kit benefits, how-it-works steps, Version 1 pricing/rate-lock copy, direct monthly/annual checkout CTAs, "I Have an Event Pass Keychain", and "I Need My Open House Kit".
 - The keychain action stores `rel8tion_open_house_kit_pending` in localStorage with purpose `open_house_kit_confirm`, the source host/path, and a 10-minute expiry. This keeps the same-domain NFC handoff at `getrel8tion.com/k?uid=...` eligible for kit confirmation.
 - `/kit-confirm` reads the scanned UID and looks up identity data from `keys` plus linked `agents`, `verified_profiles`, `smart_signs`, `smart_sign_inventory`, and linked live loan-officer session rows when available. It stores the resolved data in browser storage for `/kit-intake`.
-- `/kit-intake` supports keychain-prefilled and manual intake, collects agent/contact/shipping/sponsor/product details, searches for likely existing profiles by normalized phone, email, and close name-plus-brokerage match, and requires the user to confirm likely matches before checkout.
+- `/kit-intake` supports keychain-prefilled and manual intake, preselects monthly or annual service when a landing-page CTA passes `plan=monthly|annual`, collects agent/contact/shipping/sponsor/product details, searches for likely existing profiles by normalized phone, email, and close name-plus-brokerage match, and requires the user to confirm likely matches before checkout.
 - The browser intake does not create agent records directly. It passes source, flow, UID, agent, sponsor, and selected kit metadata into `/api/checkout/open-house-kit`, which creates Stripe Checkout Sessions for the physical kit plus monthly or annual service.
+
+### `/agent-home`
+
+File: `apps/rel8tion-app/agent-home.html`.
+
+Role: permanent owner/operator dashboard for a paid agent Rel8tionChip.
+
+`[PARTIAL]` Confirmed repo behavior:
+
+- `/agent-home?agent=<slug>&uid=<uid>` is the normal destination for a claimed agent NFC scan after higher-priority setup, rear-sign, Event Pass, LO, and backup-keychain flows are ruled out.
+- The public/share profile remains `/b?agent=<slug>` and should be the printed QR destination for agent profile/contact sharing.
+- Printed agent Rel8tionChip QR codes are inventory-first and do not need an agent profile at print time. They live in `rel8tion_chip_inventory` with a short `chip_code` and `qr_url` such as `https://irel8.me/c/ra0018b9`; the first 1000 agent rows were seeded as batch `agent-keychain-001`. During claim, or later from `/agent-home`, the QR can be linked to the claimed NFC UID and agent slug. After linking, the QR opens the public profile while NFC continues to open the private owner dashboard.
+- The page loads the agent profile, all `open_house_events` hosted by that agent, linked `event_checkins`, disclosure packet links, buyer sync status, and buyer affordability guidance/scenario counts.
+- Profile photos resolve from saved `agents` image fields first, then `listing_agents.primary_photo_url` / `directory_photo_url` by phone or forgiving name match, then conventional public `agent-images/<slug>.*` storage objects, before falling back to the generic update-profile image.
+- The top actions include public QR profile, profile editing, direct Smart Sign activation, and setup/onboarding so a kit buyer can claim the agent NFC first and then activate the Smart Sign.
+- This is the intended paid-agent home for persistent event leads, compliance records, SMS drip campaigns, buyer follow-up, LO follow-up requests, review/social prompts, and future gamified profile metrics.
 
 ### `/claim`
 
@@ -218,7 +256,10 @@ Role: claim a Rel8tionChip/keychain into an agent identity.
 - Uses geolocation and `find_nearest_open_house` to find possible listings.
 - Can search/select an open house and infer agent data from `listing_agents` or `open_houses`.
 - Normalizes listing-agent profile data before showing the "Is This You?" confirmation. Placeholder names such as `Agent`, `Listing Agent`, `Unknown Agent`, and `Real Estate Agent` are not treated as real names, and the flow tries to recover the best enriched `listing_agents` profile by open house or phone before asking the user to confirm.
+- If auto-activation finds an existing `agents` row by phone/email but the incoming agent name conflicts with that row, the flow opens the full profile form instead of silently linking the chip to the stale name.
+- `/claim?uid=<uid>&edit=profile` lets an already claimed chip update its saved agent profile and photo without resetting the key. Profile edit saves update the existing agent slug, return to `/agent-home`, and do not relink the key, send the activation SMS again, or restart the backup-keychain prompt.
 - Can manually save full profile data.
+- Profile photo upload uses `/api/agent-profile-photo` first: the visible picker stores the selected file in page state, the browser compresses the selected image, the serverless route validates the chip/slug relationship where available, uploads to Supabase Storage bucket `agent-images` with the service role, and patches `agents.image_url`. The old direct browser Storage upload remains as a fallback.
 - Upserts into `agents`.
 - Updates/inserts `keys` with claimed state and `agent_slug`.
 - Sends activation SMS through `send-lead-sms`.
@@ -249,7 +290,7 @@ Role: simple post-claim agent setup page.
 - Saves host session.
 - Shows activation entry point for smart signs.
 - Activation URL is `/sign-demo-activate.html?agent=<agent>&uid=<uid>`.
-- Live profile URL is `/a?agent=<agent>`.
+- The secondary post-claim action opens the owner dashboard at `/agent-home?agent=<agent>&uid=<uid>`; the public/share profile remains `/b` from printed QR-style paths, with `/a` only as a legacy wrapper redirect.
 - Shows claimed keychain slots for the agent.
 - Prompts agents who have exactly one keychain to choose whether they have a second keychain before moving to smart sign activation.
 - Can arm an "Add Backup Keychain" flow; the next scanned Rel8tionChip is linked through `/k` to the same `agent_slug` as `device_role = keychain` with `assigned_slot` 1 or 2.
@@ -326,6 +367,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 - If `/pass?code=...` resolves to `inventory_type = event_pass` with no `smart_sign_id`, routes to `/sign-demo-activate?code=<code>&source=event_pass&fresh_qr=1`; the setup page preserves that Event Pass source, prompts for the NFC chip on the same Event Pass keychain, stores it as an event-pass keychain, creates a schema-compatible backing sign using that NFC UID as `uid_primary` with `primary_device_type = event_pass_keychain`, and binds the selected open house without registering front/rear sign NFC chips.
 - If an Event Pass is linked to a sign and that sign has `active_event_id`, redirects directly to `/event?event=<eventId>`.
 - If an Event Pass is linked to a sign but has no active event, renders "Event Pass Ready" with setup buttons that continue into `/sign-demo-activate?code=<code>&source=event_pass`.
+- If `/pass?code=...` resolves to `pass_model = sponsored_agent_pass`, the resolver does not use the one-event Event Pass setup path. A live linked event redirects to `/event?event=<eventId>`; otherwise reuse is allowed only when `reuse_allowed = true` and `reuse_status = active`, then the agent is sent to `/sponsored-pass-activate?code=<code>`.
 - If a smart sign route has an active event, redirects to `/event?event=<eventId>`.
 - If a smart sign route has a sign but no active event, renders "Sign Found" and activation options.
 - If no host session exists, it stores pending sign activation and prompts the agent to tap their Rel8tionChip/keychain.
@@ -338,11 +380,50 @@ Event Pass product positioning:
 - The physical Event Pass has both the printed QR and an NFC chip. The QR starts setup, the NFC chip claims the temporary Event Pass keychain identity, and future NFC taps open the dashboard for the active event created by that pass.
 - A Smart Sign and Event Pass can both be live for the same listing/open-house context. They remain separate backing signs/events under the hood, which keeps each physical device independently resettable. Device-aware routing keeps them from hijacking each other: Event Pass NFC opens the Event Pass dashboard, rear Smart Sign NFC opens the Smart Sign dashboard after keychain verification, and a generic claimed keychain prefers the Smart Sign event when both are active.
 - Event Pass is intentionally one included event unless renewed by the sponsoring loan officer/admin. Once an Event Pass has prior event history and no current active event, self-service NFC/activation reuse is blocked. Admin/LO renewal clears the inventory claim/link so the next QR-first setup can explicitly re-arm it.
+- Sponsored Event Pass is the reusable model: a loan officer sponsors open-house technology and live event support, not buyer lead buying or referral purchasing. Each activation records per-event host-agent consent in `event_pass_coverage_consents` before the sponsor receives event check-in visibility.
+- Buyer `/event` check-in discloses sharing with the hosting real estate professional, Rel8tion event support, and a sponsoring loan officer when present. Financing help is only routed when the buyer explicitly asks for it, and Rel8tion does not collect mortgage application data.
+- Pending Event Pass local and remote handoff rows are ignored when they already point at a different scanned key UID, when an unbound QR-to-NFC handoff is older than the short fresh-scan window, or when their inventory is already linked to a sign with an active/prior event. The `/k` to `/claim` handoff stores the scanned UID and `/claim` requires that UID before saving `keys.device_role = event_pass_keychain`, which prevents stale QR-to-NFC setup state from hijacking unrelated fresh agent keychain scans.
 - Stale browser setup state must not create a second Event Pass backing sign for an NFC UID that is already assigned. `/k` and `/sign-demo-activate` both check for an existing active Event Pass sign by the Event Pass NFC UID and route to the existing dashboard when one is found.
 - REL8TION COMMAND can reset Event Pass inventory after typing `REL8TION`: live linked events and LO coverage are ended, the backing sign is made inactive, and `smart_sign_inventory.smart_sign_id/claimed_at` are cleared so the printed QR can be reused. Reset does not delete the inventory row or change `smart_sign_inventory.public_code`.
 - Loan officers are not buying buyer leads or referrals.
 - Rel8tion is not a lender, mortgage broker, or pre-approval provider.
 - Buyer financing help is only routed when a buyer explicitly requests it.
+
+### `/sponsored-pass-activate`
+
+Files:
+
+- `apps/rel8tion-app/sponsored-pass-activate.html`
+- `api/sponsored-pass/action.js`
+
+Role: host-agent activation flow for reusable Sponsored Event Passes.
+
+`[IMPLEMENTED]` Confirmed repo behavior:
+
+- Loads the pass by `smart_sign_inventory.public_code`.
+- Requires `inventory_type = event_pass` and `pass_model = sponsored_agent_pass`.
+- Requires an active sponsor from `verified_profiles`.
+- Uses browser GPS/search/manual entry to choose an open house and prefill or collect host-agent info.
+- Requires the agent consent checkbox before privileged activation.
+- Service-role activation creates the live event with the real estate agent as `host_agent_slug`, stores `event_pass_coverage_consents.consent_text`, creates/updates live `event_loan_officer_sessions` with source `sponsored_event_pass`, updates the pass inventory, and sends the agent to `/agent-dashboard`.
+
+### `/lo-sign` And `/lo-sign-activate`
+
+Files:
+
+- `apps/rel8tion-app/lo-sign.html`
+- `apps/rel8tion-app/lo-sign-activate.html`
+- `api/lo-sign/action.js`
+
+Role: reusable Loan Officer Coverage Sign resolver and activation flow.
+
+`[IMPLEMENTED]` Confirmed repo behavior:
+
+- `/lo-sign?code=PUBLIC_CODE` resolves `loan_officer_coverage_signs.public_code`.
+- If the sign has a live `active_event_id`, buyer-style QR scans redirect to `/event?event=<active_event_id>`.
+- If the sign is assigned to an active LO but inactive, it shows "Coverage Sign Ready" and routes to `/lo-sign-activate?code=...`.
+- `/lo-sign-activate` uses nearby/search/manual open-house selection, confirms/adds host-agent info, creates a live open-house event, creates a live `event_loan_officer_sessions` row, updates `loan_officer_coverage_signs.active_event_id`, and records `loan_officer_sign_events` history.
+- Optional Sponsored Event Pass issuance from this flow prepares the pass inventory for the agent and sponsor but does not silently activate the Sponsored Event Pass for buyer-data visibility. The Sponsored Event Pass still requires the agent consent screen when activated.
 
 ### `/event`
 
@@ -445,6 +526,26 @@ Role: activate or edit a loan officer/NMB verified profile tied to a chip UID.
 - Calls RPC `verified_profiles_activate_or_create`, then opens the LO dashboard after activation.
 - Captures profile fields including name, title, company, phone, email, photo, CTA URL, calendar URL, bio, and areas.
 
+### `/loan-officer-support`
+
+Files:
+
+- `apps/rel8tion-app/loan-officer-support.html`
+- `api/loan-officer-support-request.js`
+- `supabase/migrations/20260527134020_loan_officer_support_requests.sql`
+
+Role: public request form for loan officers who are available to assist agents with open-house support.
+
+`[IMPLEMENTED]` Confirmed repo behavior:
+
+- Collects company name, loan officer name, email, phone, coverage area, availability, experience, and notes.
+- Posts to `/api/loan-officer-support-request`.
+- The API validates the request and inserts into `loan_officer_support_requests` using the server-side Supabase service role.
+- `loan_officer_support_requests` has RLS enabled and grants access to `service_role`; no public table access is granted.
+- REL8TION COMMAND loads recent requests through `/api/admin/dashboard` and shows them in the Loan officers area with call/email actions.
+- The live migration and production submit path were smoke-tested on 2026-05-27; the throwaway verification row was deleted afterward.
+- Direct email notification to `jared@rel8tion.me` is not wired because no email provider is currently configured in this repo.
+
 ### `/nmb-verified`
 
 File: `apps/rel8tion-app/nmb-verified.html`.
@@ -507,11 +608,11 @@ Files:
 - `a.html`
 - `b.html`
 
-Role: agent buyer/profile lead capture path for claimed keychains.
+Role: public/legacy agent buyer-profile lead capture path. This is not the normal claimed NFC owner-dashboard destination.
 
 `[IMPLEMENTED]` Confirmed repo behavior:
 
-- `/a` reads `agent` and optional `uid`, then redirects to `/b?agent=<agent>&uid=<uid>`.
+- `/a` reads `agent` and optional `uid`, then redirects to `/b?agent=<agent>&uid=<uid>` for legacy/public profile traffic.
 - `/b` loads `agents` by slug.
 - `/b` tries geolocation against RPC `find_nearest_open_house`.
 - `/b` uses `listing_agents` as a fallback for agent photo.
@@ -531,7 +632,7 @@ This is separate from the smart sign `/event` check-in flow.
 1. Keychain chip opens `/k?uid=<uid>`.
 2. `/k` looks up `keys`.
 3. If unclaimed, route to `/claim?uid=<uid>`.
-4. If claimed, save a short host session and route to the appropriate pending flow or `/a`.
+4. If claimed, save a short host session and route to pending sign/Event Pass/backup-keychain/dashboard-challenge flows when present; otherwise normal agent NFC opens `/agent-home?agent=<slug>&uid=<uid>`. `/a` remains legacy/public profile redirect behavior.
 5. In sign activation, the keychain is scanned before or after QR depending on entry point and again for the final handshake.
 
 ### Front NFC Buyer Check-In
@@ -595,6 +696,26 @@ The smart sign event page validates buyer preapproval/financing status during ch
   - send loan officer intro SMS to the buyer
 - If no live loan officer is available:
   - send Jared financing alert using the hardcoded owner phone in `notifications.js`
+
+## Buyer Affordability Guidance / Property Fit Checker
+
+`[IMPLEMENTED]` Code exists for a guidance-only Property Fit Checker and was production smoke-tested on 2026-05-25. It is not a mortgage application, preapproval, underwriting decision, Loan Estimate, credit decision, or loan approval system. The licensed loan officer completes any real preapproval outside Rel8tion using their own lender tools, documents, systems, and compliance workflow.
+
+`[PARTIAL]` Confirmed repo behavior:
+
+- `/api/buyer-affordability` is the server-side service-role API for buyer sync, LO guidance writes, agent property scenario writes, and LO scenario review updates.
+- `/event` keeps the existing check-in flow, then best-effort syncs the saved check-in into `buyers` and `event_checkins.buyer_id`.
+- `/b` keeps the existing lead/SMS flow, then best-effort syncs the saved lead into `buyers` and `leads.buyer_id`.
+- `/agent-dashboard` loads guidance/scenarios for the event. If guidance exists for a buyer, the lead card shows the Property Fit Checker. If none exists, it shows "Request LO Guidance".
+- Agents can enter only property scenario inputs: purchase price, taxes, insurance, HOA, apartment-present flag, and estimated rent. Agents cannot edit LO-controlled affordability fields.
+- `/lo-affordability-guidance` lets an active `verified_profiles.uid` loan officer create/update guidance and review saved scenarios. The top-level route uses a root wrapper that preserves query/hash and forwards to `apps/rel8tion-app/lo-affordability-guidance.html`. The form requires attestation that the LO has already completed any preapproval or affordability review outside Rel8tion.
+- Scenario results use the allowed labels: "Looks Within LO Guidance", "Close — LO Review Recommended", "Outside Current LO Guidance", and "LO Review Required".
+
+`[RISK]` Rel8tion must not collect or store Social Security numbers, income, paystubs, bank statements, assets, employment, debts/liabilities, credit scores, credit reports, AUS findings, formal preapproval letters, or borrower financial documents. The checked-in API rejects obvious forbidden field names and obvious forbidden text patterns in request bodies, but product/UI reviews should keep this boundary explicit.
+
+Required disclaimer shown on the LO form, agent checker, and saved results:
+
+> This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.
 
 ## Database Tables And Expected Relationships
 
@@ -903,6 +1024,7 @@ Used for:
 Important fields:
 
 - `open_house_event_id`
+- `buyer_id`
 - `visitor_type`
 - `visitor_name`
 - `visitor_phone`
@@ -1002,6 +1124,30 @@ Important fields inferred from insert:
 - `chip_uid`
 - `property_address`
 - `property_price`
+- `buyer_id`
+
+### Buyer Affordability Guidance Tables
+
+`[IMPLEMENTED]` Migration `supabase/migrations/20260525175402_buyer_affordability_guidance.sql` defines the guidance-only buyer/property-fit model. It was applied to live Supabase and verified on 2026-05-25.
+
+Tables:
+
+- `buyers`: global buyer/contact identity with name, phone, normalized phone, email, source, first/last seen timestamps, and metadata.
+- `buyer_agent_relationships`: persistent buyer-to-agent context by `buyer_id` and `agent_slug`.
+- `buyer_loan_officer_relationships`: persistent buyer-to-LO context by `buyer_id` and `verified_profiles.uid`.
+- `agent_loan_officer_relationships`: persistent agent-to-LO relationship by `agent_slug` and `verified_profiles.uid`.
+- `buyer_affordability_guidance`: loan-officer-controlled guidance fields only: max monthly housing payment, optional max purchase price, optional max loan amount, optional assumptions, LO-controlled rent-income rule, notes, status, and required outside-Rel8tion attestation.
+- `buyer_property_fit_scenarios`: agent-entered property scenarios plus calculated result/status and LO review status.
+
+Expected relationships:
+
+- `buyers.id` links to `leads.buyer_id` and `event_checkins.buyer_id`.
+- `agents.slug` is stored on buyer/agent and guidance rows.
+- `verified_profiles.uid` is stored as `loan_officer_profile_id`.
+
+Security rule:
+
+- LO guidance writes and scenario review writes go through `/api/buyer-affordability` with the server-side Supabase service role. Browser code should not be given permission to update LO-controlled guidance fields directly.
 
 ### Outreach Tables
 
@@ -1041,7 +1187,7 @@ Still not confirmed:
 - RPC definitions for `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
 - `send-lead-sms`; local source is present, but the verifier intentionally does not call SMS functions.
 - Edge Function deployment for source under `docs/supabase-functions`.
-- Vercel Cron state after deployment; root `vercel.json` should schedule refresh/generate/render only, and `apps/mockup-renderer/vercel.json` should schedule generate/render only.
+- Vercel Cron state after deployment; root `vercel.json` should schedule refresh/generate/render/send, and `apps/mockup-renderer/vercel.json` should schedule generate/render only.
 - Full production data quality and write-path health.
 - Vercel dashboard Git production-branch setting.
 
@@ -1061,7 +1207,7 @@ Still not confirmed:
 - Finds latest matching `agent_outreach_queue` row.
 - Marks opted-out or replied rows.
 - Blocks follow-up after reply/opt-out.
-- Sends a non-blocking owner alert through Twilio for inbound outreach replies after saving the reply and blocking follow-up.
+- Sends a non-blocking owner alert through the shared SMS provider layer after saving the reply and blocking follow-up.
 - The owner-alert behavior was deployed to Supabase project `nicanqrfqlbnlmnoernb` on 2026-05-21.
 
 `supabase/functions/twilio-message-status/index.ts`
@@ -1077,8 +1223,30 @@ Still not confirmed:
 
 - Called by browser code for activation SMS, buyer/agent check-in SMS, loan officer alerts, and `/b` profile SMS.
 - `[IMPLEMENTED]` Local source is checked in at `supabase/functions/send-lead-sms/index.ts`.
+- Uses `supabase/functions/_shared/sms.ts` for provider selection, suppression checks, SMS attempt logging, and Android Gateway/Twilio dispatch.
 - `[PARTIAL]` User reports the deployed function has been active and working for months.
-- `[NEEDS VERIFICATION]` Supabase dashboard/source matching and Twilio payload behavior should be verified before changing the SMS contract.
+- `[NEEDS VERIFICATION]` Supabase dashboard/source matching, provider env, Twilio payload behavior, and Android Gateway behavior should be verified before relying on live delivery.
+
+### Android SMS Gateway Fallback
+
+Files: `supabase/functions/_shared/sms.ts`, `api/sms/android-inbound.js`, `docs/android-sms-gateway.md`, and migration `supabase/migrations/20260524034420_android_sms_gateway_fallback.sql`.
+
+`[PARTIAL]` A temporary Android SMS Gateway provider is checked in while Twilio/A2P approval is pending. It does not remove Twilio. Runtime provider selection is by `SMS_PROVIDER=twilio|android_gateway`.
+
+Behavior:
+
+- Event/buyer SMS categories route to the Android events device env (`ANDROID_EVENTS_GATEWAY_*`).
+- Outreach/manual categories route to the Android outreach device env (`ANDROID_OUTREACH_GATEWAY_*`).
+- Category routing prevents outreach categories from using the event phone and prevents event/buyer categories from using the outreach phone.
+- Outreach messages are blocked from 9 PM to 8 AM America/New_York and the provider layer ensures "Reply STOP to opt out." is present.
+- `sms_suppression_list` is checked before sends by active provider. Provider-null suppression rows remain global; Android Gateway STOP replies write `provider = android_gateway` so they block Android Gateway sends without automatically blocking Twilio after the provider is switched back.
+- `sms_message_log` records provider, route, category, recipient, body, status, external id/device id, error, and metadata where service-role Supabase access is available.
+- Root Vercel Cron now schedules `/api/cron/send-agent-outreach`; while `SMS_PROVIDER=android_gateway`, that automatic sender uses the Android outreach device for outreach categories. Root Vercel Cron also schedules `/api/cron/replay-android-inbox`, which does not send SMS and instead replays a recent Android inbox window through the inbound webhook as a reconciliation pass. On 2026-05-26, a production deploy plus live `sms_message_log` checks confirmed Android Gateway outreach sends and queue rows marked sent.
+- Android Gateway does not support outbound MMS attachments, so automatic Android outreach appends a hosted `https://irel8.me/o/<agent_outreach_queue.outreach_code>` preview link before the STOP line when a rendered mockup exists. The preview page uses `mockup_image_url` for Open Graph/Twitter image tags so SMS apps that support rich link previews can show the outreach photo. Existing `/o/<agent_outreach_queue.id>` UUID links remain valid for backwards compatibility.
+- `/api/sms/android-inbound` accepts Android Gateway inbound webhook posts, validates signature/secret when configured, parses flexible payload fields, logs inbound messages, stores STOP/UNSUBSCRIBE/CANCEL/END/QUIT in `sms_suppression_list` as Android-scoped suppression, marks matching queue rows as `android_opted_out`, and links outreach replies to `agent_outreach_replies`/`agent_outreach_queue` when a phone match exists. It also falls back to recent queue-row phone matching when older rows lack `agent_phone_normalized`, and non-STOP replies preserve `interested`, `confirmed_open_house`, and `accepted_open_house` so later texts do not remove confirmed records from Reports. The 2026-05-27 update preserves Android `receivedAt` timestamps, prefers carrier message ids over webhook event ids to reduce duplicate thread rows, skips raw duplicate inserts when the reply was already linked, treats exact STOP-word lines as opt-outs, and blocks follow-up sends after any inbound reply.
+- Supabase Edge Function `android-inbox-replay` owns the Android Gateway inbox export call so Android device credentials stay in Supabase Function secrets. `/api/admin/android-inbox-replay` is a protected admin recovery action, and `/api/cron/replay-android-inbox` is the scheduled reconciliation wrapper. REL8TION COMMAND exposes this as "Replay Android inbox" for cases where a reply is visible on the physical Android phone but no raw inbound webhook reached Supabase. Admin-triggered replay can request up to 168 hours so same-week Android inbox gaps can be reconciled without sending SMS.
+- Automatic Android outreach now mirrors sent initial/follow-up bodies into `agent_outreach_replies`, matching manual-reply behavior so `/api/admin/outreach-inbox` can show the complete inbound/outbound conversation from one table. REL8TION COMMAND also reads recent raw `sms_inbound_messages` rows as an Android fallback so stored webhook messages are visible even if reply linking lags or fails. On 2026-05-27, 52 historical Android outbound rows were backfilled from `sms_message_log`, and one visible phone reply from Theresa Balazs that Android Gateway did not webhook was manually backfilled with a trace marker.
+- Live migration application, Android Gateway credential names, deployed `send-agent-outreach` source, and automatic outreach sends were verified on 2026-05-26. Android inbound webhook registration still needs separate verification.
 
 ### `/sms-consent`
 
@@ -1116,7 +1284,8 @@ Confirmed repo behavior:
 Automatic outreach image guard:
 
 - The mockup renderer requires `listing_photo_url` and fails the queue row instead of generating a generic fallback background if the listing photo is missing or cannot be loaded.
-- `send-agent-outreach` only selects automatic send rows with `listing_photo_url`, so future MMS outreach should not use a non-listing image as the property background.
+- `send-agent-outreach` only selects automatic send rows with `listing_photo_url`, so future MMS/rich-preview outreach should not use a non-listing image as the property background.
+- `https://irel8.me/o/<outreach_code>` is the public hosted outreach preview route used for Android Gateway link previews. It shows a Rel8tion-styled page and publishes `og:image` from the rendered `mockup_image_url`. `/o/<queue-id>` UUID links still resolve so previously sent texts do not break.
 - Citysnap/CoStar CDN image URLs may return `Access Denied` to server-side fetches. Pending future Citysnap rows with stale pre-fix blue fallback mockups were marked image-unavailable on 2026-05-22 rather than kept as sendable outreach.
 
 ### `/api/compliance/ny-disclosure`
@@ -1234,35 +1403,48 @@ Endpoint and cron:
 
 `[IMPLEMENTED]` `M00000489-971018` / `703 Neptune Blvd` now accepts OneKey as source of truth: `price = source_price = 1399998`, `manual_price_override = null`, and `freshness_status = verified`. A privileged SQL check confirmed price-history audit rows for the correction from stale `$1,450,000` through the temporary manual display and then back to the OneKey source price.
 
-## Twilio And SMS Logic
+## SMS Provider Logic
 
 `[IMPLEMENTED]` Confirmed outbound callers:
 
 - `apps/rel8tion-app/src/api/notifications.js`
 - root `b.html`
+- Supabase Edge Functions `send-lead-sms`, `send-agent-outreach`, and `send-agent-manual-reply`
 - reference outreach functions under `docs/supabase-functions`
 
 `[IMPLEMENTED]` Confirmed inbound functions:
 
 - `twilio-inbound-router`
 - `twilio-inbound-reply`
+- `api/sms/android-inbound`
 
 SMS categories:
 
-- agent activation SMS
-- buyer check-in confirmation
-- agent check-in notification
-- live loan officer financing alert
-- buyer loan officer introduction
-- Jared financing alert when no live loan officer exists
-- outreach initial/follow-up/manual messages
-- inbound reply owner alert
+- `event_transactional` / agent activation SMS
+- `buyer_confirmation`
+- `agent_checkin_alert`
+- `loan_officer_alert`
+- `buyer_loan_officer_intro`
+- `owner_fallback_alert`
+- `outreach`
+- `outreach_followup`
+- `demo_request`
+- `manual_outreach`
+
+Provider behavior:
+
+- `SMS_PROVIDER=twilio` uses the existing Twilio credentials.
+- `SMS_PROVIDER=android_gateway` uses Android SMS Gateway Cloud API with separate events and outreach devices.
+- Android event/buyer traffic must use `ANDROID_EVENTS_*`; outreach/manual traffic must use `ANDROID_OUTREACH_*`.
+- Outbound attempts are logged to `sms_message_log` where available.
+- Inbound Android replies are logged to `sms_inbound_messages`; STOP words are stored in `sms_suppression_list`.
 
 Security/safety notes:
 
 - Outbound SMS can trigger real contacts and spend money.
 - Queue filters and mobile validation are critical.
 - Opt-out and reply suppression should not be loosened casually.
+- Android Gateway credentials and signing keys must stay server-side only.
 
 ## WordPress Marketing/Site Role
 
@@ -1311,15 +1493,19 @@ Important gaps/risks:
 
 - `[PARTIAL]` `apps/rel8tion-app/admin.html` is the admin-keychain/token-protected REL8TION COMMAND dashboard. It has a command-header layout, area selector, live stats, hot-list-style outreach cards with agent/listing imagery, inline reply composers, interested/yes triage, true-open-house confirmation, accepted-open-house controls, drip scheduling, thread history, Leads, Agent CRM, smart signs/events, smart-sign detach-to-fresh controls, loan officer assignment/profile/session views, accepted/confirmed field visits, payments-needed setup, and outreach reports. The Outreach view prioritizes reply conversations first and moves the raw queue snapshot to the bottom as a reference section instead of leading with the large queued-record count.
 - `[IMPLEMENTED]` The admin dashboard browser auto-refresh skips while a command text field, input, dropdown, or content-editable control is focused. Manual/background reloads also restore the previous scroll position, focused control, field value, and cursor selection to avoid interrupting outreach replies as new SMS data arrives.
+- `[IMPLEMENTED]` Admin-entered report notes live on `agent_outreach_queue.report_note` and are saved through `/api/admin/outreach-action` with `action = save_report_note`. These notes appear on REL8TION COMMAND outreach cards, confirmed report cards, and the PDF-style confirmed-open-house report, giving the operator a clean way to include manual/missing reply context without inserting fake SMS records.
+- `[IMPLEMENTED]` `/api/admin/outreach-search` provides protected server-side outreach queue search for REL8TION COMMAND. The admin Outreach search box uses this endpoint so older queue rows can be found by property address, agent, phone, email, open-house id, outreach code, or report note even when they are outside the currently loaded inbox/dashboard slice.
 - `[IMPLEMENTED]` `/api/admin/auth` validates `ADMIN_KEYCHAIN_UIDS` or fallback admin token access for the dashboard.
 - `[IMPLEMENTED]` `/api/admin/dashboard` loads aggregate project/CRM/sign/event/LO/payment/reporting data with the server-side Supabase service role.
 - `[IMPLEMENTED]` `/api/admin/event-action` can end an active `open_house_events` row, clear the linked `smart_signs.active_event_id` when the sign is still attached to that event, and end live LO coverage for that event.
 - `[IMPLEMENTED]` `/api/admin/sign-action` can detach a smart sign after exact `REL8TION` confirmation by ending any live linked open house event, ending live LO coverage, clearing `smart_signs.owner_agent_slug`, `assigned_agent_slug`, `assigned_slot`, and `active_event_id`, setting the sign inactive, and preserving the physical chip UIDs and QR/public-code inventory alias for reuse.
+- `[IMPLEMENTED]` `/api/admin/key-action` can unclaim key rows after exact `REL8TION` confirmation and includes a guarded `fresh_uid_everywhere` cleanup for bad NFC/Event Pass tests. That cleanup ends live linked events and LO coverage, unlinks Event Pass inventory, deletes or retires matching backing sign rows, removes activation-session/alias references, and leaves the UID row unclaimed for fresh reuse.
 - `[IMPLEMENTED]` `/api/admin/loan-officer-assignment` can assign, remove/end, or auto-assign live LO coverage for active `open_house_events` by writing server-side `event_loan_officer_sessions` rows. It can also remove an LO profile from active admin use by setting `verified_profiles.is_active = false`, ending any live LO coverage for that UID, and cancelling current field-demo financing assignments when `field_demo_visit_participants` is available, while preserving historical rows. It also creates/updates tested field dashboard visit/participant records when `field_demo_visits` and `field_demo_visit_participants` are available, so assigned LOs can see work in `/lo-field-dashboard`.
 - `[IMPLEMENTED]` `/api/field-demo/availability` stores open and unavailable coverage windows for LO/field profiles, and `/api/field-demo/available-support` excludes candidates with overlapping `unavailable` windows before returning coverage matches.
 - `[IMPLEMENTED]` `/api/admin/outreach-action` can mark an outreach thread interested, confirm a true open house into `field_demo_visits` with `review_status = confirmed_open_house`, accept an interested open house into `field_demo_visits`, assign or reassign an optional loan officer participant, create live LO coverage when a matching active event exists, and schedule a follow-up drip SMS on the linked `agent_outreach_queue` row. Accepting an existing confirmed field visit preserves its selected coverage window unless a new coverage window is explicitly supplied.
 - `[IMPLEMENTED]` The Reports section builds searchable and sortable upcoming/previous confirmed open house cards and a printable PDF-style ultra-compact table report from `agent_outreach_queue`, `agent_outreach_replies`, `field_demo_visits`, `field_demo_visit_participants`, `event_loan_officer_sessions`, and `open_houses` when available. Confirming a true open house opens a coverage calendar with stored open-house day buttons, an all-days option when available, and custom date/time fields before writing the `field_demo_visits.scheduled_start/scheduled_end` report window. Outreach cards show the accepted/confirmed coverage window, accepted/confirmed timestamp, primary LO details, and a quick reassignment control when field-visit data exists. Rows include confirmed date, selected open house times, property details, listing/mockup/agent photo URLs, conversation snapshot, and LO coverage when recorded. Sort options include smart date, open date, confirmed date, loan officer, agent, property, and status. The generated report follows the landscape, small-type table layout of `docs/replied-agents-ultra-compact-current-2026-04-24.pdf` rather than the older plain CSV export, and explicitly labels the original listed open-house window, confirmed coverage window, confirmation timestamp, and assigned loan officer on each row.
-- `[IMPLEMENTED]` `/api/admin/outreach-inbox` loads `agent_outreach_inbox`, linked `agent_outreach_queue` context, and `agent_outreach_replies` using the server-side Supabase service role.
+- `[IMPLEMENTED]` Existing confirmed/accepted report rows can be reopened with `Update date` from Outreach search, outreach cards, or report cards. This calls the same protected confirm action with a replacement coverage window, updates the existing `field_demo_visits` record instead of creating a duplicate, and preserves `accepted_open_house` review status when the row had already been accepted.
+- `[IMPLEMENTED]` `/api/admin/outreach-inbox` loads `agent_outreach_inbox`, linked `agent_outreach_queue` context, `agent_outreach_replies`, and recent raw Android `sms_inbound_messages` rows using the server-side Supabase service role. It loads inbound rows separately from recent all-thread rows so automatic outbound send bursts cannot push real replies out of the admin Outreach view, treats `android_opted_out` as an opt-out status in counts and filters, exposes raw Android rows when reply linking lags/fails, sends `Cache-Control: no-store`, and the browser adds cache-busting timestamps to admin GET requests. The Outreach area also shows a dedicated "Latest incoming replies" block above the filtered cards.
 - `[IMPLEMENTED]` `/api/admin/outreach-reply` calls the protected Supabase `send-agent-manual-reply` function so SMS replies are sent server-side and recorded as outbound replies.
 - `[IMPLEMENTED]` `/k` checks scanned UIDs against the admin auth API before normal keychain routing, so an allowed admin keychain opens `/admin?uid=...`.
 - `[PARTIAL]` Practical reset tooling still exists separately through `/key-reset` and `api/admin/reset-key.js`.
@@ -1362,7 +1548,7 @@ Confirmed or needs-verification gaps:
 - `[NEEDS VERIFICATION]` RPC definitions remain unverified after the latest anon run.
 - `[NEEDS VERIFICATION]` Root Vercel cron for `api/cron/enrich-agents.js` is absent in inspected `vercel.json`.
 - `[IMPLEMENTED]` Vercel CLI/API inspection confirmed the current ready production deployment is aliased to `app.rel8tion.me` and deploys serverless functions for `api/compliance/ny-disclosure`, `api/admin/reset-key`, and `api/cron/enrich-agents`.
-- `[NEEDS VERIFICATION]` After cron config deployments, verify Vercel reports refresh/generate/render cron definitions and no send cron.
+- `[IMPLEMENTED]` The 2026-05-26 production deploy re-enabled the root `/api/cron/send-agent-outreach` schedule and live `sms_message_log` rows confirmed Android Gateway outreach sends through the outreach route.
 - `[NEEDS VERIFICATION]` Live RLS policy state was not fully confirmed; the anon verification run checked zero-row schema exposure only.
 - `[NEEDS VERIFICATION]` Signed NYS disclosure PDF upload requires a live Supabase Storage bucket and service-role access from Vercel.
 - `[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
@@ -1406,12 +1592,14 @@ Status labels: `[IMPLEMENTED]`, `[PARTIAL]`, `[INTENDED]`, `[NEEDS VERIFICATION]
 | Prefilled/signed REL8TION disclosure packet PDF API exists. | `[IMPLEMENTED]` | `api/compliance/ny-disclosure.js` generates preview and signed PDF packets with `pdf-lib`, including agency, housing, and courtesy evidence. |
 | Signed disclosure PDF storage is fully live. | `[NEEDS VERIFICATION]` | Requires live Vercel env vars and Supabase Storage bucket verification. |
 | Agent dashboard lead cards show disclosure status. | `[IMPLEMENTED]` | `agent-dashboard.html` reads `metadata.nys_agency_disclosure`, `metadata.ny_discrimination_disclosure`, and `metadata.rel8tion_courtesy_notice`, then renders signed/missing status plus disclosure packet PDF link when present. |
+| Agent dashboard Property Fit Checker exists. | `[IMPLEMENTED]` | `agent-dashboard.html` loads `/api/buyer-affordability?mode=event_fit_data`, shows "Request LO Guidance" when no guidance exists, and lets the agent create property scenarios only when LO-entered guidance exists. Production route/content and API smoke tests passed on 2026-05-25. |
+| LO affordability guidance page exists. | `[IMPLEMENTED]` | `/lo-affordability-guidance`, `apps/rel8tion-app/lo-affordability-guidance.html`, and `api/buyer-affordability.js` let active verified loan officers enter limited guidance, attest that real preapproval/affordability review happened outside Rel8tion, and review saved scenarios. |
 | Buyer financing help is opt-in. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` only marks financing requested when the buyer chooses second-opinion help or checks optional financing follow-up. `pre_approved=false` alone does not send financing outreach. |
 | Buyer financing opt-in routes to active paired loan officer if present. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `getLiveLoanOfficerSession`, then sends LO alert/intro only when financing help was requested. |
 | Buyer financing opt-in routes to Jared when no active LO exists. | `[IMPLEMENTED]` | `eventShell/bootstrap.js` calls `sendJaredFinancingAlert` in the no-live-LO branch; the buyer UI also has a temporary SMS financing button to `347-775-8059`. |
 | Loan officer tag scan verifies event support and opens LO operations dashboard. | `[IMPLEMENTED]` | Dashboard arms `rel8tion_loan_officer_pending`; `/k` verifies active `verified_profiles` and writes `event_loan_officer_sessions`. Standalone active verified UID scans and older `/nmb-activate?uid=...` tag URLs open `/lo-field-dashboard?uid=...`. |
 | `/nmb-activate` and `/nmb-verified` are loan officer profile routes. | `[PARTIAL]` | `apps/rel8tion-app/nmb-activate.html` and `nmb-verified.html`; Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based. |
-| `/a` and `/b` are a separate agent profile/buyer lead path. | `[IMPLEMENTED]` | `a.html` redirects to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. |
+| `/a` and `/b` are public/legacy agent profile/buyer lead paths, not normal claimed NFC owner access. | `[IMPLEMENTED]` | `a.html` redirects legacy/public profile traffic to `/b`; `b.html` loads `agents`, posts to `leads`, and calls `send-lead-sms`. Normal claimed agent NFC opens `/agent-home`. |
 | Admin command dashboard exists. | `[PARTIAL]` | `apps/rel8tion-app/admin.html` plus protected `/api/admin/dashboard`, `/api/admin/outreach-inbox`, `/api/admin/outreach-reply`, `/api/admin/outreach-action`, `/api/admin/event-action`, `/api/admin/sign-action`, and `/api/admin/loan-officer-assignment`; leads, outreach replies, interested/confirmed/accepted open house workflow, confirmed open house reports/PDF-style export, drip scheduling, sign event closeout, smart-sign detach-to-fresh, live LO assignment/removal, LO profile soft-removal, field visit creation, and LO dashboard launch links are implemented, while CRM edits, broader sign inventory record edits, payment controls, and calendar availability editing remain unfinished. |
 | Twilio inbound reply handling is checked into deployed function structure. | `[IMPLEMENTED]` | `supabase/functions/twilio-inbound-router` and `twilio-inbound-reply`. |
 | WordPress is not the product brain. | `[PARTIAL]` | `wordpress/README.md` says files are local tracking and not auto-synced. Product state/routes live in Vercel app files and Supabase calls. |

@@ -2,7 +2,7 @@
 
 Repo operating guide for future Codex sessions working on REL8TION.
 
-Last inspected: 2026-05-09.
+Last inspected: 2026-05-27.
 
 Status labels used in this file:
 
@@ -34,8 +34,14 @@ Before making changes, inspect:
 - `apps/rel8tion-app/claim.html`
 - `apps/rel8tion-app/src/modules/claimStyled/*`
 - `apps/rel8tion-app/onboarding.html`
+- `apps/rel8tion-app/agent-home.html`
 - `b.html` and `a.html`
+- `api/chip-qr.js`
 - `api/admin/reset-key.js`
+- `api/admin/key-action.js`
+- `api/admin/sign-action.js`
+- `api/sponsored-pass/action.js`
+- `api/lo-sign/action.js`
 - `api/cron/enrich-agents.js`
 - `api/cron/refresh-open-house-data.js`
 - `estately-enrichment-worker.cjs`
@@ -53,19 +59,29 @@ Important route behavior:
 - `[IMPLEMENTED]` `/k` is the NFC/key router and routes keychains, sign chips, loan officer tags, and reset scans.
 - `[IMPLEMENTED]` `/claim` is the agent keychain claim flow.
 - `[IMPLEMENTED]` `/onboarding` is the post-claim agent setup page and contains the smart sign activation entry point.
+- `[PARTIAL]` `/agent-home` is the permanent agent owner dashboard. Normal claimed agent NFC scans open `/agent-home?agent=<slug>&uid=<uid>` after higher-priority setup, rear-sign, Event Pass, loan-officer, and backup-keychain flows are ruled out. The public/share QR profile remains `/b?agent=<slug>`.
 - `[IMPLEMENTED]` `/sign-demo-activate` is the smart sign setup and listing binding flow.
 - `[IMPLEMENTED]` `/s` and `/sign` resolve a smart sign public code and route to activation or live event.
+- `[IMPLEMENTED]` `/pass` resolves printed Event Pass QR inventory from `smart_sign_inventory.public_code` and routes fresh single-event passes into QR-first Event Pass setup. Sponsored Event Pass rows with `pass_model = sponsored_agent_pass` route to `/sponsored-pass-activate?code=PUBLIC_CODE` when no live event is linked and reuse is active.
+- `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes. It requires an active sponsor, open-house selection, host-agent info, and per-event agent consent before creating the live event, `event_pass_coverage_consents` row, and sponsor LO session.
+- `[IMPLEMENTED]` `/lo-sign` resolves reusable Loan Officer Coverage Signs from `loan_officer_coverage_signs.public_code`. Active signs redirect buyer-style QR scans to `/event`; inactive assigned signs route to `/lo-sign-activate`.
+- `[IMPLEMENTED]` `/lo-sign-activate` lets the assigned LO activate coverage for a selected open house, creates a live event/LO coverage session, updates `loan_officer_coverage_signs`, and can issue a Sponsored Event Pass to an agent without silently activating that pass for buyer-data visibility.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/agent-dashboard` is the live event dashboard for the host agent.
+- `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support the getrel8tion.com Open House Kit landing, keychain prefill, manual intake, and Stripe Checkout handoff.
+- `[IMPLEMENTED]` `/c/:code` and `/chip/:code` resolve printed Rel8tionChip QR inventory through `api/chip-qr.js`. Linked agent QR rows redirect to `/b?agent=<slug>`; unlinked rows show a branded not-linked state and can carry the QR code into NFC claim/dashboard linking.
 - `[PARTIAL]` `/nmb-activate` and `/nmb-verified` are loan officer tag/profile pages. Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management. Current LO support is scan/session based.
+- `[IMPLEMENTED]` `/loan-officer-support` is a public loan-officer open-house-support request form. It stores requests server-side in `loan_officer_support_requests` and surfaces them in REL8TION COMMAND under Loan officers.
 - `[PARTIAL]` `/key-reset` is an admin/beta reset utility. It is not a full admin dashboard.
-- `[IMPLEMENTED]` `/a` is a root static redirect page that sends claimed agent chip traffic to `/b`.
+- `[IMPLEMENTED]` `/a` is a root static redirect page that sends public/profile traffic to `/b`. Normal claimed NFC owner scans should not rely on `/a`; they now use `/agent-home`.
 - `[IMPLEMENTED]` `/b` is a root static buyer profile and lead capture page tied to an agent slug.
+- `[IMPLEMENTED]` `/` on `app.rel8tion.me` is a production-safe Rel8tion entry page with public CTAs only. Do not restore the old Vercel smoke-test copy there and do not expose `/admin` from the public root.
 - `[IMPLEMENTED]` Current sign activation carries a selected open house from the keychain claim host session and offers it first for sign binding.
 - `[IMPLEMENTED]` Current sign activation loads agent profile data and displays agent name/brokerage instead of relying on raw slugs in the visible activation flow.
 - `[IMPLEMENTED]` `/onboarding` can arm an "Add Backup Keychain" flow. `/k` links the next scanned keychain to the same agent using `keys.device_role = keychain` and `keys.assigned_slot` 1/2. Keep the localStorage plus short-lived `smart_sign_activation_sessions` remote fallback, because iPhone/new-tab NFC handoff can lose same-tab local state.
 - `[IMPLEMENTED]` `/onboarding` prompts for a second keychain before smart sign activation when an agent has exactly one keychain. Do not let smart sign activation start while a backup-keychain scan is armed.
 - `[PARTIAL]` Multiple printed sign QR codes can be used for one sign only when their `smart_sign_inventory.public_code` rows point to the same `smart_sign_id`. `/s` and `/agent-dashboard` resolve inventory aliases, and the activation success screen can link a second printed QR to the current sign. There is no polished admin dashboard for QR alias management yet.
+- `[IMPLEMENTED]` Printed agent Rel8tionChip QR inventory is separate from NFC UIDs in `rel8tion_chip_inventory`. The first 1000 agent QR rows are seeded as batch `agent-keychain-001` with URLs like `https://irel8.me/c/ra0018b9`. During claim, or later from `/agent-home`, a QR can be linked to the claimed NFC UID and agent slug.
 
 The repo also has root wrapper files such as `claim.html`, `event.html`, `s.html`, and `sign.html` that redirect into `apps/rel8tion-app`. Do not assume root and app copies are identical.
 
@@ -84,6 +100,15 @@ These rules matter more than code style.
 - `[INTENDED]` Activation controls belong in agent/onboarding/sign activation flows, not on the buyer page.
 - `[IMPLEMENTED]` A live sign is designed in SQL/code to attach to one active `open_house_events` row at a time.
 - `[IMPLEMENTED]` Each smart sign still has two NFC chip roles in the current data model: front buyer chip and rear agent chip. Extra printed QR codes are not extra NFC chips; they must be inventory aliases for the same sign.
+- `[IMPLEMENTED]` Agent Rel8tionChip behavior is intentionally split: NFC is private owner access, while printed QR is the public profile/share side. Do not route printed agent QR codes directly to `/agent-home`.
+- `[IMPLEMENTED]` Event Pass behavior is intentionally split from agent profile products: printed Event Pass QR starts setup through `/pass`, the Event Pass NFC becomes `keys.device_role = event_pass_keychain`, and future Event Pass NFC taps open the one-event dashboard when live.
+- `[IMPLEMENTED]` Sponsored Event Pass behavior is split from single-event Event Pass behavior: it remains an `inventory_type = event_pass` QR row, but uses `pass_model = sponsored_agent_pass`, `reuse_allowed = true`, and `reuse_status = active` for reusable LO-issued passes.
+- `[IMPLEMENTED]` Sponsored Event Pass activation must record per-event host-agent consent in `event_pass_coverage_consents` before the sponsoring loan officer receives event check-in visibility or is assigned as live event support.
+- `[IMPLEMENTED]` Loan Officer Coverage Sign behavior is separate from Sponsored Event Pass behavior. The LO sign stays with the loan officer and routes by `/lo-sign`; the Sponsored Event Pass stays with the agent and routes by `/pass` then `/sponsored-pass-activate`.
+- `[INTENDED]` Sponsored Event Pass and Loan Officer Coverage Sign are not buyer lead-sale/referral-purchase products. The LO sponsors open-house technology and event support; the host agent remains the real estate/open-house host.
+- `[INTENDED]` Buyer financing help must only be routed when the buyer explicitly requests financing or pre-approval help. Rel8tion must not collect SSN, credit, income, assets, borrower documents, or mortgage application data.
+- `[IMPLEMENTED]` A Smart Sign and an Event Pass may both be active for the same listing/open-house context because active event uniqueness is per backing `smart_sign_id`, not per listing.
+- `[IMPLEMENTED]` Event Pass is gated as one included event unless renewed/reset by LO/admin. Once a pass has prior event history and is not live for that same event, self-service reuse is blocked.
 - `[RISK]` Do not detach or reset real field signs unless explicitly requested. Elena/Galluzzo sign data has been treated as protected in reset code.
 - `[IMPLEMENTED]` The demo/beta lane currently uses:
   - keychain UID `7ce5a51b-8202-4178-afc7-40a2e10e2a4d`
@@ -93,13 +118,14 @@ These rules matter more than code style.
   - rear chip UID `b70d2bde-d185-43ee-8962-083b64fa4347`
 - `[IMPLEMENTED]` `/key-reset` is token-protected and restricted to the beta lane above. Do not broaden reset scope without explicit approval.
 - `[RISK]` Smart sign QR activation currently resolves `smart_sign_inventory.public_code` first. The older `smart-sign-qr-export.sql` exports from `smart_signs.public_code`; reconcile this before batch printing.
-- `[RISK]` Outreach and auto-reply behavior can spend money and affect real agent conversations. Do not deploy or enable new outbound behavior without checking filters, quiet hours, opt-out handling, and owner approval.
+- `[RISK]` Outreach and auto-reply behavior can spend money and affect real agent conversations. Do not deploy or enable new outbound behavior without checking filters, quiet hours, opt-out handling, and owner approval. REL8TION COMMAND's outreach inbox must load inbound rows separately from recent all-thread rows so automatic outbound send bursts cannot hide incoming replies; Android Gateway opt-outs use `review_status = android_opted_out`. The Outreach search UI should expose queue matches even when no inbound webhook arrived. `/api/admin/android-inbox-replay` and `/api/cron/replay-android-inbox` replay recent Android inbox messages through the webhook as recovery/reconciliation paths; these endpoints must never send SMS.
+- `[RISK]` Android SMS Gateway is a temporary Twilio/A2P fallback. Keep Twilio code intact and switch providers by env vars, not by deleting Twilio paths. Outreach STOP suppression should remain provider-scoped while Android fallback is in use.
 - `[NEEDS VERIFICATION]` No tracked Browserless/Trulia enrichment source was found in the 2026-05-09 audit. The tracked enrichment worker is Estately + Cheerio.
 - `[PARTIAL]` OneKey listing freshness is implemented in repo code and root cron config, but live schema migration and deployed cron execution need verification before relying on the audit trail.
 
 ## [PARTIAL] Data Model Warning
 
-`[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. These should be unified by treating `leads` as the global CRM/person record and `event_checkins` as the event-specific attendance/action record. This is not fully implemented yet.
+`[PARTIAL]` `/b` saves buyer profile leads into `leads`. `/event` saves event attendance/check-ins into `event_checkins`. The newer buyer-affordability sync path can populate `buyers`, `leads.buyer_id`, and `event_checkins.buyer_id`, but `leads` should still be treated as the global CRM/person lead path and `event_checkins` as event-specific attendance/action records.
 
 ## [INTENDED] Top Priority Next Task
 
@@ -140,6 +166,11 @@ Create a live Supabase verification script or checklist to confirm tables, colum
 - several standalone HTML pages
 - root `b.html`
 
+`[IMPLEMENTED]` Sponsored Event Pass and Loan Officer Coverage Sign privileged writes go through service-role serverless routes:
+
+- `/api/sponsored-pass/action`
+- `/api/lo-sign/action`
+
 `[IMPLEMENTED]` Server-side/admin code uses env vars:
 
 - `SUPABASE_URL`
@@ -153,19 +184,15 @@ Create a live Supabase verification script or checklist to confirm tables, colum
 - `verified_profiles_lookup`
 - `verified_profiles_activate_or_create`
 
-`[NEEDS VERIFICATION]` Known Edge Function called by browser code but not present under `supabase/functions`:
-
-- `send-lead-sms`
-
-Treat these as live Supabase dependencies that need verification before refactors.
+`[PARTIAL]` `send-lead-sms` source is checked in under `supabase/functions/send-lead-sms` and uses the shared SMS provider layer for Twilio or Android Gateway. Deployed source/version matching should still be verified before refactors.
 
 `[INTENDED]` Current browser code still performs several direct Supabase writes with the anon key, including sign activation/session writes and event check-ins. The intended production architecture is to move sensitive writes and security-critical state transitions through Edge Functions or serverless APIs with explicit validation.
 
 ## Vercel Boundaries
 
-`[IMPLEMENTED]` Root `vercel.json` is the route map for this repo deployment. It currently has rewrites and a root cron for `/api/cron/refresh-open-house-data`.
+`[IMPLEMENTED]` Root `vercel.json` is the route map for this repo deployment. It has app rewrites, short QR/link routes, and Vercel Cron entries for refresh, outreach generation, mockup rendering, and outreach sending.
 
-`[NEEDS VERIFICATION]` `api/cron/enrich-agents.js` exists and imports `estately-enrichment-worker.cjs`, but the root Vercel cron schedule is not present in the inspected root config. If the endpoint is running in production, it is either triggered externally, deployed from another config, or needs verification.
+`[NEEDS VERIFICATION]` `api/cron/enrich-agents.js` exists and imports `estately-enrichment-worker.cjs`, but current active root cron behavior should be verified in Vercel before assuming enrichment is scheduled.
 
 `[NEEDS VERIFICATION]` `api/cron/refresh-open-house-data.js` exists and imports `onekey-freshness-worker.cjs`. Root `vercel.json` schedules it every 30 minutes, but deployed Vercel Cron state still needs dashboard/API verification after deploy.
 
@@ -226,10 +253,12 @@ There is no confirmed full automated test suite for the main static REL8TION app
 ## [RISK] High-Risk Areas
 
 - `/k` routing order. It decides whether a scan is a buyer chip, rear agent chip, loan officer tag, reset scan, pending sign chip, claimed keychain, or unclaimed keychain.
+- `/k` must check `loan_officer_coverage_signs.uid` before normal keychain fallback so an LO Coverage Sign NFC scan opens `/lo-sign-activate` or `/lo-field-dashboard`, not buyer check-in or agent keychain claim.
 - `/k` must let sign activation win before backup-keychain linking. A fresh front/rear sign chip scanned during activation must never be claimed as an agent backup keychain, even if a backup-keychain session is still pending.
 - `smart_sign_activation_sessions`. Stale rows can make a scan resume the wrong setup.
 - `open_house_events`. Historical code sometimes expected `agent_slug`; current event host field is `host_agent_slug`.
 - `smart_sign_inventory` to `smart_signs` linking. QR code binding depends on this relationship.
+- `rel8tion_chip_inventory` to `keys`/`agents` linking. Printed agent QR codes must stay public-profile oriented while NFC remains owner/dashboard access.
 - Root `/b` buyer profile and `/event` smart sign check-in are different experiences.
 - Estately enrichment. It can populate bad office numbers if parsing/validation is loose.
 - OneKey freshness. It can update live listing prices and active event snapshots; run dry-runs and verify `manual_price_override` behavior before broad deployment.
