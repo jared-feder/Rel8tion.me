@@ -25,6 +25,49 @@ function recent(rows, field, limit = 12) {
     .slice(0, limit);
 }
 
+function rowTime(row) {
+  const date = new Date(row?.last_reply_at || row?.created_at || 0);
+  return Number.isFinite(date.getTime()) ? date.getTime() : 0;
+}
+
+function mergeRows(...groups) {
+  const merged = new Map();
+  for (const group of groups) {
+    for (const row of Array.isArray(group) ? group : []) {
+      const key = row.thread_key || row.queue_row_id || row.from_phone_normalized || row.from_phone || row.id;
+      if (!key) continue;
+      const existing = merged.get(key);
+      if (!existing || rowTime(row) >= rowTime(existing)) merged.set(key, row);
+    }
+  }
+  return [...merged.values()].sort((a, b) => rowTime(b) - rowTime(a));
+}
+
+async function loadDashboardInbox(warnings) {
+  const select = 'thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status';
+  const [inboundRows, recentRows] = await Promise.all([
+    safeRest(`agent_outreach_inbox?select=${select}&direction=neq.outbound&order=last_reply_at.desc&limit=250`, [], warnings, 'agent_outreach_inbox_inbound'),
+    safeRest(`agent_outreach_inbox?select=${select}&order=last_reply_at.desc&limit=250`, [], warnings, 'agent_outreach_inbox')
+  ]);
+  return mergeRows(inboundRows, recentRows).slice(0, 250);
+}
+
+async function loadSmartSignInventory(warnings) {
+  const extended = await safeRest(
+    'smart_sign_inventory?select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,created_at,notes,sponsor_loan_officer_profile_id,sponsor_loan_officer_uid,assigned_agent_slug,assigned_agent_phone,pass_model,sponsor_coverage_required,sponsor_coverage_consent_required,reuse_allowed,reuse_status,last_activated_at,metadata&order=created_at.desc&limit=600',
+    null,
+    warnings,
+    'smart_sign_inventory'
+  );
+  if (Array.isArray(extended)) return extended;
+  return safeRest(
+    'smart_sign_inventory?select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,created_at,notes&order=created_at.desc&limit=600',
+    [],
+    warnings,
+    'smart_sign_inventory_legacy'
+  );
+}
+
 function enc(value) {
   return encodeURIComponent(String(value || '').trim());
 }
@@ -123,10 +166,16 @@ function buildSigns({ signs, inventory, events }) {
   });
 }
 
-function buildEventPasses({ inventory, signs, events, keys }) {
+function buildEventPasses({ inventory, signs, events, keys, verifiedProfiles, coverageConsents }) {
   const signById = new Map((signs || []).map((sign) => [sign.id, sign]));
   const eventById = new Map((events || []).map((event) => [event.id, event]));
   const keyByUid = new Map((keys || []).map((key) => [key.uid, key]));
+  const profileById = new Map();
+  for (const profile of verifiedProfiles || []) {
+    if (profile.id) profileById.set(String(profile.id), profile);
+    if (profile.uid) profileById.set(String(profile.uid), profile);
+  }
+  const consentCounts = countBy(coverageConsents || [], (row) => row.event_pass_inventory_id);
 
   return (inventory || [])
     .filter((row) => row.inventory_type === 'event_pass')
@@ -136,8 +185,14 @@ function buildEventPasses({ inventory, signs, events, keys }) {
       const nfcUid = sign?.activation_uid_primary || '';
       const key = nfcUid ? keyByUid.get(nfcUid) || null : null;
       const live = Boolean(event?.id && event.status === 'active' && !event.ended_at);
+      const sponsor = profileById.get(String(row.sponsor_loan_officer_profile_id || row.sponsor_loan_officer_uid || '')) || null;
       return {
         ...row,
+        sponsor_loan_officer_name: sponsor?.full_name || '',
+        sponsor_loan_officer_company: sponsor?.company_name || '',
+        sponsor_loan_officer_phone: sponsor?.phone || '',
+        sponsor_loan_officer_email: sponsor?.email || '',
+        event_count: consentCounts[row.id] || 0,
         linked_sign_id: sign?.id || '',
         sign_status: sign?.status || '',
         active_event_id: event?.id || sign?.active_event_id || '',
@@ -150,6 +205,45 @@ function buildEventPasses({ inventory, signs, events, keys }) {
         pass_state: live ? 'live' : sign?.id ? 'linked' : 'fresh'
       };
     });
+}
+
+function buildSponsoredEventPasses({ eventPasses }) {
+  return (eventPasses || [])
+    .filter((row) => row.pass_model === 'sponsored_agent_pass')
+    .map((row) => ({
+      ...row,
+      current_event_id: row.active_event_id || row.metadata?.current_event_id || '',
+      current_event_live: row.pass_state === 'live'
+    }));
+}
+
+function buildLoanOfficerCoverageSigns({ coverageSigns, verifiedProfiles, events, eventPasses, signEvents }) {
+  const profileById = new Map();
+  for (const profile of verifiedProfiles || []) {
+    if (profile.id) profileById.set(String(profile.id), profile);
+    if (profile.uid) profileById.set(String(profile.uid), profile);
+  }
+  const eventById = new Map((events || []).map((event) => [event.id, event]));
+  const passById = new Map((eventPasses || []).map((pass) => [pass.id, pass]));
+  const eventCounts = countBy(signEvents || [], (row) => row.loan_officer_sign_id);
+
+  return (coverageSigns || []).map((row) => {
+    const profile = profileById.get(String(row.loan_officer_profile_id || row.loan_officer_uid || '')) || null;
+    const event = row.active_event_id ? eventById.get(row.active_event_id) || null : null;
+    const pass = row.active_event_pass_inventory_id ? passById.get(row.active_event_pass_inventory_id) || null : null;
+    return {
+      ...row,
+      loan_officer_name: profile?.full_name || '',
+      loan_officer_company: profile?.company_name || '',
+      loan_officer_phone: profile?.phone || '',
+      loan_officer_email: profile?.email || '',
+      active_event_host: event?.host_agent_slug || row.last_agent_slug || '',
+      active_event_status: event?.status || '',
+      active_event_address: eventAddress(event),
+      active_event_pass_code: pass?.public_code || '',
+      event_count: eventCounts[row.id] || 0
+    };
+  });
 }
 
 function buildEvents({ events, checkins, loanSessions }) {
@@ -309,6 +403,9 @@ function buildConfirmedOpenHouses({ outreach, visits, participants, messages, op
       agent_phone: firstPresent(queue.agent_phone, visit.agent_phone, context.agent_phone),
       agent_email: firstPresent(queue.agent_email, visit.agent_email, context.agent_email),
       brokerage: firstPresent(queue.brokerage, visit.brokerage, context.brokerage),
+      report_note: queue.report_note || '',
+      report_note_updated_at: queue.report_note_updated_at || '',
+      visit_notes: visit.notes || '',
       loan_officer_name: firstPresent(primaryParticipant?.participant_name, liveLoan?.loan_officer_name, liveLoan?.loan_officer_slug),
       loan_officer_phone: firstPresent(primaryParticipant?.participant_phone, liveLoan?.loan_officer_phone),
       loan_officer_email: firstPresent(primaryParticipant?.participant_email, liveLoan?.loan_officer_email),
@@ -416,22 +513,30 @@ module.exports = async function handler(req, res) {
       leads,
       fieldVisits,
       fieldParticipants,
+      loanOfficerRequests,
+      coverageSigns,
+      loanOfficerSignEvents,
+      coverageConsents,
       outreach,
       inbox
     ] = await Promise.all([
       safeRest('agents?select=id,slug,name,phone,phone_normalized,email,brokerage,image_url,website&order=name.asc&limit=250', [], warnings, 'agents'),
       safeRest('keys?select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1000', [], warnings, 'keys'),
       safeRest('smart_signs?select=id,public_code,status,owner_agent_slug,assigned_agent_slug,assigned_slot,active_event_id,uid_primary,uid_secondary,activation_uid_primary,activation_uid_secondary,activation_method,primary_device_type,secondary_device_type,created_at,updated_at,deactivated_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'smart_signs'),
-      safeRest('smart_sign_inventory?select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,created_at,notes&order=created_at.desc&limit=600', [], warnings, 'smart_sign_inventory'),
+      loadSmartSignInventory(warnings),
       safeRest('open_house_events?select=id,host_agent_slug,smart_sign_id,open_house_source_id,status,start_time,end_time,ended_at,last_activity_at,created_at,updated_at,setup_context&order=created_at.desc&limit=250', [], warnings, 'open_house_events'),
       safeRest('event_checkins?select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,created_at,metadata&order=created_at.desc&limit=800', [], warnings, 'event_checkins'),
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
-      safeRest('verified_profiles?select=uid,industry,slug,full_name,title,company_name,phone,email,photo_url,cta_url,calendar_url,is_active,activated_at,updated_at,created_at&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
+      safeRest('verified_profiles?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
       safeRest('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc&limit=250', [], warnings, 'field_demo_visits'),
       safeRest('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc&limit=500', [], warnings, 'field_demo_visit_participants'),
-      safeRest('agent_outreach_queue?select=id,open_house_id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
-      safeRest('agent_outreach_inbox?select=thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status&order=last_reply_at.desc&limit=250', [], warnings, 'agent_outreach_inbox')
+      safeRest('loan_officer_support_requests?select=id,full_name,company_name,email,phone,phone_normalized,experience,coverage_areas,availability,notes,status,source,created_at,updated_at&order=created_at.desc&limit=250', [], warnings, 'loan_officer_support_requests'),
+      safeRest('loan_officer_coverage_signs?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'loan_officer_coverage_signs'),
+      safeRest('loan_officer_sign_events?select=*&order=created_at.desc&limit=500', [], warnings, 'loan_officer_sign_events'),
+      safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
+      safeRest('agent_outreach_queue?select=id,open_house_id,outreach_code,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,report_note,report_note_updated_at,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
+      loadDashboardInbox(warnings)
     ]);
 
     const confirmedQueueIds = reportCandidateQueueIds({ outreach, visits: fieldVisits });
@@ -457,7 +562,15 @@ module.exports = async function handler(req, res) {
 
     const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
     const signRows = buildSigns({ signs, inventory, events });
-    const eventPassRows = buildEventPasses({ inventory, signs, events, keys });
+    const eventPassRows = buildEventPasses({ inventory, signs, events, keys, verifiedProfiles, coverageConsents });
+    const sponsoredEventPassRows = buildSponsoredEventPasses({ eventPasses: eventPassRows });
+    const loanOfficerCoverageSignRows = buildLoanOfficerCoverageSigns({
+      coverageSigns,
+      verifiedProfiles,
+      events,
+      eventPasses: eventPassRows,
+      signEvents: loanOfficerSignEvents
+    });
     const eventRows = buildEvents({ events, checkins, loanSessions });
     const leadRows = buildLeads({ leads, checkins, events });
     const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
@@ -481,6 +594,8 @@ module.exports = async function handler(req, res) {
         claimed_keychains: keys.filter((row) => row.claimed).length,
         smart_signs: signs.length,
         event_passes: eventPassRows.length,
+        sponsored_event_passes: sponsoredEventPassRows.length,
+        loan_officer_coverage_signs: loanOfficerCoverageSignRows.length,
         outreach_queue: outreach.length,
         outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
         active_signs: signs.filter((row) => row.status === 'active').length,
@@ -489,21 +604,28 @@ module.exports = async function handler(req, res) {
         leads: leadRows.length,
         live_loan_officers: loanSessions.filter((row) => row.status === 'live').length,
         open_events_without_lo: eventRows.filter((row) => row.status === 'active' && !row.ended_at && !row.live_loan_officer).length,
+        loan_officer_support_requests: loanOfficerRequests.length,
+        new_loan_officer_support_requests: loanOfficerRequests.filter((row) => (row.status || 'new') === 'new').length,
         confirmed_open_houses: confirmedOpenHouseRows.length,
         incoming_threads: inbox.length,
-        needs_reply: inbox.filter((row) => row.direction !== 'outbound' && !row.any_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled'].includes(row.review_status)).length,
+        needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
         payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length
       },
       crm: crmRows,
       leads: leadRows,
       signs: signRows,
       event_passes: eventPassRows,
+      sponsored_event_passes: sponsoredEventPassRows,
+      loan_officer_coverage_signs: loanOfficerCoverageSignRows,
+      loan_officer_sign_events: loanOfficerSignEvents,
+      event_pass_coverage_consents: coverageConsents,
       inventory: inventory.slice(0, 150),
       events: eventRows,
       checkins: recent(checkins, 'created_at', 100),
       field_visits: fieldVisitRows,
       confirmed_open_houses: confirmedOpenHouseRows,
       loan_officers: verifiedProfiles,
+      loan_officer_requests: loanOfficerRequests,
       loan_sessions: loanSessions,
       payments: paymentRows,
       outreach: {

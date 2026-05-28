@@ -47,6 +47,37 @@ async function endLoanOfficerCoverage(eventId, now) {
   ).catch((error) => ({ warning: error.message || String(error) }));
 }
 
+async function clearLoanOfficerCoverageSigns(eventId, now) {
+  const signs = await supabaseRest(
+    `loan_officer_coverage_signs?active_event_id=eq.${enc(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'assigned',
+        active_event_id: null,
+        active_event_pass_inventory_id: null,
+        active_smart_sign_id: null,
+        updated_at: now
+      })
+    }
+  ).catch((error) => ({ warning: error.message || String(error) }));
+
+  const history = await supabaseRest(
+    `loan_officer_sign_events?open_house_event_id=eq.${enc(eventId)}&status=eq.live`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'ended',
+        ended_at: now
+      })
+    }
+  ).catch((error) => ({ warning: error.message || String(error) }));
+
+  return { signs, history };
+}
+
 async function endEvent(eventId) {
   const event = await loadEvent(eventId);
   const now = new Date().toISOString();
@@ -80,7 +111,8 @@ async function endEvent(eventId) {
   }
 
   const loan_officer_coverage = await endLoanOfficerCoverage(event.id, now);
-  return { event: updatedEvent || event, sign, loan_officer_coverage };
+  const loan_officer_coverage_signs = await clearLoanOfficerCoverageSigns(event.id, now);
+  return { event: updatedEvent || event, sign, loan_officer_coverage, loan_officer_coverage_signs };
 }
 
 module.exports = async function handler(req, res) {
