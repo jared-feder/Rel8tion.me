@@ -2298,13 +2298,18 @@
         showToast('Event not found.');
         return;
       }
-      if (!window.confirm(`End the open house event for ${eventAddress(event)} and clear the active sign?`)) return;
+      const typed = window.prompt(`End the open house event for ${eventAddress(event)} and clear active links?\n\nBuyer check-ins, disclosure records, consent rows, and historical events will stay saved.\n\nType REL8TION to continue.`);
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('End event cancelled.');
+        return;
+      }
       state.actionKey = `end_event:${eventId}`;
       render();
       try {
         await api('/api/admin/event-action', {
           method: 'POST',
-          body: JSON.stringify({ action: 'end_event', event_id: eventId })
+          body: JSON.stringify({ action: 'end_event', event_id: eventId, confirmation: typed.trim() })
         });
         state.actionKey = '';
         showToast('Open house event ended.');
@@ -2407,13 +2412,18 @@
         showToast('No live event is linked to this Sponsored Event Pass.');
         return;
       }
-      if (!window.confirm(`End active Sponsored Event Pass event for ${pass.public_code}? Check-ins and disclosures will stay saved.`)) return;
+      const typed = window.prompt(`End active Sponsored Event Pass event for ${pass.public_code}?\n\nCheck-ins, disclosures, consent rows, and history will stay saved.\n\nType REL8TION to continue.`);
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Sponsored Event Pass end cancelled.');
+        return;
+      }
       state.actionKey = `sponsored_end:${inventoryId}`;
       render();
       try {
         await api('/api/sponsored-pass/action', {
           method: 'POST',
-          body: JSON.stringify({ action: 'end_sponsored_pass_event', inventory_id: inventoryId, event_id: pass.current_event_id || pass.active_event_id })
+          body: JSON.stringify({ action: 'end_sponsored_pass_event', inventory_id: inventoryId, event_id: pass.current_event_id || pass.active_event_id, confirmation: typed.trim() })
         });
         state.actionKey = '';
         showToast('Sponsored Event Pass event ended.');
@@ -2504,13 +2514,18 @@
         showToast('No live event is linked to this Coverage Sign.');
         return;
       }
-      if (!window.confirm(`End active coverage for LO sign ${sign.public_code}? Check-ins and disclosures will stay saved.`)) return;
+      const typed = window.prompt(`End active coverage for LO sign ${sign.public_code}?\n\nCheck-ins, disclosures, consent rows, and history will stay saved.\n\nType REL8TION to continue.`);
+      if (typed === null) return;
+      if (typed.trim() !== 'REL8TION') {
+        showToast('Coverage end cancelled.');
+        return;
+      }
       state.actionKey = `lo_sign_end:${signId}`;
       render();
       try {
         await api('/api/lo-sign/action', {
           method: 'POST',
-          body: JSON.stringify({ action: 'end_coverage', public_code: sign.public_code, event_id: sign.active_event_id })
+          body: JSON.stringify({ action: 'end_coverage', public_code: sign.public_code, event_id: sign.active_event_id, confirmation: typed.trim() })
         });
         state.actionKey = '';
         showToast('Coverage ended.');

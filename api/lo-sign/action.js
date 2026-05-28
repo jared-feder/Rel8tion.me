@@ -125,6 +125,9 @@ async function assignSignToLoanOfficer(body) {
 }
 
 async function endCoverage(body) {
+  if (clean(body.confirmation) !== 'REL8TION') {
+    throw httpError(400, 'Type REL8TION to end this Loan Officer Coverage Sign event.');
+  }
   const coverageSign = await loadLoanOfficerSign({
     publicCode: body.public_code || body.code,
     uid: body.uid

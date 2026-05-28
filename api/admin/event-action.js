@@ -140,6 +140,10 @@ module.exports = async function handler(req, res) {
       sendJson(res, 400, { ok: false, error: 'Missing event_id.' });
       return;
     }
+    if (String(body.confirmation || '').trim() !== 'REL8TION') {
+      sendJson(res, 400, { ok: false, error: 'Type REL8TION to end this event.' });
+      return;
+    }
 
     const result = await endEvent(body.event_id);
     sendJson(res, 200, { ok: true, action, ...result });

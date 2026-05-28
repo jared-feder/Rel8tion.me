@@ -108,6 +108,9 @@ async function loadInventoryByIdOrCode({ inventoryId = '', publicCode = '' }) {
 }
 
 async function endSponsoredPassEvent(body) {
+  if (clean(body.confirmation) !== 'REL8TION') {
+    throw httpError(400, 'Type REL8TION to end this Sponsored Event Pass event.');
+  }
   const inventory = body.event_id
     ? null
     : await loadInventoryByIdOrCode({
