@@ -52,6 +52,8 @@ async function loadDashboardInbox(warnings) {
   return mergeRows(inboundRows, recentRows).slice(0, 250);
 }
 
+const OUTREACH_QUEUE_SELECT = 'id,open_house_id,outreach_code,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,report_note,report_note_updated_at,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at';
+
 async function loadSmartSignInventory(warnings) {
   const extended = await safeRest(
     'smart_sign_inventory?select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,created_at,notes,sponsor_loan_officer_profile_id,sponsor_loan_officer_uid,assigned_agent_slug,assigned_agent_phone,pass_model,sponsor_coverage_required,sponsor_coverage_consent_required,reuse_allowed,reuse_status,last_activated_at,metadata&order=created_at.desc&limit=600',
@@ -313,6 +315,30 @@ function reportCandidateQueueIds({ outreach, visits }) {
   ]);
 }
 
+async function loadMissingReportQueueRows({ outreach, visits, warnings }) {
+  const loadedQueueIds = new Set((outreach || []).map((row) => row.id).filter(Boolean));
+  const missingQueueIds = reportCandidateQueueIds({ outreach, visits })
+    .filter((id) => id && !loadedQueueIds.has(id));
+
+  if (!missingQueueIds.length) return outreach || [];
+
+  const missingRows = await safeRestInChunks(
+    missingQueueIds,
+    (ids) => `agent_outreach_queue?id=${inFilter(ids)}&select=${OUTREACH_QUEUE_SELECT}&limit=${ids.length}`,
+    [],
+    warnings,
+    'confirmed_open_house_queue_rows'
+  );
+
+  if (!missingRows.length) return outreach || [];
+
+  const byId = new Map((outreach || []).map((row) => [row.id, row]));
+  for (const row of missingRows) {
+    if (row?.id) byId.set(row.id, row);
+  }
+  return [...byId.values()];
+}
+
 function buildConfirmedOpenHouses({ outreach, visits, participants, messages, openHouses, events, loanSessions }) {
   const queueById = new Map((outreach || []).map((row) => [row.id, row]));
   const openHouseById = new Map((openHouses || []).map((row) => [row.id, row]));
@@ -535,14 +561,24 @@ module.exports = async function handler(req, res) {
       safeRest('loan_officer_coverage_signs?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'loan_officer_coverage_signs'),
       safeRest('loan_officer_sign_events?select=*&order=created_at.desc&limit=500', [], warnings, 'loan_officer_sign_events'),
       safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
-      safeRest('agent_outreach_queue?select=id,open_house_id,outreach_code,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,report_note,report_note_updated_at,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at&order=created_at.desc&limit=1000', [], warnings, 'agent_outreach_queue'),
+      safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
       loadDashboardInbox(warnings)
     ]);
 
-    const confirmedQueueIds = reportCandidateQueueIds({ outreach, visits: fieldVisits });
-    const confirmedOpenHouseIds = unique(outreach
-      .filter((row) => confirmedQueueIds.includes(row.id))
-      .map((row) => row.open_house_id));
+    const reportOutreach = await loadMissingReportQueueRows({
+      outreach,
+      visits: fieldVisits,
+      warnings
+    });
+    const confirmedQueueIds = reportCandidateQueueIds({ outreach: reportOutreach, visits: fieldVisits });
+    const confirmedOpenHouseIds = unique([
+      ...reportOutreach
+        .filter((row) => confirmedQueueIds.includes(row.id))
+        .map((row) => row.open_house_id),
+      ...fieldVisits
+        .filter((visit) => visit.status !== 'cancelled' && confirmedQueueIds.includes(visit.outreach_queue_id))
+        .map((visit) => visit.open_house_id)
+    ]);
     const [confirmedMessages, confirmedOpenHouses] = await Promise.all([
       safeRestInChunks(
         confirmedQueueIds,
@@ -576,7 +612,7 @@ module.exports = async function handler(req, res) {
     const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
     const paymentRows = buildPayments({ crmRows, signs });
     const confirmedOpenHouseRows = buildConfirmedOpenHouses({
-      outreach,
+      outreach: reportOutreach,
       visits: fieldVisits,
       participants: fieldParticipants,
       messages: confirmedMessages,
