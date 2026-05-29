@@ -52,6 +52,16 @@ function getPlan(planKey) {
   return PLANS.monthly;
 }
 
+function cleanReturnPath(value, fallback = '/open-house-kit') {
+  const raw = String(value || '').trim();
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return fallback;
+  return raw.slice(0, 220);
+}
+
+function appendQuery(path, query) {
+  return `${path}${path.includes('?') ? '&' : '?'}${query}`;
+}
+
 async function readBody(req) {
   if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
   if (Buffer.isBuffer(req.body)) {
@@ -92,7 +102,8 @@ module.exports = async function handler(req, res) {
 
   const body = await readBody(req);
   const plan = getPlan(body.plan);
-  const paymentLink = firstEnv(plan.paymentLinkEnv);
+  const requiresDynamicMetadata = body.source === 'getrel8tion_open_house_kit' || body.uid || body.agent_id || body.agent_slug;
+  const paymentLink = requiresDynamicMetadata ? '' : firstEnv(plan.paymentLinkEnv);
   if (paymentLink) {
     return sendJson(res, 200, { ok: true, plan: plan.key, mode: 'payment_link', url: paymentLink });
   }
@@ -115,6 +126,10 @@ module.exports = async function handler(req, res) {
   const origin = getOrigin(req);
   const checkoutParams = new URLSearchParams();
   const referenceParts = [cleanMetadataValue(body.agent, 80), cleanMetadataValue(body.event, 80)].filter(Boolean);
+  const defaultReturnPath = body.source === 'getrel8tion_open_house_kit' ? '/kit-intake' : '/open-house-kit';
+  const returnPath = cleanReturnPath(body.return_path, defaultReturnPath);
+  const successQuery = `success=1&plan=${encodeURIComponent(plan.key)}&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelQuery = `canceled=1&plan=${encodeURIComponent(plan.key)}`;
 
   checkoutParams.set('mode', plan.mode);
   checkoutParams.set('line_items[0][price]', kitPriceId);
@@ -134,11 +149,21 @@ module.exports = async function handler(req, res) {
   checkoutParams.set('custom_text[submit][message]', FULFILLMENT_MESSAGE);
   checkoutParams.set('custom_text[after_submit][message]', 'After payment, REL8TION will use the contact and shipping details from Checkout to prepare the kit and service handoff.');
   checkoutParams.set('custom_text[shipping_address][message]', 'Use the best delivery address for the Open House Kit. Kits are expected to arrive within 14 days, or sooner when Moe can personally deliver.');
-  checkoutParams.set('success_url', `${origin}/open-house-kit?success=1&plan=${encodeURIComponent(plan.key)}&session_id={CHECKOUT_SESSION_ID}`);
-  checkoutParams.set('cancel_url', `${origin}/open-house-kit?canceled=1&plan=${encodeURIComponent(plan.key)}`);
+  checkoutParams.set('success_url', `${origin}${appendQuery(returnPath, successQuery)}`);
+  checkoutParams.set('cancel_url', `${origin}${appendQuery(returnPath, cancelQuery)}`);
   checkoutParams.set('metadata[plan]', plan.key);
   checkoutParams.set('metadata[plan_label]', plan.label);
   checkoutParams.set('metadata[source]', cleanMetadataValue(body.source || 'open_house_kit'));
+  checkoutParams.set('metadata[flow]', cleanMetadataValue(body.flow, 80));
+  checkoutParams.set('metadata[uid]', cleanMetadataValue(body.uid, 120));
+  checkoutParams.set('metadata[agent_id]', cleanMetadataValue(body.agent_id, 120));
+  checkoutParams.set('metadata[agent_slug]', cleanMetadataValue(body.agent_slug, 120));
+  checkoutParams.set('metadata[sponsor_profile_id]', cleanMetadataValue(body.sponsor_profile_id, 120));
+  checkoutParams.set('metadata[product]', cleanMetadataValue(body.product || body.selected_product || 'open_house_kit', 120));
+  checkoutParams.set('metadata[brokerage]', cleanMetadataValue(body.brokerage, 160));
+  checkoutParams.set('metadata[sponsor_name]', cleanMetadataValue(body.sponsor_name, 160));
+  checkoutParams.set('metadata[sponsor_company]', cleanMetadataValue(body.sponsor_company, 160));
+  checkoutParams.set('metadata[notes]', cleanMetadataValue(body.notes));
   checkoutParams.set('metadata[agent]', cleanMetadataValue(body.agent, 120));
   checkoutParams.set('metadata[event]', cleanMetadataValue(body.event, 120));
   checkoutParams.set('metadata[sign_id]', cleanMetadataValue(body.sign_id, 120));
@@ -148,6 +173,12 @@ module.exports = async function handler(req, res) {
   if (plan.mode === 'subscription') {
     checkoutParams.set('subscription_data[metadata][plan]', plan.key);
     checkoutParams.set('subscription_data[metadata][source]', cleanMetadataValue(body.source || 'open_house_kit'));
+    checkoutParams.set('subscription_data[metadata][flow]', cleanMetadataValue(body.flow, 80));
+    checkoutParams.set('subscription_data[metadata][uid]', cleanMetadataValue(body.uid, 120));
+    checkoutParams.set('subscription_data[metadata][agent_id]', cleanMetadataValue(body.agent_id, 120));
+    checkoutParams.set('subscription_data[metadata][agent_slug]', cleanMetadataValue(body.agent_slug, 120));
+    checkoutParams.set('subscription_data[metadata][sponsor_profile_id]', cleanMetadataValue(body.sponsor_profile_id, 120));
+    checkoutParams.set('subscription_data[metadata][product]', cleanMetadataValue(body.product || body.selected_product || 'open_house_kit', 120));
     checkoutParams.set('subscription_data[metadata][agent]', cleanMetadataValue(body.agent, 120));
     checkoutParams.set('subscription_data[metadata][event]', cleanMetadataValue(body.event, 120));
     checkoutParams.set('subscription_data[metadata][sign_id]', cleanMetadataValue(body.sign_id, 120));
