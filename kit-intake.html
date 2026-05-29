@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Open House Kit Intake</title>
+  <script>
+    (async () => {
+      const target = `/apps/rel8tion-app/kit-intake.html${window.location.search}${window.location.hash}`;
+      try {
+        const response = await fetch(target, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Kit intake page returned ${response.status}`);
+        const html = await response.text();
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (error) {
+        window.location.replace(target);
+      }
+    })();
+  </script>
+</head>
+<body>
+  Opening the Rel8tion Open House Kit intake...
+</body>
+</html>
