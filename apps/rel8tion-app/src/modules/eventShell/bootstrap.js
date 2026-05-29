@@ -102,6 +102,20 @@ function loading(message) {
   `);
 }
 
+function renderSubmittingOverlay() {
+  if (!pageState.submitting) return '';
+  return `
+    <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 px-4 py-8 backdrop-blur-sm" role="status" aria-live="polite" aria-modal="true">
+      <div class="w-full max-w-sm rounded-[30px] border border-white/80 bg-white/95 p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+        <div class="mx-auto mb-5 h-14 w-14 rounded-full border-[6px] border-slate-200 border-t-sky-500 animate-spin"></div>
+        <div class="text-[11px] font-black uppercase tracking-[0.2em] text-sky-600">Saving Check-In</div>
+        <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">Submitting your check-in.</h2>
+        <p class="mt-3 text-sm font-bold leading-relaxed text-slate-600">Rel8tion is saving your visit and sending confirmations. Please keep this screen open and do not check in again.</p>
+      </div>
+    </div>
+  `;
+}
+
 function errorView(title, message, actions = '') {
   shell(`
     <div class="text-center">
@@ -1641,6 +1655,7 @@ function renderEventShell() {
 
   shell(`
     <div style="${themeStyle()}">
+    ${renderSubmittingOverlay()}
     <section class="rounded-[30px] border border-white/70 bg-white/86 p-5 md:p-7 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-5">
       <div class="grid grid-cols-[1fr_auto] items-center gap-4">
         <div class="min-w-0">
@@ -1682,16 +1697,18 @@ function renderEventShell() {
         ` : ''}
 
         ${pageState.mode === 'checkin' ? `
-          <form id="checkin-form" class="space-y-4">
-            ${renderFormFields()}
-            ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderRequiredDisclosuresBlock() : `
-              <button type="submit" class="${primaryButtonClass()} w-full" style="background:var(--event-gradient);">Complete Agent Check-In</button>
-            `}
-            ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? `
-              <div class="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-center text-sm font-bold text-slate-500">
-                Complete Check-In appears after the disclosure acknowledgement.
-              </div>
-            ` : ''}
+          <form id="checkin-form" class="space-y-4" aria-busy="${pageState.submitting ? 'true' : 'false'}">
+            <fieldset class="m-0 space-y-4 border-0 p-0 ${pageState.submitting ? 'pointer-events-none opacity-55' : ''}" ${pageState.submitting ? 'disabled' : ''}>
+              ${renderFormFields()}
+              ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderRequiredDisclosuresBlock() : `
+                <button type="submit" class="${primaryButtonClass()} w-full" style="background:var(--event-gradient);">${pageState.submitting ? 'Saving Check-In...' : 'Complete Agent Check-In'}</button>
+              `}
+              ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? `
+                <div class="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-center text-sm font-bold text-slate-500">
+                  ${pageState.submitting ? 'Saving your check-in now.' : 'Complete Check-In appears after the disclosure acknowledgement.'}
+                </div>
+              ` : ''}
+            </fieldset>
             ${pageState.errorMessage ? `<div class="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-4 text-rose-700 font-semibold">${esc(pageState.errorMessage)}</div>` : ''}
           </form>
         ` : `
