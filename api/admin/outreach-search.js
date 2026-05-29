@@ -196,6 +196,20 @@ function uniqueById(rows) {
   return out;
 }
 
+async function safeSearch(label, warnings, fn) {
+  try {
+    const rows = await fn();
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    warnings.push({
+      source: label,
+      status: error.status || null,
+      error: error.message || 'Search source failed.'
+    });
+    return [];
+  }
+}
+
 async function searchQueue(q, limit) {
   const query = cleanSearch(q);
   if (query.length < 2) return [];
@@ -332,9 +346,13 @@ function listingAgentToSearchRow(agent, house) {
 }
 
 async function searchAll(q, limit) {
-  const queueRows = await searchQueue(q, limit);
-  const directOpenHouses = await searchOpenHouses(q, limit);
-  const directListingAgents = await searchListingAgents(q, limit);
+  const warnings = [];
+  const [queueRows, directOpenHouses, directListingAgents] = await Promise.all([
+    safeSearch('agent_outreach_queue', warnings, () => searchQueue(q, limit)),
+    safeSearch('open_houses', warnings, () => searchOpenHouses(q, limit)),
+    safeSearch('listing_agents_direct', warnings, () => searchListingAgents(q, limit))
+  ]);
+
   const openHouseIds = [
     ...(queueRows || []).map((row) => row.open_house_id),
     ...(directOpenHouses || []).map((row) => row.id),
@@ -342,8 +360,8 @@ async function searchAll(q, limit) {
   ].filter(Boolean);
 
   const [linkedOpenHouses, linkedListingAgents] = await Promise.all([
-    loadOpenHousesByIds(openHouseIds),
-    loadListingAgentsByOpenHouseIds(openHouseIds, limit)
+    safeSearch('open_houses_by_id', warnings, () => loadOpenHousesByIds(openHouseIds)),
+    safeSearch('listing_agents_by_open_house', warnings, () => loadListingAgentsByOpenHouseIds(openHouseIds, limit))
   ]);
 
   const houses = new Map(
@@ -367,7 +385,10 @@ async function searchAll(q, limit) {
     merged.push(listingAgentToSearchRow(agent, houses.get(agent.open_house_id)));
   }
 
-  return merged.slice(0, limit);
+  return {
+    rows: merged.slice(0, limit),
+    warnings
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -393,11 +414,12 @@ module.exports = async function handler(req, res) {
 
     const q = readQuery(req, 'q');
     const limit = clampLimit(readQuery(req, 'limit'));
-    const rows = await searchAll(q, limit);
+    const result = await searchAll(q, limit);
     sendJson(res, 200, {
       ok: true,
       query: cleanSearch(q),
-      rows: Array.isArray(rows) ? rows : [],
+      rows: Array.isArray(result.rows) ? result.rows : [],
+      warnings: result.warnings || [],
       loaded_at: new Date().toISOString()
     });
   } catch (error) {

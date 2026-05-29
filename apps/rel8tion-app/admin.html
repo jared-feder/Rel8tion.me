@@ -1730,11 +1730,17 @@
       try {
         const result = await api(`/api/admin/outreach-search?q=${encodeURIComponent(query)}&limit=40`);
         if (state.query.trim() !== query) return;
-        state.outreachSearch = { query, rows: result.rows || [], loading: false, error: '' };
+        state.outreachSearch = { query, rows: result.rows || [], warnings: result.warnings || [], loading: false, error: '' };
         refreshAreaContent();
       } catch (error) {
         if (state.query.trim() !== query) return;
-        state.outreachSearch = { query, rows: [], loading: false, error: error.message || 'Search failed.' };
+        state.outreachSearch = {
+          query,
+          rows: state.outreachSearch?.query === query ? state.outreachSearch.rows || [] : [],
+          warnings: [],
+          loading: false,
+          error: 'Database search unavailable; showing loaded matches.'
+        };
         refreshAreaContent();
       }
     }
@@ -3002,9 +3008,9 @@
       const searchStatus = serverSearch.loading
         ? badge('Searching database', 'info')
         : serverSearch.error
-          ? badge(serverSearch.error, 'bad')
+          ? badge(serverSearch.error, 'warn')
           : serverSearch.query === query
-            ? badge(`${serverSearch.rows?.length || 0} database`, (serverSearch.rows || []).length ? 'ok' : 'warn')
+            ? badge(`${serverSearch.rows?.length || 0} database${serverSearch.warnings?.length ? ' partial' : ''}`, serverSearch.warnings?.length ? 'warn' : (serverSearch.rows || []).length ? 'ok' : 'warn')
             : badge('Local slice', 'info');
       return `
         <div class="glass-card" style="padding:14px; display:grid; gap:10px;">

@@ -19,6 +19,12 @@ jobs:
       - name: Verify Vercel route map
         run: npm run verify:routes
 
+      - name: Check critical admin scripts
+        run: |
+          node --check api/admin/outreach-search.js
+          node --check scripts/verify-command-search.cjs
+          node --check scripts/verify-production-routes.cjs
+
       - name: Lightweight secret scan
         shell: bash
         run: |
