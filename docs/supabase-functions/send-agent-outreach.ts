@@ -157,7 +157,11 @@ function isBlockedReviewStatus(reviewStatus: string | null): boolean {
 function getTerminalTwilioBlock(message: string): { status: string; reason: string; reviewStatus?: string } | null {
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("not a mobile number")) {
+  if (
+    normalized.includes("not a mobile number") ||
+    normalized.includes("not mobile phone number") ||
+    normalized.includes("not a mobile phone")
+  ) {
     return { status: "blocked_invalid_mobile", reason: "twilio_not_mobile" };
   }
 

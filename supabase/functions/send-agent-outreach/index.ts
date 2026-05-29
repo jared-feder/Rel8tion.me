@@ -201,7 +201,11 @@ function getTerminalSmsBlock(message: string): { status: string; reason: string;
     };
   }
 
-  if (normalized.includes("not a mobile number")) {
+  if (
+    normalized.includes("not a mobile number") ||
+    normalized.includes("not mobile phone number") ||
+    normalized.includes("not a mobile phone")
+  ) {
     return { status: "blocked_invalid_mobile", reason: "twilio_not_mobile" };
   }
 
