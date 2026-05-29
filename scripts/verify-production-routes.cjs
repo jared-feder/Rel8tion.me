@@ -1,6 +1,21 @@
 const BASE_URL = (process.env.BASE_URL || 'https://app.rel8tion.me').replace(/\/$/, '');
 
 const checks = [
+  { path: '/get-open-house-kit', statuses: [200], label: 'Open House Kit landing page' },
+  { path: '/kit-intake?flow=manual', statuses: [200], label: 'Open House Kit intake page' },
+  { path: '/kit-confirm', statuses: [200], label: 'Open House Kit confirmation page' },
+  {
+    path: '/o/test',
+    statuses: [404],
+    includes: 'No outreach preview was found',
+    label: 'outreach preview short link'
+  },
+  {
+    path: '/api/outreach-preview?id=test',
+    statuses: [404],
+    includes: 'No outreach preview was found',
+    label: 'outreach preview API'
+  },
   { path: '/agent-home', statuses: [200], label: 'agent owner dashboard' },
   { path: '/lo-affordability-guidance', statuses: [200], label: 'LO affordability guidance page' },
   { path: '/loan-officer-support', statuses: [200], label: 'LO support request page' },
