@@ -165,7 +165,7 @@ serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("send_status", "not_sent")
         .gt("open_end", new Date().toISOString())
-        .or("generation_status.eq.pending,and(generation_status.eq.generated,mockup_image_url.is.null)");
+        .or("generation_status.eq.pending,and(generation_status.eq.generated,mockup_status.eq.pending,mockup_image_url.is.null)");
 
       if (blockingFuture.error) throw blockingFuture.error;
 

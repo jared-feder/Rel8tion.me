@@ -1288,7 +1288,7 @@ Automatic outreach image guard:
 - The mockup renderer requires `listing_photo_url` and fails the queue row instead of generating a generic fallback background if the listing photo is missing or cannot be loaded.
 - `send-agent-outreach` only selects automatic send rows with `listing_photo_url`, so future MMS/rich-preview outreach should not use a non-listing image as the property background.
 - `https://irel8.me/o/<outreach_code>` is the public hosted outreach preview route used for Android Gateway link previews. It shows a Rel8tion-styled page and publishes `og:image` from the rendered `mockup_image_url`. `/o/<queue-id>` UUID links still resolve so previously sent texts do not break.
-- Citysnap/CoStar CDN image URLs may return `Access Denied` to server-side fetches. Pending future Citysnap rows with stale pre-fix blue fallback mockups were marked image-unavailable on 2026-05-22 rather than kept as sendable outreach.
+- Citysnap/CoStar CDN image URLs may return `Access Denied` to server-side fetches. Pending future Citysnap rows with stale pre-fix blue fallback mockups were marked image-unavailable on 2026-05-22 rather than kept as sendable outreach. The generator backlog guard ignores generated rows whose mockup has already failed, and the renderer marks future photo-load failures as `generation_status = failed` / `blocked_image_unavailable` so failed photo rows do not clog later outreach generation.
 
 ### `/api/compliance/ny-disclosure`
 

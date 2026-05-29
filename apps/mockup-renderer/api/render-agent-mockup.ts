@@ -17,6 +17,8 @@ type QueueRow = {
   send_status: string | null;
   mockup_status: string | null;
   mockup_image_url: string | null;
+  initial_send_status: string | null;
+  followup_send_status: string | null;
   created_at: string | null;
 };
 
@@ -78,7 +80,7 @@ function publicObjectUrl(bucket: string, path: string): string {
   return `${env.supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
 }
 
-async function patchQueueRow(id: string, payload: Record<string, string | null>) {
+async function patchQueueRow(id: string, payload: Record<string, unknown>) {
   const url = `${env.supabaseUrl}/rest/v1/agent_outreach_queue?id=eq.${encodeURIComponent(id)}`;
 
   const response = await fetch(url, {
@@ -170,6 +172,8 @@ export default async function handler(req: any, res: any) {
       "send_status",
       "mockup_status",
       "mockup_image_url",
+      "initial_send_status",
+      "followup_send_status",
       "created_at"
     ].join(",");
 
@@ -300,12 +304,28 @@ export default async function handler(req: any, res: any) {
         });
 
         try {
-          await patchQueueRow(row.id, {
+          const failedPatch: Record<string, unknown> = {
+            generation_status: "failed",
             mockup_status: "failed",
             mockup_error: message,
             mockup_render_error: message,
             mockup_render_attempted_at: new Date().toISOString(),
+            last_error: message,
             updated_at: new Date().toISOString()
+          };
+
+          if (row.initial_send_status === "pending") {
+            failedPatch.initial_send_status = "blocked_image_unavailable";
+            failedPatch.initial_block_reason = "listing_photo_unavailable";
+          }
+
+          if (row.followup_send_status === "pending") {
+            failedPatch.followup_send_status = "not_scheduled";
+            failedPatch.followup_block_reason = "listing_photo_unavailable";
+          }
+
+          await patchQueueRow(row.id, {
+            ...failedPatch
           });
         } catch {}
 
