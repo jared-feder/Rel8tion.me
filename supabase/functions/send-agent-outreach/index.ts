@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSMS } from "../_shared/sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,18 +8,26 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const INITIAL_COOLDOWN_HOURS = 24 * 7;
 const BUSINESS_CARD_URL =
   Deno.env.get("NMB_BUSINESS_CARD_URL") ||
   "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/outreach-mockups/mynmb.jpg";
+const PUBLIC_APP_BASE_URL =
+  (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
+    .replace(/\/$/, "");
 
 type OutreachRow = {
+  id?: string | null;
+  outreach_code?: string | null;
+  open_house_id?: string | null;
   agent_first_name?: string | null;
   agent_name?: string | null;
   agent_phone?: string | null;
+  agent_phone_normalized?: string | null;
   address?: string | null;
   listing_photo_url?: string | null;
+  mockup_image_url?: string | null;
   open_start?: string | null;
+  open_end?: string | null;
   selected_sms?: string | null;
   followup_sms?: string | null;
   review_status?: string | null;
@@ -77,6 +86,30 @@ function formatOpenHouse(openStart: string | null): string {
 function buildSmsLink(phone: string | null, body: string): string {
   const clean = normalizePhone(phone);
   return `sms:${clean}?body=${encodeURIComponent(body)}`;
+}
+
+function usesAndroidGateway(): boolean {
+  return String(Deno.env.get("SMS_PROVIDER") || "").trim().toLowerCase() === "android_gateway";
+}
+
+function buildOutreachPreviewUrl(rowId: string | null, outreachCode?: string | null, mockupImageUrl?: string | null): string {
+  if (!usesAndroidGateway()) return "";
+  const token = outreachCode || rowId;
+  if (!token || !mockupImageUrl) return "";
+  return `${PUBLIC_APP_BASE_URL}/o/${encodeURIComponent(token)}`;
+}
+
+function addPreviewLinkBeforeStop(message: string, previewUrl: string): string {
+  const cleanMessage = String(message || "").trim();
+  const cleanPreviewUrl = String(previewUrl || "").trim();
+  if (!cleanMessage || !cleanPreviewUrl || cleanMessage.includes(cleanPreviewUrl)) return cleanMessage;
+
+  const stopPattern = /(?:\s*\n*)?Reply STOP to opt out\.?\s*$/i;
+  if (stopPattern.test(cleanMessage)) {
+    return `${cleanMessage.replace(stopPattern, "").trim()}\n\n${cleanPreviewUrl}\n\nReply STOP to opt out.`;
+  }
+
+  return `${cleanMessage}\n\n${cleanPreviewUrl}`;
 }
 
 function shouldRebuildRel8tionCopy(row: OutreachRow): boolean {
@@ -146,18 +179,27 @@ function isWithinAllowedSendWindow(): boolean {
   );
 
   const minutes = nyHour * 60 + nyMinute;
-  const start = 7 * 60;
-  const endExclusive = 21 * 60 + 59;
+  const start = 8 * 60;
+  const endExclusive = 21 * 60;
 
   return minutes >= start && minutes < endExclusive;
 }
 
 function isBlockedReviewStatus(reviewStatus: string | null): boolean {
-  return reviewStatus === "opted_out";
+  if (reviewStatus === "opted_out") return true;
+  return usesAndroidGateway() && reviewStatus === "android_opted_out";
 }
 
-function getTerminalTwilioBlock(message: string): { status: string; reason: string; reviewStatus?: string } | null {
+function getTerminalSmsBlock(message: string): { status: string; reason: string; reviewStatus?: string } | null {
   const normalized = message.toLowerCase();
+
+  if (normalized.includes("sms_suppressed") || normalized.includes("suppression list")) {
+    return {
+      status: "blocked_opted_out",
+      reason: "sms_suppressed",
+      reviewStatus: usesAndroidGateway() ? "android_opted_out" : "opted_out",
+    };
+  }
 
   if (normalized.includes("not a mobile number")) {
     return { status: "blocked_invalid_mobile", reason: "twilio_not_mobile" };
@@ -168,49 +210,6 @@ function getTerminalTwilioBlock(message: string): { status: string; reason: stri
   }
 
   return null;
-}
-
-async function sendTwilioMessage(opts: {
-  accountSid: string;
-  authToken: string;
-  from: string;
-  to: string;
-  body: string;
-  mediaUrls?: string[];
-  statusCallback?: string;
-}) {
-  const form = new URLSearchParams();
-  form.set("From", opts.from);
-  form.set("To", opts.to);
-  form.set("Body", opts.body);
-  if (opts.statusCallback) {
-    form.set("StatusCallback", opts.statusCallback);
-  }
-  for (const mediaUrl of opts.mediaUrls || []) {
-    if (mediaUrl) {
-      form.append("MediaUrl", mediaUrl);
-    }
-  }
-
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${opts.accountSid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + btoa(`${opts.accountSid}:${opts.authToken}`),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form.toString(),
-    },
-  );
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data?.message || `Twilio error ${res.status}`);
-  }
-
-  return data;
 }
 
 function buildStatusCallbackUrl(supabaseUrl: string, queueId: string, step: "initial" | "followup"): string {
@@ -224,6 +223,55 @@ function buildStatusCallbackUrl(supabaseUrl: string, queueId: string, step: "ini
   return url.toString();
 }
 
+async function recordOutboundReply(
+  supabase: any,
+  row: Record<string, any>,
+  body: string,
+  smsRes: Record<string, any>,
+  step: "initial" | "followup",
+  sentAt: string,
+) {
+  const messageSid = smsRes.externalId || smsRes.sid || `auto-${step}-${row.id}-${sentAt}`;
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("agent_outreach_replies")
+    .select("id")
+    .eq("message_sid", messageSid)
+    .limit(1);
+
+  if (lookupError) throw lookupError;
+  if (existing?.length) return;
+
+  const fromPhone = smsRes.from || smsRes.deviceId || smsRes.provider || "android_gateway";
+
+  const { error: insertError } = await supabase
+    .from("agent_outreach_replies")
+    .insert({
+      queue_row_id: row.id,
+      open_house_id: row.open_house_id || null,
+      from_phone: fromPhone,
+      from_phone_normalized: normalizePhone(String(smsRes.from || "")),
+      to_phone: toE164(row.agent_phone || row.agent_phone_normalized || ""),
+      body,
+      message_sid: messageSid,
+      account_sid: smsRes.provider || "sms",
+      direction: "outbound",
+      opt_out: false,
+      raw_payload: {
+        provider: smsRes.provider || null,
+        route: smsRes.route || null,
+        status: smsRes.status || null,
+        device_id: smsRes.deviceId || null,
+        raw: smsRes.raw || null,
+        source: "send-agent-outreach",
+        step,
+      },
+      received_at: sentAt,
+    });
+
+  if (insertError) throw insertError;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -232,13 +280,10 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioFrom = Deno.env.get("TWILIO_PHONE");
 
-    if (!supabaseUrl || !serviceRoleKey || !twilioSid || !twilioToken || !twilioFrom) {
+    if (!supabaseUrl || !serviceRoleKey) {
       throw new Error(
-        "Missing required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_PHONE",
+        "Missing required secrets: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
       );
     }
 
@@ -250,7 +295,7 @@ serve(async (req) => {
             processed: 0,
             quiet_hours: true,
             timezone: "America/New_York",
-            message: "Current time is outside allowed send window (7:00 AM–9:58 PM ET). No messages sent.",
+            message: "Current time is outside allowed send window (8:00 AM-9:00 PM ET). No messages sent.",
           },
           null,
           2,
@@ -270,12 +315,12 @@ serve(async (req) => {
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
-    const cooldownCutoff = new Date(now.getTime() - INITIAL_COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from("agent_outreach_queue")
       .select(`
         id,
+        outreach_code,
         open_house_id,
         agent_first_name,
         agent_name,
@@ -308,6 +353,12 @@ serve(async (req) => {
       .order("initial_send_at", { ascending: true, nullsFirst: false })
       .order("followup_send_at", { ascending: true, nullsFirst: false })
       .limit(fetchLimit);
+
+    if (usesAndroidGateway()) {
+      query = query.neq("review_status", "android_opted_out");
+    }
+
+    const { data: rows, error } = await query;
 
     if (error) throw error;
 
@@ -427,9 +478,14 @@ serve(async (req) => {
           continue;
         }
 
-        const initialBody = initialDue ? buildInitialOutreachBody(row) : "";
-        const followupBody = followupDue ? buildFollowupOutreachBody(row) : null;
-        const storedFollowupBody = buildFollowupOutreachBody(row);
+        const previewUrl = buildOutreachPreviewUrl(row.id, row.outreach_code, row.mockup_image_url);
+        const initialBody = initialDue
+          ? addPreviewLinkBeforeStop(buildInitialOutreachBody(row), previewUrl)
+          : "";
+        const followupBody = followupDue
+          ? addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl)
+          : null;
+        const storedFollowupBody = addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl) || null;
 
         if (dryRun) {
           results.push({
@@ -446,6 +502,8 @@ serve(async (req) => {
             open_start: row.open_start,
             open_end: row.open_end,
             review_status: row.review_status,
+            preview_url: previewUrl || null,
+            message_preview: (initialDue ? initialBody : followupBody || "").slice(0, 360),
           });
           continue;
         }
@@ -473,54 +531,30 @@ serve(async (req) => {
         }
 
         if (initialDue) {
-          const { data: recentInitial, error: recentError } = await supabase
-            .from("agent_outreach_queue")
-            .select("id, agent_name, initial_sent_at")
-            .eq("agent_phone_normalized", phoneNormalized)
-            .eq("initial_send_status", "sent")
-            .gte("initial_sent_at", cooldownCutoff)
-            .neq("id", row.id)
-            .order("initial_sent_at", { ascending: false })
-            .limit(1);
-
-          if (recentError) throw recentError;
-
-          if (recentInitial && recentInitial.length > 0) {
-            await supabase
-              .from("agent_outreach_queue")
-              .update({
-                initial_send_status: "blocked_duplicate",
-                initial_block_reason: `recent_initial_sent_to_phone:${recentInitial[0].id}`,
-                send_error: null,
-              })
-              .eq("id", row.id);
-
-            results.push({
-              id: row.id,
-              agent_name: row.agent_name,
-              step: "initial",
-              ok: true,
-              skipped: true,
-              reason: "Recent initial already sent to this phone",
-              blocked_by: recentInitial[0].id,
-            });
-            continue;
-          }
-
           sendAttempts += 1;
           attemptedStep = "initial";
-          const twilioRes = await sendTwilioMessage({
-            accountSid: twilioSid,
-            authToken: twilioToken,
-            from: twilioFrom,
+          const smsRes = await sendSMS({
+            supabase,
             to,
             body: initialBody,
+            category: row.template_key === "missed_open_house" ? "outreach_followup" : "outreach",
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
             statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "initial"),
+            metadata: {
+              queue_row_id: row.id,
+              open_house_id: row.open_house_id || null,
+              step: "initial",
+              template_key: row.template_key || null,
+              mockup_image_url: row.mockup_image_url || null,
+              outreach_preview_url: previewUrl || null,
+            },
           });
 
           const sentAt = new Date().toISOString();
-          const initialDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
+          const initialDeliveryStatus = String(smsRes.status || "queued").toLowerCase();
+          await recordOutboundReply(supabase, row, initialBody, smsRes, "initial", sentAt).catch((error) => {
+            console.error("[send-agent-outreach] outbound reply mirror failed", error);
+          });
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
@@ -532,7 +566,7 @@ serve(async (req) => {
               followup_sms_link: storedFollowupBody ? buildSmsLink(row.agent_phone, storedFollowupBody) : null,
               initial_send_status: "sent",
               initial_sent_at: sentAt,
-              twilio_sid_initial: twilioRes.sid,
+              twilio_sid_initial: smsRes.externalId || smsRes.sid || null,
               initial_delivery_status: initialDeliveryStatus,
               initial_delivery_status_updated_at: sentAt,
               initial_delivery_error_code: null,
@@ -554,7 +588,9 @@ serve(async (req) => {
             agent_name: row.agent_name,
             step: "initial",
             ok: true,
-            sid: twilioRes.sid,
+            sid: smsRes.externalId || smsRes.sid || null,
+            provider: smsRes.provider,
+            preview_url: previewUrl || null,
           });
 
           continue;
@@ -563,18 +599,28 @@ serve(async (req) => {
         if (followupDue) {
           sendAttempts += 1;
           attemptedStep = "followup";
-          const twilioRes = await sendTwilioMessage({
-            accountSid: twilioSid,
-            authToken: twilioToken,
-            from: twilioFrom,
+          const smsRes = await sendSMS({
+            supabase,
             to,
             body: followupBody || row.followup_sms || "",
+            category: "outreach_followup",
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
             statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "followup"),
+            metadata: {
+              queue_row_id: row.id,
+              open_house_id: row.open_house_id || null,
+              step: "followup",
+              template_key: row.template_key || null,
+              mockup_image_url: row.mockup_image_url || null,
+              outreach_preview_url: previewUrl || null,
+            },
           });
 
           const sentAt = new Date().toISOString();
-          const followupDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
+          const followupDeliveryStatus = String(smsRes.status || "queued").toLowerCase();
+          await recordOutboundReply(supabase, row, followupBody || row.followup_sms || "", smsRes, "followup", sentAt).catch((error) => {
+            console.error("[send-agent-outreach] outbound reply mirror failed", error);
+          });
 
           const { error: updateError } = await supabase
             .from("agent_outreach_queue")
@@ -583,7 +629,7 @@ serve(async (req) => {
               followup_sms_link: followupBody ? buildSmsLink(row.agent_phone, followupBody) : null,
               followup_send_status: "sent",
               followup_sent_at: sentAt,
-              twilio_sid_followup: twilioRes.sid,
+              twilio_sid_followup: smsRes.externalId || smsRes.sid || null,
               followup_delivery_status: followupDeliveryStatus,
               followup_delivery_status_updated_at: sentAt,
               followup_delivery_error_code: null,
@@ -605,12 +651,14 @@ serve(async (req) => {
             agent_name: row.agent_name,
             step: "followup",
             ok: true,
-            sid: twilioRes.sid,
+            sid: smsRes.externalId || smsRes.sid || null,
+            provider: smsRes.provider,
+            preview_url: previewUrl || null,
           });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const terminalBlock = getTerminalTwilioBlock(message);
+        const terminalBlock = getTerminalSmsBlock(message);
         const update: Record<string, unknown> = { send_error: message };
 
         if (terminalBlock && attemptedStep === "initial") {
@@ -651,7 +699,7 @@ serve(async (req) => {
           dry_run: dryRun,
           candidate_rows: rows?.length || 0,
           fetch_limit: fetchLimit,
-          cooldown_hours: INITIAL_COOLDOWN_HOURS,
+          duplicate_phone_cooldown: "disabled",
           results,
         },
         null,

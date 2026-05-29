@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const INITIAL_COOLDOWN_HOURS = 24 * 7;
 const BUSINESS_CARD_URL =
   Deno.env.get("NMB_BUSINESS_CARD_URL") ||
   "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/outreach-mockups/mynmb.jpg";
@@ -269,7 +268,6 @@ serve(async (req) => {
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
-    const cooldownCutoff = new Date(now.getTime() - INITIAL_COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
 
     const { data: rows, error } = await supabase
       .from("agent_outreach_queue")
@@ -470,40 +468,6 @@ serve(async (req) => {
         }
 
         if (initialDue) {
-          const { data: recentInitial, error: recentError } = await supabase
-            .from("agent_outreach_queue")
-            .select("id, agent_name, initial_sent_at")
-            .eq("agent_phone_normalized", phoneNormalized)
-            .eq("initial_send_status", "sent")
-            .gte("initial_sent_at", cooldownCutoff)
-            .neq("id", row.id)
-            .order("initial_sent_at", { ascending: false })
-            .limit(1);
-
-          if (recentError) throw recentError;
-
-          if (recentInitial && recentInitial.length > 0) {
-            await supabase
-              .from("agent_outreach_queue")
-              .update({
-                initial_send_status: "blocked_duplicate",
-                initial_block_reason: `recent_initial_sent_to_phone:${recentInitial[0].id}`,
-                send_error: null,
-              })
-              .eq("id", row.id);
-
-            results.push({
-              id: row.id,
-              agent_name: row.agent_name,
-              step: "initial",
-              ok: true,
-              skipped: true,
-              reason: "Recent initial already sent to this phone",
-              blocked_by: recentInitial[0].id,
-            });
-            continue;
-          }
-
           sendAttempts += 1;
           attemptedStep = "initial";
           const twilioRes = await sendTwilioMessage({
@@ -648,7 +612,7 @@ serve(async (req) => {
           dry_run: dryRun,
           candidate_rows: rows?.length || 0,
           fetch_limit: fetchLimit,
-          cooldown_hours: INITIAL_COOLDOWN_HOURS,
+          duplicate_phone_cooldown: "disabled",
           results,
         },
         null,

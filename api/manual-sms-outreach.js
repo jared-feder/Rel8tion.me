@@ -203,7 +203,7 @@ function isAlreadyHandled(row) {
   if (['manual_text_sent', 'manual_sms_sent', 'manual_sms_skipped', 'twilio_sent', 'delivered'].includes(sendStatus)) return true;
 
   const initial = normalizedStatus(row.initial_send_status);
-  if (['manual_text_sent', 'manual_sms_skipped', 'blocked_opted_out', 'blocked_invalid_mobile', 'blocked_duplicate', 'skipped_expired', 'skipped_started'].includes(initial)) return true;
+  if (['manual_text_sent', 'manual_sms_skipped', 'blocked_opted_out', 'blocked_invalid_mobile', 'skipped_expired', 'skipped_started'].includes(initial)) return true;
 
   if (initial === 'sent' && !isDeliveryFailure(row)) return true;
   return false;
