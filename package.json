@@ -1,6 +1,8 @@
 {
   "private": true,
   "scripts": {
+    "verify:routes": "node scripts/verify-route-map.cjs",
+    "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",
     "refresh:onekey": "node onekey-freshness-worker.cjs",
     "refresh:onekey:dry-run": "node onekey-freshness-worker.cjs --dry-run"

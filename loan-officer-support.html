@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loan Officer Open House Support | Rel8tion</title>
+  <script>
+    (async () => {
+      const target = `/apps/rel8tion-app/loan-officer-support.html${window.location.search}${window.location.hash}`;
+      try {
+        const response = await fetch(target, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Loan officer support page returned ${response.status}`);
+        const html = await response.text();
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (error) {
+        window.location.replace(target);
+      }
+    })();
+  </script>
+</head>
+<body>
+  Opening the Rel8tion loan officer support request page...
+</body>
+</html>

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Agent Home</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #17224f;
+      --muted: #5a6b82;
+      --blue: #172c76;
+      --sky: #38bdf8;
+      --paper: rgba(255,255,255,.72);
+      --line: rgba(255,255,255,.78);
+      --shadow: 0 26px 70px rgba(23,34,79,.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% 8%, rgba(255,255,255,.9) 0 11%, transparent 23%),
+        radial-gradient(circle at 88% 10%, rgba(255,255,255,.78) 0 9%, transparent 20%),
+        linear-gradient(180deg, #57d0f7 0%, #edf9ff 48%, #f8fbff 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 48% 0%, rgba(142,230,207,.24), transparent 24%),
+        radial-gradient(circle at 92% 76%, rgba(255,138,118,.14), transparent 25%);
+    }
+
+    main {
+      position: relative;
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 24px 0 44px;
+    }
+
+    .brand {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .brand img { height: 52px; width: auto; }
+
+    .hero,
+    .panel,
+    .event-card,
+    .lead-card {
+      border: 1px solid var(--line);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      border-radius: 34px;
+      padding: clamp(24px, 4vw, 42px);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .profile {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 28px;
+      object-fit: cover;
+      background: rgba(255,255,255,.74);
+      border: 1px solid rgba(23,44,118,.1);
+      box-shadow: 0 16px 30px rgba(23,44,118,.12);
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(36px, 6vw, 70px);
+      line-height: .95;
+      color: var(--blue);
+      letter-spacing: 0;
+    }
+
+    .meta {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+      font-weight: 800;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(23,44,118,.1);
+      background: rgba(255,255,255,.76);
+      color: #334273;
+      padding: 9px 12px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+      width: min(280px, 100%);
+    }
+
+    .btn {
+      min-height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 12px 16px;
+      text-decoration: none;
+      border: 0;
+      background: var(--blue);
+      color: white;
+      font: 900 14px/1 Inter, sans-serif;
+      box-shadow: 0 16px 30px rgba(23,44,118,.18);
+      cursor: pointer;
+    }
+
+    .btn.secondary {
+      background: rgba(255,255,255,.82);
+      color: var(--blue);
+      border: 1px solid rgba(23,44,118,.1);
+      box-shadow: 0 10px 24px rgba(23,34,79,.08);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .stat {
+      border-radius: 24px;
+      background: rgba(255,255,255,.64);
+      border: 1px solid rgba(255,255,255,.76);
+      padding: 18px;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 8px;
+      color: var(--blue);
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(330px, .85fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .panel {
+      border-radius: 30px;
+      padding: clamp(20px, 3vw, 28px);
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      color: var(--blue);
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .event-card,
+    .lead-card {
+      border-radius: 22px;
+      padding: 16px;
+      background: rgba(255,255,255,.66);
+      box-shadow: 0 12px 30px rgba(23,34,79,.08);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .title {
+      margin: 0;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.18;
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.45;
+    }
+
+    .status {
+      border-radius: 999px;
+      background: rgba(56,189,248,.16);
+      color: #155e75;
+      padding: 7px 10px;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .status.ended { background: rgba(100,116,139,.14); color: #475569; }
+    .status.live { background: rgba(16,185,129,.15); color: #047857; }
+    .status.missing { background: rgba(244,63,94,.12); color: #9f1239; }
+
+    .mini-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .mini {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(23,44,118,.08);
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .empty {
+      margin: 0;
+      border-radius: 22px;
+      background: rgba(255,255,255,.58);
+      border: 1px solid rgba(23,44,118,.08);
+      color: var(--muted);
+      padding: 18px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .loading {
+      min-height: 64vh;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    @media (max-width: 860px) {
+      main { width: min(100% - 18px, 1180px); padding-top: 12px; }
+      .hero-grid, .layout, .row { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+    </div>
+    <div id="app" class="loading">Opening your Rel8tion dashboard...</div>
+  </main>
+
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260426-1108';
+    import { linkChipQrToAgent, loadAgentChipQrLinks, normalizeChipQrInput, readPendingChipQrCode } from '/apps/rel8tion-app/src/api/chipQr.js?v=20260527-chip-qr';
+
+    const params = new URLSearchParams(window.location.search);
+    const agentSlug = params.get('agent') || params.get('agent_slug') || '';
+    const uid = params.get('uid') || '';
+    const activeEventId = params.get('active_event') || params.get('event') || '';
+    const profileSaved = params.get('profile_saved') === '1';
+    const app = document.getElementById('app');
+
+    function esc(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    async function request(path) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const raw = await response.text().catch(() => '');
+      if (!response.ok) throw new Error(raw || `Request failed: ${response.status}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function safeRows(path) {
+      try {
+        const rows = await request(path);
+        return Array.isArray(rows) ? rows : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function displayPhone(value) {
+      let digits = String(value || '').replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+      if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      return value || '';
+    }
+
+    function fmtDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function firstPresent(...values) {
+      return values.find((value) => String(value || '').trim()) || '';
+    }
+
+    function agentPhotoUrl(agent = {}) {
+      return firstPresent(agent.image_url, agent.profile_photo_url, agent.primary_photo_url, agent.directory_photo_url, agent.photo_url);
+    }
+
+    async function publicImageExists(url) {
+      try {
+        const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+        return response.ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function findStoredAgentPhoto(slug) {
+      const safeSlug = String(slug || '').trim();
+      if (!safeSlug) return '';
+      const extensions = ['jpg', 'jpeg', 'png', 'webp', 'heic'];
+      for (const ext of extensions) {
+        const url = `${SUPABASE_URL}/storage/v1/object/public/agent-images/${encodeURIComponent(safeSlug)}.${ext}`;
+        if (await publicImageExists(url)) return url;
+      }
+      return '';
+    }
+
+    async function findListingAgentPhoto(agent = {}) {
+      const normalizedPhone = String(agent.phone || agent.phone_normalized || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+      const name = String(agent.name || '').trim();
+      const queries = [];
+      const select = 'primary_photo_url,directory_photo_url';
+      if (normalizedPhone) queries.push(`listing_agents?select=${select}&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`);
+      if (name) {
+        queries.push(`listing_agents?select=${select}&name=eq.${encodeURIComponent(name)}&limit=1`);
+        queries.push(`listing_agents?select=${select}&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=1`);
+      }
+
+      for (const query of queries) {
+        const rows = await safeRows(query);
+        if (rows.length) {
+          const photo = firstPresent(rows[0].primary_photo_url, rows[0].directory_photo_url);
+          if (photo) return photo;
+        }
+      }
+      return '';
+    }
+
+    async function hydrateAgentPhoto(agent = {}) {
+      if (agentPhotoUrl(agent)) return agent;
+      const listingPhoto = await findListingAgentPhoto(agent);
+      if (listingPhoto) return { ...agent, image_url: listingPhoto };
+      const storedPhoto = await findStoredAgentPhoto(agent.slug || agentSlug);
+      if (storedPhoto) return { ...agent, image_url: storedPhoto };
+      return agent;
+    }
+
+    function eventAddress(event, houseMap = {}) {
+      const ctx = event?.setup_context || {};
+      const house = houseMap[event?.open_house_source_id] || {};
+      return firstPresent(house.address, ctx.address, ctx.property_address, ctx.listing_address, event?.open_house_source_id, event?.id, 'Open house');
+    }
+
+    function eventStatus(event) {
+      if (event?.ended_at || event?.status === 'ended') return 'ended';
+      if (event?.id === activeEventId || event?.status === 'active' || event?.status === 'live') return 'live';
+      return event?.status || 'saved';
+    }
+
+    function disclosureSummary(checkin) {
+      const meta = checkin?.metadata || {};
+      const agency = meta.nys_agency_disclosure || {};
+      const courtesy = meta.rel8tion_courtesy_notice || {};
+      const housing = meta.ny_discrimination_disclosure || {};
+      const agencySigned = (agency.agency_disclosure_reviewed === true || meta.agency_disclosure_reviewed === true)
+        && (agency.seller_representation_acknowledged === true || meta.seller_representation_acknowledged === true)
+        && Boolean(agency.agency_disclosure_signed_at || meta.agency_disclosure_signed_at);
+      const housingSigned = housing.acknowledged === true && housing.reviewed === true && housing.esign_consent === true;
+      const courtesySigned = (courtesy.rel8tion_courtesy_acknowledged === true || meta.rel8tion_courtesy_acknowledged === true)
+        && Boolean(courtesy.rel8tion_courtesy_signed_at || meta.rel8tion_courtesy_signed_at);
+      return {
+        signed: agencySigned && housingSigned && courtesySigned,
+        pdfUrl: checkin?.id ? `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1` : ''
+      };
+    }
+
+    async function linkKeychainQr() {
+      const input = document.getElementById('keychain_qr_code');
+      const status = document.getElementById('keychain_qr_status');
+      const chipCode = normalizeChipQrInput(input?.value || readPendingChipQrCode());
+      if (!uid) {
+        if (status) status.textContent = 'Open this dashboard by scanning your NFC chip first, then link the QR.';
+        return;
+      }
+      if (!chipCode) {
+        if (status) status.textContent = 'Enter the printed QR code or paste the QR URL.';
+        input?.focus();
+        return;
+      }
+      if (status) status.textContent = 'Linking QR code...';
+      try {
+        const result = await linkChipQrToAgent({ chipCode, agentSlug, uid });
+        if (status) status.textContent = `Linked. QR now opens ${result.profile_url || 'your public profile'}.`;
+        setTimeout(() => init(), 700);
+      } catch (error) {
+        if (status) status.textContent = error.message || 'Unable to link this QR code.';
+      }
+    }
+
+    window.linkKeychainQr = linkKeychainQr;
+
+    function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks }) {
+      const checkinsByEvent = checkins.reduce((map, row) => {
+        const key = row.open_house_event_id || '';
+        if (!map[key]) map[key] = [];
+        map[key].push(row);
+        return map;
+      }, {});
+      const signedCount = checkins.filter((row) => disclosureSummary(row).signed).length;
+      const activeEvents = events.filter((event) => eventStatus(event) === 'live');
+      const fallbackPhoto = 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png';
+      const photo = agentPhotoUrl(agent) || fallbackPhoto;
+      const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+      const onboarding = `/onboarding?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
+      const activateSign = `/sign-demo-activate?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
+      const editProfile = uid ? `/claim?uid=${encodeURIComponent(uid)}&edit=profile` : '';
+      const pendingQrCode = readPendingChipQrCode();
+      let qrLinkError = '';
+      try {
+        qrLinkError = window.sessionStorage.getItem('rel8tion_chip_qr_link_error') || '';
+        if (qrLinkError) window.sessionStorage.removeItem('rel8tion_chip_qr_link_error');
+      } catch (_) {}
+
+      app.className = '';
+      app.innerHTML = `
+        <section class="hero">
+          <div class="hero-grid">
+            <div class="profile">
+              <img class="avatar" src="${esc(photo)}" onerror="this.onerror=null;this.src='${esc(fallbackPhoto)}';" alt="${esc(agent.name || 'Agent')}">
+              <div>
+                <div class="badge">Personal Agent Dashboard</div>
+                <h1>${esc(agent.name || agentSlug || 'Agent')}</h1>
+                <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn" href="${esc(publicProfile)}">Open Public QR Profile</a>
+              ${editProfile ? `<a class="btn secondary" href="${esc(editProfile)}">Edit Profile</a>` : ''}
+              <a class="btn secondary" href="${esc(activateSign)}">Activate Smart Sign</a>
+              <a class="btn secondary" href="${esc(onboarding)}">Manage Setup</a>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><span>Open houses</span><strong>${events.length}</strong></div>
+            <div class="stat"><span>Event check-ins</span><strong>${checkins.length}</strong></div>
+            <div class="stat"><span>Signed docs</span><strong>${signedCount}</strong></div>
+            <div class="stat"><span>LO guidance</span><strong>${guidance.length}</strong></div>
+          </div>
+          ${profileSaved ? '<div class="mini" style="margin-top:14px;display:inline-flex;background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.28);color:#047857;">Profile saved</div>' : ''}
+        </section>
+
+        <section class="layout">
+          <div class="panel">
+            <h2>Open Houses</h2>
+            <div class="list">
+              ${events.length ? events.map((event) => {
+                const status = eventStatus(event);
+                const rows = checkinsByEvent[event.id] || [];
+                const address = eventAddress(event, houseMap);
+                const dashboard = `/agent-dashboard?agent=${encodeURIComponent(agentSlug)}&event=${encodeURIComponent(event.id)}${event.smart_sign_id ? `&sign_id=${encodeURIComponent(event.smart_sign_id)}` : ''}`;
+                return `
+                  <article class="event-card">
+                    <div class="row">
+                      <div>
+                        <p class="title">${esc(address)}</p>
+                        <p class="sub">${esc(fmtDate(event.start_time || event.created_at))} | ${rows.length} check-ins | ${rows.filter((row) => disclosureSummary(row).signed).length} signed disclosure sets</p>
+                      </div>
+                      <span class="status ${esc(status)}">${esc(status)}</span>
+                    </div>
+                    <div class="mini-actions">
+                      <a class="mini" href="${esc(dashboard)}">Open Event Dashboard</a>
+                      ${rows.length ? `<a class="mini" href="#leads">View Leads</a>` : ''}
+                    </div>
+                  </article>
+                `;
+              }).join('') : '<p class="empty">No open houses are saved to this agent yet. Event Pass and Smart Sign events will appear here after setup.</p>'}
+            </div>
+          </div>
+
+          <aside class="panel">
+            <h2>Next Tools</h2>
+            <div class="list">
+              <div class="event-card">
+                <p class="title">Public QR profile stays public.</p>
+                <p class="sub">Printed QR codes should open the share/contact profile. NFC opens this owner dashboard.</p>
+                <div class="mini-actions"><a class="mini" href="${esc(publicProfile)}">Preview Public Page</a></div>
+              </div>
+              <div class="event-card">
+                <p class="title">Link My Keychain QR</p>
+                <p class="sub">${qrLinks.length ? 'This keychain QR is connected to your public profile.' : 'Enter the printed QR code or paste the QR URL from your Rel8tionChip.'}</p>
+                ${qrLinks.length ? qrLinks.map((row) => `
+                  <div class="mini-actions">
+                    <a class="mini" href="${esc(row.qr_url || `/c/${row.chip_code}`)}" target="_blank" rel="noopener">${esc(row.chip_code || 'Open QR')}</a>
+                    <span class="mini">linked</span>
+                  </div>
+                `).join('') : `
+                  <input id="keychain_qr_code" value="${esc(pendingQrCode)}" placeholder="Code or QR URL" style="width:100%;margin-top:12px;border:1px solid rgba(23,44,118,.12);border-radius:16px;background:rgba(255,255,255,.86);padding:12px 14px;font:800 14px/1.2 Inter,sans-serif;color:#17224f;">
+                  <div class="mini-actions"><button class="mini" type="button" onclick="linkKeychainQr()">Link QR</button></div>
+                  <p id="keychain_qr_status" class="sub">${esc(qrLinkError)}</p>
+                `}
+              </div>
+              <div class="event-card">
+                <p class="title">Follow-up engine</p>
+                <p class="sub">SMS drips, buyer follow-up, LO review requests, and review/social prompts will hang off this permanent dashboard.</p>
+              </div>
+              <div class="event-card">
+                <p class="title">Affordability guidance</p>
+                <p class="sub">${scenarios.length} saved property scenarios and ${guidance.length} active LO guidance records are connected to this agent.</p>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section id="leads" class="panel" style="margin-top:18px;">
+          <h2>Recent Leads & Compliance</h2>
+          <div class="list">
+            ${checkins.length ? checkins.slice(0, 40).map((lead) => {
+              const docs = disclosureSummary(lead);
+              const event = events.find((row) => row.id === lead.open_house_event_id) || {};
+              return `
+                <article class="lead-card">
+                  <div class="row">
+                    <div>
+                      <p class="title">${esc(lead.visitor_name || lead.name || 'Open house visitor')}</p>
+                      <p class="sub">${esc([displayPhone(lead.visitor_phone || lead.phone), lead.visitor_email || lead.email, eventAddress(event, houseMap)].filter(Boolean).join(' | '))}</p>
+                    </div>
+                    <span class="status ${docs.signed ? 'live' : 'missing'}">${docs.signed ? 'docs signed' : 'docs missing'}</span>
+                  </div>
+                  <div class="mini-actions">
+                    ${docs.pdfUrl ? `<a class="mini" href="${esc(docs.pdfUrl)}" target="_blank" rel="noopener">Disclosure Packet</a>` : ''}
+                    ${lead.buyer_id ? `<span class="mini">Buyer linked</span>` : '<span class="mini">Buyer sync pending</span>'}
+                  </div>
+                </article>
+              `;
+            }).join('') : '<p class="empty">No event check-ins yet. Buyer leads will collect here permanently once events are run through Rel8tion.</p>'}
+          </div>
+        </section>
+      `;
+    }
+
+    async function init() {
+      if (!agentSlug) {
+        app.className = 'panel';
+        app.innerHTML = '<h2>Missing Agent</h2><p class="empty">This dashboard needs an agent slug.</p>';
+        return;
+      }
+
+      const [agents, events, leads] = await Promise.all([
+        safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=*&limit=1`),
+        safeRows(`open_house_events?host_agent_slug=eq.${encodeURIComponent(agentSlug)}&select=*&order=created_at.desc&limit=80`),
+        safeRows(`leads?agent_slug=eq.${encodeURIComponent(agentSlug)}&select=*&order=created_at.desc&limit=100`)
+      ]);
+      const agent = await hydrateAgentPhoto(agents[0] || { slug: agentSlug, name: agentSlug });
+      const eventIds = events.map((event) => event.id).filter(Boolean);
+      const houseIds = [...new Set(events.map((event) => event.open_house_source_id).filter(Boolean))];
+      const [checkins, houses, scenarios, guidance, qrLinks] = await Promise.all([
+        eventIds.length ? safeRows(`event_checkins?open_house_event_id=in.(${eventIds.map((id) => encodeURIComponent(id)).join(',')})&select=*&order=created_at.desc&limit=300`) : [],
+        houseIds.length ? safeRows(`open_houses?id=in.(${houseIds.map((id) => encodeURIComponent(id)).join(',')})&select=id,address,image_url,city,state,zip&limit=120`) : [],
+        safeRows(`buyer_property_fit_scenarios?agent_slug=eq.${encodeURIComponent(agentSlug)}&select=id,buyer_id,result_status,created_at&order=created_at.desc&limit=200`),
+        safeRows(`buyer_affordability_guidance?agent_slug=eq.${encodeURIComponent(agentSlug)}&status=eq.active&select=id,buyer_id,status,updated_at&order=updated_at.desc&limit=200`),
+        loadAgentChipQrLinks({ agentSlug, uid }).catch(() => [])
+      ]);
+      const houseMap = Object.fromEntries(houses.map((house) => [house.id, house]));
+      renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks });
+    }
+
+    init().catch((error) => {
+      app.className = 'panel';
+      app.innerHTML = `<h2>Dashboard could not load.</h2><p class="empty">${esc(error.message || error)}</p>`;
+    });
+  </script>
+</body>
+</html>

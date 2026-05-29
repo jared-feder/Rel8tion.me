@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-27.
+Last inspected: 2026-05-29.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -82,6 +82,8 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/services/nmb/activate` and `/services/nmb/verified` to app pages
 
 The root also has static `index.html`, `a.html`, `b.html`, `agent-home.html`, `get-open-house-kit.html`, `kit-confirm.html`, `kit-intake.html`, `lo-affordability-guidance.html`, `loan-officer-support.html`, and `manual-sms-outreach.html`. They are not all explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/`, `/a`, `/b`, `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/lo-affordability-guidance`, `/loan-officer-support`, and `/manual-sms-outreach`. `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/open-house-kit`, `/lo-affordability-guidance`, and `/loan-officer-support` have root wrappers that preserve query/hash values and forward into the app page.
+
+`[IMPLEMENTED]` Route hygiene is now checked by `npm run verify:routes`. The check reads `vercel.json`, confirms every rewrite/cron target has a tracked backing file, requires root wrappers for clean app URLs, and also verifies critical production APIs such as `/api/chip-qr`, `/api/buyer-affordability`, `/api/sms/android-inbound`, and admin outreach search/replay helpers. `npm run verify:production-routes` performs the corresponding live `app.rel8tion.me` smoke check after deployment.
 
 `[RISK]` Other root files include marketing/static pages and legacy/test pages. Examples:
 

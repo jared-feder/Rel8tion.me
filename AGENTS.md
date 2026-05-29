@@ -2,7 +2,7 @@
 
 Repo operating guide for future Codex sessions working on REL8TION.
 
-Last inspected: 2026-05-27.
+Last inspected: 2026-05-29.
 
 Status labels used in this file:
 
@@ -192,6 +192,8 @@ Create a live Supabase verification script or checklist to confirm tables, colum
 
 `[IMPLEMENTED]` Root `vercel.json` is the route map for this repo deployment. It has app rewrites, short QR/link routes, and Vercel Cron entries for refresh, outreach generation, mockup rendering, and outreach sending.
 
+`[IMPLEMENTED]` Route-map guardrails exist. Run `npm run verify:routes` before production route/API changes; it fails when `vercel.json` points at an untracked/missing file, when a clean app URL lacks its root wrapper, or when a critical production API/page source is not tracked. After deploy, run `npm run verify:production-routes` to catch Vercel-level `NOT_FOUND` responses on the live aliases.
+
 `[NEEDS VERIFICATION]` `api/cron/enrich-agents.js` exists and imports `estately-enrichment-worker.cjs`, but current active root cron behavior should be verified in Vercel before assuming enrichment is scheduled.
 
 `[NEEDS VERIFICATION]` `api/cron/refresh-open-house-data.js` exists and imports `onekey-freshness-worker.cjs`. Root `vercel.json` schedules it every 30 minutes, but deployed Vercel Cron state still needs dashboard/API verification after deploy.
@@ -220,6 +222,13 @@ General inspection:
 git status --short
 rg "pattern"
 rg --files
+```
+
+Route/deploy checks:
+
+```powershell
+npm run verify:routes
+npm run verify:production-routes
 ```
 
 Static app local server:

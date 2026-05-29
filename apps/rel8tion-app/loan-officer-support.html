@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loan Officer Open House Support | Rel8tion</title>
+  <meta name="description" content="Request to assist Rel8tion agents with open house support.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #17224f;
+      --muted: #5d6c84;
+      --line: rgba(255, 255, 255, 0.68);
+      --panel: rgba(255, 255, 255, 0.76);
+      --panel-strong: rgba(255, 255, 255, 0.92);
+      --accent: #245cff;
+      --violet: #6557dc;
+      --cyan: #27bce4;
+      --good: #0f7b67;
+      --bad: #a2192f;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 14% 0%, rgba(39, 188, 228, 0.48), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(101, 87, 220, 0.22), transparent 30%),
+        linear-gradient(180deg, #d7f8ff 0%, #f4fbff 48%, #edf6ff 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -20vh -20vw auto -20vw;
+      height: 48vh;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 18% 58%, rgba(255,255,255,0.88) 0 18%, transparent 19%),
+        radial-gradient(ellipse at 33% 45%, rgba(255,255,255,0.74) 0 20%, transparent 21%),
+        radial-gradient(ellipse at 70% 54%, rgba(255,255,255,0.62) 0 17%, transparent 18%);
+      filter: blur(2px);
+      opacity: 0.82;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 26px 0 42px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      box-shadow: 0 18px 32px rgba(36, 92, 255, 0.22);
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(380px, 1.08fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .hero,
+    .form-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 28px 70px rgba(24, 35, 91, 0.14), inset 0 1px 0 rgba(255,255,255,0.75);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+    }
+
+    .hero {
+      border-radius: 28px;
+      padding: clamp(24px, 4vw, 42px);
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: rgba(36, 92, 255, 0.08);
+      color: #214fc1;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 720px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(42px, 7vw, 76px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      margin: 22px 0 0;
+      max-width: 690px;
+      color: var(--muted);
+      font-size: clamp(17px, 2.2vw, 21px);
+      line-height: 1.55;
+      font-weight: 650;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 34px;
+    }
+
+    .mini {
+      min-height: 104px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.58);
+      border: 1px solid rgba(255,255,255,0.72);
+      padding: 16px;
+    }
+
+    .mini strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .mini span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 650;
+    }
+
+    .form-card {
+      border-radius: 28px;
+      padding: clamp(18px, 3.3vw, 34px);
+      background: var(--panel-strong);
+    }
+
+    form {
+      display: grid;
+      gap: 15px;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(24, 35, 91, 0.16);
+      background: rgba(255,255,255,0.94);
+      color: var(--ink);
+      padding: 0 15px;
+      font: 700 16px/1.35 Inter, sans-serif;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    input { min-height: 52px; }
+    textarea {
+      min-height: 118px;
+      padding-top: 13px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: rgba(36, 92, 255, 0.72);
+      box-shadow: 0 0 0 4px rgba(36, 92, 255, 0.12);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    button {
+      min-height: 58px;
+      border: 0;
+      border-radius: 16px;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--violet));
+      font: 900 16px/1 Inter, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 20px 38px rgba(36, 92, 255, 0.24);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: 0 24px 44px rgba(36, 92, 255, 0.3); }
+    button:disabled { cursor: wait; opacity: 0.68; transform: none; }
+
+    .status {
+      display: none;
+      padding: 14px 15px;
+      border-radius: 16px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .status.show { display: block; }
+    .status.ok { color: var(--good); background: rgba(15, 123, 103, 0.1); border: 1px solid rgba(15, 123, 103, 0.22); }
+    .status.bad { color: var(--bad); background: rgba(162, 25, 47, 0.09); border: 1px solid rgba(162, 25, 47, 0.2); }
+
+    .fine-print {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 650;
+    }
+
+    a { color: var(--ink); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+    @media (max-width: 860px) {
+      .page { width: min(100% - 18px, 620px); padding-top: 10px; }
+      .shell,
+      .grid,
+      .cards { grid-template-columns: 1fr; }
+      .hero,
+      .form-card { border-radius: 24px; }
+      .cards { margin-top: 24px; }
+      h1 { font-size: clamp(40px, 13vw, 62px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="brand" aria-label="Rel8tion">
+      <div class="mark">r8</div>
+      <span>Rel8tion</span>
+    </div>
+
+    <section class="shell">
+      <div class="hero">
+        <div>
+          <div class="eyebrow">Loan Officer Support</div>
+          <h1>Available to assist agents at open houses?</h1>
+          <p class="intro">
+            Rel8tion connects active open-house technology with qualified local support. If you can help agents with live
+            open house coverage, buyer questions, and follow-up coordination, send your details below.
+          </p>
+        </div>
+
+        <div class="cards" aria-label="Support details">
+          <div class="mini">
+            <strong>Open house support</strong>
+            <span>Help agents during live events when buyer financing or support questions come up.</span>
+          </div>
+          <div class="mini">
+            <strong>Admin reviewed</strong>
+            <span>Your request goes into REL8TION COMMAND for review before any assignment.</span>
+          </div>
+          <div class="mini">
+            <strong>Local context</strong>
+            <span>Coverage area, availability, and experience help match the right event.</span>
+          </div>
+          <div class="mini">
+            <strong>Simple next step</strong>
+            <span>Jared or the Rel8tion team can follow up if there is a fit.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <form id="supportForm" novalidate>
+          <div class="grid">
+            <label>
+              Your Name
+              <input id="fullName" name="full_name" autocomplete="name" required>
+            </label>
+
+            <label>
+              Company Name
+              <input id="companyName" name="company_name" autocomplete="organization" required>
+            </label>
+          </div>
+
+          <div class="grid">
+            <label>
+              Email
+              <input id="email" name="email" type="email" autocomplete="email" required>
+            </label>
+
+            <label>
+              Mobile Phone
+              <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required>
+            </label>
+          </div>
+
+          <label>
+            Coverage Area
+            <input id="coverageAreas" name="coverage_areas" placeholder="Example: Nassau, Suffolk, Queens">
+          </label>
+
+          <label>
+            Availability
+            <input id="availability" name="availability" placeholder="Example: weekends 11-4, weekday evenings">
+          </label>
+
+          <label>
+            Experience
+            <textarea id="experience" name="experience" required placeholder="Tell us about your mortgage/open-house experience, licensing footprint, and how you like to support agents."></textarea>
+          </label>
+
+          <label>
+            Notes, optional
+            <textarea id="notes" name="notes" placeholder="Anything else Jared should know?"></textarea>
+          </label>
+
+          <div id="status" class="status" role="status" aria-live="polite"></div>
+
+          <button id="submitButton" type="submit">Request Open House Support Review</button>
+        </form>
+        <p class="fine-print">
+          Submitting this request does not create a Rel8tion verified profile or guarantee event assignments. Rel8tion
+          reviews support availability before matching any open-house work.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('supportForm');
+    const statusEl = document.getElementById('status');
+    const submitButton = document.getElementById('submitButton');
+
+    function clean(value) {
+      return String(value || '').trim();
+    }
+
+    function normalizePhone(value) {
+      const digits = clean(value).replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
+      return digits;
+    }
+
+    function showStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = `status show ${type}`;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const payload = {
+        full_name: clean(formData.get('full_name')),
+        company_name: clean(formData.get('company_name')),
+        email: clean(formData.get('email')),
+        phone: clean(formData.get('phone')),
+        coverage_areas: clean(formData.get('coverage_areas')),
+        availability: clean(formData.get('availability')),
+        experience: clean(formData.get('experience')),
+        notes: clean(formData.get('notes')),
+        source_host: window.location.host,
+        source_path: window.location.pathname
+      };
+
+      if (payload.full_name.length < 2) return showStatus('Please enter your name.', 'bad');
+      if (payload.company_name.length < 2) return showStatus('Please enter your company name.', 'bad');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return showStatus('Please enter a valid email address.', 'bad');
+      if (normalizePhone(payload.phone).length !== 10) return showStatus('Please enter a valid 10-digit mobile phone number.', 'bad');
+      if (payload.experience.length < 10) return showStatus('Please add a short note about your experience.', 'bad');
+
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending Request...';
+      showStatus('Sending your request to Rel8tion...', 'ok');
+
+      try {
+        const response = await fetch('/api/loan-officer-support-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save request.');
+        form.reset();
+        showStatus('Your request was sent to Rel8tion. Jared or the team can follow up from the admin dashboard.', 'ok');
+      } catch (error) {
+        showStatus(error.message || 'We could not send your request right now. Please try again.', 'bad');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Request Open House Support Review';
+      }
+    });
+  </script>
+</body>
+</html>

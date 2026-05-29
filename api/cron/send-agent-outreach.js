@@ -15,8 +15,16 @@ module.exports = async function handler(req, res) {
     }
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
-    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_SEND_LIMIT || 25), 50));
-    const payload = await callSupabaseFunction('send-agent-outreach', { limit, mode: 'automatic' }, 'TWILIO_SEND_FUNCTION_URL');
+    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_SEND_LIMIT || 5), 50));
+    const requestedMode = String(body.mode || '').trim();
+    const mode = req.method === 'POST' && ['dry_run', 'diagnostic_no_send'].includes(requestedMode)
+      ? requestedMode
+      : 'automatic';
+    const payload = await callSupabaseFunction(
+      'send-agent-outreach',
+      { limit, mode, dry_run: mode !== 'automatic' },
+      'TWILIO_SEND_FUNCTION_URL'
+    );
     send(res, 200, { ok: true, stage: 'send-agent-outreach', payload });
   } catch (error) {
     console.error('[cron/send-agent-outreach] failed', error);

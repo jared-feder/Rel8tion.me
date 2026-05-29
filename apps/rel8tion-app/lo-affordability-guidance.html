@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Rel8tion LO Guidance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 42%,#f8fbff 100%);">
+    <section class="mx-auto max-w-4xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Loan Officer</div>
+            <div id="loLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Guidance</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/60 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Guidance</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading buyer and scenario context.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      uid: params.get('uid') || params.get('loan_officer_uid') || '',
+      buyerId: params.get('buyer_id') || '',
+      checkinId: params.get('checkin_id') || '',
+      agent: params.get('agent') || params.get('agent_slug') || '',
+      eventId: params.get('event') || params.get('event_id') || '',
+      profile: null,
+      buyer: null,
+      guidance: null,
+      scenarios: [],
+      disclaimer: ''
+    };
+
+    const app = document.getElementById('app');
+    const loLabel = document.getElementById('loLabel');
+    const DEFAULT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const money = (value) => {
+      const number = Number(value || 0);
+      return number ? `$${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '';
+    };
+
+    function field(label, name, value = '', attrs = '') {
+      return `<label class="block">
+        <div class="mb-2 text-[11px] font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div>
+        <input name="${esc(name)}" value="${esc(value || '')}" ${attrs} class="w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-base font-bold outline-none focus:border-sky-500">
+      </label>`;
+    }
+
+    function scenarioTone(status) {
+      if (status === 'within_guidance') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      if (status === 'close_review_recommended') return 'border-amber-200 bg-amber-50 text-amber-800';
+      if (status === 'outside_guidance') return 'border-rose-200 bg-rose-50 text-rose-800';
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Request failed.');
+      return data;
+    }
+
+    async function loadContext() {
+      const query = new URLSearchParams({
+        mode: 'lo_form',
+        uid: state.uid,
+        buyer_id: state.buyerId,
+        checkin_id: state.checkinId,
+        agent: state.agent,
+        event: state.eventId
+      });
+      const data = await api(`/api/buyer-affordability?${query.toString()}`);
+      state.profile = data.profile;
+      state.buyer = data.buyer;
+      state.guidance = data.guidance;
+      state.scenarios = data.scenarios || [];
+      state.disclaimer = data.disclaimer || DEFAULT_DISCLAIMER;
+      state.agent = data.agent_slug || state.agent;
+      loLabel.textContent = state.profile?.full_name || 'Loan Officer';
+    }
+
+    function renderScenario(scenario) {
+      return `<article class="rounded-2xl border ${scenarioTone(scenario.result_status)} p-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="text-lg font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
+            <div class="mt-1 text-sm font-bold opacity-80">Net estimate ${esc(money(scenario.estimated_net_monthly_payment))} / cap ${esc(money(scenario.monthly_cap))}</div>
+            <div class="mt-1 text-sm font-bold opacity-80">Price ${esc(money(scenario.purchase_price))} • Taxes ${esc(money(scenario.annual_taxes))}/yr • HOA ${esc(money(scenario.monthly_hoa))}/mo</div>
+          </div>
+          <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
+        </div>
+        <form data-review-form data-scenario-id="${esc(scenario.id)}" class="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+          <select name="review_status" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold">
+            <option value="reviewed">Reviewed</option>
+            <option value="lo_review_required">LO Review Required</option>
+            <option value="needs_guidance_update">Needs Guidance Update</option>
+          </select>
+          <input name="review_notes" placeholder="Optional review note" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold md:col-span-2">
+          <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-black text-white md:col-span-2">Save Review</button>
+        </form>
+        <p class="mt-3 text-[11px] font-semibold leading-relaxed opacity-80">${esc(state.disclaimer)}</p>
+      </article>`;
+    }
+
+    function render() {
+      const guidance = state.guidance || {};
+      app.innerHTML = `<section>
+        <div class="rounded-[28px] border border-slate-200 bg-white/80 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Buyer Guidance</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Property Fit Guidance</h1>
+          <p class="mt-3 text-base font-semibold leading-relaxed text-slate-600">Use this only after you have completed your preapproval workflow outside Rel8tion using your own systems, documents, lender process, and compliance requirements.</p>
+          <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-700">
+            <div>${esc(state.buyer?.full_name || 'Buyer')}</div>
+            <div class="text-slate-500">${esc([state.buyer?.phone, state.buyer?.email].filter(Boolean).join(' • '))}</div>
+          </div>
+        </div>
+
+        <form id="guidanceForm" class="mt-5 grid gap-4 rounded-[28px] border border-white/80 bg-white/75 p-5 md:grid-cols-2">
+          ${field('Max Monthly Housing Payment', 'max_monthly_housing_payment', guidance.max_monthly_housing_payment, 'type="number" min="1" step="25" required')}
+          ${field('Optional Max Purchase Price', 'max_purchase_price_guidance', guidance.max_purchase_price_guidance, 'type="number" min="0" step="1000"')}
+          ${field('Optional Max Loan Amount', 'max_loan_amount_guidance', guidance.max_loan_amount_guidance, 'type="number" min="0" step="1000"')}
+          ${field('Down Payment % Assumption', 'down_payment_percent', guidance.down_payment_percent, 'type="number" min="0" max="100" step=".01"')}
+          ${field('Rate Assumption %', 'rate_assumption_percent', guidance.rate_assumption_percent, 'type="number" min="0" max="25" step=".001"')}
+          ${field('Loan Term Years', 'loan_term_years', guidance.loan_term_years, 'type="number" min="1" max="50" step="1"')}
+          ${field('Mortgage Insurance Monthly', 'mortgage_insurance_monthly', guidance.mortgage_insurance_monthly, 'type="number" min="0" step="25"')}
+          <label class="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-sm font-black text-slate-700">
+            <input name="rent_income_allowed" type="checkbox" class="h-4 w-4" ${guidance.rent_income_allowed ? 'checked' : ''}>
+            Allow rent-income offset
+          </label>
+          ${field('Rent Income % Used', 'rent_income_percentage', guidance.rent_income_percentage, 'type="number" min="0" max="100" step=".01"')}
+          <label class="block md:col-span-2">
+            <div class="mb-2 text-[11px] font-black uppercase tracking-[.16em] text-slate-500">Rent Rule Notes</div>
+            <textarea name="rent_income_notes" class="min-h-[80px] w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-base font-bold outline-none focus:border-sky-500">${esc(guidance.rent_income_notes || '')}</textarea>
+          </label>
+          <label class="block md:col-span-2">
+            <div class="mb-2 text-[11px] font-black uppercase tracking-[.16em] text-slate-500">Guidance Notes</div>
+            <textarea name="guidance_notes" class="min-h-[80px] w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-base font-bold outline-none focus:border-sky-500">${esc(guidance.guidance_notes || '')}</textarea>
+          </label>
+          <label class="flex items-start gap-3 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold leading-relaxed text-amber-950 md:col-span-2">
+            <input name="lo_attestation_completed_preapproval_outside_rel8tion" type="checkbox" required class="mt-1 h-4 w-4">
+            <span>I confirm I have completed any preapproval or affordability review outside Rel8tion using my own systems, lender process, compliance workflow, and documents. Rel8tion is only storing my limited guidance for property scenario testing.</span>
+          </label>
+          <p class="rounded-[20px] border border-slate-200 bg-white/90 px-4 py-4 text-xs font-semibold leading-relaxed text-slate-600 md:col-span-2">${esc(state.disclaimer)}</p>
+          <button class="rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white md:col-span-2">Save LO Guidance</button>
+        </form>
+
+        <section class="mt-5 rounded-[28px] border border-white/80 bg-white/75 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Saved Scenarios</div>
+          <div class="mt-4 grid gap-3">${state.scenarios.length ? state.scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-5 text-center font-bold text-slate-500">No property scenarios have been saved yet.</div>'}</div>
+        </section>
+      </section>`;
+      attachHandlers();
+    }
+
+    function attachHandlers() {
+      document.getElementById('guidanceForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const payload = Object.fromEntries(formData.entries());
+        payload.action = 'upsert_guidance';
+        payload.loan_officer_uid = state.uid;
+        payload.buyer_id = state.buyer?.id || state.buyerId;
+        payload.checkin_id = state.checkinId;
+        payload.agent_slug = state.agent;
+        payload.event_id = state.eventId;
+        payload.rent_income_allowed = formData.get('rent_income_allowed') === 'on';
+        payload.lo_attestation_completed_preapproval_outside_rel8tion = true;
+        try {
+          const data = await api('/api/buyer-affordability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          state.guidance = data.guidance;
+          window.alert('LO guidance saved.');
+          render();
+        } catch (error) {
+          window.alert(error.message || 'Could not save guidance.');
+        }
+      });
+
+      document.querySelectorAll('[data-review-form]').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const formData = new FormData(form);
+          try {
+            await api('/api/buyer-affordability', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'review_scenario',
+                loan_officer_uid: state.uid,
+                scenario_id: form.dataset.scenarioId,
+                review_status: formData.get('review_status'),
+                review_notes: formData.get('review_notes')
+              })
+            });
+            await loadContext();
+            render();
+          } catch (error) {
+            window.alert(error.message || 'Could not save review.');
+          }
+        });
+      });
+    }
+
+    loadContext().then(render).catch((error) => {
+      app.innerHTML = `<div class="py-12 text-center">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Guidance Not Ready</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open LO Guidance</h1>
+        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">${esc(error.message || 'Unable to load this guidance page.')}</p>
+      </div>`;
+    });
+  </script>
+</body>
+</html>

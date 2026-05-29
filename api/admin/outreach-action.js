@@ -54,6 +54,10 @@ function cleanPhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function isOptedOut(queue) {
+  return queue?.review_status === 'opted_out' || queue?.review_status === 'android_opted_out';
+}
+
 async function loadQueueRow(rowId) {
   const row = one(await supabaseRest(`agent_outreach_queue?id=eq.${enc(rowId)}&select=*&limit=1`));
   if (!row) {
@@ -282,7 +286,7 @@ async function upsertLiveCoverageIfEventLinked(visit, profile) {
 
 async function acceptOpenHouse(body) {
   const queue = await loadQueueRow(body.queue_row_id);
-  if (queue.review_status === 'opted_out') {
+  if (isOptedOut(queue)) {
     const error = new Error('This contact is opted out.');
     error.status = 409;
     throw error;
@@ -299,7 +303,7 @@ async function acceptOpenHouse(body) {
 
 async function confirmOpenHouse(body) {
   const queue = await loadQueueRow(body.queue_row_id);
-  if (queue.review_status === 'opted_out') {
+  if (isOptedOut(queue)) {
     const error = new Error('This contact is opted out.');
     error.status = 409;
     throw error;
@@ -308,9 +312,13 @@ async function confirmOpenHouse(body) {
   const visit = await upsertFieldVisit(queue, {
     source: 'admin_confirmed_open_house',
     assignment_source: 'confirmed_outreach',
-    note_prefix: 'Confirmed as a true open house from REL8TION COMMAND outreach'
+    note_prefix: 'Confirmed as a true open house from REL8TION COMMAND outreach',
+    coverage_start: body.coverage_start,
+    coverage_end: body.coverage_end,
+    coverage_label: body.coverage_label
   });
-  const updated_queue = await markInterested(queue.id, 'confirmed_open_house');
+  const nextStatus = queue.review_status === 'accepted_open_house' ? 'accepted_open_house' : 'confirmed_open_house';
+  const updated_queue = await markInterested(queue.id, nextStatus);
 
   return { queue: updated_queue || queue, visit };
 }
@@ -320,7 +328,7 @@ async function scheduleDrip(body) {
   const text = String(body.body || '').replace(/\s+\n/g, '\n').trim();
   const sendAt = new Date(body.send_at || '');
 
-  if (queue.review_status === 'opted_out') {
+  if (isOptedOut(queue)) {
     const error = new Error('This contact is opted out.');
     error.status = 409;
     throw error;
@@ -362,6 +370,16 @@ async function scheduleDrip(body) {
     send_error: null
   });
 
+  return { queue: updated || queue };
+}
+
+async function saveReportNote(body) {
+  const queue = await loadQueueRow(body.queue_row_id);
+  const note = String(body.report_note || '').trim();
+  const updated = await patchQueue(queue.id, {
+    report_note: note || null,
+    report_note_updated_at: new Date().toISOString()
+  });
   return { queue: updated || queue };
 }
 
@@ -407,6 +425,12 @@ module.exports = async function handler(req, res) {
 
     if (action === 'schedule_drip') {
       const result = await scheduleDrip(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'save_report_note') {
+      const result = await saveReportNote(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

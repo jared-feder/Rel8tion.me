@@ -16,6 +16,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Vercel route map
+        run: npm run verify:routes
+
       - name: Lightweight secret scan
         shell: bash
         run: |

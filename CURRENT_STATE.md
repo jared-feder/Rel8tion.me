@@ -1,6 +1,6 @@
 # Current State
 
-Last inspected: 2026-05-27.
+Last inspected: 2026-05-29.
 
 This is an operational snapshot of what the current repo appears to support. It is repo-based, not a guarantee of the current live production deployment.
 
@@ -17,6 +17,7 @@ Status labels:
 - `[IMPLEMENTED]` Production is configured to deploy from the `main` branch through Vercel Git production branch automation.
 - `[IMPLEMENTED]` Vercel API inspection confirms project Git `productionBranch = main` and the current ready production deployment is aliased to `app.rel8tion.me`.
 - `[IMPLEMENTED]` Latest inspected production deployment includes REL8TION COMMAND confirmed open house reporting, Tailwind runtime support across active app pages, Event Pass/admin cleanup fixes, and the Rel8tionChip QR inventory/linking flow. Vercel reports the production aliases ready at `app.rel8tion.me`, `irel8.me`, `getrel8tion.com`, and `www.getrel8tion.com`; `/` on `app.rel8tion.me` is now a production-safe Rel8tion entry page instead of a Vercel smoke-test page and does not expose an admin dashboard CTA, while `getrel8tion.com/` and `www.getrel8tion.com/` redirect to `/get-open-house-kit`. `/admin` is served by a root shell that hydrates `apps/rel8tion-app/admin.html` in place so the browser URL stays `app.rel8tion.me/admin` instead of redirecting to the app file path. The admin route served the confirm-open-house action, confirmed report cards, printable report export with explicit listed-open-house, confirmed-coverage, confirmed-on, and assigned-loan-officer labels, focus guard, quiet auto-refresh, scroll/focus restore, Leads, accepted-open-house, drip scheduling, sign event closeout controls, sign detach-to-fresh controls, widened outreach cards, and stronger glass/home-style background layer.
+- `[IMPLEMENTED]` A 2026-05-29 production route audit found repeated Vercel `NOT_FOUND` failures caused by `vercel.json` routes or app code referring to files that were present locally but not tracked/deployed. The repo now includes `npm run verify:routes`, which validates Vercel rewrites, cron API targets, clean URL root wrappers, and critical production API/page files before deployment; `.github/workflows/repo-checks.yml` runs it on PRs. `npm run verify:production-routes` is the live smoke check for `app.rel8tion.me` route/API availability after deploy.
 - `[IMPLEMENTED]` The `/event` cloud background and fixed disclosure modal fix was verified live after `main` commit `c8789ae` (`Fix event disclosure modals and cloud styling`).
 - `[IMPLEMENTED]` `staging` exists as the pre-production/staging branch and currently points to the same reconciled commit as `main`.
 - `[IMPLEMENTED]` The previous direct/dirty production deploy from `modular-claim-test` commit `51d2d1a` is preserved by tag `production-51d2d1a-2026-05-08`.
