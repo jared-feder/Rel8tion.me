@@ -265,6 +265,7 @@
           agent: agentSlug,
           event: state.event?.id || ''
         });
+        params.set('return_to', `/agent-dashboard?${new URLSearchParams({ agent: agentSlug, event: state.event?.id || '' }).toString()}`);
         return { href: `/lo-affordability-guidance?${params.toString()}`, label: 'Request LO Guidance' };
       }
       const message = [
@@ -295,7 +296,7 @@
           </div>
           <div class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
         </div>
-        <div class="mt-2 text-xs font-bold opacity-80">Price ${esc(formatMoney(scenario.purchase_price))} • Taxes ${esc(formatMoney(scenario.annual_taxes))}/yr • HOA ${esc(formatMoney(scenario.monthly_hoa))}/mo</div>
+        <div class="mt-2 text-xs font-bold opacity-80">Price ${esc(formatMoney(scenario.purchase_price))} • Taxes ${esc(formatMoney(scenario.annual_taxes))}/yr • Insurance ${esc(formatMoney(scenario.annual_insurance))}/yr • HOA ${esc(formatMoney(scenario.monthly_hoa))}/mo</div>
         ${scenario.review_notes ? `<div class="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-bold">${esc(scenario.review_notes)}</div>` : ''}
         <p class="mt-2 text-[11px] font-semibold leading-relaxed opacity-80">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
       </div>`;
@@ -331,12 +332,12 @@
           <div class="rounded-xl bg-white/75 px-3 py-2">Term: ${guidance.loan_term_years ? `${esc(guidance.loan_term_years)} yrs` : '-'}</div>
         </div>
         <form data-fit-form data-checkin-id="${esc(checkin.id || '')}" data-buyer-id="${esc(buyerId)}" class="mt-4 grid gap-3 rounded-2xl bg-white/75 p-3 md:grid-cols-2">
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Purchase Price<input name="purchase_price" type="number" min="1" step="1000" value="${esc(defaultPrice || '')}" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Taxes<input name="annual_taxes" type="number" min="0" step="100" value="${esc(defaultTaxes || '')}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Insurance<input name="annual_insurance" type="number" min="0" step="50" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Monthly HOA<input name="monthly_hoa" type="number" min="0" step="25" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Purchase Price<input name="purchase_price" type="number" min="1" step="any" value="${esc(defaultPrice || '')}" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Property Taxes<input name="annual_taxes" type="number" min="0" step="any" value="${esc(defaultTaxes || '')}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Homeowners Insurance<input name="annual_insurance" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Monthly HOA<input name="monthly_hoa" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
           <label class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700"><input name="apartment_present" type="checkbox" class="h-4 w-4"> Apartment present</label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Estimated Rent<input name="estimated_monthly_rent" type="number" min="0" step="50" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Estimated Rent<input name="estimated_monthly_rent" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
           <button type="submit" class="rounded-full bg-indigo-600 px-4 py-3 text-sm font-black text-white md:col-span-2">Check Property Fit</button>
         </form>
         <div class="mt-3 grid gap-2">${scenarios.length ? scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-indigo-200 bg-white/55 p-3 text-sm font-bold text-slate-500">No saved property scenarios yet.</div>'}</div>

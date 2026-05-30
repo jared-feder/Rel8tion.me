@@ -39,6 +39,7 @@
       checkinId: params.get('checkin_id') || '',
       agent: params.get('agent') || params.get('agent_slug') || '',
       eventId: params.get('event') || params.get('event_id') || '',
+      returnTo: params.get('return_to') || '',
       profile: null,
       buyer: null,
       guidance: null,
@@ -60,6 +61,14 @@
         <div class="mb-2 text-[11px] font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div>
         <input name="${esc(name)}" value="${esc(value || '')}" ${attrs} class="w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-base font-bold outline-none focus:border-sky-500">
       </label>`;
+    }
+
+    function dashboardHref() {
+      if (state.returnTo) return state.returnTo;
+      const query = new URLSearchParams();
+      if (state.uid) query.set('uid', state.uid);
+      if (state.eventId) query.set('event', state.eventId);
+      return `/loan-officer-dashboard${query.toString() ? `?${query.toString()}` : ''}`;
     }
 
     function scenarioTone(status) {
@@ -101,7 +110,7 @@
           <div>
             <div class="text-lg font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
             <div class="mt-1 text-sm font-bold opacity-80">Net estimate ${esc(money(scenario.estimated_net_monthly_payment))} / cap ${esc(money(scenario.monthly_cap))}</div>
-            <div class="mt-1 text-sm font-bold opacity-80">Price ${esc(money(scenario.purchase_price))} • Taxes ${esc(money(scenario.annual_taxes))}/yr • HOA ${esc(money(scenario.monthly_hoa))}/mo</div>
+            <div class="mt-1 text-sm font-bold opacity-80">Price ${esc(money(scenario.purchase_price))} • Taxes ${esc(money(scenario.annual_taxes))}/yr • Insurance ${esc(money(scenario.annual_insurance))}/yr • HOA ${esc(money(scenario.monthly_hoa))}/mo</div>
           </div>
           <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
         </div>
@@ -129,16 +138,17 @@
             <div>${esc(state.buyer?.full_name || 'Buyer')}</div>
             <div class="text-slate-500">${esc([state.buyer?.phone, state.buyer?.email].filter(Boolean).join(' • '))}</div>
           </div>
+          <a href="${esc(dashboardHref())}" class="mt-4 inline-flex rounded-full bg-white px-4 py-2 text-sm font-black text-sky-700 ring-1 ring-sky-200">Back To Dashboard</a>
         </div>
 
         <form id="guidanceForm" class="mt-5 grid gap-4 rounded-[28px] border border-white/80 bg-white/75 p-5 md:grid-cols-2">
-          ${field('Max Monthly Housing Payment', 'max_monthly_housing_payment', guidance.max_monthly_housing_payment, 'type="number" min="1" step="25" required')}
-          ${field('Optional Max Purchase Price', 'max_purchase_price_guidance', guidance.max_purchase_price_guidance, 'type="number" min="0" step="1000"')}
-          ${field('Optional Max Loan Amount', 'max_loan_amount_guidance', guidance.max_loan_amount_guidance, 'type="number" min="0" step="1000"')}
+          ${field('Max Monthly Housing Payment', 'max_monthly_housing_payment', guidance.max_monthly_housing_payment, 'type="number" min="1" step="any" required')}
+          ${field('Optional Max Purchase Price', 'max_purchase_price_guidance', guidance.max_purchase_price_guidance, 'type="number" min="0" step="any"')}
+          ${field('Optional Max Loan Amount', 'max_loan_amount_guidance', guidance.max_loan_amount_guidance, 'type="number" min="0" step="any"')}
           ${field('Down Payment % Assumption', 'down_payment_percent', guidance.down_payment_percent, 'type="number" min="0" max="100" step=".01"')}
           ${field('Rate Assumption %', 'rate_assumption_percent', guidance.rate_assumption_percent, 'type="number" min="0" max="25" step=".001"')}
           ${field('Loan Term Years', 'loan_term_years', guidance.loan_term_years, 'type="number" min="1" max="50" step="1"')}
-          ${field('Mortgage Insurance Monthly', 'mortgage_insurance_monthly', guidance.mortgage_insurance_monthly, 'type="number" min="0" step="25"')}
+          ${field('Mortgage Insurance Monthly', 'mortgage_insurance_monthly', guidance.mortgage_insurance_monthly, 'type="number" min="0" step="any"')}
           <label class="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-sm font-black text-slate-700">
             <input name="rent_income_allowed" type="checkbox" class="h-4 w-4" ${guidance.rent_income_allowed ? 'checked' : ''}>
             Allow rent-income offset
@@ -157,10 +167,28 @@
             <span>I confirm I have completed any preapproval or affordability review outside Rel8tion using my own systems, lender process, compliance workflow, and documents. Rel8tion is only storing my limited guidance for property scenario testing.</span>
           </label>
           <p class="rounded-[20px] border border-slate-200 bg-white/90 px-4 py-4 text-xs font-semibold leading-relaxed text-slate-600 md:col-span-2">${esc(state.disclaimer)}</p>
-          <button class="rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white md:col-span-2">Save LO Guidance</button>
+          <button class="rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white md:col-span-2">Save LO Guidance And Return</button>
         </form>
 
-        <section class="mt-5 rounded-[28px] border border-white/80 bg-white/75 p-5">
+        <form id="scenarioForm" class="mt-5 grid gap-4 rounded-[28px] border border-indigo-200 bg-indigo-50/80 p-5 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <div class="text-xs font-black uppercase tracking-[.16em] text-indigo-700">Property Taxes + Insurance Fit Check</div>
+            <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Test This Property</h2>
+            <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">Taxes, homeowners insurance, HOA, and mortgage insurance are part of the payment. A lower-tax area can support a higher price at the same monthly cap.</p>
+          </div>
+          ${field('Purchase Price', 'purchase_price', guidance.max_purchase_price_guidance || '', 'type="number" min="1" step="any" required')}
+          ${field('Annual Property Taxes', 'annual_taxes', '', 'type="number" min="0" step="any" placeholder="13000"')}
+          ${field('Annual Homeowners Insurance', 'annual_insurance', '', 'type="number" min="0" step="any" placeholder="2500"')}
+          ${field('Monthly HOA / Common Charges', 'monthly_hoa', '', 'type="number" min="0" step="any"')}
+          <label class="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-sm font-black text-slate-700">
+            <input name="apartment_present" type="checkbox" class="h-4 w-4">
+            Apartment / rental unit present
+          </label>
+          ${field('Estimated Monthly Rent', 'estimated_monthly_rent', '', 'type="number" min="0" step="any"')}
+          <button class="rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white md:col-span-2">Run Property Fit Check</button>
+        </form>
+
+        <section data-scenarios class="mt-5 rounded-[28px] border border-white/80 bg-white/75 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Saved Scenarios</div>
           <div class="mt-4 grid gap-3">${state.scenarios.length ? state.scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-5 text-center font-bold text-slate-500">No property scenarios have been saved yet.</div>'}</div>
         </section>
@@ -188,10 +216,38 @@
             body: JSON.stringify(payload)
           });
           state.guidance = data.guidance;
-          window.alert('LO guidance saved.');
-          render();
+          window.location.href = dashboardHref();
         } catch (error) {
           window.alert(error.message || 'Could not save guidance.');
+        }
+      });
+
+      document.getElementById('scenarioForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        try {
+          await api('/api/buyer-affordability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'create_scenario',
+              event_id: state.eventId,
+              agent_slug: state.agent,
+              checkin_id: state.checkinId,
+              buyer_id: state.buyer?.id || state.buyerId,
+              purchase_price: formData.get('purchase_price') || '',
+              annual_taxes: formData.get('annual_taxes') || '',
+              annual_insurance: formData.get('annual_insurance') || '',
+              monthly_hoa: formData.get('monthly_hoa') || '',
+              apartment_present: formData.get('apartment_present') === 'on',
+              estimated_monthly_rent: formData.get('estimated_monthly_rent') || ''
+            })
+          });
+          await loadContext();
+          render();
+          document.querySelector('[data-scenarios]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) {
+          window.alert(error.message || 'Could not run property fit check.');
         }
       });
 

@@ -410,7 +410,28 @@
       if (row?.id) query.set('checkin_id', row.id);
       if (row?.buyer_id) query.set('buyer_id', row.buyer_id);
       if (visit?.agent_slug) query.set('agent', visit.agent_slug);
+      const returnTo = new URLSearchParams();
+      if (uid) returnTo.set('uid', uid);
+      if (visit?.open_house_event_id) returnTo.set('event', visit.open_house_event_id);
+      query.set('return_to', `/loan-officer-dashboard${returnTo.toString() ? `?${returnTo.toString()}` : ''}`);
       return `/lo-affordability-guidance?${query.toString()}`;
+    }
+
+    function renderLoanOfficerNav() {
+      if (!isLoanOfficerDashboard()) return '';
+      return `
+        <aside class="rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Dashboard Sections</div>
+          <nav class="mt-3 grid gap-2">
+            ${[
+              ['lo-overview', 'Overview'],
+              ['lo-availability', 'Availability'],
+              ['lo-agents', 'Worked Agents'],
+              ['lo-open-houses', 'Open Houses + Buyers']
+            ].map(([id, label]) => `<a href="#${id}" class="rounded-2xl bg-white px-3 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-100">${esc(label)}</a>`).join('')}
+          </nav>
+        </aside>
+      `;
     }
 
     function buyerRequestCard(visit, row) {
@@ -511,7 +532,7 @@
     function renderWorkedAgentsPanel(agents = workedAgents()) {
       if (!isLoanOfficerDashboard()) return '';
       return `
-        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+        <section id="lo-agents" class="mb-6 scroll-mt-5 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div class="text-xs font-black uppercase tracking-[.18em] text-violet-700">Agent Relationships</div>
@@ -911,8 +932,8 @@
       profileLabel.textContent = profileName;
       dashboardRoleLabel.textContent = isLoanOfficerDashboard() ? 'Loan Officer' : 'Field Operations';
       document.title = isLoanOfficerDashboard() ? `REL8TION ${dashboardTitle()}` : 'REL8TION Field Dashboard';
-      app.innerHTML = `
-        <section class="mb-6">
+      const dashboardBody = `
+        <section id="lo-overview" class="mb-6 scroll-mt-5">
           <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">${esc(dashboardKicker())}</div>
           <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(dashboardTitle())}</h1>
           <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">
@@ -939,19 +960,22 @@
 
         ${isLoanOfficerDashboard() ? '' : renderSchedulePanel()}
 
-        ${renderAvailabilityPanel()}
+        <div id="lo-availability" class="scroll-mt-5">${renderAvailabilityPanel()}</div>
 
         ${renderWorkedAgentsPanel(agents)}
 
         ${isLoanOfficerDashboard() ? '' : renderOutreachPanel()}
 
-        <section class="grid gap-4">
+        <section id="lo-open-houses" class="grid scroll-mt-5 gap-4">
           ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
             <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${isLoanOfficerDashboard() ? 'No Upcoming Open Houses Assigned' : 'No Assigned Visits In The Next 7 Days'}</h2>
             <p class="mt-2 font-semibold text-slate-500">${isLoanOfficerDashboard() ? 'Assigned open houses will appear here with agent, listing, buyer financing, and live-event context.' : 'Use Schedule Visit to create the next field coverage, then send outreach with a concrete appointment path.'}</p>
           </div>`}
         </section>
       `;
+      app.innerHTML = isLoanOfficerDashboard()
+        ? `<div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">${renderLoanOfficerNav()}<div class="min-w-0">${dashboardBody}</div></div>`
+        : dashboardBody;
       document.getElementById('schedule-form')?.addEventListener('submit', handleScheduleSubmit);
       document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
     }
