@@ -693,6 +693,26 @@
       return data?.coverage_sign ? data : null;
     }
 
+    function loanOfficerCoverageSignChipRole(data, chipUid) {
+      const sign = data?.coverage_sign || {};
+      const scanned = String(chipUid || '').trim();
+      if (!scanned) return '';
+      const primary = String(sign.uid_primary || '').trim();
+      const secondary = String(sign.uid_secondary || '').trim();
+      const legacyUid = String(sign.uid || '').trim();
+      const hasHardwareRoles = Boolean(primary || secondary);
+      if (secondary && scanned === secondary) return 'operator';
+      if (primary && scanned === primary) return 'public';
+      if (hasHardwareRoles && legacyUid && scanned === legacyUid && legacyUid === primary) return 'public';
+      return 'operator';
+    }
+
+    function loanOfficerCoverageSignOperatorUid(data, fallbackUid = '') {
+      const sign = data?.coverage_sign || {};
+      const profile = data?.profile || {};
+      return profile.uid || sign.loan_officer_uid || sign.loan_officer_profile_id || fallbackUid || '';
+    }
+
     async function findActiveSignByChipUid(chipUid) {
       const encodedUid = encodeURIComponent(chipUid);
       const response = await fetch(`${SUPABASE_URL}/rest/v1/smart_signs?or=(uid_primary.eq.${encodedUid},uid_secondary.eq.${encodedUid})&status=eq.active&select=id,public_code,uid_primary,uid_secondary,owner_agent_slug,active_event_id,primary_device_type,secondary_device_type&limit=1`, {
@@ -1035,13 +1055,21 @@
         window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
         window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+        const coverageCode = loCoverageSign.coverage_sign.public_code;
+        const chipRole = loanOfficerCoverageSignChipRole(loCoverageSign, uid);
+        if (chipRole === 'public') {
+          setStatus('Opening Coverage Sign', loCoverageSign.live ? 'Loading the buyer check-in route.' : 'Loading the public Coverage Sign page.');
+          window.location.href = `${window.location.origin}/lo-sign?code=${encodeURIComponent(coverageCode)}`;
+          return;
+        }
+        const operatorUid = loanOfficerCoverageSignOperatorUid(loCoverageSign, uid);
         if (loCoverageSign.live && loCoverageSign.event?.id) {
           setStatus('Coverage Sign Found', 'Opening the loan officer field dashboard.');
-          window.location.href = `${window.location.origin}/lo-field-dashboard?uid=${encodeURIComponent(uid)}&event=${encodeURIComponent(loCoverageSign.event.id)}`;
+          window.location.href = `${window.location.origin}/lo-field-dashboard?uid=${encodeURIComponent(operatorUid)}&event=${encodeURIComponent(loCoverageSign.event.id)}`;
           return;
         }
         setStatus('Coverage Sign Ready', 'Opening coverage activation.');
-        window.location.href = `${window.location.origin}/lo-sign-activate?code=${encodeURIComponent(loCoverageSign.coverage_sign.public_code)}&uid=${encodeURIComponent(uid)}`;
+        window.location.href = `${window.location.origin}/lo-sign-activate?code=${encodeURIComponent(coverageCode)}&uid=${encodeURIComponent(operatorUid)}`;
         return;
       }
 
