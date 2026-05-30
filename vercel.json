@@ -76,6 +76,8 @@
     { "source": "/smart-sign-event.html", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/sign-view-test.html", "destination": "/apps/rel8tion-app/sign.html" },
     { "source": "/event", "destination": "/apps/rel8tion-app/event.html" },
+    { "source": "/event-chat", "destination": "/apps/rel8tion-app/event-chat.html" },
+    { "source": "/event-chat.html", "destination": "/apps/rel8tion-app/event-chat.html" },
     { "source": "/event-shell-test.html", "destination": "/apps/rel8tion-app/event.html" },
     { "source": "/agent-home", "destination": "/apps/rel8tion-app/agent-home.html" },
     { "source": "/agent-home.html", "destination": "/apps/rel8tion-app/agent-home.html" },

@@ -1066,6 +1066,10 @@
           loan_officer_slug: state.profile?.slug || '',
           loan_officer_name: state.profile?.full_name || '',
           loan_officer_phone: state.profile?.phone || '',
+          metadata: {
+            loan_officer_company: state.profile?.company_name || '',
+            loan_officer_photo_url: state.profile?.photo_url || ''
+          },
           sender_role: 'system',
           sender_name: 'REL8TION',
           body: 'Field support opened this buyer financing conversation.'
@@ -1084,7 +1088,7 @@
         const textarea = document.getElementById(`chat-draft-${visitId}-${conversationId}`);
         const body = textarea?.value?.trim() || '';
         if (!body) throw new Error('Type a message first.');
-        await api('/api/event-chat/send', {
+        const payload = await api('/api/event-chat/send', {
           conversation_id: conversationId,
           open_house_event_id: visit?.open_house_event_id || '',
           field_demo_visit_id: visit?.id || null,
@@ -1094,6 +1098,10 @@
           loan_officer_slug: state.profile?.slug || '',
           loan_officer_name: state.profile?.full_name || '',
           loan_officer_phone: state.profile?.phone || '',
+          metadata: {
+            loan_officer_company: state.profile?.company_name || '',
+            loan_officer_photo_url: state.profile?.photo_url || ''
+          },
           sender_role: hasFinance(visit) ? 'loan_officer' : 'field_specialist',
           sender_name: state.profile?.full_name || 'Field Specialist',
           sender_phone: state.profile?.phone || '',
@@ -1103,7 +1111,7 @@
         });
         textarea.value = '';
         state.activeConversationByVisit[visitId] = conversationId;
-        await refresh('Message sent.');
+        await refresh(payload.notification?.warning ? 'Message saved. Buyer SMS notification needs review.' : 'Message sent and buyer notified.');
       } catch (error) {
         state.error = error.message || 'Could not send message.';
         render();

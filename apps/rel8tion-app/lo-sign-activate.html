@@ -29,7 +29,7 @@
 <body>
   <main id="app" class="min-h-screen flex items-center justify-center px-4 py-7"></main>
   <script type="module">
-    import { ASSETS } from '/apps/rel8tion-app/src/core/config.js';
+    import { ASSETS, KEY, SUPABASE_URL } from '/apps/rel8tion-app/src/core/config.js';
     import { esc, money } from '/apps/rel8tion-app/src/core/utils.js';
     import { findNearestOpenHouses, searchOpenHouses } from '/apps/rel8tion-app/src/api/openHouses.js?v=20260528-lo-sign';
     import { findListingAgentsByOpenHouse } from '/apps/rel8tion-app/src/api/agents.js?v=20260528-lo-sign';
@@ -46,7 +46,10 @@
       houses: [],
       selectedHouse: null,
       manual: false,
-      agent: { name: '', phone: '', email: '', brokerage: '' }
+      agent: { name: '', phone: '', email: '', brokerage: '', image_url: '' },
+      agentCandidates: [],
+      agentPhotoFile: null,
+      agentPhotoPreviewUrl: ''
     };
 
     function app(html) {
@@ -92,12 +95,110 @@
       return end && !Number.isNaN(end.getTime()) ? `${fmt.format(start)} - ${fmt.format(end)}` : fmt.format(start);
     }
 
+    function authHeaders() {
+      return { apikey: KEY, Authorization: `Bearer ${KEY}` };
+    }
+
+    async function supabaseRows(path) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: authHeaders() });
+      const raw = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(raw || `Supabase request failed: ${res.status}`);
+      try {
+        const rows = raw ? JSON.parse(raw) : [];
+        return Array.isArray(rows) ? rows : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function phoneDigits(value) {
+      return String(value || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+    }
+
+    function agentImage(agent = {}) {
+      return agent.image_url || agent.primary_photo_url || agent.directory_photo_url || agent.profile_photo_url || agent.photo_url || agent.agent_photo_url || '';
+    }
+
+    function normalizeCandidate(row = {}, source = 'agent') {
+      return {
+        source,
+        slug: row.slug || row.agent_slug || '',
+        name: row.name || row.agent_name || row.full_name || row.member_name || row.agent || 'Listing agent',
+        phone: row.phone || row.agent_phone || '',
+        email: row.email || row.agent_email || '',
+        brokerage: row.brokerage || row.office_name || row.company || '',
+        image_url: agentImage(row),
+        open_house_id: row.open_house_id || ''
+      };
+    }
+
+    function mergeCandidates(rows = []) {
+      const seen = new Set();
+      return rows
+        .map((row) => normalizeCandidate(row.row || row, row.source || 'agent'))
+        .filter((row) => row.name || row.phone || row.email || row.image_url)
+        .filter((row) => {
+          const key = [phoneDigits(row.phone), row.email.toLowerCase(), row.slug, row.name.toLowerCase()].filter(Boolean).join('|');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 8);
+    }
+
+    async function searchAgentDirectory(term = '', openHouseId = '') {
+      const q = String(term || '').trim();
+      const digits = phoneDigits(q);
+      const results = [];
+
+      if (openHouseId) {
+        const listingRows = await findListingAgentsByOpenHouse(openHouseId).catch(() => []);
+        results.push(...listingRows.map((row) => ({ ...row, source: 'listing_agent' })));
+      }
+
+      if (q || digits) {
+        const safeQ = q.replace(/[(),]/g, ' ').trim();
+        const filters = [];
+        if (safeQ) {
+          const like = `*${safeQ}*`;
+          filters.push(`name.ilike.${encodeURIComponent(like)}`);
+          filters.push(`email.ilike.${encodeURIComponent(like)}`);
+          filters.push(`brokerage.ilike.${encodeURIComponent(like)}`);
+          filters.push(`phone.ilike.${encodeURIComponent(like)}`);
+        }
+        if (digits.length >= 4) {
+          filters.push(`phone_normalized.ilike.${encodeURIComponent(`*${digits}*`)}`);
+          filters.push(`phone.ilike.${encodeURIComponent(`*${digits}*`)}`);
+        }
+        if (filters.length) {
+          const agentRows = await supabaseRows(`agents?select=slug,name,phone,phone_normalized,email,brokerage,image_url&or=(${filters.join(',')})&order=updated_at.desc.nullslast,created_at.desc&limit=8`).catch(() => []);
+          results.push(...agentRows.map((row) => ({ ...row, source: 'agent_profile' })));
+          const listingRows = await supabaseRows(`listing_agents?select=*&or=(${filters.join(',')})&order=created_at.desc&limit=8`).catch(() => []);
+          results.push(...listingRows.map((row) => ({ ...row, source: 'listing_agent' })));
+        }
+      }
+
+      return mergeCandidates(results);
+    }
+
+    function useAgentCandidate(candidate) {
+      state.agent = {
+        name: candidate.name || state.agent.name || '',
+        phone: candidate.phone || state.agent.phone || '',
+        email: candidate.email || state.agent.email || '',
+        brokerage: candidate.brokerage || state.agent.brokerage || '',
+        image_url: candidate.image_url || state.agent.image_url || ''
+      };
+      if (candidate.image_url) state.agentPhotoPreviewUrl = candidate.image_url;
+    }
+
     function updateAgentFromInputs() {
       state.agent = {
         name: document.getElementById('agentName')?.value?.trim() || '',
         phone: document.getElementById('agentPhone')?.value?.trim() || '',
         email: document.getElementById('agentEmail')?.value?.trim() || '',
-        brokerage: document.getElementById('brokerage')?.value?.trim() || ''
+        brokerage: document.getElementById('brokerage')?.value?.trim() || '',
+        image_url: state.agent.image_url || ''
       };
     }
 
@@ -118,14 +219,16 @@
     async function prefillAgentFromHouse(house) {
       if (!house?.id) return;
       const agents = await findListingAgentsByOpenHouse(house.id).catch(() => []);
-      const agent = agents.find((row) => row.name || row.phone || row.email) || null;
+      state.agentCandidates = mergeCandidates(agents.map((row) => ({ ...row, source: 'listing_agent' })));
+      const agent = state.agentCandidates.find((row) => row.name || row.phone || row.email || row.image_url) || null;
       if (!agent) return;
-      state.agent = {
+      useAgentCandidate({
         name: state.agent.name || agent.name || '',
         phone: state.agent.phone || agent.phone || '',
         email: state.agent.email || agent.email || '',
-        brokerage: state.agent.brokerage || agent.brokerage || house.brokerage || ''
-      };
+        brokerage: state.agent.brokerage || agent.brokerage || house.brokerage || '',
+        image_url: state.agent.image_url || agent.image_url || ''
+      });
     }
 
     async function resolveSign() {
@@ -175,6 +278,33 @@
       `;
     }
 
+    function renderAgentPhotoPreview() {
+      const image = state.agentPhotoPreviewUrl || state.agent.image_url || '';
+      if (image) {
+        return `<img src="${esc(image)}" alt="${esc(state.agent.name || 'Agent photo')}" class="h-16 w-16 rounded-full border border-white bg-white object-cover shadow-sm">`;
+      }
+      return `<div class="flex h-16 w-16 items-center justify-center rounded-full border border-white bg-white text-lg font-black text-slate-500 shadow-sm">AG</div>`;
+    }
+
+    function renderAgentCandidates() {
+      if (!state.agentCandidates.length) {
+        return `<div class="rounded-[18px] bg-white/70 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">Search by agent name, phone, email, or brokerage if the listing feed did not return the right host.</div>`;
+      }
+      return `
+        <div class="grid gap-2">
+          ${state.agentCandidates.map((candidate, index) => `
+            <button type="button" data-agent-candidate="${index}" class="flex w-full items-center gap-3 rounded-[18px] bg-white/85 p-3 text-left ring-1 ring-slate-100">
+              ${agentImage(candidate) ? `<img src="${esc(agentImage(candidate))}" alt="${esc(candidate.name || 'Agent')}" class="h-12 w-12 rounded-full object-cover">` : `<div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-sm font-black text-slate-500">AG</div>`}
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-black text-slate-900">${esc(candidate.name || 'Listing agent')}</span>
+                <span class="block truncate text-xs font-bold text-slate-500">${esc([candidate.brokerage, candidate.phone, candidate.email].filter(Boolean).join(' | '))}</span>
+              </span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
     function renderForm() {
       const house = state.selectedHouse;
       return `
@@ -206,6 +336,19 @@
           `}
           <div class="rounded-[24px] border border-white/80 bg-white/72 p-4">
             ${label('Host Agent')}
+            <form id="agentSearchForm" class="mb-3 flex gap-2">
+              <input id="agentSearchTerm" class="field" placeholder="Search agent name, phone, email">
+              <button class="btn btn-soft shrink-0" type="submit">Find</button>
+            </form>
+            <div class="mb-4">${renderAgentCandidates()}</div>
+            <div class="mb-4 flex items-center gap-4 rounded-[20px] bg-white/70 p-3 ring-1 ring-slate-100">
+              ${renderAgentPhotoPreview()}
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-black text-slate-900">Agent photo</div>
+                <p class="text-xs font-bold leading-relaxed text-slate-500">Use a listing photo or upload a headshot for the buyer check-in page.</p>
+                <input id="agentPhoto" type="file" accept="image/*" class="mt-2 block w-full text-xs font-bold text-slate-500">
+              </div>
+            </div>
             <div class="grid gap-3">
               <input id="agentName" class="field" value="${esc(state.agent.name)}" placeholder="Agent name">
               <input id="agentPhone" class="field" value="${esc(state.agent.phone)}" placeholder="Agent phone">
@@ -297,6 +440,37 @@
       }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 });
     }
 
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function uploadAgentPhotoAfterActivation(agent) {
+      if (!state.agentPhotoFile || !agent?.slug) return null;
+      if (state.agentPhotoFile.size > 6 * 1024 * 1024) {
+        throw new Error('Agent photo is too large. Choose a smaller image.');
+      }
+      const dataUrl = await fileToDataUrl(state.agentPhotoFile);
+      const res = await fetch('/api/agent-profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: agent.slug,
+          uid,
+          fileName: state.agentPhotoFile.name || 'agent-photo.jpg',
+          contentType: state.agentPhotoFile.type || 'image/jpeg',
+          photo: dataUrl
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || 'Agent photo upload failed.');
+      return data.publicUrl || null;
+    }
+
     async function activate() {
       updateAgentFromInputs();
       const house = selectedOrManualHouse();
@@ -329,6 +503,9 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.ok === false) throw new Error(data.error || 'Unable to activate coverage.');
+        await uploadAgentPhotoAfterActivation(data.agent).catch((error) => {
+          console.warn('Agent photo upload skipped', error);
+        });
         window.location.replace(data.dashboard_url || `/lo-field-dashboard?uid=${encodeURIComponent(state.resolved?.profile?.uid || uid || '')}&event=${encodeURIComponent(data.event?.id || '')}`);
       } catch (error) {
         state.busy = false;
@@ -347,9 +524,33 @@
       document.getElementById('wrongHouse')?.addEventListener('click', () => {
         state.selectedHouse = null;
         state.manual = false;
+        state.agentCandidates = [];
         render();
       });
       document.getElementById('activateBtn')?.addEventListener('click', activate);
+      document.getElementById('agentPhoto')?.addEventListener('change', (event) => {
+        updateAgentFromInputs();
+        const file = event.target.files?.[0] || null;
+        state.agentPhotoFile = file;
+        state.agentPhotoPreviewUrl = file ? URL.createObjectURL(file) : (state.agent.image_url || '');
+        render();
+      });
+      document.getElementById('agentSearchForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        updateAgentFromInputs();
+        const term = document.getElementById('agentSearchTerm')?.value?.trim() || '';
+        state.notice = 'Searching agent profiles...';
+        render();
+        try {
+          state.agentCandidates = await searchAgentDirectory(term, state.selectedHouse?.id || '');
+          state.notice = state.agentCandidates.length ? 'Choose the host agent or keep typing manually.' : 'No matching agent was found. You can still enter the host manually.';
+          render();
+        } catch (error) {
+          state.notice = '';
+          state.error = error.message || 'Agent search failed.';
+          render();
+        }
+      });
       document.getElementById('searchForm')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const term = document.getElementById('searchTerm')?.value?.trim() || '';
@@ -374,6 +575,16 @@
           state.selectedHouse = state.houses[index] || null;
           state.notice = '';
           await prefillAgentFromHouse(state.selectedHouse);
+          render();
+        });
+      });
+      document.querySelectorAll('[data-agent-candidate]').forEach((button) => {
+        button.addEventListener('click', () => {
+          updateAgentFromInputs();
+          const index = Number(button.getAttribute('data-agent-candidate'));
+          const candidate = state.agentCandidates[index];
+          if (candidate) useAgentCandidate(candidate);
+          state.notice = 'Agent selected. Review the details, then activate coverage.';
           render();
         });
       });

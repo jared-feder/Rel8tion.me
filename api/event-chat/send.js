@@ -6,6 +6,10 @@ const {
   send,
   supabaseRest
 } = require('../../lib/field-demo-shared');
+const { randomBytes } = require('crypto');
+
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 function clean(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -13,6 +17,84 @@ function clean(value) {
 
 function normalizePhone(value) {
   return String(value || '').replace(/[^\d+]/g, '').trim();
+}
+
+function httpError(status, message) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function safeMetadata(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function buyerAccessToken() {
+  return randomBytes(18).toString('base64url');
+}
+
+function appOrigin(req) {
+  const forwardedHost = req.headers?.['x-forwarded-host'];
+  const forwardedProto = req.headers?.['x-forwarded-proto'];
+  const host = Array.isArray(forwardedHost) ? forwardedHost[0] : (forwardedHost || req.headers?.host || 'app.rel8tion.me');
+  const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : (forwardedProto || 'https');
+  return `${proto}://${host}`;
+}
+
+function chatUrl(req, conversationId, token) {
+  return `${appOrigin(req).replace(/\/$/, '')}/event-chat?cid=${encodeURIComponent(conversationId)}&token=${encodeURIComponent(token)}`;
+}
+
+async function sendDirectSms({ to, buyerName, category, message, metadata }) {
+  if (!to || !message || !SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/send-lead-sms`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      agent_phone: to,
+      buyer_phone: to,
+      buyer_name: buyerName || 'Buyer',
+      category,
+      message,
+      metadata
+    })
+  });
+  const raw = await response.text().catch(() => '');
+  if (!response.ok) throw new Error(raw || `SMS notification failed: ${response.status}`);
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return { raw };
+  }
+}
+
+async function ensureBuyerChatToken(conversation) {
+  const metadata = safeMetadata(conversation?.metadata);
+  if (metadata.buyer_access_token) {
+    return { conversation, token: metadata.buyer_access_token };
+  }
+
+  const token = buyerAccessToken();
+  const nextMetadata = {
+    ...metadata,
+    buyer_access_token: token,
+    buyer_access_created_at: new Date().toISOString()
+  };
+  const updated = one(await supabaseRest(`event_conversations?id=eq.${enc(conversation.id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ metadata: nextMetadata })
+  })) || { ...conversation, metadata: nextMetadata };
+
+  return { conversation: updated, token };
+}
+
+function tokenMatches(conversation, token) {
+  return Boolean(clean(token) && clean(token) === clean(safeMetadata(conversation?.metadata).buyer_access_token));
 }
 
 async function findConversation(input) {
@@ -48,7 +130,11 @@ async function createConversation(input) {
     loan_officer_phone: input.loan_officer_phone || null,
     status: 'open',
     source: input.source || 'event_checkin',
-    metadata: input.metadata || {}
+    metadata: {
+      ...safeMetadata(input.metadata),
+      buyer_access_token: buyerAccessToken(),
+      buyer_access_created_at: new Date().toISOString()
+    }
   };
   return one(await supabaseRest('event_conversations', {
     method: 'POST',
@@ -74,8 +160,10 @@ module.exports = async function handler(req, res) {
       loan_officer_slug: clean(body.loan_officer_slug || ''),
       loan_officer_name: clean(body.loan_officer_name || ''),
       loan_officer_phone: normalizePhone(body.loan_officer_phone || ''),
-      body: clean(body.body || body.message || '')
+      body: clean(body.body || body.message || ''),
+      access_token: clean(body.access_token || body.token || '')
     };
+    const senderRole = clean(body.sender_role || 'system') || 'system';
 
     if (!input.open_house_event_id && !body.conversation_id) throw new Error('Missing open house event id.');
     if (!input.body) throw new Error('Message body is required.');
@@ -87,6 +175,17 @@ module.exports = async function handler(req, res) {
     }
     if (!conversation?.id) throw new Error('Conversation could not be created.');
 
+    if (senderRole === 'buyer' && !tokenMatches(conversation, input.access_token)) {
+      throw httpError(403, 'This chat link is no longer valid. Ask event support to send a fresh link.');
+    }
+
+    let buyerToken = safeMetadata(conversation.metadata).buyer_access_token || '';
+    if (['loan_officer', 'field_specialist'].includes(senderRole) && (conversation.buyer_phone || input.buyer_phone)) {
+      const tokenResult = await ensureBuyerChatToken(conversation);
+      conversation = tokenResult.conversation;
+      buyerToken = tokenResult.token;
+    }
+
     const now = new Date().toISOString();
     const message = one(await supabaseRest('event_conversation_messages', {
       method: 'POST',
@@ -94,7 +193,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         conversation_id: conversation.id,
         open_house_event_id: conversation.open_house_event_id || input.open_house_event_id,
-        sender_role: clean(body.sender_role || 'system'),
+        sender_role: senderRole,
         sender_name: clean(body.sender_name || ''),
         sender_phone: normalizePhone(body.sender_phone || ''),
         sender_uid: clean(body.sender_uid || ''),
@@ -105,23 +204,77 @@ module.exports = async function handler(req, res) {
       })
     }));
 
+    const extraConversationMetadata = safeMetadata(body.metadata);
+    const conversationPatch = {
+      updated_at: now,
+      buyer_name: input.buyer_name || conversation.buyer_name,
+      buyer_phone: input.buyer_phone || conversation.buyer_phone,
+      loan_officer_slug: input.loan_officer_slug || conversation.loan_officer_slug,
+      loan_officer_name: input.loan_officer_name || conversation.loan_officer_name,
+      loan_officer_phone: input.loan_officer_phone || conversation.loan_officer_phone,
+      agent_slug: input.agent_slug || conversation.agent_slug,
+      agent_name: input.agent_name || conversation.agent_name,
+      agent_phone: input.agent_phone || conversation.agent_phone
+    };
+    if (Object.keys(extraConversationMetadata).length) {
+      conversationPatch.metadata = {
+        ...safeMetadata(conversation.metadata),
+        ...extraConversationMetadata
+      };
+    }
+
     conversation = one(await supabaseRest(`event_conversations?id=eq.${enc(conversation.id)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        updated_at: now,
-        loan_officer_slug: input.loan_officer_slug || conversation.loan_officer_slug,
-        loan_officer_name: input.loan_officer_name || conversation.loan_officer_name,
-        loan_officer_phone: input.loan_officer_phone || conversation.loan_officer_phone,
-        agent_slug: input.agent_slug || conversation.agent_slug,
-        agent_name: input.agent_name || conversation.agent_name,
-        agent_phone: input.agent_phone || conversation.agent_phone
-      })
+      body: JSON.stringify(conversationPatch)
     })) || conversation;
 
-    send(res, 200, { ok: true, conversation, message });
+    let notification = null;
+    if (['loan_officer', 'field_specialist'].includes(senderRole) && (conversation.buyer_phone || input.buyer_phone)) {
+      const link = chatUrl(req, conversation.id, buyerToken);
+      notification = await sendDirectSms({
+        to: conversation.buyer_phone || input.buyer_phone,
+        buyerName: conversation.buyer_name || input.buyer_name || 'Buyer',
+        category: 'event_chat_buyer_alert',
+        message: [
+          `${message.sender_name || conversation.loan_officer_name || 'Rel8tion event support'} sent you a Rel8tion event message.`,
+          input.body.length > 220 ? `${input.body.slice(0, 217)}...` : input.body,
+          `Open chat: ${link}`,
+          'Reply STOP to opt out.'
+        ].filter(Boolean).join('\n'),
+        metadata: {
+          mode: 'event_chat_buyer_alert',
+          conversation_id: conversation.id,
+          open_house_event_id: conversation.open_house_event_id || input.open_house_event_id
+        }
+      }).catch((error) => ({ warning: error.message || String(error) }));
+    } else if (senderRole === 'buyer' && conversation.loan_officer_phone) {
+      notification = await sendDirectSms({
+        to: conversation.loan_officer_phone,
+        buyerName: conversation.buyer_name || input.buyer_name || 'Buyer',
+        category: 'event_chat_loan_officer_alert',
+        message: [
+          `${conversation.buyer_name || input.buyer_name || 'A buyer'} replied in Rel8tion event chat.`,
+          input.body.length > 220 ? `${input.body.slice(0, 217)}...` : input.body,
+          conversation.buyer_phone ? `Buyer phone: ${conversation.buyer_phone}` : ''
+        ].filter(Boolean).join('\n'),
+        metadata: {
+          mode: 'event_chat_loan_officer_alert',
+          conversation_id: conversation.id,
+          open_house_event_id: conversation.open_house_event_id || input.open_house_event_id
+        }
+      }).catch((error) => ({ warning: error.message || String(error) }));
+    }
+
+    send(res, 200, {
+      ok: true,
+      conversation,
+      message,
+      buyer_chat_url: buyerToken ? chatUrl(req, conversation.id, buyerToken) : null,
+      notification
+    });
   } catch (error) {
     console.error('[event-chat/send] failed', error);
-    send(res, 500, { ok: false, error: error.message || 'Failed to send event chat message.' });
+    send(res, error.status || 500, { ok: false, error: error.message || 'Failed to send event chat message.' });
   }
 };

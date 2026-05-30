@@ -398,6 +398,53 @@ function renderAgentImage(agent, classes = 'h-16 w-16') {
   return `<div class="${classes} flex shrink-0 items-center justify-center rounded-full bg-white/80 text-xl font-black text-slate-700 shadow-sm">${esc(initials(agentName))}</div>`;
 }
 
+function loanOfficerPhotoUrl(officer) {
+  return firstPresent(
+    officer?.loan_officer_photo_url,
+    officer?.photo_url,
+    officer?.profile_photo_url,
+    officer?.image_url,
+    officer?.avatar_url
+  );
+}
+
+function renderLoanOfficerImage(officer, classes = 'h-16 w-16') {
+  const name = officer?.loan_officer_name || officer?.name || 'Loan Officer';
+  const image = loanOfficerPhotoUrl(officer);
+  if (image) {
+    return `<img src="${esc(image)}" onerror="this.outerHTML='<div class=&quot;${classes} flex shrink-0 items-center justify-center rounded-full bg-white/80 text-xl font-black text-sky-700 shadow-sm&quot;>${esc(initials(name))}</div>';" alt="${esc(name)}" class="${classes} shrink-0 rounded-full border border-white bg-white object-cover shadow-sm">`;
+  }
+  return `<div class="${classes} flex shrink-0 items-center justify-center rounded-full bg-white/80 text-xl font-black text-sky-700 shadow-sm">${esc(initials(name))}</div>`;
+}
+
+function renderLoanOfficerCoverageCard(subjectAddress = 'this open house') {
+  const officer = pageState.loanOfficer;
+  if (!officer?.loan_officer_name && !officer?.loan_officer_phone) return '';
+  const name = officer.loan_officer_name || 'Sponsoring loan officer';
+  const company = officer.loan_officer_company || 'Event support';
+  const title = officer.loan_officer_title || 'Live loan officer coverage';
+  const phone = officer.loan_officer_phone || '';
+  const financingBody = `Hi ${name}, I just checked in through Rel8tion for ${subjectAddress} and would like financing or pre-approval help.`;
+
+  return `
+    <div class="mb-4 rounded-[22px] border border-sky-100 bg-sky-50/90 p-5">
+      <div class="flex items-start gap-4">
+        ${renderLoanOfficerImage(officer, 'h-16 w-16')}
+        <div class="min-w-0">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-1">Live Loan Officer Coverage</div>
+          <div class="text-slate-900 font-black text-xl">${esc(name)}</div>
+          <div class="text-slate-600 font-semibold">${esc([title, company].filter(Boolean).join(' | '))}</div>
+          <p class="mt-2 text-sm font-bold leading-relaxed text-slate-600">Available as event support for this open house. Financing help is only provided if you request it.</p>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <a href="${esc(telHref(phone))}" class="inline-flex items-center justify-center px-4 py-3 rounded-full font-bold text-sm bg-white/90 border border-sky-100 text-slate-700 ${phone ? '' : 'pointer-events-none opacity-60'}">Call Coverage</a>
+        <a href="${esc(smsHref(phone, financingBody))}" class="inline-flex items-center justify-center px-4 py-3 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.18)] ${phone ? '' : 'pointer-events-none opacity-60'}" style="background:var(--event-gradient);">Request Financing Help</a>
+      </div>
+    </div>
+  `;
+}
+
 function eventAreaLabel(house) {
   const address = String(house?.address || '').split(',').map((part) => part.trim()).filter(Boolean);
   if (address.length >= 2) return address[1].replace(/\s+NY\b.*$/i, '').trim();
@@ -1133,7 +1180,13 @@ function nextStepCards() {
   const subjectAddress = house?.address || 'this property';
   const contactHref = vcardHref(agent);
   const neighborhoodBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress}. Can you tell me more about the neighborhood and nearby open houses?`;
-  const financingBody = `Hi, I just checked in through Rel8tion for ${subjectAddress} and would like to talk about financing.`;
+  const liveLoanOfficer = pageState.loanOfficer;
+  const financingPhone = liveLoanOfficer?.loan_officer_phone || TEMP_FINANCING_SUPPORT_PHONE;
+  const financingName = liveLoanOfficer?.loan_officer_name || 'the sponsoring loan officer';
+  const financingBody = liveLoanOfficer
+    ? `Hi ${financingName}, I just checked in through Rel8tion for ${subjectAddress} and would like financing or pre-approval help.`
+    : `Hi, I just checked in through Rel8tion for ${subjectAddress} and would like to talk about financing.`;
+  const financingLabel = liveLoanOfficer ? 'Request Financing Help' : 'Start Financing Chat';
 
   return `
     <section class="grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
@@ -1169,6 +1222,7 @@ function nextStepCards() {
 
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-4">Host Contact</h2>
+        ${renderLoanOfficerCoverageCard(subjectAddress)}
         <div class="rounded-[22px] bg-slate-50 border border-slate-100 p-5 mb-4">
           <div class="flex items-start gap-4">
             ${renderAgentImage(agent, 'h-16 w-16')}
@@ -1188,7 +1242,7 @@ function nextStepCards() {
           <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
           <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${subjectAddress}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
           <a href="${esc(mailtoHref(agent?.email || '', `Question about ${subjectAddress}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
-          <a href="${esc(smsHref(TEMP_FINANCING_SUPPORT_PHONE, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)]" style="background:var(--event-gradient);">Start Financing Chat</a>
+          <a href="${esc(smsHref(financingPhone, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)]" style="background:var(--event-gradient);">${esc(financingLabel)}</a>
         </div>
       </article>
     </section>

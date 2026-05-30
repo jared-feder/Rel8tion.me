@@ -21,6 +21,8 @@
     { "source": "/lo-sign-activate", "destination": "/lo-sign-activate.html" },
     { "source": "/lo-sign-activate.html", "destination": "/lo-sign-activate.html" },
     { "source": "/event", "destination": "/event.html" },
+    { "source": "/event-chat", "destination": "/event-chat.html" },
+    { "source": "/event-chat.html", "destination": "/event-chat.html" },
     { "source": "/agent-home", "destination": "/agent-home.html" },
     { "source": "/agent-dashboard", "destination": "/agent-dashboard.html" },
     { "source": "/lo-affordability-guidance", "destination": "/lo-affordability-guidance.html" },
