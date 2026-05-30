@@ -279,6 +279,23 @@ function normalizePhone(value = "") {
   return String(value || "").replace(/\D/g, "");
 }
 
+function roleOption(value, label, currentTitle) {
+  const current = String(currentTitle || "Mortgage Loan Officer").trim().toLowerCase();
+  const selected = current === String(value || "").trim().toLowerCase() ? " selected" : "";
+  return `<option value="${esc(value)}"${selected}>${esc(label)}</option>`;
+}
+
+function roleOptions(currentTitle) {
+  const current = String(currentTitle || "").trim();
+  const roles = ["Mortgage Loan Officer", "Loan Officer Assistant"];
+  const custom = current && !roles.some((role) => role.toLowerCase() === current.toLowerCase())
+    ? `<option value="${esc(current)}" selected>${esc(current)}</option>`
+    : "";
+  return `${roleOption("Mortgage Loan Officer", "Mortgage Loan Officer", current || "Mortgage Loan Officer")}
+            ${roleOption("Loan Officer Assistant", "Loan Officer Assistant", current)}
+            ${custom}`;
+}
+
 function openLoanOfficerDashboard(profile = {}) {
   const next = new URLSearchParams();
   next.set("uid", profile.uid || uid);
@@ -382,8 +399,10 @@ function renderForm(existing = {}) {
         </div>
 
         <div>
-          <label class="field-label">Title</label>
-          <input class="field" name="title" placeholder="Mortgage Loan Officer" value="${esc(existing.title || 'Mortgage Loan Officer')}">
+          <label class="field-label">Role</label>
+          <select class="field" name="title" required>
+            ${roleOptions(existing.title)}
+          </select>
         </div>
 
         <div>
