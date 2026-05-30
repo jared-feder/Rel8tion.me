@@ -67,6 +67,7 @@ Important route behavior:
 - `[IMPLEMENTED]` `/lo-sign` resolves reusable Loan Officer Coverage Signs from `loan_officer_coverage_signs.public_code`. Active signs redirect buyer-style QR scans to `/event`; inactive assigned signs route to `/lo-sign-activate`.
 - `[IMPLEMENTED]` `/lo-sign-activate` lets the assigned LO activate coverage for a selected open house, creates a live event/LO coverage session, updates `loan_officer_coverage_signs`, and can issue a Sponsored Event Pass to an agent without silently activating that pass for buyer-data visibility.
 - `[IMPLEMENTED]` LO Coverage Sign activation uses a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) so the current live `smart_signs.uid_primary` not-null schema does not require a buyer NFC chip. Service-side Sponsored Event Pass activation uses `synthetic:event-pass-qr:<code>` until the physical Event Pass NFC flow provides a real UID.
+- `[IMPLEMENTED]` LO Coverage Sign activation also writes the matching `field_demo_visits` and `field_demo_visit_participants` rows so the assigned loan officer sees the live event in `/lo-field-dashboard` right after activation.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/agent-dashboard` is the live event dashboard for the host agent.
 - `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support the getrel8tion.com Open House Kit landing, keychain prefill, manual intake, and Stripe Checkout handoff.
