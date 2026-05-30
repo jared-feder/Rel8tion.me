@@ -28,6 +28,7 @@ REL8TION is a low-friction real estate engagement system built around physical N
 The current product connects:
 
 - `[IMPLEMENTED]` agent Rel8tionChip/keychain identity
+- `[IMPLEMENTED]` loan officer Rel8tionChip/keychain identity, where NFC is private dashboard access and the printed QR is the prospect-facing verified profile
 - `[IMPLEMENTED]` smart signs with a printed QR code/public code
 - `[IMPLEMENTED]` Event Pass printed QR codes that resolve through `smart_sign_inventory.public_code` at `/pass`
 - `[IMPLEMENTED]` Sponsored Event Passes that are reusable Event Pass inventory rows issued by a verified loan officer, activated by an agent per open house, and gated by per-event agent consent before sponsor visibility
@@ -67,7 +68,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/event-chat` to `apps/rel8tion-app/event-chat.html`
 - `/l/:id` to `api/open-house-link.js`, which opens a REL8TION property landing page with an optional button to the saved MLS/listing URL
 - `/o/:id` to `api/outreach-preview.js`, which opens a public outreach preview page with Open Graph image tags for rendered outreach mockups
-- `/c/:code` and `/chip/:code` to `api/chip-qr.js`, which resolves printed Rel8tionChip QR inventory. Linked agent QR rows redirect to `/b?agent=<slug>`; unlinked rows show a branded not-linked state and can carry the QR code into the NFC claim/dashboard linking flow.
+- `/c/:code` and `/chip/:code` to `api/chip-qr.js`, which resolves printed Rel8tionChip QR inventory. Linked agent QR rows redirect to `/b?agent=<slug>`; linked loan-officer/NMB/verified-professional QR rows redirect to `/nmb-verified?slug=<lo_slug>`; unlinked rows show a branded not-linked state and can carry the QR code into the appropriate NFC claim/dashboard linking flow.
 - `/` on `app.rel8tion.me` serves the root `index.html` production entry page with public Rel8tion CTAs only. It must not be reverted to a deployment smoke-test page or expose an admin dashboard CTA.
 - `/agent-home` to `apps/rel8tion-app/agent-home.html`
 - `/agent-dashboard` to `apps/rel8tion-app/agent-dashboard.html`
@@ -237,6 +238,7 @@ Role: permanent owner/operator dashboard for a paid agent Rel8tionChip.
 - `/agent-home?agent=<slug>&uid=<uid>` is the normal destination for a claimed agent NFC scan after higher-priority setup, rear-sign, Event Pass, LO, and backup-keychain flows are ruled out.
 - The public/share profile remains `/b?agent=<slug>` and should be the printed QR destination for agent profile/contact sharing.
 - Printed agent Rel8tionChip QR codes are inventory-first and do not need an agent profile at print time. They live in `rel8tion_chip_inventory` with a short `chip_code` and `qr_url` such as `https://irel8.me/c/ra0018b9`; the first 1000 agent rows were seeded as batch `agent-keychain-001`. During claim, or later from `/agent-home`, the QR can be linked to the claimed NFC UID and agent slug. After linking, the QR opens the public profile while NFC continues to open the private owner dashboard.
+- Printed loan officer Rel8tionChip QR codes use the same `/c/:code` resolver but are keyed through `verified_profile_uid` instead of `agent_slug`. `chip_type = nmb|verified|professional` rows open the public `/nmb-verified?slug=<lo_slug>` page when linked, while the loan officer's NFC UID continues to open the private Loan Officer Dashboard. A quick live batch `lo-keychain-quick-20260530` currently contains `lq000001` through `lq000005`, linked to Jared Feder's verified profile for immediate testing/printing.
 - The page loads the agent profile, all `open_house_events` hosted by that agent, linked `event_checkins`, disclosure packet links, buyer sync status, and buyer affordability guidance/scenario counts.
 - Profile photos resolve from saved `agents` image fields first, then `listing_agents.primary_photo_url` / `directory_photo_url` by phone or forgiving name match, then conventional public `agent-images/<slug>.*` storage objects, before falling back to the generic update-profile image.
 - The top actions include public QR profile, profile editing, direct Smart Sign activation, and setup/onboarding so a kit buyer can claim the agent NFC first and then activate the Smart Sign.

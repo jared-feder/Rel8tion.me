@@ -114,6 +114,19 @@ async function loadAgent(agentSlug) {
   return one(`agents?slug=eq.${enc(agentSlug)}&select=slug,name,brokerage,phone,email`);
 }
 
+function isVerifiedProfileQr(chip) {
+  return ['loan_officer', 'nmb', 'verified', 'professional'].includes(String(chip?.chip_type || '').toLowerCase());
+}
+
+async function loadVerifiedProfileByUid(uid) {
+  if (!uid) return null;
+  return one(`verified_profiles?uid=eq.${enc(uid)}&is_active=eq.true&select=uid,slug,full_name,title,company_name,phone,email,is_active`);
+}
+
+async function resolveVerifiedProfile(chip) {
+  return loadVerifiedProfileByUid(chip?.verified_profile_uid || chip?.uid);
+}
+
 async function linkChip(body) {
   const chipCode = cleanCode(body.chip_code || body.code || body.qr_code);
   const uid = clean(body.uid);
@@ -225,8 +238,49 @@ async function renderPublicQr(req, res, code) {
     return;
   }
 
+  if (chip.status === 'linked' && isVerifiedProfileQr(chip)) {
+    const profile = await resolveVerifiedProfile(chip);
+    if (profile?.slug) {
+      const profileUrl = `/nmb-verified?slug=${encodeURIComponent(profile.slug)}&chip_code=${encodeURIComponent(chipCode)}`;
+      if (wantsJson(req)) {
+        sendJson(res, 200, {
+          ok: true,
+          chip,
+          verified_profile: profile,
+          profile_url: profileUrl
+        });
+        return;
+      }
+      res.writeHead(302, { Location: profileUrl });
+      res.end();
+      return;
+    }
+
+    if (wantsJson(req)) {
+      sendJson(res, 409, { ok: false, error: 'This loan officer QR is linked, but its public profile is not active.' });
+      return;
+    }
+    sendHtml(res, 409, htmlShell({
+      title: 'Profile Needs Attention',
+      eyebrow: 'Loan Officer QR',
+      body: '<p>This loan officer QR is linked, but the public profile is not active yet. Open the owner dashboard or contact Rel8tion to finish setup.</p>',
+      action: `<div class="code">${chipCode}</div>`
+    }));
+    return;
+  }
+
   if (wantsJson(req)) {
     sendJson(res, 200, { ok: true, chip, linked: false });
+    return;
+  }
+
+  if (isVerifiedProfileQr(chip)) {
+    sendHtml(res, 200, htmlShell({
+      title: 'Loan Officer QR Ready',
+      eyebrow: 'Loan Officer QR',
+      body: `<p>This QR code is ready, but it has not been connected to a verified loan officer profile yet.</p><p>Tap the NFC side of the loan officer Rel8tionChip to open the private dashboard, then link this public QR.</p>`,
+      action: `<div class="code">${chipCode}</div><a class="btn soft" href="/nmb-activate?chip_code=${encodeURIComponent(chipCode)}">Open Loan Officer Setup</a><script>try{localStorage.setItem('rel8tion_lo_chip_qr_pending',JSON.stringify({purpose:'loan_officer_chip_qr_link',chipCode:${JSON.stringify(chipCode)},startedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+10*60*1000).toISOString(),sourceHost:location.host,sourcePath:location.pathname}));}catch(e){}</script>`
+    }));
     return;
   }
 
