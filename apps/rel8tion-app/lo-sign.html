@@ -32,6 +32,7 @@
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code') || '';
+    const SETUP_SESSION_KEY = 'rel8tion_lo_sign_setup_pending';
     const app = document.getElementById('app');
 
     function shell(content) {
@@ -49,6 +50,32 @@
 
     function profileName(profile) {
       return [profile?.full_name || profile?.slug, profile?.company_name].filter(Boolean).join(', ') || 'Assigned loan officer';
+    }
+
+    function readSetupSession() {
+      try {
+        const raw = window.localStorage.getItem(SETUP_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const expiresAt = new Date(parsed.expiresAt || parsed.createdAt || 0).getTime();
+        if (!parsed.loanOfficerUid || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          window.localStorage.removeItem(SETUP_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(SETUP_SESSION_KEY);
+        return null;
+      }
+    }
+
+    function pendingSetupUrl() {
+      const pending = readSetupSession();
+      if (!pending?.loanOfficerUid) return '';
+      const next = new URLSearchParams();
+      if (code || pending.publicCode) next.set('code', code || pending.publicCode);
+      next.set('uid', pending.loanOfficerUid);
+      return `/lo-sign-setup?${next.toString()}`;
     }
 
     async function init() {
@@ -93,11 +120,18 @@
           return;
         }
 
+        const setupUrl = pendingSetupUrl();
+        if (setupUrl) {
+          window.location.replace(setupUrl);
+          return;
+        }
         shell(`
           ${label('Loan Officer Coverage Sign')}
           <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-4">Sign Setup Needed</h1>
           <p class="text-slate-700 text-lg font-bold leading-relaxed mb-6">This Coverage Sign is not assigned to a verified loan officer yet.</p>
-          <a class="btn btn-primary w-full" href="${esc(data.profile_activation_url || '/nmb-activate')}">Activate Loan Officer Profile</a>
+          ${setupUrl
+            ? `<a class="btn btn-primary w-full" href="${esc(setupUrl)}">Continue Sign Setup</a>`
+            : `<a class="btn btn-primary w-full" href="${esc(data.profile_activation_url || '/nmb-activate')}">Activate Loan Officer Profile</a>`}
         `);
       } catch (error) {
         shell(`

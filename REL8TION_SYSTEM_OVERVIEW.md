@@ -61,6 +61,7 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/s` and `/sign` to `apps/rel8tion-app/sign.html`; `/pass` to `apps/rel8tion-app/pass.html`, which reuses the same resolver module in Event Pass mode
 - `/sponsored-pass-activate` to `apps/rel8tion-app/sponsored-pass-activate.html`
 - `/lo-sign` to `apps/rel8tion-app/lo-sign.html`
+- `/lo-sign-setup` to `apps/rel8tion-app/lo-sign-setup.html`
 - `/lo-sign-activate` to `apps/rel8tion-app/lo-sign-activate.html`
 - `/event` to `apps/rel8tion-app/event.html`
 - `/event-chat` to `apps/rel8tion-app/event-chat.html`
@@ -419,6 +420,7 @@ Role: host-agent activation flow for reusable Sponsored Event Passes.
 Files:
 
 - `apps/rel8tion-app/lo-sign.html`
+- `apps/rel8tion-app/lo-sign-setup.html`
 - `apps/rel8tion-app/lo-sign-activate.html`
 - `api/lo-sign/action.js`
 
@@ -429,12 +431,14 @@ Role: reusable Loan Officer Coverage Sign resolver and activation flow.
 - `/lo-sign?code=PUBLIC_CODE` resolves `loan_officer_coverage_signs.public_code`.
 - If the sign has a live `active_event_id`, buyer-style QR scans redirect to `/event?event=<active_event_id>`.
 - If the sign is assigned to an active LO but inactive, it shows "Coverage Sign Ready" and routes to `/lo-sign-activate?code=...`.
+- `/lo-sign-setup` is the loan-officer dashboard hardware setup lane. The LO starts setup from the dashboard, scans a pooled LO sign QR, then taps the two physical NFC chips. `/k` registers those chips as `loan_officer_coverage_signs.uid_primary` and `uid_secondary`; legacy `uid` remains the primary-chip compatibility alias.
 - `/lo-sign-activate` uses nearby/search/manual open-house selection, confirms/adds host-agent info, creates a live open-house event, creates a live `event_loan_officer_sessions` row, updates `loan_officer_coverage_signs.active_event_id`, and records `loan_officer_sign_events` history.
 - `/lo-sign-activate` shows listing-agent candidates when available, supports host-agent search across saved agent/listing-agent data, and allows an optional host-agent photo upload that updates `agents.image_url` after activation.
 - Coverage-sign activations use a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) because the live schema still requires `smart_signs.uid_primary` even when no buyer NFC chip is involved. Service-side Sponsored Event Pass activation uses the same compatibility pattern (`synthetic:event-pass-qr:<code>`) until a physical Event Pass NFC UID is supplied by the QR-to-NFC setup flow.
 - Coverage-sign activations create/reuse `field_demo_visits` and `field_demo_visit_participants` rows for the assigned loan officer so `/lo-field-dashboard` renders the live coverage card immediately after activation.
 - Optional Sponsored Event Pass issuance from this flow prepares the pass inventory for the agent and sponsor but does not silently activate the Sponsored Event Pass for buyer-data visibility. The Sponsored Event Pass still requires the agent consent screen when activated.
 - The issued pass stores a seeded context with the coverage event, open house, property facts, and host-agent details. If that coverage event is still live when the agent activates the pass, Sponsored Pass activation reuses the same `open_house_events` row and links the pass backing sign to it, keeping the LO dashboard, agent dashboard, buyer check-in QR, and Event Pass QR aligned.
+- The starter LO QR pool is `loan_officer_coverage_signs.batch_id = lo-sign-001`, seeded as `lo000001` through `lo000100`. Use `supabase/sql/loan_officer_coverage_sign_qr_export.sql` to export unprinted QR URLs.
 
 ### `/event`
 
@@ -582,7 +586,8 @@ Role: tested field/loan-officer work surface for scheduled REL8TION demo and sup
 
 - Loads a verified profile by `uid` or `slug`.
 - Shows next-7-days field visit stats, assigned visits, buyer financing requests, event chat logs, and LO/field availability controls.
-- In loan-officer mode, labels the page with the LO first name, hides the field-ops outreach queue and manual coverage scheduler, and keeps the page focused on assigned/upcoming open houses, agent/listing context, buyer financing, affordability guidance, chat, worked agents, and availability controls.
+- In loan-officer mode, labels the page with the LO first name, hides the field-ops outreach queue and manual coverage scheduler, and defaults to an overview with important cards, urgent notifications, quick actions, and the next few open houses. Availability, worked agents, and the full open-house/buyer list are behind the section menu.
+- Loan-officer quick actions include `Set Up Coverage Sign` (`/lo-sign-setup`), `Edit Profile` (`/nmb-activate?edit=profile`), Buyer Affordability, and Availability.
 - Standalone active LO keychain/tag scans through `/k` open this dashboard directly by UID.
 - Lets an LO or field profile add one-day or repeated weekly/monthly availability windows using role, responsibility, service ZIP, service radius, and time window.
 - Lets an LO or field profile save `unavailable` exception blocks, such as blocking one Saturday inside a recurring weekend pattern.

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set Up LO Coverage Sign | Rel8tion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(125,211,252,.42), transparent 28%),
+        radial-gradient(circle at 86% 16%, rgba(167,243,208,.34), transparent 30%),
+        linear-gradient(135deg, #eef8ff, #f8fbff 46%, #eefdf7);
+      color: #0f172a;
+    }
+    .glass { border:1px solid rgba(255,255,255,.74); background:rgba(255,255,255,.68); box-shadow:0 24px 70px rgba(31,42,90,.12); backdrop-filter:blur(18px); }
+    .btn { display:inline-flex; align-items:center; justify-content:center; min-height:56px; border-radius:999px; padding:1rem 1.25rem; font-weight:900; }
+    .btn-primary { color:white; background:linear-gradient(90deg,#06b6d4,#2563eb); box-shadow:0 18px 38px rgba(37,99,235,.22); }
+    .btn-soft { background:rgba(255,255,255,.84); border:1px solid rgba(255,255,255,.9); color:#334155; }
+    .field { width:100%; border-radius:18px; border:1px solid rgba(203,213,225,.9); background:rgba(255,255,255,.9); padding:.95rem 1rem; font-weight:800; outline:none; }
+  </style>
+</head>
+<body>
+  <main id="app" class="min-h-screen flex items-center justify-center px-4 py-7"></main>
+  <script type="module">
+    import { ASSETS } from '/apps/rel8tion-app/src/core/config.js';
+    import { esc } from '/apps/rel8tion-app/src/core/utils.js';
+
+    const SESSION_KEY = 'rel8tion_lo_sign_setup_pending';
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      code: params.get('code') || '',
+      uid: params.get('uid') || params.get('profile_uid') || '',
+      sign: null,
+      profile: null,
+      loading: true,
+      busy: false,
+      error: '',
+      notice: ''
+    };
+
+    const app = document.getElementById('app');
+
+    function shell(content) {
+      app.innerHTML = `
+        <section class="w-full max-w-3xl glass rounded-[34px] p-5 sm:p-8">
+          <div class="text-center mb-6"><img src="${ASSETS.rel8tionLogo}" alt="Rel8tion" class="h-16 w-auto mx-auto"></div>
+          ${content}
+        </section>
+      `;
+      bind();
+    }
+
+    function label(text) {
+      return `<div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">${esc(text)}</div>`;
+    }
+
+    function profileLine() {
+      return [state.profile?.full_name || state.profile?.slug, state.profile?.company_name].filter(Boolean).join(', ') || 'Verified loan officer';
+    }
+
+    function saveSetupSession(nextChip) {
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify({
+        publicCode: state.code,
+        loanOfficerUid: state.profile?.uid || state.uid,
+        nextChip,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      }));
+    }
+
+    function saveQrScanSession() {
+      if (!state.uid || state.code) return;
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify({
+        publicCode: '',
+        loanOfficerUid: state.uid,
+        nextChip: 'primary',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      }));
+    }
+
+    function clearSetupSession() {
+      window.localStorage.removeItem(SESSION_KEY);
+    }
+
+    async function postSetup(body) {
+      const res = await fetch('/api/lo-sign/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setup_sign_hardware', ...body })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || 'Coverage Sign setup failed.');
+      state.sign = data.coverage_sign || state.sign;
+      state.profile = data.profile || state.profile;
+      return data;
+    }
+
+    async function resolve() {
+      if (!state.code) {
+        state.loading = false;
+        render();
+        return;
+      }
+      try {
+        const query = new URLSearchParams({ code: state.code });
+        if (state.uid) query.set('uid', state.uid);
+        const res = await fetch(`/api/lo-sign/action?${query.toString()}`, { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || 'Coverage Sign not found.');
+
+        state.sign = data.coverage_sign || null;
+        state.profile = data.profile || null;
+        if (!state.profile && state.uid) {
+          const assigned = await postSetup({ public_code: state.code, loan_officer_uid: state.uid });
+          state.sign = assigned.coverage_sign || state.sign;
+          state.profile = assigned.profile || state.profile;
+        }
+        state.loading = false;
+        render();
+      } catch (error) {
+        if (state.uid) {
+          try {
+            const assigned = await postSetup({ public_code: state.code, loan_officer_uid: state.uid });
+            state.sign = assigned.coverage_sign || state.sign;
+            state.profile = assigned.profile || state.profile;
+            state.loading = false;
+            render();
+            return;
+          } catch (_) {
+            // Fall through to the branded error below.
+          }
+        }
+        state.error = error.message || 'Unable to open this Coverage Sign.';
+        state.loading = false;
+        render();
+      }
+    }
+
+    function renderNoCode() {
+      saveQrScanSession();
+      shell(`
+        ${label('Coverage Sign Setup')}
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-3">Scan The Sign QR</h1>
+        <p class="text-slate-700 text-lg font-bold leading-relaxed mb-5">Use this setup from your Loan Officer Dashboard, then scan the printed QR on the physical Coverage Sign.</p>
+        <form id="manualCodeForm" class="grid gap-3">
+          <input id="manualCode" class="field" placeholder="LO sign public code">
+          <button class="btn btn-primary w-full" type="submit">Continue Setup</button>
+        </form>
+        ${state.error ? `<div class="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 p-4 font-black text-rose-700">${esc(state.error)}</div>` : ''}
+      `);
+    }
+
+    function chipStatus() {
+      const primary = state.sign?.uid_primary || state.sign?.uid || '';
+      const secondary = state.sign?.uid_secondary || '';
+      return { primary, secondary, complete: Boolean(primary && secondary) };
+    }
+
+    function renderSetup() {
+      const chips = chipStatus();
+      const nextChip = chips.primary ? 'secondary' : 'primary';
+      if (chips.complete) clearSetupSession();
+      shell(`
+        ${label('Loan Officer Coverage Sign')}
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-950 mb-3">${chips.complete ? 'Coverage Sign Ready' : 'Set Up Coverage Sign'}</h1>
+        <p class="text-slate-700 text-lg font-bold leading-relaxed mb-5">Assigned LO: ${esc(profileLine())}. This QR stays on the LO sign; the two NFC chips become Coverage Sign chips for this account.</p>
+
+        <div class="grid gap-3 sm:grid-cols-2 mb-5">
+          <div class="rounded-[24px] border border-white/80 bg-white/74 p-4">
+            ${label('Printed QR')}
+            <div class="text-slate-950 font-black text-2xl">${esc(state.code)}</div>
+            <div class="text-slate-500 text-sm font-bold mt-1">/lo-sign?code=${esc(state.code)}</div>
+          </div>
+          <div class="rounded-[24px] border border-white/80 bg-white/74 p-4">
+            ${label('Chip Status')}
+            <div class="text-slate-950 font-black">${chips.primary ? 'First chip saved' : 'First chip needed'}</div>
+            <div class="text-slate-950 font-black mt-1">${chips.secondary ? 'Second chip saved' : 'Second chip needed'}</div>
+          </div>
+        </div>
+
+        ${chips.complete ? `
+          <div class="rounded-[24px] border border-emerald-200 bg-emerald-50/90 p-5 mb-5">
+            <div class="text-emerald-800 font-black text-xl">This Coverage Sign is active on your account.</div>
+            <p class="text-emerald-900 font-bold mt-2">At an open house, scan this sign QR to start coverage and attach a Sponsored Event Pass.</p>
+          </div>
+          <a class="btn btn-primary w-full" href="/loan-officer-dashboard?uid=${encodeURIComponent(state.profile?.uid || state.uid)}">Back To Dashboard</a>
+        ` : `
+          <div class="rounded-[24px] border border-sky-200 bg-sky-50/90 p-5 mb-5">
+            <div class="text-sky-800 font-black text-xl">${nextChip === 'primary' ? 'Tap the first NFC chip now.' : 'Tap the second NFC chip now.'}</div>
+            <p class="text-sky-900 font-bold mt-2">Keep this setup session on the same phone. The NFC tap will open /k and return here automatically.</p>
+          </div>
+          <button id="armChip" class="btn btn-primary w-full" type="button">Arm ${nextChip === 'primary' ? 'First' : 'Second'} Chip Scan</button>
+        `}
+        ${state.notice ? `<div class="mt-4 rounded-[18px] border border-sky-200 bg-sky-50 p-4 font-black text-sky-700">${esc(state.notice)}</div>` : ''}
+        ${state.error ? `<div class="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 p-4 font-black text-rose-700">${esc(state.error)}</div>` : ''}
+      `);
+    }
+
+    function render() {
+      if (state.loading) {
+        shell(`
+          ${label('Coverage Sign Setup')}
+          <div class="mx-auto mb-5 h-14 w-14 rounded-full border-[6px] border-slate-200 border-t-sky-500 animate-spin"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold text-slate-950">Opening Setup</h1>
+        `);
+        return;
+      }
+      if (!state.code) {
+        renderNoCode();
+        return;
+      }
+      if (!state.profile) {
+        shell(`
+          ${label('Coverage Sign Setup')}
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl sm:text-5xl font-extrabold text-slate-950 mb-3">Loan Officer Needed</h1>
+          <p class="text-slate-700 font-bold mb-5">Open this from your Loan Officer Dashboard so the sign can attach to your verified profile.</p>
+          <a class="btn btn-soft w-full" href="/nmb-activate${state.uid ? `?uid=${encodeURIComponent(state.uid)}` : ''}">Activate Profile</a>
+        `);
+        return;
+      }
+      renderSetup();
+    }
+
+    function bind() {
+      document.getElementById('manualCodeForm')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const manual = document.getElementById('manualCode')?.value?.trim() || '';
+        if (!manual) return;
+        const query = new URLSearchParams();
+        query.set('code', manual);
+        if (state.uid) query.set('uid', state.uid);
+        window.location.href = `/lo-sign-setup?${query.toString()}`;
+      });
+      document.getElementById('armChip')?.addEventListener('click', () => {
+        const nextChip = chipStatus().primary ? 'secondary' : 'primary';
+        saveSetupSession(nextChip);
+        state.notice = `${nextChip === 'primary' ? 'First' : 'Second'} chip scan is armed. Tap the NFC chip on the Coverage Sign now.`;
+        render();
+      });
+    }
+
+    resolve();
+  </script>
+</body>
+</html>

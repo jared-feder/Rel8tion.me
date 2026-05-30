@@ -27,6 +27,7 @@
     const EXTRA_SIGN_CHIP_SESSION_KEY = 'rel8tion_extra_sign_chip_pending';
     const OPEN_HOUSE_KIT_PENDING_KEY = 'rel8tion_open_house_kit_pending';
     const CHIP_QR_PENDING_KEY = 'rel8tion_chip_qr_pending';
+    const LO_SIGN_SETUP_SESSION_KEY = 'rel8tion_lo_sign_setup_pending';
     const ADD_KEYCHAIN_REMOTE_PREFIX = 'backup-keychain-';
     const EVENT_PASS_UNBOUND_WINDOW_MS = 10 * 60 * 1000;
     const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
@@ -170,6 +171,68 @@
         window.localStorage.removeItem(OPEN_HOUSE_KIT_PENDING_KEY);
         return null;
       }
+    }
+
+    function readLoanOfficerSignSetupSession() {
+      try {
+        const raw = window.localStorage.getItem(LO_SIGN_SETUP_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const expiresAt = new Date(parsed.expiresAt || parsed.createdAt || 0).getTime();
+        if (!parsed.publicCode || !parsed.loanOfficerUid || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          window.localStorage.removeItem(LO_SIGN_SETUP_SESSION_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        window.localStorage.removeItem(LO_SIGN_SETUP_SESSION_KEY);
+        return null;
+      }
+    }
+
+    async function maybeHandleLoanOfficerSignSetupScan() {
+      const pending = readLoanOfficerSignSetupSession();
+      if (!pending?.publicCode || !pending.loanOfficerUid) return false;
+      if (uid === pending.loanOfficerUid) {
+        setStatus('Tap The Sign Chip', 'That was your loan officer keychain. Tap the NFC chip on the Coverage Sign.');
+        return true;
+      }
+
+      const role = pending.nextChip === 'secondary' ? 'secondary' : 'primary';
+      setStatus(role === 'secondary' ? 'Second Sign Chip Found' : 'First Sign Chip Found', 'Registering this chip to your Coverage Sign.');
+      const response = await fetch('/api/lo-sign/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setup_sign_hardware',
+          public_code: pending.publicCode,
+          loan_officer_uid: pending.loanOfficerUid,
+          chip_uid: uid,
+          chip_role: role
+        })
+      }).catch(() => null);
+      const payload = response ? await response.json().catch(() => ({})) : {};
+      if (!response?.ok || payload.ok === false) {
+        setStatus('Coverage Sign Setup Paused', payload.error || 'This chip could not be registered.');
+        return true;
+      }
+
+      if (payload.next_step === 'complete') {
+        window.localStorage.removeItem(LO_SIGN_SETUP_SESSION_KEY);
+      } else {
+        window.localStorage.setItem(LO_SIGN_SETUP_SESSION_KEY, JSON.stringify({
+          ...pending,
+          nextChip: 'secondary',
+          updatedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        }));
+      }
+      const next = new URLSearchParams();
+      next.set('code', pending.publicCode);
+      next.set('uid', pending.loanOfficerUid);
+      next.set('stage', payload.next_step || 'secondary_chip');
+      window.location.href = `${window.location.origin}/lo-sign-setup?${next.toString()}`;
+      return true;
     }
 
     function readAddKeychainSession() {
@@ -960,6 +1023,10 @@
         window.localStorage.setItem('rel8tion_admin_uid', uid);
         setStatus('Admin Keychain', 'Opening the admin dashboard.');
         window.location.href = `${window.location.origin}/admin?uid=${encodeURIComponent(uid)}`;
+        return;
+      }
+
+      if (await maybeHandleLoanOfficerSignSetupScan()) {
         return;
       }
 

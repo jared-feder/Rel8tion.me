@@ -18,6 +18,8 @@
     { "source": "/sponsored-pass-activate.html", "destination": "/sponsored-pass-activate.html" },
     { "source": "/lo-sign", "destination": "/lo-sign.html" },
     { "source": "/lo-sign.html", "destination": "/lo-sign.html" },
+    { "source": "/lo-sign-setup", "destination": "/lo-sign-setup.html" },
+    { "source": "/lo-sign-setup.html", "destination": "/lo-sign-setup.html" },
     { "source": "/lo-sign-activate", "destination": "/lo-sign-activate.html" },
     { "source": "/lo-sign-activate.html", "destination": "/lo-sign-activate.html" },
     { "source": "/event", "destination": "/event.html" },

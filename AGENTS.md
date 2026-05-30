@@ -31,6 +31,7 @@ Before making changes, inspect:
 - `apps/rel8tion-app/src/modules/signResolver/*`
 - `apps/rel8tion-app/src/modules/eventShell/*`
 - `apps/rel8tion-app/agent-dashboard.html`
+- `apps/rel8tion-app/field-dashboard.html`
 - `apps/rel8tion-app/claim.html`
 - `apps/rel8tion-app/src/modules/claimStyled/*`
 - `apps/rel8tion-app/onboarding.html`
@@ -65,11 +66,12 @@ Important route behavior:
 - `[IMPLEMENTED]` `/pass` resolves printed Event Pass QR inventory from `smart_sign_inventory.public_code` and routes fresh single-event passes into QR-first Event Pass setup. Sponsored Event Pass rows with `pass_model = sponsored_agent_pass` route to `/sponsored-pass-activate?code=PUBLIC_CODE` when no live event is linked and reuse is active.
 - `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes. It requires an active sponsor, open-house selection, host-agent info, and per-event agent consent before creating/reusing the live event, `event_pass_coverage_consents` row, and sponsor LO session. If the pass was issued from `/lo-sign-activate`, it should prefill the seeded open house/agent context from `smart_sign_inventory.metadata` and reuse the matching live LO coverage event when possible.
 - `[IMPLEMENTED]` `/lo-sign` resolves reusable Loan Officer Coverage Signs from `loan_officer_coverage_signs.public_code`. Active signs redirect buyer-style QR scans to `/event`; inactive assigned signs route to `/lo-sign-activate`.
+- `[IMPLEMENTED]` `/lo-sign-setup` is the loan-officer dashboard hardware setup lane. The LO starts from the dashboard, scans a pooled LO sign QR, then taps both physical sign NFC chips. `/k` registers those chips into `loan_officer_coverage_signs.uid_primary` and `uid_secondary`; legacy `uid` remains the primary-chip compatibility alias.
 - `[IMPLEMENTED]` `/lo-sign-activate` lets the assigned LO activate coverage for a selected open house, creates a live event/LO coverage session, updates `loan_officer_coverage_signs`, and can issue a Sponsored Event Pass to an agent without silently activating that pass for buyer-data visibility.
 - `[IMPLEMENTED]` LO Coverage Sign activation uses a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) so the current live `smart_signs.uid_primary` not-null schema does not require a buyer NFC chip. Service-side Sponsored Event Pass activation uses `synthetic:event-pass-qr:<code>` until the physical Event Pass NFC flow provides a real UID.
 - `[IMPLEMENTED]` LO Coverage Sign activation also writes the matching `field_demo_visits` and `field_demo_visit_participants` rows so the assigned loan officer sees the live event in the Loan Officer Dashboard (`/loan-officer-dashboard`, with `/lo-field-dashboard` kept as a backward-compatible alias) right after activation.
 - `[IMPLEMENTED]` `/lo-sign-activate` exposes host-agent search/selection and optional host-agent photo upload so LO sign activations can populate the buyer-facing agent card instead of forcing manual faceless entries.
-- `[IMPLEMENTED]` `/loan-officer-dashboard` is the clean LO dashboard alias. It opens the same `field-dashboard?role=loan_officer` surface as `/lo-field-dashboard`, labels the page by the LO first name, includes buyer Affordability actions, and shows a Worked Agents panel derived from covered events.
+- `[IMPLEMENTED]` `/loan-officer-dashboard` is the clean LO dashboard alias. It opens the same `field-dashboard?role=loan_officer` surface as `/lo-field-dashboard`, labels the page by the LO first name, defaults to important cards/urgent notifications/quick actions, includes Buyer Affordability, Edit Profile, and Set Up Coverage Sign actions, and keeps availability, worked agents, and full open-house/buyer lists behind the section menu.
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event-chat` is the buyer return page for event chat SMS links. `/api/event-chat/send` creates buyer access tokens and sends SMS links when an LO/field specialist sends a dashboard chat message.
 - `[IMPLEMENTED]` `/agent-dashboard` is the live event dashboard for the host agent.
@@ -113,6 +115,7 @@ These rules matter more than code style.
 - `[IMPLEMENTED]` Sponsored Event Pass activation must record per-event host-agent consent in `event_pass_coverage_consents` before the sponsoring loan officer receives event check-in visibility or is assigned as live event support.
 - `[IMPLEMENTED]` Sponsored Event Pass seed context is not consent. LO Coverage Sign issuance may store prepared open-house/host-agent context on the pass inventory so the agent does not start from a blank claim, but the seed is marked consumed after the agent activates and consents.
 - `[IMPLEMENTED]` Loan Officer Coverage Sign behavior is separate from Sponsored Event Pass behavior. The LO sign stays with the loan officer and routes by `/lo-sign`; the Sponsored Event Pass stays with the agent and routes by `/pass` then `/sponsored-pass-activate`.
+- `[IMPLEMENTED]` LO Coverage Sign QR pool batch `lo-sign-001` uses `loan_officer_coverage_signs.public_code` values `lo000001` through `lo000100` and QR URLs under `/lo-sign?code=...`. These QR codes are assigned to LOs later through `/lo-sign-setup`; do not merge them into Event Pass QR setup or change existing printed Event Pass URLs.
 - `[INTENDED]` Sponsored Event Pass and Loan Officer Coverage Sign are not buyer lead-sale/referral-purchase products. The LO sponsors open-house technology and event support; the host agent remains the real estate/open-house host.
 - `[INTENDED]` Buyer financing help must only be routed when the buyer explicitly requests financing or pre-approval help. Rel8tion must not collect SSN, credit, income, assets, borrower documents, or mortgage application data.
 - `[IMPLEMENTED]` A Smart Sign and an Event Pass may both be active for the same listing/open-house context because routing is device/sign-aware rather than listing-blocked. Sponsored Event Passes issued from an LO Coverage Sign may share the existing live coverage event after agent consent; other Event Pass flows may create their own event row.
@@ -271,7 +274,7 @@ There is no confirmed full automated test suite for the main static REL8TION app
 ## [RISK] High-Risk Areas
 
 - `/k` routing order. It decides whether a scan is a buyer chip, rear agent chip, loan officer tag, reset scan, pending sign chip, claimed keychain, or unclaimed keychain.
-- `/k` must check `loan_officer_coverage_signs.uid` before normal keychain fallback so an LO Coverage Sign NFC scan opens `/lo-sign-activate` or `/lo-field-dashboard`, not buyer check-in or agent keychain claim.
+- `/k` must check `loan_officer_coverage_signs.uid`, `uid_primary`, and `uid_secondary` before normal keychain fallback so an LO Coverage Sign NFC scan opens `/lo-sign-activate` or `/lo-field-dashboard`, not buyer check-in or agent keychain claim. During `/lo-sign-setup`, the pending setup session takes priority and registers the next scanned sign chip.
 - `/k` must let sign activation win before backup-keychain linking. A fresh front/rear sign chip scanned during activation must never be claimed as an agent backup keychain, even if a backup-keychain session is still pending.
 - `smart_sign_activation_sessions`. Stale rows can make a scan resume the wrong setup.
 - `open_house_events`. Historical code sometimes expected `agent_slug`; current event host field is `host_agent_slug`.

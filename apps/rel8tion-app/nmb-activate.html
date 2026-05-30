@@ -264,6 +264,7 @@ const DEFAULT_LOGO_URL = "https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/ob
 
 const params = new URLSearchParams(window.location.search);
 const uid = params.get("uid");
+const editMode = params.get("edit") === "profile" || params.get("edit") === "1";
 
 function esc(str){
   return String(str || "")
@@ -356,6 +357,7 @@ async function uploadHeadshot(file, uid){
 }
 
 function renderForm(existing = {}) {
+  const editing = editMode || existing.is_active === true;
   document.getElementById("activateMount").innerHTML = `
     <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
       <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
@@ -363,11 +365,11 @@ function renderForm(existing = {}) {
       </div>
 
       <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
-        Activate Your Rel8tionchip
+        ${editing ? "Edit Your Verified Page" : "Activate Your Rel8tionchip"}
       </h1>
 
       <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-3xl mx-auto mb-10 leading-normal">
-        Complete your verified page in one shot and go live instantly.
+        ${editing ? "Keep your buyer-facing and event-support profile current." : "Complete your verified page in one shot and go live instantly."}
       </p>
 
       <form id="activateForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
@@ -426,7 +428,7 @@ function renderForm(existing = {}) {
 
         <div class="md:col-span-2 pt-2">
           <button id="submitBtn" type="submit" class="brand-button w-full px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
-            Activate Verified Page
+            ${editing ? "Save Verified Page" : "Activate Verified Page"}
           </button>
         </div>
 
@@ -445,7 +447,7 @@ function renderForm(existing = {}) {
     const btn = document.getElementById("submitBtn");
 
     btn.disabled = true;
-    btn.textContent = "Building Verified Page...";
+    btn.textContent = editing ? "Saving Verified Page..." : "Building Verified Page...";
     status.textContent = "";
 
     const formData = new FormData(form);
@@ -463,7 +465,7 @@ function renderForm(existing = {}) {
         uploadedPhotoUrl = await uploadHeadshot(headshotFile, uid);
       }
 
-      status.textContent = "Activating verified page...";
+      status.textContent = editing ? "Saving verified page..." : "Activating verified page...";
 
       const payload = {
         p_uid: uid,
@@ -488,13 +490,13 @@ function renderForm(existing = {}) {
         throw new Error("Activation succeeded but no slug was returned.");
       }
 
-      status.textContent = "Profile active. Opening dashboard...";
+      status.textContent = "Profile saved. Opening dashboard...";
       openLoanOfficerDashboard(data[0]);
     } catch (err) {
       console.error(err);
       status.textContent = err.message || "Activation failed.";
       btn.disabled = false;
-      btn.textContent = "Activate Verified Page";
+      btn.textContent = editing ? "Save Verified Page" : "Activate Verified Page";
     }
   });
 }
@@ -520,13 +522,13 @@ async function boot() {
 
     const row = Array.isArray(data) && data.length ? data[0] : null;
 
-    if (row && row.is_active && row.slug) {
+    if (row && row.is_active && row.slug && !editMode) {
       openLoanOfficerDashboard(row);
       return;
     }
 
     const keychainProfile = await lookupVerifiedProfileByAgentKey(uid).catch(() => null);
-    if (keychainProfile?.uid) {
+    if (keychainProfile?.uid && !editMode) {
       openLoanOfficerDashboard(keychainProfile);
       return;
     }

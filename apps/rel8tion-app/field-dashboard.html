@@ -49,6 +49,7 @@
       messages: {},
       activeConversationByVisit: {},
       scheduleOpen: false,
+      activeSection: params.get('section') || window.location.hash.replace(/^#/, '') || 'lo-overview',
       busy: false,
       message: '',
       error: ''
@@ -402,6 +403,44 @@
       return 'One place for open houses, buyer check-ins, affordability guidance, event chat, and agent relationships.';
     }
 
+    function loanOfficerUid() {
+      return state.profile?.uid || state.uid || '';
+    }
+
+    function normalizeLoanOfficerSection(value) {
+      return ['lo-overview', 'lo-availability', 'lo-agents', 'lo-open-houses'].includes(value) ? value : 'lo-overview';
+    }
+
+    function dashboardSectionHref(section) {
+      const next = new URLSearchParams(window.location.search);
+      next.set('role', 'loan_officer');
+      next.set('section', normalizeLoanOfficerSection(section));
+      if (state.profile?.uid && !next.get('uid')) next.set('uid', state.profile.uid);
+      if (state.profile?.slug && !next.get('slug')) next.set('slug', state.profile.slug);
+      return `/field-dashboard?${next.toString()}`;
+    }
+
+    function editProfileHref() {
+      const uid = loanOfficerUid();
+      return uid ? `/nmb-activate?uid=${encodeURIComponent(uid)}&edit=profile` : '/nmb-activate';
+    }
+
+    function coverageSignSetupHref() {
+      const query = new URLSearchParams();
+      const uid = loanOfficerUid();
+      if (uid) query.set('uid', uid);
+      if (state.profile?.slug) query.set('slug', state.profile.slug);
+      return `/lo-sign-setup${query.toString() ? `?${query.toString()}` : ''}`;
+    }
+
+    function affordabilityDashboardHref() {
+      const query = new URLSearchParams();
+      const uid = loanOfficerUid();
+      if (uid) query.set('uid', uid);
+      query.set('return_to', `/loan-officer-dashboard${uid ? `?uid=${encodeURIComponent(uid)}` : ''}`);
+      return `/lo-affordability-guidance?${query.toString()}`;
+    }
+
     function affordabilityHref(visit, row = {}) {
       const query = new URLSearchParams();
       const uid = state.profile?.uid || state.uid || '';
@@ -419,6 +458,7 @@
 
     function renderLoanOfficerNav() {
       if (!isLoanOfficerDashboard()) return '';
+      const active = normalizeLoanOfficerSection(state.activeSection);
       return `
         <aside class="rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Dashboard Sections</div>
@@ -428,7 +468,7 @@
               ['lo-availability', 'Availability'],
               ['lo-agents', 'Worked Agents'],
               ['lo-open-houses', 'Open Houses + Buyers']
-            ].map(([id, label]) => `<a href="#${id}" class="rounded-2xl bg-white px-3 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-100">${esc(label)}</a>`).join('')}
+            ].map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label)}</a>`).join('')}
           </nav>
         </aside>
       `;
@@ -564,6 +604,170 @@
                 </article>
               `;
             }).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 lg:col-span-2">No worked agents yet. Once this LO covers an open house or activates a coverage sign, agent relationships will collect here.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderLoanOfficerQuickActions() {
+      if (!isLoanOfficerDashboard()) return '';
+      const actions = [
+        {
+          href: coverageSignSetupHref(),
+          label: 'Set Up Coverage Sign',
+          text: 'Scan the sign QR, then tap both sign chips.',
+          tone: 'bg-sky-600 text-white ring-sky-600'
+        },
+        {
+          href: editProfileHref(),
+          label: 'Edit Profile',
+          text: 'Update photo, phone, company, and verified page details.',
+          tone: 'bg-white text-slate-800 ring-slate-100'
+        },
+        {
+          href: affordabilityDashboardHref(),
+          label: 'Buyer Affordability',
+          text: 'Open financing guidance and saved buyer scenarios.',
+          tone: 'bg-white text-slate-800 ring-slate-100'
+        },
+        {
+          href: dashboardSectionHref('lo-availability'),
+          label: 'Availability',
+          text: 'Set the times and ZIPs where you can cover events.',
+          tone: 'bg-white text-slate-800 ring-slate-100'
+        }
+      ];
+      return `
+        <section class="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          ${actions.map((action) => `
+            <a href="${esc(action.href)}" class="rounded-[26px] border border-white/80 p-5 shadow-sm ring-1 ${action.tone}">
+              <div class="text-base font-black">${esc(action.label)}</div>
+              <div class="mt-2 text-sm font-bold ${action.tone.includes('text-white') ? 'text-sky-50' : 'text-slate-500'}">${esc(action.text)}</div>
+            </a>
+          `).join('')}
+        </section>
+      `;
+    }
+
+    function loanOfficerUrgentItems() {
+      const items = [];
+      const financingRows = [];
+      state.visits.forEach((visit) => {
+        const rows = state.buyerRequests[visit.open_house_event_id] || [];
+        rows.forEach((row) => {
+          if (row.pre_approved === false || row.metadata?.financing_requested === true) {
+            financingRows.push({ visit, row });
+          }
+        });
+      });
+
+      financingRows.slice(0, 3).forEach(({ visit, row }) => {
+        items.push({
+          tone: 'rose',
+          title: `${row.visitor_name || row.metadata?.name || 'Buyer'} requested financing help`,
+          body: [visit.agent_name, visit.open_house_id || visit.open_house_event_id, fmtTime(row.created_at)].filter(Boolean).join(' - '),
+          href: affordabilityHref(visit, row),
+          action: 'Open Affordability'
+        });
+      });
+
+      state.visits.filter((visit) => visit.status === 'live').slice(0, 2).forEach((visit) => {
+        items.push({
+          tone: 'emerald',
+          title: `Live coverage: ${visit.agent_name || visit.agent_slug || 'Open house'}`,
+          body: [visit.open_house_id || visit.open_house_event_id, fmtTime(visit.scheduled_start)].filter(Boolean).join(' - '),
+          href: dashboardSectionHref('lo-open-houses'),
+          action: 'Open Events'
+        });
+      });
+
+      if (state.profile && !state.profile.photo_url) {
+        items.push({
+          tone: 'sky',
+          title: 'Add your profile photo',
+          body: 'Buyer check-in and event support pages look stronger with your verified photo.',
+          href: editProfileHref(),
+          action: 'Edit Profile'
+        });
+      }
+
+      if (!state.availability.length) {
+        items.push({
+          tone: 'slate',
+          title: 'Set coverage availability',
+          body: 'Add your service windows so coverage scheduling can find you.',
+          href: dashboardSectionHref('lo-availability'),
+          action: 'Set Availability'
+        });
+      }
+
+      return items.slice(0, 4);
+    }
+
+    function renderLoanOfficerUrgentNotifications() {
+      if (!isLoanOfficerDashboard()) return '';
+      const items = loanOfficerUrgentItems();
+      const toneClass = (tone) => tone === 'rose'
+        ? 'border-rose-200 bg-rose-50 text-rose-800'
+        : tone === 'emerald'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          : tone === 'sky'
+            ? 'border-sky-200 bg-sky-50 text-sky-800'
+            : 'border-slate-200 bg-white/80 text-slate-800';
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-rose-700">Urgent</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Needs Attention</h2>
+            </div>
+            <a href="${esc(dashboardSectionHref('lo-open-houses'))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200">All Events</a>
+          </div>
+          <div class="mt-4 grid gap-3">
+            ${items.length ? items.map((item) => `
+              <a href="${esc(item.href)}" class="rounded-[22px] border p-4 ${toneClass(item.tone)}">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="font-black">${esc(item.title)}</div>
+                    <div class="mt-1 text-sm font-bold opacity-80">${esc(item.body)}</div>
+                  </div>
+                  <div class="rounded-full bg-white/80 px-3 py-2 text-xs font-black">${esc(item.action)}</div>
+                </div>
+              </a>
+            `).join('') : `<div class="rounded-[22px] border border-emerald-200 bg-emerald-50 p-4 font-bold text-emerald-800">Nothing urgent right now.</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderLoanOfficerTopOpenHouses() {
+      if (!isLoanOfficerDashboard()) return '';
+      const visits = [...state.visits]
+        .sort((a, b) => (b.status === 'live') - (a.status === 'live') || new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0))
+        .slice(0, 3);
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Coverage</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Next Open Houses</h2>
+            </div>
+            <a href="${esc(dashboardSectionHref('lo-open-houses'))}" class="rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white">View All</a>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-3">
+            ${visits.length ? visits.map((visit) => {
+              const agentLine = [visit.agent_name || visit.agent_slug, visit.brokerage].filter(Boolean).join(' - ');
+              const buyers = (state.buyerRequests[visit.open_house_event_id] || []).length;
+              return `
+                <article class="rounded-[24px] bg-white/85 p-4 ring-1 ring-slate-100">
+                  <div class="flex flex-wrap items-center gap-2">${visitStatusPill(visit.status)}</div>
+                  <h3 class="mt-3 text-lg font-black leading-tight">${esc(agentLine || 'Assigned coverage')}</h3>
+                  <p class="mt-1 text-sm font-bold text-slate-500">${esc(visit.open_house_id || visit.open_house_event_id || 'Open house')}</p>
+                  <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
+                  <p class="mt-2 text-xs font-black uppercase tracking-[.12em] text-slate-400">${buyers} buyer check-in${buyers === 1 ? '' : 's'}</p>
+                </article>
+              `;
+            }).join('') : `<div class="rounded-[24px] bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 lg:col-span-3">No upcoming open houses yet. At the open house, scan your Coverage Sign QR to start live coverage and link a Sponsored Event Pass.</div>`}
           </div>
         </section>
       `;
@@ -929,10 +1133,20 @@
       const profileName = state.profile?.full_name || state.uid || state.slug || 'Field Team';
       const stats = visitStats();
       const agents = workedAgents();
+      const activeSection = normalizeLoanOfficerSection(state.activeSection);
+      const showOverview = !isLoanOfficerDashboard() || activeSection === 'lo-overview';
       profileLabel.textContent = profileName;
       dashboardRoleLabel.textContent = isLoanOfficerDashboard() ? 'Loan Officer' : 'Field Operations';
       document.title = isLoanOfficerDashboard() ? `REL8TION ${dashboardTitle()}` : 'REL8TION Field Dashboard';
       const dashboardBody = `
+        ${!showOverview && (state.message || state.error) ? `
+          <section class="mb-6 rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm">
+            ${state.message ? `<div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
+            ${state.error ? `<div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
+          </section>
+        ` : ''}
+
+        ${showOverview ? `
         <section id="lo-overview" class="mb-6 scroll-mt-5">
           <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">${esc(dashboardKicker())}</div>
           <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(dashboardTitle())}</h1>
@@ -942,14 +1156,16 @@
           ${state.message ? `<div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
           ${state.error ? `<div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
         </section>
+        ` : ''}
 
-        ${!state.profile && !state.uid ? `
+        ${showOverview && !state.profile && !state.uid ? `
           <section class="mb-6 rounded-[28px] border border-amber-200 bg-amber-50/90 p-5">
             <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Profile Not Identified</h2>
             <p class="mt-2 font-semibold leading-relaxed text-amber-900">Open this dashboard from a verified NMB/field profile link using <code>uid</code> or <code>slug</code>, or tap a verified field/loan officer chip once that router path is added.</p>
           </section>
         ` : ''}
 
+        ${showOverview ? `
         <section class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           ${stat('Today', stats.today, 'blue')}
           ${stat(isLoanOfficerDashboard() ? 'Agents' : 'Tomorrow', isLoanOfficerDashboard() ? agents.length : stats.tomorrow, 'blue')}
@@ -957,21 +1173,30 @@
           ${stat('Buyer requests', stats.buyers, 'slate')}
           ${stat('Financing', stats.financing, stats.financing ? 'rose' : 'slate')}
         </section>
+        ` : ''}
+
+        ${isLoanOfficerDashboard() && showOverview ? `
+          ${renderLoanOfficerQuickActions()}
+          ${renderLoanOfficerUrgentNotifications()}
+          ${renderLoanOfficerTopOpenHouses()}
+        ` : ''}
 
         ${isLoanOfficerDashboard() ? '' : renderSchedulePanel()}
 
-        <div id="lo-availability" class="scroll-mt-5">${renderAvailabilityPanel()}</div>
+        ${!isLoanOfficerDashboard() || activeSection === 'lo-availability' ? `<div id="lo-availability" class="scroll-mt-5">${renderAvailabilityPanel()}</div>` : ''}
 
-        ${renderWorkedAgentsPanel(agents)}
+        ${!isLoanOfficerDashboard() || activeSection === 'lo-agents' ? renderWorkedAgentsPanel(agents) : ''}
 
         ${isLoanOfficerDashboard() ? '' : renderOutreachPanel()}
 
+        ${!isLoanOfficerDashboard() || activeSection === 'lo-open-houses' ? `
         <section id="lo-open-houses" class="grid scroll-mt-5 gap-4">
           ${state.visits.length ? state.visits.map(renderVisit).join('') : `<div class="rounded-[28px] border border-dashed border-slate-300 bg-white/65 p-8 text-center">
             <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${isLoanOfficerDashboard() ? 'No Upcoming Open Houses Assigned' : 'No Assigned Visits In The Next 7 Days'}</h2>
             <p class="mt-2 font-semibold text-slate-500">${isLoanOfficerDashboard() ? 'Assigned open houses will appear here with agent, listing, buyer financing, and live-event context.' : 'Use Schedule Visit to create the next field coverage, then send outreach with a concrete appointment path.'}</p>
           </div>`}
         </section>
+        ` : ''}
       `;
       app.innerHTML = isLoanOfficerDashboard()
         ? `<div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">${renderLoanOfficerNav()}<div class="min-w-0">${dashboardBody}</div></div>`
