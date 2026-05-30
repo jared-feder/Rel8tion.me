@@ -1099,6 +1099,33 @@
     }
 
     .lock-panel form { display: grid; gap: 10px; }
+    .lock-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border: 1px solid rgba(122,148,173,.18);
+      border-radius: 8px;
+      background: rgba(255,255,255,.62);
+      padding: 10px;
+      color: #31465f;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+
+    .lock-option input {
+      width: auto;
+      min-height: 0;
+      margin-top: 2px;
+      flex: 0 0 auto;
+    }
+
+    .lock-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
     .error { color: var(--bad); font-weight: 900; }
     .muted { color: var(--muted); }
 
@@ -1287,6 +1314,9 @@
   <script>
     const ADMIN_UID_KEY = 'rel8tion_admin_uid';
     const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
+    const ADMIN_LOCAL_LOCK_KEY = 'rel8tion_admin_local_lock_v1';
+    const ADMIN_LOCK_SESSION_KEY = 'rel8tion_admin_lock_session_v1';
+    const ADMIN_LOCK_DURATION_MS = 8 * 60 * 60 * 1000;
     const DRAFTS_KEY = 'rel8tion_admin_reply_drafts';
     const AREA_KEY = 'rel8tion_admin_area';
 
@@ -1302,6 +1332,8 @@
 
     const state = {
       verified: false,
+      credentialVerified: false,
+      lockStep: 'credentials',
       loading: false,
       sendingKey: '',
       actionKey: '',
@@ -1343,6 +1375,165 @@
       if (cred.uid) headers['x-admin-uid'] = cred.uid;
       if (cred.token) headers['x-admin-token'] = cred.token;
       return headers;
+    }
+
+    function adminLockSubject() {
+      const cred = credential();
+      if (cred.uid) return `uid:${cred.uid}`;
+      if (cred.token) return 'token:fallback-admin';
+      return 'admin';
+    }
+
+    function readAdminLocalLock() {
+      try {
+        const lock = JSON.parse(window.localStorage.getItem(ADMIN_LOCAL_LOCK_KEY) || 'null');
+        return lock?.subject === adminLockSubject() ? lock : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function saveAdminLocalLock(lock) {
+      window.localStorage.setItem(ADMIN_LOCAL_LOCK_KEY, JSON.stringify(lock));
+    }
+
+    function clearAdminLockSession() {
+      window.sessionStorage.removeItem(ADMIN_LOCK_SESSION_KEY);
+    }
+
+    function setAdminLockSession(lock) {
+      window.sessionStorage.setItem(ADMIN_LOCK_SESSION_KEY, JSON.stringify({
+        lock_id: lock.id,
+        subject: lock.subject,
+        unlocked_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + ADMIN_LOCK_DURATION_MS).toISOString()
+      }));
+    }
+
+    function adminLockSessionValid(lock) {
+      try {
+        const session = JSON.parse(window.sessionStorage.getItem(ADMIN_LOCK_SESSION_KEY) || 'null');
+        return Boolean(
+          lock?.id
+          && session?.lock_id === lock.id
+          && session?.subject === lock.subject
+          && new Date(session.expires_at || 0).getTime() > Date.now()
+        );
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function ensureAdminLocalLock() {
+      const lock = readAdminLocalLock();
+      if (!lock) {
+        state.lockStep = 'setup';
+        return false;
+      }
+      if (adminLockSessionValid(lock)) {
+        state.lockStep = 'unlocked';
+        return true;
+      }
+      state.lockStep = 'unlock';
+      return false;
+    }
+
+    function randomBytes(length = 32) {
+      const bytes = new Uint8Array(length);
+      window.crypto.getRandomValues(bytes);
+      return bytes;
+    }
+
+    function bytesToBase64Url(bytes) {
+      let binary = '';
+      new Uint8Array(bytes).forEach((byte) => { binary += String.fromCharCode(byte); });
+      return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlToBytes(value) {
+      const clean = String(value || '');
+      const padded = `${clean.replace(/-/g, '+').replace(/_/g, '/')}${'='.repeat((4 - (clean.length % 4)) % 4)}`;
+      return Uint8Array.from(window.atob(padded), (char) => char.charCodeAt(0));
+    }
+
+    async function pinDigest(pin, salt) {
+      const bytes = new TextEncoder().encode(`${salt}:${pin}`);
+      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+      return bytesToBase64Url(new Uint8Array(digest));
+    }
+
+    function passkeyAvailable() {
+      return Boolean(window.PublicKeyCredential && navigator.credentials?.create && navigator.credentials?.get);
+    }
+
+    async function buildPinLock(pin) {
+      const salt = bytesToBase64Url(randomBytes(18));
+      return {
+        id: bytesToBase64Url(randomBytes(18)),
+        subject: adminLockSubject(),
+        pin_salt: salt,
+        pin_hash: await pinDigest(pin, salt),
+        passkey: null,
+        created_at: new Date().toISOString(),
+        note: 'Local admin lock concept. Hardened production version should verify server-side.'
+      };
+    }
+
+    async function registerAdminPasskey(lock) {
+      if (!passkeyAvailable()) throw new Error('This browser does not support phone/passkey unlock.');
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: randomBytes(32),
+          rp: { name: 'REL8TION' },
+          user: {
+            id: randomBytes(16),
+            name: 'rel8tion-admin',
+            displayName: 'REL8TION COMMAND'
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },
+            { type: 'public-key', alg: -257 }
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            residentKey: 'preferred',
+            userVerification: 'required'
+          },
+          timeout: 60000,
+          attestation: 'none'
+        }
+      });
+      if (!credential?.rawId) throw new Error('Phone/passkey setup was cancelled.');
+      return {
+        id: bytesToBase64Url(new Uint8Array(credential.rawId)),
+        type: credential.type || 'public-key',
+        created_at: new Date().toISOString()
+      };
+    }
+
+    async function unlockAdminWithPasskey(lock) {
+      if (!lock?.passkey?.id) throw new Error('Phone unlock is not set up on this browser.');
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: randomBytes(32),
+          allowCredentials: [{
+            id: base64UrlToBytes(lock.passkey.id),
+            type: lock.passkey.type || 'public-key'
+          }],
+          userVerification: 'required',
+          timeout: 60000
+        }
+      });
+      if (!assertion?.rawId) throw new Error('Phone unlock was cancelled.');
+      setAdminLockSession(lock);
+    }
+
+    async function unlockAdminWithPin(pin) {
+      const lock = readAdminLocalLock();
+      if (!lock) throw new Error('No admin PIN is set on this browser.');
+      const hash = await pinDigest(pin, lock.pin_salt);
+      if (hash !== lock.pin_hash) throw new Error('That PIN did not match.');
+      setAdminLockSession(lock);
     }
 
     function readDrafts() {
@@ -1671,17 +1862,28 @@
       const cred = credential();
       if (!cred.uid && !cred.token) {
         state.verified = false;
+        state.credentialVerified = false;
+        state.lockStep = 'credentials';
         render();
         return;
       }
 
       try {
         await api('/api/admin/auth');
+        state.credentialVerified = true;
+        if (!ensureAdminLocalLock()) {
+          state.verified = false;
+          state.error = '';
+          render();
+          return;
+        }
         state.verified = true;
         state.error = '';
         await loadAll();
       } catch (error) {
         state.verified = false;
+        state.credentialVerified = false;
+        state.lockStep = 'credentials';
         state.error = error.message || 'Unauthorized.';
         render();
       }
@@ -2571,6 +2773,9 @@
     function signOut() {
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+      clearAdminLockSession();
+      state.credentialVerified = false;
+      state.lockStep = 'credentials';
       state.verified = false;
       state.inbox = [];
       state.command = null;
@@ -2584,8 +2789,140 @@
       showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 3200);
     }
 
+    async function finishAdminLocalUnlock(message = '') {
+      state.lockStep = 'unlocked';
+      state.verified = true;
+      state.error = '';
+      await loadAll({ showLoading: true, preserveUi: false });
+      if (message) showToast(message);
+    }
+
+    async function handleAdminLockSetup(event) {
+      event.preventDefault();
+      const pin = document.getElementById('pinSetupInput')?.value?.trim() || '';
+      const confirm = document.getElementById('pinConfirmInput')?.value?.trim() || '';
+      const usePasskey = Boolean(document.getElementById('passkeySetupInput')?.checked);
+      if (!/^\d{4}$/.test(pin)) {
+        state.error = 'Use exactly 4 digits for the admin PIN.';
+        renderLock();
+        return;
+      }
+      if (pin !== confirm) {
+        state.error = 'The two PIN entries do not match.';
+        renderLock();
+        return;
+      }
+      try {
+        state.error = '';
+        const lock = await buildPinLock(pin);
+        let passkeyMessage = '';
+        if (usePasskey) {
+          try {
+            lock.passkey = await registerAdminPasskey(lock);
+            passkeyMessage = ' Phone unlock is also ready on this device.';
+          } catch (error) {
+            passkeyMessage = ` Phone unlock was not added: ${error.message || 'setup cancelled'}.`;
+          }
+        }
+        saveAdminLocalLock(lock);
+        setAdminLockSession(lock);
+        await finishAdminLocalUnlock(`Admin PIN saved.${passkeyMessage}`);
+      } catch (error) {
+        state.error = error.message || 'Could not set the admin lock.';
+        renderLock();
+      }
+    }
+
+    async function handleAdminPinUnlock(event) {
+      event.preventDefault();
+      const pin = document.getElementById('pinUnlockInput')?.value?.trim() || '';
+      try {
+        await unlockAdminWithPin(pin);
+        await finishAdminLocalUnlock('Admin unlocked.');
+      } catch (error) {
+        state.error = error.message || 'Could not unlock admin.';
+        renderLock();
+      }
+    }
+
+    async function handleAdminPasskeyUnlock() {
+      try {
+        await unlockAdminWithPasskey(readAdminLocalLock());
+        await finishAdminLocalUnlock('Phone unlock accepted.');
+      } catch (error) {
+        state.error = error.message || 'Phone unlock failed.';
+        renderLock();
+      }
+    }
+
+    function resetAdminTestLock() {
+      const typed = window.prompt('Reset the test admin PIN/passkey lock on this browser?\n\nType REL8TION to continue.');
+      if (typed !== 'REL8TION') return;
+      window.localStorage.removeItem(ADMIN_LOCAL_LOCK_KEY);
+      clearAdminLockSession();
+      state.lockStep = 'setup';
+      state.error = 'Test lock reset. Set a new PIN to continue.';
+      renderLock();
+    }
+
     function renderLock() {
       const cred = credential();
+      const lock = readAdminLocalLock();
+      if (state.credentialVerified && state.lockStep === 'setup') {
+        app.innerHTML = `
+          <main class="lock">
+            <section class="lock-panel">
+              <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+              <h1>Set Admin Lock</h1>
+              <p class="small" style="margin-bottom:12px;">Your admin chip/token is verified. Now set a 4-digit PIN for this browser. You can also test phone unlock if this device supports passkeys.</p>
+              <form id="adminLockSetupForm">
+                <input id="pinSetupInput" class="field" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="Create 4-digit PIN">
+                <input id="pinConfirmInput" class="field" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="Confirm PIN">
+                <label class="lock-option">
+                  <input id="passkeySetupInput" type="checkbox" ${passkeyAvailable() ? '' : 'disabled'}>
+                  <span>${passkeyAvailable() ? 'Also set up phone unlock with Face ID, fingerprint, or device passcode.' : 'Phone unlock is not available in this browser.'}</span>
+                </label>
+                ${state.error ? `<div class="error small">${esc(state.error)}</div>` : ''}
+                <button class="btn primary" type="submit"><i data-lucide="shield-check"></i><span>Save Admin Lock</span></button>
+              </form>
+              <p class="small" style="margin-top:12px;">Concept test: this lock is stored on this browser. The hardened version will issue a short-lived server-verified dashboard session.</p>
+            </section>
+          </main>
+        `;
+        document.getElementById('adminLockSetupForm')?.addEventListener('submit', handleAdminLockSetup);
+        window.lucide?.createIcons();
+        return;
+      }
+
+      if (state.credentialVerified && state.lockStep === 'unlock') {
+        app.innerHTML = `
+          <main class="lock">
+            <section class="lock-panel">
+              <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+              <h1>Unlock COMMAND</h1>
+              <p class="small" style="margin-bottom:12px;">Admin chip/token verified. Unlock this browser session with your PIN${lock?.passkey ? ' or phone unlock' : ''}.</p>
+              ${lock?.passkey ? `<button id="passkeyUnlockButton" class="btn primary" type="button"><i data-lucide="scan-face"></i><span>Use Phone Unlock</span></button>` : ''}
+              <form id="adminPinUnlockForm" style="margin-top:10px;">
+                <input id="pinUnlockInput" class="field" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="4-digit PIN">
+                ${state.error ? `<div class="error small">${esc(state.error)}</div>` : ''}
+                <button class="btn ${lock?.passkey ? 'soft' : 'primary'}" type="submit"><i data-lucide="lock-keyhole"></i><span>Unlock With PIN</span></button>
+              </form>
+              <div class="lock-actions">
+                <button id="resetAdminTestLockButton" class="btn soft" type="button"><i data-lucide="rotate-ccw"></i><span>Reset Test Lock</span></button>
+                <button id="adminLockSignOutButton" class="btn bad" type="button"><i data-lucide="log-out"></i><span>Forget Admin Credentials</span></button>
+              </div>
+              <p class="small" style="margin-top:12px;">This is a local concept test. Do not treat it as final admin security until server enforcement is added.</p>
+            </section>
+          </main>
+        `;
+        document.getElementById('adminPinUnlockForm')?.addEventListener('submit', handleAdminPinUnlock);
+        document.getElementById('passkeyUnlockButton')?.addEventListener('click', handleAdminPasskeyUnlock);
+        document.getElementById('resetAdminTestLockButton')?.addEventListener('click', resetAdminTestLock);
+        document.getElementById('adminLockSignOutButton')?.addEventListener('click', signOut);
+        window.lucide?.createIcons();
+        return;
+      }
+
       app.innerHTML = `
         <main class="lock">
           <section class="lock-panel">

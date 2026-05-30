@@ -160,6 +160,7 @@ Create a live Supabase verification script or checklist to confirm tables, colum
 - The Supabase anon key is intentionally public in browser code. Service role access belongs only in serverless or Edge Function code.
 - Be careful with RLS. Browser code must only depend on policies intentionally available to anon/authenticated users.
 - Admin reset flows are destructive. `api/admin/reset-key.js` requires `KEY_RESET_ADMIN_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY`.
+- REL8TION COMMAND has a browser-local admin Dashboard Lock concept for PIN/passkey testing. Treat it as UX validation only until privileged admin APIs require a server-issued unlock session in addition to the existing admin UID/token.
 - When changing sign activation, test both Android-style direct NFC navigation and iPhone popup behavior.
 - When changing buyer check-in, verify SMS side effects and preapproval routing.
 - When changing outreach, inspect both `agent_outreach_queue` and `agent_outreach_replies`.
