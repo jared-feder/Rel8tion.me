@@ -425,6 +425,7 @@ Role: reusable Loan Officer Coverage Sign resolver and activation flow.
 - If the sign has a live `active_event_id`, buyer-style QR scans redirect to `/event?event=<active_event_id>`.
 - If the sign is assigned to an active LO but inactive, it shows "Coverage Sign Ready" and routes to `/lo-sign-activate?code=...`.
 - `/lo-sign-activate` uses nearby/search/manual open-house selection, confirms/adds host-agent info, creates a live open-house event, creates a live `event_loan_officer_sessions` row, updates `loan_officer_coverage_signs.active_event_id`, and records `loan_officer_sign_events` history.
+- Coverage-sign activations use a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) because the live schema still requires `smart_signs.uid_primary` even when no buyer NFC chip is involved. Service-side Sponsored Event Pass activation uses the same compatibility pattern (`synthetic:event-pass-qr:<code>`) until a physical Event Pass NFC UID is supplied by the QR-to-NFC setup flow.
 - Optional Sponsored Event Pass issuance from this flow prepares the pass inventory for the agent and sponsor but does not silently activate the Sponsored Event Pass for buyer-data visibility. The Sponsored Event Pass still requires the agent consent screen when activated.
 
 ### `/event`
