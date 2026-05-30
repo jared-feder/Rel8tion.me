@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-Last inspected: 2026-05-29.
+Last inspected: 2026-05-30.
 
 This document describes the implementation currently present in the repository. It intentionally separates confirmed implementation from inferred or unverified behavior.
 
@@ -372,6 +372,7 @@ Role: public smart sign and Event Pass resolver. `/s` and `/sign` preserve the s
 - If an Event Pass is linked to a sign and that sign has `active_event_id`, redirects directly to `/event?event=<eventId>`.
 - If an Event Pass is linked to a sign but has no active event, renders "Event Pass Ready" with setup buttons that continue into `/sign-demo-activate?code=<code>&source=event_pass`.
 - If `/pass?code=...` resolves to `pass_model = sponsored_agent_pass`, the resolver does not use the one-event Event Pass setup path. A live linked event redirects to `/event?event=<eventId>`; otherwise reuse is allowed only when `reuse_allowed = true` and `reuse_status = active`, then the agent is sent to `/sponsored-pass-activate?code=<code>`.
+- If a Sponsored Event Pass was issued from `/lo-sign-activate`, `/pass` and `/sponsored-pass-activate` use the seeded context stored on `smart_sign_inventory.metadata`: selected open house, property facts, host-agent info, and the LO coverage event id. The pass activation still requires the agent consent checkbox, but it starts from the LO's prepared context instead of a blank fresh claim.
 - If a smart sign route has an active event, redirects to `/event?event=<eventId>`.
 - If a smart sign route has a sign but no active event, renders "Sign Found" and activation options.
 - If no host session exists, it stores pending sign activation and prompts the agent to tap their Rel8tionChip/keychain.
@@ -382,9 +383,10 @@ Event Pass product positioning:
 
 - Event Pass is a B2B open-house technology/access product sponsored by a loan officer. It is strictly an event pass and not an agent profile product.
 - The physical Event Pass has both the printed QR and an NFC chip. The QR starts setup, the NFC chip claims the temporary Event Pass keychain identity, and future NFC taps open the dashboard for the active event created by that pass.
-- A Smart Sign and Event Pass can both be live for the same listing/open-house context. They remain separate backing signs/events under the hood, which keeps each physical device independently resettable. Device-aware routing keeps them from hijacking each other: Event Pass NFC opens the Event Pass dashboard, rear Smart Sign NFC opens the Smart Sign dashboard after keychain verification, and a generic claimed keychain prefers the Smart Sign event when both are active.
+- A Smart Sign and Event Pass can both be live for the same listing/open-house context. They remain separate physical/backing sign identities and may either share the same `open_house_events` row or use separate event rows depending on the activation path. Device-aware routing keeps them from hijacking each other: Event Pass NFC opens the Event Pass dashboard, rear Smart Sign NFC opens the Smart Sign dashboard after keychain verification, and a generic claimed keychain prefers the Smart Sign event when both are active.
 - Event Pass is intentionally one included event unless renewed by the sponsoring loan officer/admin. Once an Event Pass has prior event history and no current active event, self-service NFC/activation reuse is blocked. Admin/LO renewal clears the inventory claim/link so the next QR-first setup can explicitly re-arm it.
 - Sponsored Event Pass is the reusable model: a loan officer sponsors open-house technology and live event support, not buyer lead buying or referral purchasing. Each activation records per-event host-agent consent in `event_pass_coverage_consents` before the sponsor receives event check-in visibility.
+- Sponsored Event Pass seed context is one-use operational context, not consent. After the agent activates the pass, metadata records `seed_consumed_at` / `seed_consumed_event_id` so the same reusable pass can be used later without preloading an old ended event unless the LO issues it again from a new coverage-sign activation.
 - Buyer `/event` check-in discloses sharing with the hosting real estate professional, Rel8tion event support, and a sponsoring loan officer when present. Financing help is only routed when the buyer explicitly asks for it, and Rel8tion does not collect mortgage application data.
 - After check-in, `/event` shows live loan-officer coverage when an active `event_loan_officer_sessions` row exists, including photo/name/company/title and explicit call/request-financing actions. The financing CTA still requires buyer action.
 - Pending Event Pass local and remote handoff rows are ignored when they already point at a different scanned key UID, when an unbound QR-to-NFC handoff is older than the short fresh-scan window, or when their inventory is already linked to a sign with an active/prior event. The `/k` to `/claim` handoff stores the scanned UID and `/claim` requires that UID before saving `keys.device_role = event_pass_keychain`, which prevents stale QR-to-NFC setup state from hijacking unrelated fresh agent keychain scans.
@@ -432,6 +434,7 @@ Role: reusable Loan Officer Coverage Sign resolver and activation flow.
 - Coverage-sign activations use a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) because the live schema still requires `smart_signs.uid_primary` even when no buyer NFC chip is involved. Service-side Sponsored Event Pass activation uses the same compatibility pattern (`synthetic:event-pass-qr:<code>`) until a physical Event Pass NFC UID is supplied by the QR-to-NFC setup flow.
 - Coverage-sign activations create/reuse `field_demo_visits` and `field_demo_visit_participants` rows for the assigned loan officer so `/lo-field-dashboard` renders the live coverage card immediately after activation.
 - Optional Sponsored Event Pass issuance from this flow prepares the pass inventory for the agent and sponsor but does not silently activate the Sponsored Event Pass for buyer-data visibility. The Sponsored Event Pass still requires the agent consent screen when activated.
+- The issued pass stores a seeded context with the coverage event, open house, property facts, and host-agent details. If that coverage event is still live when the agent activates the pass, Sponsored Pass activation reuses the same `open_house_events` row and links the pass backing sign to it, keeping the LO dashboard, agent dashboard, buyer check-in QR, and Event Pass QR aligned.
 
 ### `/event`
 

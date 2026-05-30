@@ -2,7 +2,7 @@
 
 Repo operating guide for future Codex sessions working on REL8TION.
 
-Last inspected: 2026-05-29.
+Last inspected: 2026-05-30.
 
 Status labels used in this file:
 
@@ -63,7 +63,7 @@ Important route behavior:
 - `[IMPLEMENTED]` `/sign-demo-activate` is the smart sign setup and listing binding flow.
 - `[IMPLEMENTED]` `/s` and `/sign` resolve a smart sign public code and route to activation or live event.
 - `[IMPLEMENTED]` `/pass` resolves printed Event Pass QR inventory from `smart_sign_inventory.public_code` and routes fresh single-event passes into QR-first Event Pass setup. Sponsored Event Pass rows with `pass_model = sponsored_agent_pass` route to `/sponsored-pass-activate?code=PUBLIC_CODE` when no live event is linked and reuse is active.
-- `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes. It requires an active sponsor, open-house selection, host-agent info, and per-event agent consent before creating the live event, `event_pass_coverage_consents` row, and sponsor LO session.
+- `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes. It requires an active sponsor, open-house selection, host-agent info, and per-event agent consent before creating/reusing the live event, `event_pass_coverage_consents` row, and sponsor LO session. If the pass was issued from `/lo-sign-activate`, it should prefill the seeded open house/agent context from `smart_sign_inventory.metadata` and reuse the matching live LO coverage event when possible.
 - `[IMPLEMENTED]` `/lo-sign` resolves reusable Loan Officer Coverage Signs from `loan_officer_coverage_signs.public_code`. Active signs redirect buyer-style QR scans to `/event`; inactive assigned signs route to `/lo-sign-activate`.
 - `[IMPLEMENTED]` `/lo-sign-activate` lets the assigned LO activate coverage for a selected open house, creates a live event/LO coverage session, updates `loan_officer_coverage_signs`, and can issue a Sponsored Event Pass to an agent without silently activating that pass for buyer-data visibility.
 - `[IMPLEMENTED]` LO Coverage Sign activation uses a QR-only backing `smart_signs` row with a deterministic synthetic `uid_primary` (`synthetic:lo-coverage-sign:<code>`) so the current live `smart_signs.uid_primary` not-null schema does not require a buyer NFC chip. Service-side Sponsored Event Pass activation uses `synthetic:event-pass-qr:<code>` until the physical Event Pass NFC flow provides a real UID.
@@ -111,10 +111,11 @@ These rules matter more than code style.
 - `[IMPLEMENTED]` Event Pass behavior is intentionally split from agent profile products: printed Event Pass QR starts setup through `/pass`, the Event Pass NFC becomes `keys.device_role = event_pass_keychain`, and future Event Pass NFC taps open the one-event dashboard when live.
 - `[IMPLEMENTED]` Sponsored Event Pass behavior is split from single-event Event Pass behavior: it remains an `inventory_type = event_pass` QR row, but uses `pass_model = sponsored_agent_pass`, `reuse_allowed = true`, and `reuse_status = active` for reusable LO-issued passes.
 - `[IMPLEMENTED]` Sponsored Event Pass activation must record per-event host-agent consent in `event_pass_coverage_consents` before the sponsoring loan officer receives event check-in visibility or is assigned as live event support.
+- `[IMPLEMENTED]` Sponsored Event Pass seed context is not consent. LO Coverage Sign issuance may store prepared open-house/host-agent context on the pass inventory so the agent does not start from a blank claim, but the seed is marked consumed after the agent activates and consents.
 - `[IMPLEMENTED]` Loan Officer Coverage Sign behavior is separate from Sponsored Event Pass behavior. The LO sign stays with the loan officer and routes by `/lo-sign`; the Sponsored Event Pass stays with the agent and routes by `/pass` then `/sponsored-pass-activate`.
 - `[INTENDED]` Sponsored Event Pass and Loan Officer Coverage Sign are not buyer lead-sale/referral-purchase products. The LO sponsors open-house technology and event support; the host agent remains the real estate/open-house host.
 - `[INTENDED]` Buyer financing help must only be routed when the buyer explicitly requests financing or pre-approval help. Rel8tion must not collect SSN, credit, income, assets, borrower documents, or mortgage application data.
-- `[IMPLEMENTED]` A Smart Sign and an Event Pass may both be active for the same listing/open-house context because active event uniqueness is per backing `smart_sign_id`, not per listing.
+- `[IMPLEMENTED]` A Smart Sign and an Event Pass may both be active for the same listing/open-house context because routing is device/sign-aware rather than listing-blocked. Sponsored Event Passes issued from an LO Coverage Sign may share the existing live coverage event after agent consent; other Event Pass flows may create their own event row.
 - `[IMPLEMENTED]` Event Pass is gated as one included event unless renewed/reset by LO/admin. Once a pass has prior event history and is not live for that same event, self-service reuse is blocked.
 - `[RISK]` Do not detach or reset real field signs unless explicitly requested. Elena/Galluzzo sign data has been treated as protected in reset code.
 - `[IMPLEMENTED]` The demo/beta lane currently uses:

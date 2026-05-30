@@ -80,6 +80,7 @@ async function resolveResponse(code) {
     live: resolved.live,
     sponsored,
     consent_text: resolved.consent_text || '',
+    seeded_context: resolved.seeded_context || null,
     activation_url: `/sponsored-pass-activate?code=${encodeURIComponent(code)}`,
     event_url: resolved.live && resolved.event?.id ? `/event?event=${encodeURIComponent(resolved.event.id)}` : '',
     blocked_reason: sponsored

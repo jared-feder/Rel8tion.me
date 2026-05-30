@@ -75,6 +75,7 @@
       error: '',
       notice: '',
       resolved: null,
+      seededContext: null,
       houses: [],
       selectedHouse: null,
       manual: false,
@@ -133,6 +134,41 @@
       return [sponsor.full_name || sponsor.slug, sponsor.company_name].filter(Boolean).join(', ') || 'Verified loan officer sponsor';
     }
 
+    function normalizeSeededHouse(house = {}) {
+      const id = house.id || house.open_house_id || '';
+      const address = house.address || house.property_address || '';
+      if (!id && !address) return null;
+      return {
+        ...house,
+        id,
+        address,
+        listing_photo_url: house.listing_photo_url || house.primary_photo_url || house.photo_url || house.image_url || '',
+        open_start: house.open_start || house.start_time || '',
+        open_end: house.open_end || house.end_time || ''
+      };
+    }
+
+    function applySeededContext(data = {}) {
+      const seed = data.seeded_context || null;
+      state.seededContext = seed;
+      if (!seed) return;
+
+      const seededHouse = normalizeSeededHouse(seed.open_house || {});
+      if (seededHouse) state.selectedHouse = seededHouse;
+
+      const agent = seed.agent || {};
+      state.agent = {
+        name: state.agent.name || agent.name || agent.agent_name || '',
+        phone: state.agent.phone || agent.phone || agent.agent_phone || agent.phone_normalized || '',
+        email: state.agent.email || agent.email || agent.agent_email || '',
+        brokerage: state.agent.brokerage || agent.brokerage || ''
+      };
+
+      if (seededHouse || state.agent.name || state.agent.phone) {
+        state.notice = 'Prepared from the Loan Officer Coverage Sign setup. Review the open house and host agent, then activate with consent.';
+      }
+    }
+
     function updateAgentFromInputs() {
       state.agent = {
         name: document.getElementById('agentName')?.value?.trim() || '',
@@ -172,6 +208,7 @@
           return;
         }
         state.resolved = data;
+        applySeededContext(data);
         state.loading = false;
         render();
       } catch (error) {

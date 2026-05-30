@@ -491,12 +491,23 @@ function sponsoredEventPassReadyView(details, inventory) {
   const sponsor = details?.sponsor || {};
   const sponsorLabel = [sponsor.full_name || sponsor.slug, sponsor.company_name].filter(Boolean).join(', ') || 'the sponsoring loan officer';
   const activationUrl = `/sponsored-pass-activate?code=${encodeURIComponent(code)}`;
+  const seed = details?.seeded_context || {};
+  const preparedAddress = seed.open_house?.address || '';
+  const preparedAgent = seed.agent?.name || seed.agent?.slug || '';
+  const preparedFor = [preparedAddress, preparedAgent ? `Host: ${preparedAgent}` : ''].filter(Boolean).join(' | ');
 
   shell(`
     <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Sponsored Event Pass</div>
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Activate Sponsored Event Pass</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Event Pass was issued by ${esc(sponsorLabel)} and can be used to activate this open house with live event coverage.</p>
     <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">A simple open-house technology pass issued by a verified loan officer and used by an agent to activate a paperless, support-ready open house. Financing help is only provided when requested by a buyer.</p>
+    ${preparedFor ? `
+      <div class="rounded-[28px] border border-emerald-100 bg-emerald-50/80 p-6 text-left max-w-xl mx-auto mb-6">
+        <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-3">Prepared From Coverage Setup</div>
+        <div class="text-slate-900 font-black text-xl leading-tight">${esc(preparedFor)}</div>
+        <div class="text-slate-600 font-semibold text-sm mt-2">The agent will still review and consent before this pass goes live.</div>
+      </div>
+    ` : ''}
     <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
       <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
