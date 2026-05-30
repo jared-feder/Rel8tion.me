@@ -28,6 +28,7 @@
     { "source": "/lo-affordability-guidance", "destination": "/lo-affordability-guidance.html" },
     { "source": "/open-house-kit", "destination": "/open-house-kit.html" },
     { "source": "/field-dashboard", "destination": "/field-dashboard.html" },
+    { "source": "/loan-officer-dashboard", "destination": "/loan-officer-dashboard.html" },
     { "source": "/lo-field-dashboard", "destination": "/lo-field-dashboard.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/nmb-activate", "destination": "/nmb-activate.html" },

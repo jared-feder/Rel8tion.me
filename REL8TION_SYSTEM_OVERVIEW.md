@@ -77,12 +77,13 @@ The root `vercel.json` has `cleanUrls: true` and rewrites most app routes into `
 - `/kit-intake` to `apps/rel8tion-app/kit-intake.html`
 - `/open-house-kit` to `apps/rel8tion-app/open-house-kit.html`
 - `/field-dashboard` to `apps/rel8tion-app/field-dashboard.html`
+- `/loan-officer-dashboard` to `apps/rel8tion-app/loan-officer-dashboard.html`
 - `/lo-field-dashboard` to `apps/rel8tion-app/lo-field-dashboard.html`
 - `/admin` to `apps/rel8tion-app/admin.html`
 - `/nmb-activate` and `/nmb-verified` to app pages
 - `/services/nmb/activate` and `/services/nmb/verified` to app pages
 
-The root also has static `index.html`, `a.html`, `b.html`, `agent-home.html`, `get-open-house-kit.html`, `kit-confirm.html`, `kit-intake.html`, `lo-affordability-guidance.html`, `loan-officer-support.html`, and `manual-sms-outreach.html`. They are not all explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/`, `/a`, `/b`, `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/lo-affordability-guidance`, `/loan-officer-support`, and `/manual-sms-outreach`. `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/open-house-kit`, `/lo-affordability-guidance`, and `/loan-officer-support` have root wrappers that preserve query/hash values and forward into the app page.
+The root also has static `index.html`, `a.html`, `b.html`, `agent-home.html`, `get-open-house-kit.html`, `kit-confirm.html`, `kit-intake.html`, `lo-affordability-guidance.html`, `loan-officer-dashboard.html`, `loan-officer-support.html`, and `manual-sms-outreach.html`. They are not all explicitly rewritten in root `vercel.json`, but with clean URLs they appear intended to serve `/`, `/a`, `/b`, `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/lo-affordability-guidance`, `/loan-officer-dashboard`, `/loan-officer-support`, and `/manual-sms-outreach`. `/agent-home`, `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, `/open-house-kit`, `/lo-affordability-guidance`, `/loan-officer-dashboard`, and `/loan-officer-support` have root wrappers that preserve query/hash values and forward into the app page.
 
 `[IMPLEMENTED]` Route hygiene is now checked by `npm run verify:routes`. The check reads `vercel.json`, confirms every rewrite/cron target has a tracked backing file, requires root wrappers for clean app URLs, and also verifies critical production APIs such as `/api/chip-qr`, `/api/buyer-affordability`, `/api/sms/android-inbound`, and admin outreach search/replay helpers. `npm run verify:production-routes` performs the corresponding live `app.rel8tion.me` smoke check after deployment.
 
@@ -564,27 +565,30 @@ Role: public verified loan officer profile.
 - Loads `verified_profiles` by slug and `is_active = true`.
 - Shows photo, company logo, contact info, areas, bio, call/text, VCard, CTA, and calendar actions.
 
-### `/field-dashboard` And `/lo-field-dashboard`
+### `/field-dashboard`, `/lo-field-dashboard`, And `/loan-officer-dashboard`
 
 Files:
 
 - `apps/rel8tion-app/field-dashboard.html`
 - `apps/rel8tion-app/lo-field-dashboard.html`
+- `apps/rel8tion-app/loan-officer-dashboard.html`
 
-Role: tested field/loan-officer work surface for scheduled REL8TION demo and support visits. `/lo-field-dashboard` opens `/field-dashboard?role=loan_officer`.
+Role: tested field/loan-officer work surface for scheduled REL8TION demo and support visits. `/loan-officer-dashboard` is the clean LO alias and `/lo-field-dashboard` remains the backward-compatible NFC/keychain alias; both open `/field-dashboard?role=loan_officer`.
 
 `[PARTIAL]` Confirmed repo behavior:
 
 - Loads a verified profile by `uid` or `slug`.
 - Shows next-7-days field visit stats, assigned visits, buyer financing requests, event chat logs, and LO/field availability controls.
-- In `/lo-field-dashboard` / `role=loan_officer` mode, hides the field-ops outreach queue and manual coverage scheduler so the page only shows assigned/upcoming open houses, agent/listing context, buyer financing, chat, and availability controls.
+- In loan-officer mode, labels the page with the LO first name, hides the field-ops outreach queue and manual coverage scheduler, and keeps the page focused on assigned/upcoming open houses, agent/listing context, buyer financing, affordability guidance, chat, worked agents, and availability controls.
 - Standalone active LO keychain/tag scans through `/k` open this dashboard directly by UID.
 - Lets an LO or field profile add one-day or repeated weekly/monthly availability windows using role, responsibility, service ZIP, service radius, and time window.
 - Lets an LO or field profile save `unavailable` exception blocks, such as blocking one Saturday inside a recurring weekend pattern.
 - Can create field/demo visits and participants through `/api/field-demo/*`.
 - Can start a financing-support visit and upsert live `event_loan_officer_sessions`, which existing buyer financing routing and the agent dashboard already understand.
+- Buyer request cards include an Affordability action into `/lo-affordability-guidance` with the current `uid`, `event`, `checkin_id`, `buyer_id` when available, and `agent` context.
+- The Worked Agents panel is currently derived from assigned/covered field visit rows and linked buyer request counts. It is an operational relationship view, not a full persistent invite/request/accept relationship manager yet.
 - Visit cards can open the linked Event Dashboard when an `open_house_event_id` is present, giving the loan officer/field user a path to the same live event controls and closeout summary.
-- Uses `event_conversations` and `event_conversation_messages` for in-app conversation logging. This is not realtime, not SMS-relayed, not video, and not a hardened multi-user auth model yet.
+- Uses `event_conversations` and `event_conversation_messages` for conversation logging and can SMS a buyer return link when the LO sends from the dashboard. This is not realtime video and not a hardened multi-user auth model yet.
 
 ### `/key-reset`
 

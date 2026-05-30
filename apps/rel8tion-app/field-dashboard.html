@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Cache-Control" content="no-store">
-  <title>REL8TION Field Dashboard</title>
+  <title>REL8TION Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -15,7 +15,7 @@
         <div class="flex items-center justify-between gap-4">
           <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
           <div class="text-right">
-            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Field Operations</div>
+            <div id="dashboardRoleLabel" class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Field Operations</div>
             <div id="profileLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Loading...</div>
           </div>
         </div>
@@ -24,7 +24,7 @@
       <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
         <div class="py-14 text-center">
           <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
-          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Field Dashboard</h1>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Dashboard</h1>
           <p class="mt-3 text-lg font-semibold text-slate-600">Loading assigned REL8TION demo visits.</p>
         </div>
       </div>
@@ -42,6 +42,7 @@
       profile: null,
       availability: [],
       visits: [],
+      relationshipVisits: [],
       outreachCandidates: [],
       buyerRequests: {},
       conversations: {},
@@ -56,6 +57,7 @@
     const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
     const app = document.getElementById('app');
     const profileLabel = document.getElementById('profileLabel');
+    const dashboardRoleLabel = document.getElementById('dashboardRoleLabel');
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -184,6 +186,16 @@
       return { start, end };
     }
 
+    function relationshipRange() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - 180);
+      const end = new Date();
+      end.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() + 31);
+      return { start, end };
+    }
+
     async function loadProfile() {
       if (state.uid) {
         const rows = await request(`verified_profiles?uid=eq.${encodeURIComponent(state.uid)}&is_active=eq.true&select=*&limit=1`).catch(() => []);
@@ -196,8 +208,8 @@
       return null;
     }
 
-    async function loadParticipantRows() {
-      const { start, end } = dashboardRange();
+    async function loadParticipantRows(range = dashboardRange()) {
+      const { start, end } = range;
       const queries = [];
       if (state.profile?.uid) {
         queries.push(`participant_profile_id=eq.${encodeURIComponent(state.profile.uid)}`);
@@ -254,7 +266,7 @@
         if (!visit.open_house_event_id) continue;
         const eventId = visit.open_house_event_id;
         next[eventId] = await request(
-          `event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,metadata,created_at&order=created_at.desc&limit=50`
+          `event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=id,open_house_event_id,buyer_id,visitor_name,visitor_phone,visitor_email,pre_approved,metadata,created_at&order=created_at.desc&limit=50`
         ).catch((error) => {
           console.log('buyer request load skipped', eventId, error);
           return [];
@@ -368,6 +380,39 @@
       return row?.participant_name || state.profile?.full_name || 'Field Specialist';
     }
 
+    function firstName(value) {
+      const clean = String(value || '').trim();
+      return clean.split(/\s+/)[0] || '';
+    }
+
+    function dashboardTitle() {
+      if (!isLoanOfficerDashboard()) return 'Field Dashboard';
+      const first = firstName(state.profile?.full_name || state.profile?.name || '');
+      return first ? `${first}'s Dashboard` : 'Loan Officer Dashboard';
+    }
+
+    function dashboardKicker() {
+      return isLoanOfficerDashboard() ? 'Loan Officer Command Center' : 'Next 7 Days';
+    }
+
+    function dashboardIntro() {
+      if (!isLoanOfficerDashboard()) {
+        return 'Schedule visits, go live for financing support, see buyer requests, and keep the event conversation in one place.';
+      }
+      return 'One place for open houses, buyer check-ins, affordability guidance, event chat, and agent relationships.';
+    }
+
+    function affordabilityHref(visit, row = {}) {
+      const query = new URLSearchParams();
+      const uid = state.profile?.uid || state.uid || '';
+      if (uid) query.set('uid', uid);
+      if (visit?.open_house_event_id) query.set('event', visit.open_house_event_id);
+      if (row?.id) query.set('checkin_id', row.id);
+      if (row?.buyer_id) query.set('buyer_id', row.buyer_id);
+      if (visit?.agent_slug) query.set('agent', visit.agent_slug);
+      return `/lo-affordability-guidance?${query.toString()}`;
+    }
+
     function buyerRequestCard(visit, row) {
       const meta = row.metadata || {};
       const name = row.visitor_name || meta.name || 'Buyer';
@@ -389,6 +434,7 @@
             <div class="flex flex-wrap gap-2">
               <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white ${phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
               <a href="${esc(smsHref(phone, textBody))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+              <a href="${esc(affordabilityHref(visit, row))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-violet-700 ring-1 ring-violet-200">Affordability</a>
               <button type="button" onclick="window.openBuyerChat('${esc(visit.id)}','${esc(row.id)}')" class="rounded-full bg-sky-600 px-3 py-2 text-xs font-black text-white">Open Chat</button>
             </div>
           </div>
@@ -406,15 +452,99 @@
         <div class="mt-4 rounded-[22px] bg-white/80 p-4 ring-1 ring-emerald-100">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <div class="text-xs font-black uppercase tracking-[.14em] text-emerald-700">Buyer Requests</div>
+              <div class="text-xs font-black uppercase tracking-[.14em] text-emerald-700">Buyer Requests + Affordability</div>
               <div class="mt-1 text-sm font-extrabold text-slate-600">${rows.length} check-ins - ${needsHelp.length} financing follow-up</div>
             </div>
             <button type="button" onclick="window.refreshDashboard()" class="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">Refresh</button>
           </div>
           <div class="mt-3 grid gap-2">
-            ${rows.length ? rows.map((row) => buyerRequestCard(visit, row)).join('') : `<div class="rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No buyer check-ins yet. New financing opt-ins will appear here without opening the agent dashboard.</div>`}
+            ${rows.length ? rows.map((row) => buyerRequestCard(visit, row)).join('') : `<div class="rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-100">No buyer check-ins yet. New financing opt-ins and affordability work will appear here without opening the agent dashboard.</div>`}
           </div>
         </div>
+      `;
+    }
+
+    function workedAgents() {
+      const agents = new Map();
+      const visits = state.relationshipVisits?.length ? state.relationshipVisits : state.visits;
+      visits.forEach((visit) => {
+        const key = visit.agent_slug || cleanPhone(visit.agent_phone) || String(visit.agent_email || '').toLowerCase() || visit.agent_name || visit.id;
+        if (!key) return;
+        const existing = agents.get(key) || {
+          agent_slug: visit.agent_slug || '',
+          agent_name: visit.agent_name || visit.agent_slug || 'Agent',
+          agent_phone: visit.agent_phone || '',
+          agent_email: visit.agent_email || '',
+          brokerage: visit.brokerage || '',
+          visits: 0,
+          buyer_count: 0,
+          live_count: 0,
+          latest_time: '',
+          latest_visit: visit
+        };
+        existing.agent_slug = existing.agent_slug || visit.agent_slug || '';
+        existing.agent_name = existing.agent_name || visit.agent_name || visit.agent_slug || 'Agent';
+        existing.agent_phone = existing.agent_phone || visit.agent_phone || '';
+        existing.agent_email = existing.agent_email || visit.agent_email || '';
+        existing.brokerage = existing.brokerage || visit.brokerage || '';
+        existing.visits += 1;
+        existing.buyer_count += (state.buyerRequests[visit.open_house_event_id] || []).length;
+        existing.live_count += visit.status === 'live' ? 1 : 0;
+        const visitTime = visit.scheduled_start || visit.created_at || '';
+        if (!existing.latest_time || new Date(visitTime || 0) > new Date(existing.latest_time || 0)) {
+          existing.latest_time = visitTime;
+          existing.latest_visit = visit;
+        }
+        agents.set(key, existing);
+      });
+      return [...agents.values()].sort((a, b) => new Date(b.latest_time || 0) - new Date(a.latest_time || 0));
+    }
+
+    function agentEventDashboardHref(agent) {
+      const visit = agent.latest_visit || {};
+      const query = new URLSearchParams();
+      if (agent.agent_slug) query.set('agent', agent.agent_slug);
+      if (visit.open_house_event_id) query.set('event', visit.open_house_event_id);
+      return query.toString() ? `/agent-dashboard?${query.toString()}` : '';
+    }
+
+    function renderWorkedAgentsPanel(agents = workedAgents()) {
+      if (!isLoanOfficerDashboard()) return '';
+      return `
+        <section class="mb-6 rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-black uppercase tracking-[.18em] text-violet-700">Agent Relationships</div>
+              <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Worked Agents</h2>
+              <p class="mt-1 max-w-2xl text-sm font-semibold text-slate-500">Agents tied to assigned open houses, coverage sign activations, and buyer-support sessions appear here.</p>
+            </div>
+            <div class="rounded-full bg-violet-50 px-4 py-2 text-sm font-black text-violet-700 ring-1 ring-violet-100">${agents.length} agent${agents.length === 1 ? '' : 's'}</div>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            ${agents.length ? agents.map((agent) => {
+              const dashboardHref = agentEventDashboardHref(agent);
+              const textBody = `Hi ${agent.agent_name || 'there'}, this is ${state.profile?.full_name || 'your loan officer'} from Rel8tion. I am checking in from our open-house coverage.`;
+              return `
+                <article class="rounded-[24px] bg-white/85 p-4 ring-1 ring-slate-100">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 class="text-xl font-black leading-tight">${esc(agent.agent_name || 'Agent')}</h3>
+                      <p class="mt-1 text-sm font-bold text-slate-500">${esc(agent.brokerage || 'Brokerage not set')}</p>
+                      <p class="mt-1 text-xs font-black uppercase tracking-[.12em] text-slate-400">${esc(agent.visits)} coverage event${agent.visits === 1 ? '' : 's'} - ${esc(agent.buyer_count)} buyer check-in${agent.buyer_count === 1 ? '' : 's'}</p>
+                    </div>
+                    ${agent.live_count ? `<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-emerald-700">Live</span>` : ''}
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <a href="${esc(telHref(agent.agent_phone))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${agent.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                    <a href="${esc(smsHref(agent.agent_phone, textBody))}" class="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 ${agent.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                    ${dashboardHref ? `<a href="${esc(dashboardHref)}" class="rounded-full bg-sky-600 px-3 py-2 text-xs font-black text-white">Event Dashboard</a>` : ''}
+                  </div>
+                  <p class="mt-3 text-xs font-bold text-slate-400">Latest: ${esc(fmtTime(agent.latest_time))}</p>
+                </article>
+              `;
+            }).join('') : `<div class="rounded-2xl bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 lg:col-span-2">No worked agents yet. Once this LO covers an open house or activates a coverage sign, agent relationships will collect here.</div>`}
+          </div>
+        </section>
       `;
     }
 
@@ -777,13 +907,16 @@
     function render() {
       const profileName = state.profile?.full_name || state.uid || state.slug || 'Field Team';
       const stats = visitStats();
+      const agents = workedAgents();
       profileLabel.textContent = profileName;
+      dashboardRoleLabel.textContent = isLoanOfficerDashboard() ? 'Loan Officer' : 'Field Operations';
+      document.title = isLoanOfficerDashboard() ? `REL8TION ${dashboardTitle()}` : 'REL8TION Field Dashboard';
       app.innerHTML = `
         <section class="mb-6">
-          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Next 7 Days</div>
-          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">Loan Officer Field Dashboard</h1>
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">${esc(dashboardKicker())}</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(dashboardTitle())}</h1>
           <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">
-            Schedule visits, go live for financing support, see buyer requests, and keep the event conversation in one place.
+            ${esc(dashboardIntro())}
           </p>
           ${state.message ? `<div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
           ${state.error ? `<div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">${esc(state.error)}</div>` : ''}
@@ -798,7 +931,7 @@
 
         <section class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           ${stat('Today', stats.today, 'blue')}
-          ${stat('Tomorrow', stats.tomorrow, 'blue')}
+          ${stat(isLoanOfficerDashboard() ? 'Agents' : 'Tomorrow', isLoanOfficerDashboard() ? agents.length : stats.tomorrow, 'blue')}
           ${stat('Live', stats.live, 'green')}
           ${stat('Buyer requests', stats.buyers, 'slate')}
           ${stat('Financing', stats.financing, stats.financing ? 'rose' : 'slate')}
@@ -807,6 +940,8 @@
         ${isLoanOfficerDashboard() ? '' : renderSchedulePanel()}
 
         ${renderAvailabilityPanel()}
+
+        ${renderWorkedAgentsPanel(agents)}
 
         ${isLoanOfficerDashboard() ? '' : renderOutreachPanel()}
 
@@ -940,9 +1075,19 @@
       state.profile = await loadProfile();
       state.availability = await loadAvailability();
       state.outreachCandidates = await loadOutreachCandidates();
-      const rows = await loadParticipantRows();
+      const rows = await loadParticipantRows(dashboardRange());
       state.visits = groupVisits(rows);
-      await loadBuyerRequestsForVisits(state.visits);
+      if (isLoanOfficerDashboard()) {
+        const relationshipRows = await loadParticipantRows(relationshipRange());
+        state.relationshipVisits = groupVisits(relationshipRows);
+      } else {
+        state.relationshipVisits = state.visits;
+      }
+      const buyerVisitMap = new Map();
+      [...state.visits, ...state.relationshipVisits].forEach((visit) => {
+        if (visit?.id) buyerVisitMap.set(visit.id, visit);
+      });
+      await loadBuyerRequestsForVisits([...buyerVisitMap.values()]);
       await loadChatsForVisits(state.visits);
       render();
     }

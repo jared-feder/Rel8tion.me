@@ -18,6 +18,7 @@ const checks = [
   },
   { path: '/agent-home', statuses: [200], label: 'agent owner dashboard' },
   { path: '/event-chat', statuses: [200], label: 'buyer event chat page' },
+  { path: '/loan-officer-dashboard', statuses: [200], label: 'loan officer dashboard' },
   { path: '/lo-affordability-guidance', statuses: [200], label: 'LO affordability guidance page' },
   { path: '/loan-officer-support', statuses: [200], label: 'LO support request page' },
   { path: '/services/nmb/activate', statuses: [200], label: 'legacy NMB activation link' },
