@@ -74,6 +74,7 @@ Status labels:
 - `[IMPLEMENTED]` `/event` is the smart sign buyer check-in page.
 - `[IMPLEMENTED]` `/event` first visible screen is buyer-first: a formatted "Welcome to" property-address header, property image when available, hosted-by agent photo/name/brokerage, then small top check-in path buttons and immediate name/phone/pre-approval inputs. Email is optional. Host contact/save-contact actions are intentionally shown after successful check-in.
 - `[IMPLEMENTED]` `/event` now shows a full-screen "Saving Check-In" overlay immediately after a valid check-in submit. The form is disabled while the check-in, disclosure packet, buyer sync, and SMS confirmation work finishes, preventing visitors from thinking the submit was ignored and checking in twice.
+- `[IMPLEMENTED]` `/event` displays the active `open_house_events.start_time/end_time` over the source `open_houses` window when an event is live, so manually extended events such as a full-weekend Event Pass/sign activation do not appear closed just because the source listing has a narrower open-house window.
 - `[IMPLEMENTED]` `/event` uses the Rel8tion cloud background layer and opens agency/courtesy disclosure dialogs as fixed viewport overlays, so tapping Review & Sign does not require scrolling to the bottom of the page.
 - `[IMPLEMENTED]` `/event` applies matched brokerage theme colors/fonts from the `brokerages` lookup when a brokerage match is available; otherwise it falls back to Rel8tion defaults.
 - `[IMPLEMENTED]` Smart sign buyer check-in saves to `event_checkins`.

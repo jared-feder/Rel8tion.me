@@ -1634,15 +1634,17 @@ function attachEventHandlers() {
 
 function renderEventShell() {
   const { eventRow, house, agent, selectedPath } = pageState;
-  const contextHouse = house || {
+  const contextHouse = {
+    ...(house || {
     address: eventRow?.setup_context?.address || '',
     brokerage: eventRow?.setup_context?.detected_brokerage || '',
     price: eventRow?.setup_context?.price || null,
     beds: eventRow?.setup_context?.beds || null,
     baths: eventRow?.setup_context?.baths || null,
     sqft: eventRow?.setup_context?.sqft || null,
-    open_start: eventRow?.start_time || null,
-    open_end: eventRow?.end_time || null
+    }),
+    open_start: eventRow?.start_time || house?.open_start || null,
+    open_end: eventRow?.end_time || house?.open_end || null
   };
   const status = houseStatus(contextHouse);
   const agentName = agent?.name || 'Host Agent';
