@@ -3,24 +3,491 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rel8tion Open House Kit Confirm</title>
-  <script>
-    (async () => {
-      const target = `/apps/rel8tion-app/kit-confirm.html${window.location.search}${window.location.hash}`;
-      try {
-        const response = await fetch(target, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Kit confirmation page returned ${response.status}`);
-        const html = await response.text();
-        document.open();
-        document.write(html);
-        document.close();
-      } catch (error) {
-        window.location.replace(target);
-      }
-    })();
-  </script>
+  <title>Confirm Rel8tion Open House Kit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #15245f;
+      --muted: #59667d;
+      --blue: #172c76;
+      --sky: #42c8f4;
+      --mint: #8ee6cf;
+      --coral: #ff8a76;
+      --paper: rgba(255, 255, 255, 0.72);
+      --line: rgba(255, 255, 255, 0.76);
+      --shadow: 0 28px 70px rgba(31, 42, 90, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 8%, rgba(255,255,255,0.92) 0 11%, transparent 22%),
+        radial-gradient(circle at 88% 16%, rgba(255,255,255,0.82) 0 10%, transparent 20%),
+        linear-gradient(180deg, #57d0f7 0%, #edf9ff 50%, #f7fbff 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 52% 0%, rgba(142,230,207,0.26), transparent 24%),
+        radial-gradient(circle at 82% 74%, rgba(255,138,118,0.14), transparent 24%);
+    }
+
+    main {
+      position: relative;
+      width: min(940px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 26px 0 42px;
+    }
+
+    .brand {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .brand img {
+      height: 52px;
+      width: auto;
+      filter: drop-shadow(0 10px 18px rgba(23,44,118,0.1));
+    }
+
+    .shell {
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: clamp(26px, 5vw, 50px);
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      color: var(--blue);
+      font-size: clamp(40px, 7vw, 74px);
+      line-height: 0.96;
+      letter-spacing: 0;
+      text-align: center;
+    }
+
+    .subtitle {
+      margin: 0 auto 28px;
+      max-width: 680px;
+      color: #33426f;
+      font-size: clamp(17px, 2.5vw, 22px);
+      line-height: 1.45;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .status {
+      margin: 0 auto 22px;
+      max-width: 560px;
+      border: 1px solid rgba(23,44,118,0.1);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.68);
+      color: var(--muted);
+      padding: 14px 16px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .profile {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr);
+      gap: 24px;
+      align-items: center;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.82);
+      background: rgba(255,255,255,0.74);
+      box-shadow: 0 18px 40px rgba(31,42,90,0.1);
+      padding: clamp(20px, 4vw, 30px);
+    }
+
+    .photo {
+      width: 154px;
+      height: 154px;
+      border-radius: 32px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, rgba(66,200,244,0.28), rgba(142,230,207,0.34));
+      border: 1px solid rgba(23,44,118,0.08);
+      color: var(--blue);
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 44px;
+      font-weight: 900;
+    }
+
+    .photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .name {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(30px, 5vw, 48px);
+      line-height: 1.02;
+    }
+
+    .company {
+      color: #344273;
+      font-size: 17px;
+      font-weight: 900;
+      margin-bottom: 18px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .detail {
+      border-radius: 18px;
+      background: rgba(238,248,255,0.72);
+      border: 1px solid rgba(23,44,118,0.08);
+      padding: 13px 14px;
+      min-height: 72px;
+    }
+
+    .detail span {
+      display: block;
+      color: #657188;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .detail strong {
+      display: block;
+      color: var(--blue);
+      font-size: 15px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .sponsor {
+      margin-top: 16px;
+      border-left: 5px solid var(--mint);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.66);
+      padding: 16px 18px;
+      color: var(--muted);
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .question {
+      margin: 26px 0 16px;
+      text-align: center;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      color: var(--blue);
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .btn {
+      min-height: 58px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #fff;
+      font: 900 16px/1 Inter, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 18px 34px rgba(23,44,118,0.22);
+    }
+
+    .btn.secondary {
+      color: var(--blue);
+      background: linear-gradient(135deg, #ffffff, #eaf8ff);
+      border: 1px solid rgba(23,44,118,0.12);
+      box-shadow: 0 14px 28px rgba(31,42,90,0.1);
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 720px) {
+      .profile { grid-template-columns: 1fr; text-align: center; }
+      .photo { margin: 0 auto; }
+      .detail-grid, .actions { grid-template-columns: 1fr; }
+      .shell { border-radius: 28px; }
+    }
+  </style>
 </head>
 <body>
-  Opening the Rel8tion Open House Kit confirmation...
+  <main>
+    <div class="brand">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+    </div>
+
+    <section class="shell" aria-labelledby="confirm-title">
+      <h1 id="confirm-title">We Found Your Rel8tion Open House Kit</h1>
+      <p class="subtitle">Please confirm the agent, company, and sponsor details below.</p>
+      <div id="status" class="status">Looking up your Event Pass keychain.</div>
+
+      <section id="profile" class="profile hidden" aria-live="polite">
+        <div id="photo" class="photo">R8</div>
+        <div>
+          <h2 id="agent-name" class="name">Open House Kit</h2>
+          <div id="company" class="company">Rel8tion</div>
+          <div class="detail-grid">
+            <div class="detail"><span>Phone</span><strong id="phone">-</strong></div>
+            <div class="detail"><span>Email</span><strong id="email">-</strong></div>
+            <div class="detail"><span>Kit / Pass Status</span><strong id="kit-status">-</strong></div>
+            <div class="detail"><span>Smart Sign</span><strong id="sign-status">-</strong></div>
+          </div>
+          <div id="sponsor" class="sponsor hidden"></div>
+        </div>
+      </section>
+
+      <h2 class="question">Is this correct?</h2>
+      <div class="actions">
+        <button id="confirm" class="btn" type="button">Yes, This Is Correct</button>
+        <button id="update" class="btn secondary" type="button">Update My Info</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260426-1108';
+
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('uid') || '';
+    const statusEl = document.getElementById('status');
+    const profileEl = document.getElementById('profile');
+    const STORAGE_KEY = 'rel8tion_open_house_kit_prefill';
+    const PENDING_KEY = 'rel8tion_open_house_kit_pending';
+    let resolved = { uid };
+
+    function esc(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function firstPresent(...values) {
+      return values.find((value) => String(value || '').trim()) || '';
+    }
+
+    function initials(name) {
+      const parts = String(name || 'R8').trim().split(/\s+/).filter(Boolean);
+      return (parts[0]?.[0] || 'R') + (parts[1]?.[0] || '8');
+    }
+
+    async function rest(path) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error(`Supabase lookup failed: ${path}`);
+      return res.json();
+    }
+
+    async function safeRows(path) {
+      try {
+        const rows = await rest(path);
+        return Array.isArray(rows) ? rows : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    async function firstRow(path) {
+      const rows = await safeRows(path);
+      return rows[0] || null;
+    }
+
+    async function loadAgent(slug) {
+      if (!slug) return null;
+      return firstRow(`agents?slug=eq.${encodeURIComponent(slug)}&select=*&limit=1`);
+    }
+
+    function mergeAgent(agent) {
+      if (!agent) return;
+      resolved.agent_id = firstPresent(resolved.agent_id, agent.id);
+      resolved.agent_slug = firstPresent(resolved.agent_slug, agent.slug);
+      resolved.agent_name = firstPresent(resolved.agent_name, agent.name, agent.full_name);
+      resolved.brokerage = firstPresent(resolved.brokerage, agent.brokerage, agent.company, agent.office_name);
+      resolved.phone = firstPresent(resolved.phone, agent.phone, agent.mobile_phone, agent.phone_normalized);
+      resolved.email = firstPresent(resolved.email, agent.email);
+      resolved.photo_url = firstPresent(resolved.photo_url, agent.image_url, agent.profile_photo_url, agent.primary_photo_url, agent.directory_photo_url, agent.photo_url, agent.agent_photo_url, agent.logo_url);
+    }
+
+    function mergeVerifiedProfile(profile) {
+      if (!profile) return;
+      resolved.profile_uid = firstPresent(resolved.profile_uid, profile.uid);
+      resolved.profile_status = profile.is_active === false ? 'Inactive profile' : 'Verified profile';
+      const looksLikeSponsor = /loan|mortgage|lender|nmb/i.test([profile.title, profile.industry, profile.company_name].join(' '));
+      if (looksLikeSponsor) {
+        resolved.sponsor_profile_id = firstPresent(resolved.sponsor_profile_id, profile.id, profile.uid);
+        resolved.sponsor_name = firstPresent(resolved.sponsor_name, profile.full_name, profile.name);
+        resolved.sponsor_company = firstPresent(resolved.sponsor_company, profile.company_name, profile.company);
+        resolved.sponsor_phone = firstPresent(resolved.sponsor_phone, profile.phone, profile.mobile_phone);
+        resolved.sponsor_email = firstPresent(resolved.sponsor_email, profile.email);
+      } else {
+        resolved.agent_name = firstPresent(resolved.agent_name, profile.full_name, profile.name);
+        resolved.brokerage = firstPresent(resolved.brokerage, profile.company_name, profile.company);
+        resolved.phone = firstPresent(resolved.phone, profile.phone, profile.mobile_phone);
+        resolved.email = firstPresent(resolved.email, profile.email);
+        resolved.photo_url = firstPresent(resolved.photo_url, profile.photo_url, profile.image_url, profile.logo_url);
+      }
+    }
+
+    function mergeLoanOfficerSession(row) {
+      if (!row) return;
+      resolved.sponsor_profile_id = firstPresent(resolved.sponsor_profile_id, row.verified_profile_id, row.loan_officer_profile_id, row.loan_officer_uid, row.id);
+      resolved.sponsor_name = firstPresent(resolved.sponsor_name, row.loan_officer_name, row.name);
+      resolved.sponsor_company = firstPresent(resolved.sponsor_company, row.loan_officer_company, row.company_name);
+      resolved.sponsor_phone = firstPresent(resolved.sponsor_phone, row.loan_officer_phone, row.phone);
+      resolved.sponsor_email = firstPresent(resolved.sponsor_email, row.loan_officer_email, row.email);
+      resolved.sponsor_photo_url = firstPresent(resolved.sponsor_photo_url, row.loan_officer_photo_url, row.photo_url);
+    }
+
+    function mergeSign(sign, inventoryRows = []) {
+      if (!sign) return;
+      resolved.sign_id = firstPresent(resolved.sign_id, sign.id);
+      resolved.public_code = firstPresent(resolved.public_code, sign.public_code);
+      resolved.agent_slug = firstPresent(resolved.agent_slug, sign.owner_agent_slug, sign.assigned_agent_slug);
+      resolved.sign_status = firstPresent(sign.status, sign.active_event_id ? 'active' : '');
+      resolved.active_event_id = firstPresent(resolved.active_event_id, sign.active_event_id);
+      const inventoryLabel = inventoryRows
+        .map((row) => firstPresent(row.inventory_type, row.status, row.public_code))
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(', ');
+      resolved.kit_status = firstPresent(resolved.kit_status, inventoryLabel, sign.activation_method, sign.primary_device_type, sign.secondary_device_type);
+    }
+
+    async function resolveKitIdentity() {
+      if (!uid) return null;
+
+      const keyRow = await firstRow(`keys?uid=eq.${encodeURIComponent(uid)}&select=*&limit=1`);
+      if (keyRow) {
+        resolved.key_status = keyRow.claimed ? 'Claimed keychain' : 'Unclaimed keychain';
+        resolved.key_role = firstPresent(keyRow.device_role, keyRow.assigned_slot);
+        resolved.agent_slug = firstPresent(resolved.agent_slug, keyRow.agent_slug);
+        resolved.kit_status = firstPresent(resolved.kit_status, keyRow.device_role, resolved.key_status);
+        mergeAgent(await loadAgent(keyRow.agent_slug));
+      }
+
+      const verifiedProfile = await firstRow(`verified_profiles?uid=eq.${encodeURIComponent(uid)}&select=*&limit=1`);
+      mergeVerifiedProfile(verifiedProfile);
+
+      let sign = await firstRow(`smart_signs?or=(uid_primary.eq.${encodeURIComponent(uid)},uid_secondary.eq.${encodeURIComponent(uid)},activation_uid_primary.eq.${encodeURIComponent(uid)},activation_uid_secondary.eq.${encodeURIComponent(uid)})&select=*&limit=1`);
+      if (!sign) {
+        sign = await firstRow(`smart_signs?or=(uid_primary.eq.${encodeURIComponent(uid)},uid_secondary.eq.${encodeURIComponent(uid)})&select=*&limit=1`);
+      }
+
+      let inventoryRows = [];
+      if (sign?.id) {
+        inventoryRows = await safeRows(`smart_sign_inventory?smart_sign_id=eq.${encodeURIComponent(sign.id)}&select=*&limit=5`);
+        mergeSign(sign, inventoryRows);
+        if (!resolved.agent_name && resolved.agent_slug) {
+          mergeAgent(await loadAgent(resolved.agent_slug));
+        }
+        if (sign.active_event_id) {
+          const loSession = await firstRow(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(sign.active_event_id)}&select=*&limit=1`);
+          mergeLoanOfficerSession(loSession);
+        }
+      }
+
+      if (!resolved.agent_name && !resolved.sponsor_name && !resolved.sign_id && !resolved.key_status) return null;
+      return resolved;
+    }
+
+    function renderProfile(data) {
+      const name = firstPresent(data.agent_name, data.sponsor_name, 'Open House Kit');
+      const company = firstPresent(data.brokerage, data.sponsor_company, 'Rel8tion');
+      const photo = firstPresent(data.photo_url, data.sponsor_photo_url);
+      document.getElementById('agent-name').textContent = name;
+      document.getElementById('company').textContent = company;
+      document.getElementById('phone').textContent = firstPresent(data.phone, data.sponsor_phone, '-');
+      document.getElementById('email').textContent = firstPresent(data.email, data.sponsor_email, '-');
+      document.getElementById('kit-status').textContent = firstPresent(data.kit_status, data.key_status, data.profile_status, '-');
+      document.getElementById('sign-status').textContent = data.sign_id
+        ? `${firstPresent(data.sign_status, 'linked')} ${data.public_code ? `| ${data.public_code}` : ''}`.trim()
+        : '-';
+      document.getElementById('photo').innerHTML = photo
+        ? `<img src="${esc(photo)}" alt="${esc(name)}">`
+        : esc(initials(name));
+
+      if (data.sponsor_name || data.sponsor_company) {
+        const sponsorText = `${firstPresent(data.sponsor_name, 'Sponsor loan officer')}${data.sponsor_company ? ` with ${data.sponsor_company}` : ''}${data.sponsor_phone ? ` | ${data.sponsor_phone}` : ''}`;
+        const sponsorEl = document.getElementById('sponsor');
+        sponsorEl.textContent = sponsorText;
+        sponsorEl.classList.remove('hidden');
+      }
+
+      profileEl.classList.remove('hidden');
+    }
+
+    function continueToIntake(mode) {
+      const payload = {
+        ...resolved,
+        flow: 'keychain_prefill',
+        confirmed: mode === 'confirm',
+        updateRequested: mode === 'update',
+        storedAt: new Date().toISOString()
+      };
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.removeItem(PENDING_KEY);
+      const next = new URLSearchParams();
+      next.set(mode === 'confirm' ? 'prefill' : 'update', '1');
+      if (uid) next.set('uid', uid);
+      window.location.href = `/kit-intake?${next.toString()}`;
+    }
+
+    document.getElementById('confirm').addEventListener('click', () => continueToIntake('confirm'));
+    document.getElementById('update').addEventListener('click', () => continueToIntake('update'));
+
+    if (!uid) {
+      statusEl.textContent = 'No keychain UID was included. You can still enter your info manually.';
+      resolved = { flow: 'manual_intake' };
+      document.getElementById('confirm').textContent = 'Enter My Info Instead';
+      document.getElementById('update').classList.add('hidden');
+    } else {
+      resolveKitIdentity().then((data) => {
+        if (!data) {
+          statusEl.textContent = 'We could not match this keychain yet. You can still enter or update your kit details.';
+          resolved = { uid, flow: 'keychain_prefill' };
+          return;
+        }
+        statusEl.textContent = 'Review the matched Open House Kit profile below.';
+        renderProfile(data);
+      }).catch(() => {
+        statusEl.textContent = 'The lookup took too long. You can still enter or update your kit details.';
+        resolved = { uid, flow: 'keychain_prefill' };
+      });
+    }
+  </script>
 </body>
 </html>
