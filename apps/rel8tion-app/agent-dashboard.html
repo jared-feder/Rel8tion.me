@@ -101,7 +101,7 @@
         || '';
       if (sponsor) kitParams.set('sponsor', sponsor);
       kitParams.set('source', isSponsoredEventPassEvent() ? 'sponsored_event_pass' : isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
-      return `/open-house-kit?${kitParams.toString()}`;
+      return `/get-open-house-kit?${kitParams.toString()}`;
     }
 
     async function request(path, options = {}) {

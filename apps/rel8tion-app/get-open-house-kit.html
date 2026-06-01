@@ -651,7 +651,8 @@
     }
 
     function startManualIntake(plan = '') {
-      const qs = new URLSearchParams({ flow: 'manual' });
+      const qs = new URLSearchParams(window.location.search);
+      if (!qs.get('flow')) qs.set('flow', 'manual');
       if (plan) qs.set('plan', plan);
       window.location.href = `/kit-intake?${qs.toString()}`;
     }

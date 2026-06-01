@@ -3,13 +3,670 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=/apps/rel8tion-app/open-house-kit.html">
-  <title>Rel8tion Open House Kit</title>
-  <script>
-    window.location.replace(`/apps/rel8tion-app/open-house-kit.html${window.location.search}${window.location.hash}`);
-  </script>
+  <title>Get Your Rel8tion Open House Kit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #15245f;
+      --muted: #59667d;
+      --blue: #172c76;
+      --sky: #42c8f4;
+      --mint: #8ee6cf;
+      --coral: #ff8a76;
+      --paper: rgba(255, 255, 255, 0.72);
+      --line: rgba(255, 255, 255, 0.72);
+      --shadow: 0 28px 70px rgba(31, 42, 90, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.96) 0 12%, transparent 22%),
+        radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.86) 0 10%, transparent 21%),
+        linear-gradient(180deg, #57d0f7 0%, #eaf8ff 48%, #f7fbff 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.58), rgba(255,255,255,0) 36%),
+        radial-gradient(circle at 48% 0%, rgba(142,230,207,0.26), transparent 24%),
+        radial-gradient(circle at 88% 70%, rgba(255,138,118,0.16), transparent 26%);
+    }
+
+    .page {
+      position: relative;
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .brand {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .brand img {
+      height: 54px;
+      width: auto;
+      filter: drop-shadow(0 10px 18px rgba(23, 44, 118, 0.1));
+    }
+
+    .hero {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: clamp(28px, 6vw, 62px);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+      gap: clamp(28px, 5vw, 56px);
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(23,44,118,0.1);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.74);
+      padding: 10px 15px;
+      color: #314071;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--sky), var(--mint));
+      box-shadow: 0 0 0 5px rgba(66,200,244,0.16);
+    }
+
+    h1 {
+      margin: 22px 0 16px;
+      max-width: 760px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(46px, 8vw, 92px);
+      line-height: 0.94;
+      letter-spacing: 0;
+      color: var(--blue);
+    }
+
+    .subheadline {
+      margin: 0;
+      max-width: 760px;
+      color: #2f3d6d;
+      font-size: clamp(18px, 2.4vw, 25px);
+      line-height: 1.36;
+      font-weight: 800;
+    }
+
+    .body-copy {
+      margin: 18px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.72;
+      font-weight: 600;
+    }
+
+    .hero-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+      max-width: 650px;
+    }
+
+    .micro-copy {
+      margin: 14px 0 0;
+      color: #40507d;
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 800;
+    }
+
+    .kit-graphic {
+      position: relative;
+      min-height: 420px;
+      border-radius: 30px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.54)),
+        radial-gradient(circle at 50% 18%, rgba(66,200,244,0.28), transparent 32%);
+      border: 1px solid rgba(255,255,255,0.86);
+      box-shadow: 0 24px 60px rgba(31, 42, 90, 0.12);
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    .sign-card {
+      width: min(300px, 86%);
+      aspect-ratio: 0.72;
+      border-radius: 26px;
+      border: 1px solid rgba(23,44,118,0.12);
+      background: linear-gradient(180deg, #f7fdff, #e8f9ff);
+      box-shadow: 0 26px 48px rgba(23,44,118,0.16);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      transform: rotate(-2deg);
+    }
+
+    .chip {
+      width: 90px;
+      height: 90px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, var(--sky), var(--mint));
+      box-shadow: inset 0 0 0 10px rgba(255,255,255,0.28), 0 18px 34px rgba(66,200,244,0.28);
+      display: grid;
+      place-items: center;
+    }
+
+    .chip svg { width: 48px; height: 48px; stroke: #fff; }
+
+    .sign-card strong {
+      width: min-content;
+      min-width: 180px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 36px;
+      line-height: 0.98;
+      color: var(--blue);
+    }
+
+    .floating-badge {
+      position: absolute;
+      right: 22px;
+      bottom: 24px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(23,44,118,0.1);
+      box-shadow: 0 14px 32px rgba(31,42,90,0.12);
+      padding: 14px 18px;
+      color: #314071;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .feature-card {
+      min-height: 184px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.74);
+      background: rgba(255,255,255,0.62);
+      padding: 22px;
+      box-shadow: 0 14px 34px rgba(31,42,90,0.08);
+    }
+
+    .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, rgba(66,200,244,0.24), rgba(142,230,207,0.28));
+      color: var(--blue);
+    }
+
+    .icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .feature-card h2 {
+      margin: 0 0 9px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 19px;
+      color: var(--blue);
+    }
+
+    .feature-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .section-band {
+      margin-top: 22px;
+      border: 1px solid rgba(255,255,255,0.78);
+      border-radius: 30px;
+      background: rgba(255,255,255,0.56);
+      box-shadow: 0 16px 38px rgba(31,42,90,0.08);
+      padding: clamp(22px, 4vw, 34px);
+    }
+
+    .section-band h2 {
+      margin: 0 0 12px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      color: var(--blue);
+      font-size: clamp(27px, 4.4vw, 46px);
+      line-height: 1.02;
+    }
+
+    .section-band > p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+
+    .kit-detail-grid,
+    .steps {
+      display: grid;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .kit-detail-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .steps {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .detail-card,
+    .step-card {
+      border-radius: 24px;
+      border: 1px solid rgba(23,44,118,0.08);
+      background: rgba(255,255,255,0.68);
+      padding: 20px;
+    }
+
+    .detail-card strong,
+    .step-card strong {
+      display: block;
+      color: var(--blue);
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 20px;
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+
+    .detail-card span,
+    .step-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 750;
+    }
+
+    .step-number {
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), #345bd8);
+      font-weight: 900;
+      box-shadow: 0 12px 24px rgba(23,44,118,0.18);
+    }
+
+    .pricing-strip {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: center;
+      margin-top: 22px;
+      border-radius: 28px;
+      border: 1px solid rgba(23,44,118,0.1);
+      background:
+        linear-gradient(135deg, rgba(23,44,118,0.95), rgba(44,84,188,0.92)),
+        linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
+      color: #fff;
+      padding: clamp(22px, 4vw, 32px);
+      box-shadow: 0 20px 46px rgba(23,44,118,0.2);
+    }
+
+    .pricing-strip h2 {
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .pricing-strip p {
+      color: rgba(255,255,255,0.86);
+      max-width: 720px;
+      font-weight: 750;
+    }
+
+    .pricing-actions {
+      display: grid;
+      gap: 10px;
+      width: min(320px, 100%);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .choice {
+      border: 1px solid rgba(255,255,255,0.84);
+      border-radius: 28px;
+      background: rgba(255,255,255,0.72);
+      padding: 24px;
+      box-shadow: 0 16px 38px rgba(31,42,90,0.1);
+    }
+
+    .choice p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.52;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .btn {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--blue);
+      color: white;
+      font: 900 16px/1 Inter, sans-serif;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      box-shadow: 0 18px 34px rgba(23,44,118,0.22);
+    }
+
+    .btn.secondary {
+      background: linear-gradient(135deg, #ffffff, #eaf8ff);
+      color: var(--blue);
+      border: 1px solid rgba(23,44,118,0.12);
+      box-shadow: 0 14px 28px rgba(31,42,90,0.1);
+    }
+
+    .btn.light {
+      background: #fff;
+      color: var(--blue);
+      box-shadow: 0 14px 30px rgba(4,12,40,0.18);
+    }
+
+    .scan-state {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: none;
+      place-items: center;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,0.92) 0 14%, transparent 26%),
+        linear-gradient(180deg, #57d0f7 0%, #eefaff 56%, #f8fbff 100%);
+    }
+
+    .scan-panel {
+      width: min(620px, 100%);
+      border-radius: 34px;
+      border: 1px solid rgba(255,255,255,0.82);
+      background: rgba(255,255,255,0.68);
+      box-shadow: var(--shadow);
+      text-align: center;
+      padding: clamp(30px, 8vw, 58px);
+      backdrop-filter: blur(18px);
+    }
+
+    .scan-panel h2 {
+      margin: 20px 0 14px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      color: var(--blue);
+      font-size: clamp(38px, 8vw, 70px);
+      line-height: 0.96;
+    }
+
+    .scan-panel p {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    body.is-armed .page { display: none; }
+    body.is-armed .scan-state { display: grid; }
+
+    @media (max-width: 880px) {
+      .hero-grid, .split { grid-template-columns: 1fr; }
+      .kit-graphic { min-height: 340px; }
+      .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .kit-detail-grid, .steps, .pricing-strip, .hero-actions { grid-template-columns: 1fr; }
+      .pricing-actions { width: 100%; }
+    }
+
+    @media (max-width: 560px) {
+      .page { width: min(100% - 20px, 1120px); padding-top: 14px; }
+      .hero { border-radius: 28px; padding: 24px; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .feature-card { min-height: 148px; }
+      .floating-badge { position: static; margin-top: 24px; }
+      .kit-graphic { padding: 22px; }
+      .sign-card strong { font-size: 32px; }
+    }
+  </style>
 </head>
 <body>
-  Redirecting to the Rel8tion Open House Kit...
+  <main class="page">
+    <div class="brand">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+    </div>
+
+    <section class="hero" aria-labelledby="kit-title">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">Open House Kit</div>
+          <h1 id="kit-title">Get Your Rel8tion Open House Kit</h1>
+          <p class="subheadline">A smarter open house experience for agents &mdash; powered by smart check-in, live buyer alerts, disclosure-friendly records, and optional loan officer support.</p>
+          <p class="body-copy">Rel8tion helps turn a regular open house into a paperless, trackable, follow-up-ready event. Your kit gives buyers a simple check-in experience while giving you cleaner records, faster communication, and a better way to stay connected after the event.</p>
+          <div class="hero-actions" aria-label="Open House Kit checkout actions">
+            <button class="btn plan-cta" type="button" data-plan="monthly">Start With Monthly</button>
+            <button class="btn secondary plan-cta" type="button" data-plan="annual">Pay For The Year</button>
+          </div>
+          <p class="micro-copy">Both checkout paths include the physical Open House Kit plus required platform service so the Event Pass, dashboard, smart check-in, and alerts stay active.</p>
+        </div>
+
+        <div class="kit-graphic" aria-hidden="true">
+          <div class="sign-card">
+            <div class="chip">
+              <svg viewBox="0 0 48 48" aria-hidden="true">
+                <path d="M14 18c6-6 14-6 20 0"></path>
+                <path d="M18 24c4-4 8-4 12 0"></path>
+                <path d="M22 30c1.5-1.5 2.5-1.5 4 0"></path>
+                <rect x="12" y="8" width="24" height="32" rx="7"></rect>
+              </svg>
+            </div>
+            <strong>Smart Check-In</strong>
+          </div>
+          <div class="floating-badge">LIVE EVENT READY</div>
+        </div>
+      </div>
+
+      <div class="feature-grid" aria-label="Open House Kit features">
+        <article class="feature-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+          </div>
+          <h2>Smart Sign</h2>
+          <p>Buyers scan or tap to check in.</p>
+        </article>
+        <article class="feature-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9"></path><path d="M17 12v4"></path><path d="M20 12v3"></path></svg>
+          </div>
+          <h2>Event Pass Keychain</h2>
+          <p>Confirms the agent, company, and kit setup.</p>
+        </article>
+        <article class="feature-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"></path><path d="M10 21h4"></path></svg>
+          </div>
+          <h2>Live Alerts</h2>
+          <p>Buyer info can be sent to the agent in real time.</p>
+        </article>
+        <article class="feature-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"></path><path d="M8 9h3"></path><path d="M14 9h2"></path><path d="M8 13h8"></path><path d="M8 16h5"></path></svg>
+          </div>
+          <h2>Event Dashboard</h2>
+          <p>Check-ins, disclosures, financing interest, and follow-up in one place.</p>
+        </article>
+      </div>
+
+      <section class="section-band" aria-labelledby="kit-includes-title">
+        <h2 id="kit-includes-title">Everything an agent needs to run a cleaner open house.</h2>
+        <p>The Open House Kit is built for a real listing day: buyers check in from the sign, the agent gets usable contact records, and the event stays organized without passing around paper sheets.</p>
+        <div class="kit-detail-grid">
+          <div class="detail-card">
+            <strong>Buyer Check-In</strong>
+            <span>Mobile-first scan or tap flow with required open house disclosure steps and clean visitor records.</span>
+          </div>
+          <div class="detail-card">
+            <strong>Agent Dashboard</strong>
+            <span>Live check-ins, financing interest, signed disclosure status, recap links, and follow-up context in one place.</span>
+          </div>
+          <div class="detail-card">
+            <strong>Loan Officer Support</strong>
+            <span>Optional coverage can be connected when a sponsoring loan officer is helping support the event.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-band" aria-labelledby="how-it-works-title">
+        <h2 id="how-it-works-title">How it works.</h2>
+        <p>Start from the printed Event Pass, a direct purchase, or a manual setup request. The goal is the same: get the agent into a working Open House Kit profile without creating duplicate records.</p>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <strong>Choose a path</strong>
+            <span>Use an existing Event Pass keychain or start fresh with customer and payment info.</span>
+          </div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <strong>Confirm details</strong>
+            <span>Rel8tion checks for an existing agent profile by phone, email, name, and brokerage.</span>
+          </div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <strong>Checkout</strong>
+            <span>Stripe collects payment, shipping, and the selected monthly or annual service option.</span>
+          </div>
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <strong>Get the kit</strong>
+            <span>Kits are expected within 14 days, or sooner when Moe can personally deliver and help with setup.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="pricing-strip" aria-labelledby="pricing-title">
+        <div>
+          <h2 id="pricing-title">Version 1 pricing locks in the best rate.</h2>
+          <p>This first release will keep improving with more upgrades, stronger dashboards, and better event support. Starting now locks this account into a great early rate while future pricing is expected to go up.</p>
+        </div>
+        <div class="pricing-actions">
+          <button class="btn light plan-cta" type="button" data-plan="monthly">Buy Kit + Monthly</button>
+          <button class="btn secondary plan-cta" type="button" data-plan="annual">Buy Kit + Annual</button>
+        </div>
+      </section>
+
+      <div class="split" aria-label="Choose your Open House Kit path">
+        <section class="choice">
+          <p>Tap or scan your Event Pass so we can pull your agent, company, and kit details.</p>
+          <button id="scan-keychain" class="btn" type="button">I Have an Event Pass Keychain</button>
+        </section>
+        <section class="choice">
+          <p>Start with your customer and payment info. We&rsquo;ll create your kit profile and prepare your Event Pass.</p>
+          <button id="manual-intake" class="btn secondary" type="button">I Need My Open House Kit</button>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <section class="scan-state" aria-live="polite">
+    <div class="scan-panel">
+      <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" style="height:50px;width:auto;">
+      <h2>Now tap or scan your Event Pass keychain.</h2>
+      <p>Keep this browser open on getrel8tion.com so the keychain scan can confirm your Open House Kit details.</p>
+      <button id="fallback-intake" class="btn secondary" type="button">Enter My Info Instead</button>
+    </div>
+  </section>
+
+  <script>
+    const PENDING_KEY = 'rel8tion_open_house_kit_pending';
+
+    function armOpenHouseKitScan() {
+      const now = Date.now();
+      const payload = {
+        purpose: 'open_house_kit_confirm',
+        startedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 10 * 60 * 1000).toISOString(),
+        sourceHost: window.location.host,
+        sourcePath: window.location.pathname
+      };
+      window.localStorage.setItem(PENDING_KEY, JSON.stringify(payload));
+      document.body.classList.add('is-armed');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function startManualIntake(plan = '') {
+      const qs = new URLSearchParams(window.location.search);
+      if (!qs.get('flow')) qs.set('flow', 'manual');
+      if (plan) qs.set('plan', plan);
+      window.location.href = `/kit-intake?${qs.toString()}`;
+    }
+
+    document.getElementById('scan-keychain').addEventListener('click', armOpenHouseKitScan);
+    document.getElementById('manual-intake').addEventListener('click', () => {
+      startManualIntake();
+    });
+    document.getElementById('fallback-intake').addEventListener('click', () => {
+      startManualIntake();
+    });
+    document.querySelectorAll('.plan-cta').forEach((button) => {
+      button.addEventListener('click', () => startManualIntake(button.dataset.plan || 'monthly'));
+    });
+  </script>
 </body>
 </html>
