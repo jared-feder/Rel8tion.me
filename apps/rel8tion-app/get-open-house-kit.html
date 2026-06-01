@@ -3,19 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Get Your Rel8tion Open House Kit</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>REL8TION Open House Kit + Agent Website Builder</title>
+  <meta name="description" content="REL8TION open house technology with smart check-in, Event Passes, agent dashboards, website builder, and AI listing tools.">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --ink: #15245f;
-      --muted: #59667d;
-      --blue: #172c76;
-      --sky: #42c8f4;
-      --mint: #8ee6cf;
-      --coral: #ff8a76;
-      --paper: rgba(255, 255, 255, 0.72);
-      --line: rgba(255, 255, 255, 0.72);
-      --shadow: 0 28px 70px rgba(31, 42, 90, 0.16);
+      color-scheme: light;
+      --ink: #121c3f;
+      --muted: #526179;
+      --line: rgba(18, 28, 63, 0.12);
+      --glass: rgba(255, 255, 255, 0.78);
+      --glass-strong: rgba(255, 255, 255, 0.92);
+      --blue: #145cf2;
+      --cyan: #26bde2;
+      --violet: #635bff;
+      --green: #0f7a54;
+      --coral: #ff7f6f;
+      --shadow: 0 24px 70px rgba(27, 50, 92, 0.16);
     }
 
     * { box-sizing: border-box; }
@@ -23,12 +27,12 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.96) 0 12%, transparent 22%),
-        radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.86) 0 10%, transparent 21%),
-        linear-gradient(180deg, #57d0f7 0%, #eaf8ff 48%, #f7fbff 100%);
+        radial-gradient(circle at 12% 8%, rgba(38, 189, 226, 0.34), transparent 32%),
+        radial-gradient(circle at 88% 12%, rgba(99, 91, 255, 0.2), transparent 30%),
+        linear-gradient(180deg, #effaff 0%, #eef4ff 48%, #f7fbff 100%);
     }
 
     body::before {
@@ -36,86 +40,88 @@
       position: fixed;
       inset: 0;
       pointer-events: none;
-      background:
-        linear-gradient(135deg, rgba(255,255,255,0.58), rgba(255,255,255,0) 36%),
-        radial-gradient(circle at 48% 0%, rgba(142,230,207,0.26), transparent 24%),
-        radial-gradient(circle at 88% 70%, rgba(255,138,118,0.16), transparent 26%);
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.42) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 75%);
     }
 
     .page {
       position: relative;
-      width: min(1120px, calc(100% - 32px));
+      width: min(1180px, calc(100% - 28px));
       margin: 0 auto;
-      padding: 28px 0 44px;
+      padding: 34px 0 56px;
     }
 
     .brand {
       display: flex;
-      justify-content: center;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
       margin-bottom: 22px;
     }
 
     .brand img {
-      height: 54px;
+      height: 52px;
       width: auto;
       filter: drop-shadow(0 10px 18px rgba(23, 44, 118, 0.1));
     }
 
+    .nav-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      padding: 10px 14px;
+      color: var(--ink);
+      background: rgba(255,255,255,0.62);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
     .hero {
       overflow: hidden;
+      min-height: min(720px, calc(100vh - 120px));
       border: 1px solid var(--line);
-      border-radius: 34px;
-      background: var(--paper);
+      border-radius: 30px;
+      background: var(--glass);
       box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-      padding: clamp(28px, 6vw, 62px);
+      backdrop-filter: blur(20px);
+      padding: clamp(28px, 5vw, 56px);
     }
 
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
-      gap: clamp(28px, 5vw, 56px);
+      grid-template-columns: minmax(0, 1.04fr) minmax(330px, 0.78fr);
+      gap: clamp(24px, 4.8vw, 54px);
       align-items: center;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      border: 1px solid rgba(23,44,118,0.1);
-      border-radius: 999px;
-      background: rgba(255,255,255,0.74);
-      padding: 10px 15px;
-      color: #314071;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-
-    .eyebrow::before {
-      content: "";
-      width: 11px;
-      height: 11px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, var(--sky), var(--mint));
-      box-shadow: 0 0 0 5px rgba(66,200,244,0.16);
     }
 
     h1 {
-      margin: 22px 0 16px;
-      max-width: 760px;
+      margin: 0 0 18px;
+      max-width: 820px;
       font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: clamp(46px, 8vw, 92px);
+      font-size: clamp(48px, 7.8vw, 92px);
       line-height: 0.94;
       letter-spacing: 0;
-      color: var(--blue);
+      color: var(--ink);
     }
 
     .subheadline {
       margin: 0;
       max-width: 760px;
-      color: #2f3d6d;
+      color: #23315f;
       font-size: clamp(18px, 2.4vw, 25px);
       line-height: 1.36;
       font-weight: 800;
@@ -125,12 +131,12 @@
       margin: 18px 0 0;
       max-width: 720px;
       color: var(--muted);
-      font-size: 17px;
-      line-height: 1.72;
+      font-size: clamp(16px, 1.8vw, 19px);
+      line-height: 1.68;
       font-weight: 600;
     }
 
-    .hero-actions {
+    .hero-actions, .pricing-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
@@ -146,69 +152,100 @@
       font-weight: 800;
     }
 
-    .kit-graphic {
+    .product-console {
       position: relative;
-      min-height: 420px;
-      border-radius: 30px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.54)),
-        radial-gradient(circle at 50% 18%, rgba(66,200,244,0.28), transparent 32%);
-      border: 1px solid rgba(255,255,255,0.86);
-      box-shadow: 0 24px 60px rgba(31, 42, 90, 0.12);
       display: grid;
-      place-items: center;
-      padding: 32px;
+      gap: 14px;
     }
 
-    .sign-card {
-      width: min(300px, 86%);
-      aspect-ratio: 0.72;
-      border-radius: 26px;
-      border: 1px solid rgba(23,44,118,0.12);
-      background: linear-gradient(180deg, #f7fdff, #e8f9ff);
-      box-shadow: 0 26px 48px rgba(23,44,118,0.16);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      text-align: center;
-      transform: rotate(-2deg);
+    .console-card {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255,255,255,0.72);
+      box-shadow: 0 18px 42px rgba(27,50,92,0.12);
+      padding: 20px;
     }
 
-    .chip {
-      width: 90px;
-      height: 90px;
-      border-radius: 28px;
-      background: linear-gradient(135deg, var(--sky), var(--mint));
-      box-shadow: inset 0 0 0 10px rgba(255,255,255,0.28), 0 18px 34px rgba(66,200,244,0.28);
-      display: grid;
-      place-items: center;
+    .console-card.featured {
+      background: linear-gradient(135deg, rgba(20,92,242,0.96), rgba(99,91,255,0.92));
+      color: #fff;
+      box-shadow: 0 24px 54px rgba(20,92,242,0.22);
     }
 
-    .chip svg { width: 48px; height: 48px; stroke: #fff; }
-
-    .sign-card strong {
-      width: min-content;
-      min-width: 180px;
+    .console-card h2,
+    .console-card h3 {
+      margin: 0;
       font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: 36px;
-      line-height: 0.98;
-      color: var(--blue);
+      line-height: 1.02;
     }
 
-    .floating-badge {
-      position: absolute;
-      right: 22px;
-      bottom: 24px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.9);
-      border: 1px solid rgba(23,44,118,0.1);
-      box-shadow: 0 14px 32px rgba(31,42,90,0.12);
-      padding: 14px 18px;
-      color: #314071;
+    .console-card h2 {
+      font-size: clamp(32px, 4vw, 52px);
+    }
+
+    .console-card h3 {
+      font-size: 22px;
+    }
+
+    .console-card p {
+      margin: 10px 0 0;
+      color: rgba(18,28,63,0.7);
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 720;
+    }
+
+    .console-card.featured p {
+      color: rgba(255,255,255,0.84);
+    }
+
+    .console-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .tool-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .tool-row {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: center;
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,0.66);
+      border: 1px solid rgba(18,28,63,0.08);
+    }
+
+    .tool-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: #fff;
       font-weight: 900;
-      letter-spacing: 0.04em;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+    }
+
+    .tool-row strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .tool-row span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
     }
 
     .feature-grid {
@@ -222,7 +259,7 @@
       min-height: 184px;
       border-radius: 22px;
       border: 1px solid rgba(255,255,255,0.74);
-      background: rgba(255,255,255,0.62);
+      background: rgba(255,255,255,0.68);
       padding: 22px;
       box-shadow: 0 14px 34px rgba(31,42,90,0.08);
     }
@@ -234,7 +271,7 @@
       display: grid;
       place-items: center;
       margin-bottom: 18px;
-      background: linear-gradient(135deg, rgba(66,200,244,0.24), rgba(142,230,207,0.28));
+      background: linear-gradient(135deg, rgba(20,92,242,0.14), rgba(38,189,226,0.18));
       color: var(--blue);
     }
 
@@ -267,7 +304,7 @@
       margin-top: 22px;
       border: 1px solid rgba(255,255,255,0.78);
       border-radius: 30px;
-      background: rgba(255,255,255,0.56);
+      background: rgba(255,255,255,0.66);
       box-shadow: 0 16px 38px rgba(31,42,90,0.08);
       padding: clamp(22px, 4vw, 34px);
     }
@@ -346,14 +383,14 @@
 
     .pricing-strip {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) minmax(340px, 0.7fr);
       gap: 20px;
       align-items: center;
       margin-top: 22px;
-      border-radius: 28px;
+      border-radius: 30px;
       border: 1px solid rgba(23,44,118,0.1);
       background:
-        linear-gradient(135deg, rgba(23,44,118,0.95), rgba(44,84,188,0.92)),
+        linear-gradient(135deg, rgba(18,28,63,0.96), rgba(20,92,242,0.92)),
         linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
       color: #fff;
       padding: clamp(22px, 4vw, 32px);
@@ -371,10 +408,33 @@
       font-weight: 750;
     }
 
-    .pricing-actions {
+    .price-stack {
       display: grid;
-      gap: 10px;
-      width: min(320px, 100%);
+      gap: 12px;
+    }
+
+    .price-card {
+      border-radius: 22px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.22);
+      padding: 18px;
+    }
+
+    .price-card strong {
+      display: block;
+      color: #fff;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .price-card span {
+      display: block;
+      margin-top: 8px;
+      color: rgba(255,255,255,0.82);
+      font-size: 14px;
+      font-weight: 750;
+      line-height: 1.4;
     }
 
     .split {
@@ -387,7 +447,7 @@
     .choice {
       border: 1px solid rgba(255,255,255,0.84);
       border-radius: 28px;
-      background: rgba(255,255,255,0.72);
+      background: rgba(255,255,255,0.78);
       padding: 24px;
       box-shadow: 0 16px 38px rgba(31,42,90,0.1);
     }
@@ -404,25 +464,25 @@
       width: 100%;
       min-height: 58px;
       border: 0;
-      border-radius: 999px;
-      background: var(--blue);
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--blue), var(--violet));
       color: white;
       font: 900 16px/1 Inter, sans-serif;
       letter-spacing: 0.01em;
       cursor: pointer;
-      box-shadow: 0 18px 34px rgba(23,44,118,0.22);
+      box-shadow: 0 18px 34px rgba(20,92,242,0.24);
     }
 
     .btn.secondary {
       background: linear-gradient(135deg, #ffffff, #eaf8ff);
-      color: var(--blue);
-      border: 1px solid rgba(23,44,118,0.12);
+      color: var(--ink);
+      border: 1px solid var(--line);
       box-shadow: 0 14px 28px rgba(31,42,90,0.1);
     }
 
     .btn.light {
       background: #fff;
-      color: var(--blue);
+      color: var(--ink);
       box-shadow: 0 14px 30px rgba(4,12,40,0.18);
     }
 
@@ -434,15 +494,16 @@
       place-items: center;
       padding: 22px;
       background:
-        radial-gradient(circle at 50% 18%, rgba(255,255,255,0.92) 0 14%, transparent 26%),
-        linear-gradient(180deg, #57d0f7 0%, #eefaff 56%, #f8fbff 100%);
+        radial-gradient(circle at 12% 8%, rgba(38, 189, 226, 0.34), transparent 32%),
+        radial-gradient(circle at 88% 12%, rgba(99, 91, 255, 0.2), transparent 30%),
+        linear-gradient(180deg, #effaff 0%, #eef4ff 48%, #f7fbff 100%);
     }
 
     .scan-panel {
       width: min(620px, 100%);
-      border-radius: 34px;
-      border: 1px solid rgba(255,255,255,0.82);
-      background: rgba(255,255,255,0.68);
+      border-radius: 30px;
+      border: 1px solid var(--line);
+      background: var(--glass);
       box-shadow: var(--shadow);
       text-align: center;
       padding: clamp(30px, 8vw, 58px);
@@ -469,9 +530,8 @@
     body.is-armed .scan-state { display: grid; }
 
     @media (max-width: 880px) {
-      .hero-grid, .split { grid-template-columns: 1fr; }
-      .kit-graphic { min-height: 340px; }
-      .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-grid, .split, .pricing-strip { grid-template-columns: 1fr; }
+      .feature-grid, .console-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .kit-detail-grid, .steps, .pricing-strip, .hero-actions { grid-template-columns: 1fr; }
       .pricing-actions { width: 100%; }
     }
@@ -479,11 +539,9 @@
     @media (max-width: 560px) {
       .page { width: min(100% - 20px, 1120px); padding-top: 14px; }
       .hero { border-radius: 28px; padding: 24px; }
-      .feature-grid { grid-template-columns: 1fr; }
+      .brand { align-items: flex-start; }
+      .feature-grid, .console-grid { grid-template-columns: 1fr; }
       .feature-card { min-height: 148px; }
-      .floating-badge { position: static; margin-top: 24px; }
-      .kit-graphic { padding: 22px; }
-      .sign-card strong { font-size: 32px; }
     }
   </style>
 </head>
@@ -491,35 +549,58 @@
   <main class="page">
     <div class="brand">
       <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+      <nav class="nav-actions" aria-label="REL8TION links">
+        <a class="nav-link" href="#pricing-title">Pricing</a>
+        <a class="nav-link" href="https://my.rel8tion.me/get-started">Website Builder</a>
+        <a class="nav-link" href="/kit-intake?flow=manual">Start Checkout</a>
+      </nav>
     </div>
 
     <section class="hero" aria-labelledby="kit-title">
       <div class="hero-grid">
         <div>
-          <div class="eyebrow">Open House Kit</div>
-          <h1 id="kit-title">Get Your Rel8tion Open House Kit</h1>
-          <p class="subheadline">A smarter open house experience for agents &mdash; powered by smart check-in, live buyer alerts, disclosure-friendly records, and optional loan officer support.</p>
-          <p class="body-copy">Rel8tion helps turn a regular open house into a paperless, trackable, follow-up-ready event. Your kit gives buyers a simple check-in experience while giving you cleaner records, faster communication, and a better way to stay connected after the event.</p>
+          <h1 id="kit-title">Smarter open houses, cleaner follow-up, and a better agent website.</h1>
+          <p class="subheadline">REL8TION gives agents the Open House Kit, smart check-in, Event Pass routing, buyer records, website builder, and AI marketing tools in one connected workflow.</p>
+          <p class="body-copy">Start with the kit for your next open house. Add the REL8TION agent website builder for a polished public presence, then use AI tools for headshots, virtually staged listing images, and short-form listing reels.</p>
           <div class="hero-actions" aria-label="Open House Kit checkout actions">
-            <button class="btn plan-cta" type="button" data-plan="monthly">Start With Monthly</button>
-            <button class="btn secondary plan-cta" type="button" data-plan="annual">Pay For The Year</button>
+            <button class="btn plan-cta" type="button" data-plan="monthly">Get Kit + Website Bundle</button>
+            <button class="btn secondary plan-cta" type="button" data-plan="annual">Lock Annual Pricing</button>
           </div>
-          <p class="micro-copy">Both checkout paths include the physical Open House Kit plus required platform service so the Event Pass, dashboard, smart check-in, and alerts stay active.</p>
+          <p class="micro-copy">Open House Kit checkout includes the physical kit plus platform service. Kit buyers unlock the REL8TION website-builder bundle rate.</p>
         </div>
 
-        <div class="kit-graphic" aria-hidden="true">
-          <div class="sign-card">
-            <div class="chip">
-              <svg viewBox="0 0 48 48" aria-hidden="true">
-                <path d="M14 18c6-6 14-6 20 0"></path>
-                <path d="M18 24c4-4 8-4 12 0"></path>
-                <path d="M22 30c1.5-1.5 2.5-1.5 4 0"></path>
-                <rect x="12" y="8" width="24" height="32" rx="7"></rect>
-              </svg>
-            </div>
-            <strong>Smart Check-In</strong>
+        <div class="product-console" aria-label="REL8TION product stack">
+          <section class="console-card featured">
+            <h2>$10/mo</h2>
+            <p>Website-builder bundle rate for Open House Kit buyers, or $100/year when paid annually.</p>
+          </section>
+          <div class="console-grid">
+            <section class="console-card">
+              <h3>Open House Kit</h3>
+              <p>Smart sign, Event Pass, check-in records, dashboard, alerts, and follow-up context.</p>
+            </section>
+            <section class="console-card">
+              <h3>Agent Website</h3>
+              <p>Custom agent site with listings, contact capture, brand styling, and Hostinger domain support.</p>
+            </section>
           </div>
-          <div class="floating-badge">LIVE EVENT READY</div>
+          <section class="console-card">
+            <h3>AI marketing studio</h3>
+            <div class="tool-list">
+              <div class="tool-row">
+                <div class="tool-icon">H</div>
+                <div><strong>Headshot Creator</strong><span>Refresh agent profile photos for websites and campaigns.</span></div>
+              </div>
+              <div class="tool-row">
+                <div class="tool-icon">S</div>
+                <div><strong>Listing Staging</strong><span>Create virtually staged listing images for marketing concepts.</span></div>
+              </div>
+              <div class="tool-row">
+                <div class="tool-icon">R</div>
+                <div><strong>AutoReel</strong><span>Turn listing photos into short social video concepts.</span></div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 
@@ -528,64 +609,64 @@
           <div class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
           </div>
-          <h2>Smart Sign</h2>
-          <p>Buyers scan or tap to check in.</p>
+          <h2>Smart Check-In</h2>
+          <p>Buyers scan or tap the sign for a simple open-house check-in flow.</p>
         </article>
         <article class="feature-card">
           <div class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9"></path><path d="M17 12v4"></path><path d="M20 12v3"></path></svg>
           </div>
-          <h2>Event Pass Keychain</h2>
-          <p>Confirms the agent, company, and kit setup.</p>
+          <h2>Event Pass</h2>
+          <p>Connects the event, agent, sponsor, and dashboard without app installs.</p>
         </article>
         <article class="feature-card">
           <div class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"></path><path d="M10 21h4"></path></svg>
           </div>
-          <h2>Live Alerts</h2>
-          <p>Buyer info can be sent to the agent in real time.</p>
+          <h2>Website Builder</h2>
+          <p>Launch a polished agent site with listings, gallery images, and contact capture.</p>
         </article>
         <article class="feature-card">
           <div class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"></path><path d="M8 9h3"></path><path d="M14 9h2"></path><path d="M8 13h8"></path><path d="M8 16h5"></path></svg>
           </div>
-          <h2>Event Dashboard</h2>
-          <p>Check-ins, disclosures, financing interest, and follow-up in one place.</p>
+          <h2>AI Listing Tools</h2>
+          <p>Headshots, staging concepts, and short listing reels for modern agent marketing.</p>
         </article>
       </div>
 
       <section class="section-band" aria-labelledby="kit-includes-title">
-        <h2 id="kit-includes-title">Everything an agent needs to run a cleaner open house.</h2>
-        <p>The Open House Kit is built for a real listing day: buyers check in from the sign, the agent gets usable contact records, and the event stays organized without passing around paper sheets.</p>
+        <h2 id="kit-includes-title">Built for the real agent workflow before, during, and after the open house.</h2>
+        <p>REL8TION is not just a sign. The kit captures cleaner buyer records at the event, the dashboard keeps follow-up organized, and the website builder helps the agent show up professionally after the conversation moves online.</p>
         <div class="kit-detail-grid">
           <div class="detail-card">
-            <strong>Buyer Check-In</strong>
-            <span>Mobile-first scan or tap flow with required open house disclosure steps and clean visitor records.</span>
+            <strong>Open house capture</strong>
+            <span>Smart check-in, event records, disclosure-friendly context, financing interest, and buyer follow-up details.</span>
           </div>
           <div class="detail-card">
-            <strong>Agent Dashboard</strong>
-            <span>Live check-ins, financing interest, signed disclosure status, recap links, and follow-up context in one place.</span>
+            <strong>Website presence</strong>
+            <span>Agent pages with listings, photos, testimonials, lead forms, and domain-ready public URLs.</span>
           </div>
           <div class="detail-card">
-            <strong>Loan Officer Support</strong>
-            <span>Optional coverage can be connected when a sponsoring loan officer is helping support the event.</span>
+            <strong>Marketing upgrades</strong>
+            <span>AI headshot concepts, listing staging concepts, and AutoReel social video generation for listing content.</span>
           </div>
         </div>
       </section>
 
       <section class="section-band" aria-labelledby="how-it-works-title">
-        <h2 id="how-it-works-title">How it works.</h2>
-        <p>Start from the printed Event Pass, a direct purchase, or a manual setup request. The goal is the same: get the agent into a working Open House Kit profile without creating duplicate records.</p>
+        <h2 id="how-it-works-title">How agents start.</h2>
+        <p>Checkout collects the service plan and shipping details through Stripe. After the kit is prepared, the agent can activate the Event Pass, run smart check-ins, and unlock the website-builder bundle rate.</p>
         <div class="steps">
           <div class="step-card">
             <div class="step-number">1</div>
-            <strong>Choose a path</strong>
-            <span>Use an existing Event Pass keychain or start fresh with customer and payment info.</span>
+            <strong>Choose monthly or annual</strong>
+            <span>Pick the Open House Kit service plan that fits the agent or sponsoring partner.</span>
           </div>
           <div class="step-card">
             <div class="step-number">2</div>
-            <strong>Confirm details</strong>
-            <span>Rel8tion checks for an existing agent profile by phone, email, name, and brokerage.</span>
+            <strong>Confirm agent details</strong>
+            <span>REL8TION checks for existing profile data before checkout to reduce duplicate records.</span>
           </div>
           <div class="step-card">
             <div class="step-number">3</div>
@@ -594,31 +675,41 @@
           </div>
           <div class="step-card">
             <div class="step-number">4</div>
-            <strong>Get the kit</strong>
-            <span>Kits are expected within 14 days, or sooner when Moe can personally deliver and help with setup.</span>
+            <strong>Launch the stack</strong>
+            <span>Use the kit at the event, then connect the agent website and AI marketing tools.</span>
           </div>
         </div>
       </section>
 
       <section class="pricing-strip" aria-labelledby="pricing-title">
         <div>
-          <h2 id="pricing-title">Version 1 pricing locks in the best rate.</h2>
-          <p>This first release will keep improving with more upgrades, stronger dashboards, and better event support. Starting now locks this account into a great early rate while future pricing is expected to go up.</p>
+          <h2 id="pricing-title">Current launch pricing</h2>
+          <p>Start with the Open House Kit and required platform service, then unlock the REL8TION website builder at the bundle rate. Version 1 pricing is intended to lock in early accounts while the product keeps expanding.</p>
         </div>
-        <div class="pricing-actions">
-          <button class="btn light plan-cta" type="button" data-plan="monthly">Buy Kit + Monthly</button>
-          <button class="btn secondary plan-cta" type="button" data-plan="annual">Buy Kit + Annual</button>
+        <div class="price-stack">
+          <div class="price-card">
+            <strong>Open House Kit + Service</strong>
+            <span>Physical kit plus monthly or annual platform service through secure Stripe Checkout.</span>
+          </div>
+          <div class="price-card">
+            <strong>$10/mo or $100/yr</strong>
+            <span>Website-builder bundle rate for Open House Kit buyers. Standalone website pricing remains separate.</span>
+          </div>
+          <div class="pricing-actions">
+            <button class="btn light plan-cta" type="button" data-plan="monthly">Start Monthly</button>
+            <button class="btn secondary plan-cta" type="button" data-plan="annual">Start Annual</button>
+          </div>
         </div>
       </section>
 
       <div class="split" aria-label="Choose your Open House Kit path">
         <section class="choice">
-          <p>Tap or scan your Event Pass so we can pull your agent, company, and kit details.</p>
+          <p>Tap or scan your Event Pass so REL8TION can pull agent, company, sponsor, and kit context before checkout.</p>
           <button id="scan-keychain" class="btn" type="button">I Have an Event Pass Keychain</button>
         </section>
         <section class="choice">
-          <p>Start with your customer and payment info. We&rsquo;ll create your kit profile and prepare your Event Pass.</p>
-          <button id="manual-intake" class="btn secondary" type="button">I Need My Open House Kit</button>
+          <p>Start fresh with agent and shipping details, choose service, and continue to secure Stripe Checkout.</p>
+          <button id="manual-intake" class="btn secondary" type="button">Start My Open House Kit</button>
         </section>
       </div>
     </section>
