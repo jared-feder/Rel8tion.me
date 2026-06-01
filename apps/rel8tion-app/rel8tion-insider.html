@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rel8tion Insider</title>
+  <meta name="description" content="Join Rel8tion Insider for open house technology updates, product announcements, webinars, Event Pass opportunities, and special offers.">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #121c3f;
+      --muted: #526179;
+      --line: rgba(18, 28, 63, 0.12);
+      --glass: rgba(255, 255, 255, 0.78);
+      --glass-strong: rgba(255, 255, 255, 0.93);
+      --blue: #145cf2;
+      --cyan: #26bde2;
+      --violet: #635bff;
+      --shadow: 0 24px 70px rgba(27, 50, 92, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(38, 189, 226, 0.34), transparent 32%),
+        radial-gradient(circle at 88% 12%, rgba(99, 91, 255, 0.2), transparent 30%),
+        linear-gradient(180deg, #effaff 0%, #eef4ff 48%, #f7fbff 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.42) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 75%);
+    }
+
+    .page {
+      position: relative;
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 34px 0 56px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand img {
+      height: 52px;
+      width: auto;
+      filter: drop-shadow(0 10px 18px rgba(23, 44, 118, 0.1));
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      padding: 10px 14px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .hero {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: var(--glass);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+      padding: clamp(28px, 5vw, 56px);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(330px, 0.74fr);
+      gap: clamp(24px, 4.8vw, 54px);
+      align-items: start;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(20, 92, 242, 0.18);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--blue);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      max-width: 760px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(46px, 7.4vw, 86px);
+      line-height: 0.94;
+      letter-spacing: 0;
+      color: var(--ink);
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 720px;
+      color: #23315f;
+      font-size: clamp(18px, 2.1vw, 24px);
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .body-copy {
+      margin: 18px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.68;
+      font-weight: 650;
+    }
+
+    .audience-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .audience-list li {
+      border: 1px solid rgba(20, 92, 242, 0.16);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #23315f;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .promise {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .promise-card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+      padding: 16px;
+    }
+
+    .promise-card strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--ink);
+    }
+
+    .promise-card span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.48;
+      font-weight: 650;
+    }
+
+    .form-shell {
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: var(--glass-strong);
+      box-shadow: 0 18px 42px rgba(27, 50, 92, 0.12);
+      padding: clamp(18px, 3vw, 28px);
+    }
+
+    .form-shell h2 {
+      margin: 0 0 8px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1.05;
+    }
+
+    .form-shell p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.56;
+      font-weight: 650;
+    }
+
+    .reach-form-frame {
+      min-height: 520px;
+      border-radius: 20px;
+      background: #fff;
+      border: 1px solid rgba(18, 28, 63, 0.08);
+      padding: 4px;
+    }
+
+    .fallback-note {
+      margin-top: 14px;
+      color: #526179;
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 650;
+    }
+
+    .fallback-note a {
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    @media (max-width: 860px) {
+      .brand {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav-actions {
+        justify-content: flex-start;
+      }
+
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .promise {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="brand" aria-label="Rel8tion Insider header">
+      <a href="/" aria-label="Rel8tion home">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+      </a>
+      <nav class="nav-actions" aria-label="Primary">
+        <a class="nav-link" href="/get-open-house-kit">Open House Kit</a>
+        <a class="nav-link" href="https://my.rel8tion.me/get-started">Website Builder</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">Rel8tion Insider</div>
+          <h1>Stay Connected With Rel8tion</h1>
+          <p class="lead">Get open house technology updates, industry insights, Event Pass opportunities, Open House Kit announcements, webinar invitations, product updates, and special offers from Rel8tion.</p>
+          <p class="body-copy">Rel8tion Insider is for the agents, broker owners, loan officers, buyers, and industry professionals who want to stay close to the next wave of open house technology.</p>
+
+          <ul class="audience-list" aria-label="Rel8tion Insider audience types">
+            <li>Real Estate Agent</li>
+            <li>Broker Office Owner</li>
+            <li>Loan Officer</li>
+            <li>Buyer</li>
+            <li>Industry Professional</li>
+            <li>Other</li>
+          </ul>
+
+          <div class="promise" aria-label="What Rel8tion Insider includes">
+            <div class="promise-card">
+              <strong>Open House Technology</strong>
+              <span>Smart check-in, Event Pass, Open House Kit, and product updates.</span>
+            </div>
+            <div class="promise-card">
+              <strong>Education And Events</strong>
+              <span>Webinars, industry insights, special offers, and launch announcements.</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="form-shell" aria-label="Rel8tion Insider subscriber form">
+          <h2>Join Rel8tion Insider</h2>
+          <p>First name and email are required. Mobile phone is optional. Please choose the role that best describes you.</p>
+          <div class="reach-form-frame">
+            <div data-reach-form="b2065ac9-ae84-478b-bc8c-aa543d9e762b"></div>
+          </div>
+          <p class="fallback-note">By joining, you agree to receive Rel8tion email communications about open house technology, education, webinars, industry insights, product updates, events, and special offers. You can unsubscribe at any time.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <script src="https://cdn-reach.hostinger.com/js/embed.js"></script>
+</body>
+</html>

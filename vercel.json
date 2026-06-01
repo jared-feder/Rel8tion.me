@@ -46,6 +46,8 @@
     { "source": "/kit-confirm.html", "destination": "/apps/rel8tion-app/kit-confirm.html" },
     { "source": "/kit-intake", "destination": "/apps/rel8tion-app/kit-intake.html" },
     { "source": "/kit-intake.html", "destination": "/apps/rel8tion-app/kit-intake.html" },
+    { "source": "/rel8tion-insider", "destination": "/apps/rel8tion-app/rel8tion-insider.html" },
+    { "source": "/rel8tion-insider.html", "destination": "/apps/rel8tion-app/rel8tion-insider.html" },
     { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim.html", "destination": "/apps/rel8tion-app/claim.html" },
     { "source": "/claim-test-styled.html", "destination": "/apps/rel8tion-app/claim.html" },
