@@ -90,6 +90,8 @@ The send function should assume:
 
 It should not need to know how the image was generated.
 
+Twilio-specific recovery details live in `docs/twilio-outreach-sms-runbook.md`. The current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`.
+
 ## Hot-List UI Changes
 
 The hot-list page should show persisted state, not fabricate a different preview in the browser.
