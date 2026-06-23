@@ -1,19 +1,74 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { sendSMS } from "../_shared/sms.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
+};
+
+function clean(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function hotLeadAgentBody(opts: {
+  buyerName: string;
+  buyerPhone: string;
+  areas: string;
+  price: string;
+  preapproved: string;
+}) {
+  return `HOT BUYER LEAD
+
+${opts.buyerName}
+${opts.buyerPhone}
+
+Looking in: ${opts.areas}
+Budget: ${opts.price}
+
+${opts.preapproved === "no" ? "NOT pre-approved - opportunity for financing" : "Already pre-approved"}
+
+Call now - timing matters.`;
+}
+
+function buyerAcknowledgementBody(buyerName: string) {
+  return `Hey ${buyerName}, we got your request. Your agent will reach out shortly.
+
+- Rel8tion
+
+Reply STOP to opt out.`;
+}
+
+function ownerFinancingBody(opts: {
+  buyerName: string;
+  buyerPhone: string;
+  areas: string;
+  price: string;
+}) {
+  return `HOT OPPORTUNITY
+${opts.buyerName}
+${opts.buyerPhone}
+
+Areas: ${opts.areas}
+Price: ${opts.price}
+
+Call now and own the deal.`;
+}
 
 serve(async (req) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
-  };
-
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
+    const body = await req.json().catch(() => ({}));
     const {
       agent_phone,
       buyer_phone,
@@ -22,115 +77,79 @@ serve(async (req) => {
       price,
       preapproved,
       message,
+      category,
+      metadata,
     } = body;
 
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const from = Deno.env.get("TWILIO_PHONE");
-    const yourPhone = Deno.env.get("YOUR_PHONE");
+    const buyerName = clean(buyer_name) || "Buyer";
+    const buyerPhone = clean(buyer_phone);
+    const agentPhone = clean(agent_phone);
+    const yourPhone = clean(Deno.env.get("YOUR_PHONE") || Deno.env.get("REL8TION_OWNER_ALERT_PHONE"));
+    const results: Array<Record<string, unknown>> = [];
 
-    const auth = btoa(`${accountSid}:${authToken}`);
-
-    // Direct message mode, used for agent access links and other one-off SMS.
     if (message) {
-      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Basic ${auth}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+      const sms = await sendSMS({
+        to: agentPhone,
+        body: clean(message),
+        category: clean(category) || "event_transactional",
+        metadata: {
+          mode: "direct_message",
+          ...(metadata && typeof metadata === "object" ? metadata : {}),
         },
-        body: new URLSearchParams({
-          From: from || "",
-          To: agent_phone,
-          Body: message,
-        }),
       });
 
       return new Response(
-        JSON.stringify({ success: true, mode: "direct_message" }),
+        JSON.stringify({ success: true, mode: "direct_message", sms }),
         {
           status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
 
-    // Agent SMS, lead mode.
-    await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        From: from || "",
-        To: agent_phone,
-        Body: `🔥 HOT BUYER LEAD
-
-${buyer_name}
-${buyer_phone}
-
-Looking in: ${areas}
-Budget: ${price}
-
-${preapproved === "no" ? "🚨 NOT pre-approved — opportunity for financing" : "✅ Already pre-approved"}
-
-Call NOW — timing matters.`,
-      }),
-    });
-
-    // Buyer SMS.
-    await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        From: from || "",
-        To: buyer_phone,
-        Body: `Hey ${buyer_name}, we got your request. Your agent will reach out shortly. 🚀
-
-- Rel8tion
-
-Reply STOP to opt out.`,
-      }),
-    });
-
-    // Owner alert for financing opportunities.
-    if (preapproved === "no") {
-      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Basic ${auth}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          From: from || "",
-          To: yourPhone || "",
-          Body: `🚨 HOT OPPORTUNITY
-${buyer_name}
-${buyer_phone}
-
-Areas: ${areas}
-Price: ${price}
-
-🚨 Call Now & Own The Deal!`,
+    if (agentPhone) {
+      results.push(await sendSMS({
+        to: agentPhone,
+        body: hotLeadAgentBody({
+          buyerName,
+          buyerPhone,
+          areas: clean(areas) || "Open House Visitor",
+          price: clean(price),
+          preapproved: clean(preapproved),
         }),
-      });
+        category: clean(category) || "agent_checkin_alert",
+        metadata: { mode: "lead_agent_alert" },
+      }));
+    }
+
+    if (buyerPhone) {
+      results.push(await sendSMS({
+        to: buyerPhone,
+        body: buyerAcknowledgementBody(buyerName),
+        category: "buyer_confirmation",
+        metadata: { mode: "buyer_acknowledgement" },
+      }));
+    }
+
+    if (clean(preapproved) === "no" && yourPhone) {
+      results.push(await sendSMS({
+        to: yourPhone,
+        body: ownerFinancingBody({
+          buyerName,
+          buyerPhone,
+          areas: clean(areas) || "Open House Visitor",
+          price: clean(price),
+        }),
+        category: "owner_fallback_alert",
+        metadata: { mode: "owner_financing_alert", internal_operational_alert: true },
+      }));
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, results }),
       {
         status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
   } catch (err) {
@@ -139,10 +158,7 @@ Price: ${price}
       JSON.stringify({ error: message }),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
   }

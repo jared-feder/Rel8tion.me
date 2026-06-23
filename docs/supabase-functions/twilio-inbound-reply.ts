@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSMS } from "../_shared/sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,12 +10,55 @@ const corsHeaders = {
 
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) return digits.slice(1);
+  return digits;
+}
+
+function phoneLookupVariants(phone: string | null): string[] {
+  const rawDigits = phone ? phone.replace(/\D/g, "") : "";
+  const normalized = normalizePhone(phone);
+  return Array.from(new Set([normalized, rawDigits].filter(Boolean)));
 }
 
 function isOptOut(text: string): boolean {
   const normalized = text.trim().toUpperCase();
   return ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(normalized);
+}
+
+function toE164(phone: string | null): string {
+  const digits = normalizePhone(phone);
+  if (!digits) return "";
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  if (phone?.trim().startsWith("+")) return phone.trim();
+  return `+${digits}`;
+}
+
+function shortText(text: string, max = 520): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 3)}...`;
+}
+
+function buildOwnerReplyAlert(opts: {
+  queueRow: Record<string, unknown> | null;
+  fromPhone: string;
+  body: string;
+  optOut: boolean;
+}): string {
+  const agentName = String(opts.queueRow?.agent_name || "Unknown agent");
+  const agentPhone = String(opts.queueRow?.agent_phone || opts.fromPhone || "");
+  const address = String(opts.queueRow?.address || opts.queueRow?.open_house_id || "Open house");
+  const status = opts.optOut ? "STOP / opt-out" : "reply";
+
+  return [
+    `Rel8tion outreach ${status}`,
+    `${agentName} (${agentPhone})`,
+    address,
+    shortText(opts.body || "(empty reply)"),
+    "Use the admin dashboard to reply.",
+  ].filter(Boolean).join("\n");
 }
 
 serve(async (req) => {
@@ -25,6 +69,10 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const ownerAlertPhone =
+      Deno.env.get("OUTREACH_REPLY_ALERT_PHONE") ||
+      Deno.env.get("REL8TION_OWNER_ALERT_PHONE") ||
+      "13477758059";
 
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -60,8 +108,8 @@ serve(async (req) => {
 
     const { data: queueRow, error: queueLookupError } = await supabase
       .from("agent_outreach_queue")
-      .select("id, open_house_id, agent_name, agent_phone_normalized, send_mode, review_status")
-      .eq("agent_phone_normalized", fromPhoneNormalized)
+      .select("id, open_house_id, agent_name, agent_phone, agent_phone_normalized, address, send_mode, review_status")
+      .in("agent_phone_normalized", phoneLookupVariants(fromPhone))
       .order("last_outreach_at", { ascending: false, nullsFirst: false })
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -90,6 +138,43 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
+    if (optOut) {
+      const suppressedPhone = toE164(fromPhone);
+      const { data: existingSuppression, error: suppressLookupError } = await supabase
+        .from("sms_suppression_list")
+        .select("id")
+        .eq("phone", suppressedPhone)
+        .eq("provider", "twilio")
+        .maybeSingle();
+
+      if (suppressLookupError) {
+        console.error("SMS suppression lookup failed", suppressLookupError);
+      }
+
+      const suppressionPayload = {
+        phone: suppressedPhone,
+        reason: "STOP keyword",
+        provider: "twilio",
+        source: "twilio-inbound-reply",
+        raw_payload: payload,
+      };
+
+      const suppressRequest = existingSuppression?.id
+        ? supabase
+          .from("sms_suppression_list")
+          .update(suppressionPayload)
+          .eq("id", existingSuppression.id)
+        : supabase
+          .from("sms_suppression_list")
+          .insert(suppressionPayload);
+
+      const { error: suppressError } = await suppressRequest;
+
+      if (suppressError) {
+        console.error("SMS suppression upsert failed", suppressError);
+      }
+    }
+
     if (queueRow?.id) {
       const queueUpdate: Record<string, unknown> = {
         approved_for_send: false,
@@ -108,6 +193,30 @@ serve(async (req) => {
       if (updateQueueError) throw updateQueueError;
     }
 
+    let ownerAlertStatus = "skipped";
+    const ownerAlertTo = toE164(ownerAlertPhone);
+
+    if (ownerAlertTo) {
+      try {
+        const ownerAlert = await sendSMS({
+          supabase,
+          to: ownerAlertTo,
+          body: buildOwnerReplyAlert({ queueRow, fromPhone, body, optOut }),
+          category: "owner_fallback_alert",
+          metadata: {
+            source: "twilio-inbound-reply",
+            queue_row_id: queueRow?.id || null,
+            inbound_reply_id: savedReply?.id || null,
+            internal_operational_alert: true,
+          },
+        });
+        ownerAlertStatus = String(ownerAlert.sid || ownerAlert.externalId || "sent");
+      } catch (alertErr) {
+        ownerAlertStatus = "failed";
+        console.error("Owner outreach reply alert failed", alertErr);
+      }
+    }
+
     const twiml = optOut
       ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>You have been opted out. No further automated texts will be sent.</Message></Response>`
       : `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
@@ -117,6 +226,7 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": "text/xml",
+        "X-Rel8tion-Owner-Alert": ownerAlertStatus,
       },
     });
   } catch (err) {

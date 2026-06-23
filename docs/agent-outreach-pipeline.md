@@ -90,7 +90,9 @@ The send function should assume:
 
 It should not need to know how the image was generated.
 
-Twilio-specific recovery details live in `docs/twilio-outreach-sms-runbook.md`. The current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`.
+Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. To protect Twilio, keep `SMS_PROVIDER=twilio`, set `SMS_EVENTS_PROVIDER=twilio`, and set `SMS_OUTREACH_PROVIDER=android_gateway`.
+
+For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 
 ## Hot-List UI Changes
 

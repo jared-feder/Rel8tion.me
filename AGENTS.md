@@ -112,9 +112,10 @@ Preserve these priorities:
 - `[RISK]` Outreach and auto-reply behavior can spend money and affect real agent conversations. Do not deploy or enable new outbound behavior casually.
 - `[RISK]` Before outreach changes, inspect queue filters, quiet hours, opt-out handling, provider selection, and owner approval.
 - `[RISK]` REL8TION COMMAND's outreach inbox must load inbound rows separately from recent all-thread rows so outbound bursts cannot hide incoming replies.
-- `[RISK]` Android SMS Gateway is a temporary Twilio/A2P fallback. Keep Twilio code intact and switch providers by env vars.
+- `[RISK]` Android SMS Gateway is a temporary outreach-volume fallback. Keep Twilio code intact and switch providers by route-scoped env vars.
 - `[IMPLEMENTED]` Twilio outreach recovery and webhook settings are documented in `docs/twilio-outreach-sms-runbook.md`. Do not delete that runbook; update it when Twilio numbers, Messaging Service settings, callback tokens, or inbound routing behavior changes.
-- `[IMPLEMENTED]` Current Twilio outreach path uses `SMS_PROVIDER=twilio` and `TWILIO_PHONE` for the sender number. Twilio inbound replies must point to the public `twilio-inbound-router` webhook, not directly to `twilio-inbound-reply`.
+- `[IMPLEMENTED]` SMS provider selection supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. To protect Twilio, use `SMS_OUTREACH_PROVIDER=android_gateway`, `SMS_EVENTS_PROVIDER=twilio`, and `SMS_PROVIDER=twilio`.
+- `[IMPLEMENTED]` Current Twilio sender path uses `SMS_PROVIDER=twilio` and `TWILIO_PHONE` for the sender number. Twilio inbound replies must point to the public `twilio-inbound-router` webhook, not directly to `twilio-inbound-reply`.
 - `[RISK]` In Twilio Messaging Service settings, inbound messages must be set to `Send a webhook`; `Receive the message` stores replies at Twilio but does not invoke REL8TION.
 - `[RISK]` Replay endpoints such as `/api/admin/android-inbox-replay` and `/api/cron/replay-android-inbox` must never send SMS.
 

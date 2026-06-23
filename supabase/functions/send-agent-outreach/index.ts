@@ -14,6 +14,8 @@ const BUSINESS_CARD_URL =
 const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
+const DEFAULT_SEND_MAX_PER_RUN = 3;
+const DEFAULT_SEND_MAX_PER_HOUR = 6;
 
 type OutreachRow = {
   id?: string | null;
@@ -89,7 +91,27 @@ function buildSmsLink(phone: string | null, body: string): string {
 }
 
 function usesAndroidGateway(): boolean {
+  const outreachProvider = String(Deno.env.get("SMS_OUTREACH_PROVIDER") || "").trim().toLowerCase();
+  if (outreachProvider) return outreachProvider === "android_gateway";
   return String(Deno.env.get("SMS_PROVIDER") || "").trim().toLowerCase() === "android_gateway";
+}
+
+function positiveIntEnv(name: string, fallback: number, max: number): number {
+  const parsed = Number(Deno.env.get(name) || "");
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.min(Math.floor(parsed), max));
+}
+
+async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("sms_message_log")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", sinceIso)
+    .in("status", ["sent", "queued"])
+    .or("route.eq.outreach,category.eq.outreach,category.eq.outreach_followup,category.eq.manual_outreach");
+
+  if (error) throw error;
+  return count || 0;
 }
 
 function buildOutreachPreviewUrl(rowId: string | null, outreachCode?: string | null, mockupImageUrl?: string | null): string {
@@ -291,6 +313,9 @@ serve(async (req) => {
       );
     }
 
+    const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, 50);
+    const maxPerHour = positiveIntEnv("OUTREACH_SEND_MAX_PER_HOUR", DEFAULT_SEND_MAX_PER_HOUR, 200);
+
     if (!isWithinAllowedSendWindow()) {
       return new Response(
         JSON.stringify(
@@ -299,6 +324,8 @@ serve(async (req) => {
             processed: 0,
             quiet_hours: true,
             timezone: "America/New_York",
+            max_per_run: maxPerRun,
+            max_per_hour: maxPerHour,
             message: "Current time is outside allowed send window (8:00 AM-9:00 PM ET). No messages sent.",
           },
           null,
@@ -313,12 +340,47 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
-    const requestedLimit = Number(body.limit ?? 25);
-    const limit = Math.max(0, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 25, 50));
+    const requestedLimit = Number(body.limit ?? maxPerRun);
+    const normalizedRequestedLimit = Math.max(
+      0,
+      Math.min(Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : maxPerRun, 50),
+    );
+    const hourlyWindowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const recentSendCount = await recentOutreachSendCount(supabase, hourlyWindowStart);
+    const hourlyRemaining = Math.max(0, maxPerHour - recentSendCount);
+    const limit = dryRun
+      ? normalizedRequestedLimit
+      : Math.min(normalizedRequestedLimit, maxPerRun, hourlyRemaining);
     const inspectionLimit = dryRun ? Math.max(1, limit || 25) : limit;
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
+
+    if (!dryRun && limit <= 0) {
+      return new Response(
+        JSON.stringify(
+          {
+            ok: true,
+            processed: 0,
+            dry_run: false,
+            throttled: true,
+            requested_limit: normalizedRequestedLimit,
+            effective_limit: limit,
+            max_per_run: maxPerRun,
+            max_per_hour: maxPerHour,
+            recent_outreach_sends_1h: recentSendCount,
+            hourly_remaining: hourlyRemaining,
+            message: "Outreach send throttle is active. No messages sent this run.",
+            results: [],
+          },
+          null,
+          2,
+        ),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
     let query = supabase
       .from("agent_outreach_queue")
@@ -352,6 +414,7 @@ serve(async (req) => {
       .eq("send_mode", "automatic")
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
+      .eq("approved_for_send", true)
       .not("listing_photo_url", "is", null)
       .or(`and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
       .order("initial_send_at", { ascending: true, nullsFirst: false })
@@ -466,6 +529,7 @@ serve(async (req) => {
           row.initial_send_at &&
           row.initial_send_at <= nowIso &&
           row.selected_sms &&
+          row.approved_for_send === true &&
           (isMissedOpenHouseCampaign || !openEnd || openEnd > now);
 
         const followupDue =
@@ -703,6 +767,12 @@ serve(async (req) => {
           dry_run: dryRun,
           candidate_rows: rows?.length || 0,
           fetch_limit: fetchLimit,
+          requested_limit: normalizedRequestedLimit,
+          effective_limit: limit,
+          max_per_run: maxPerRun,
+          max_per_hour: maxPerHour,
+          recent_outreach_sends_1h: recentSendCount,
+          hourly_remaining: hourlyRemaining,
           duplicate_phone_cooldown: "disabled",
           results,
         },

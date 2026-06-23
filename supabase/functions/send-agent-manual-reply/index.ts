@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSMS } from "../_shared/sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,44 +33,6 @@ function isServiceRoleRequest(req: Request, serviceRoleKey: string): boolean {
   return authHeader === `Bearer ${serviceRoleKey}`;
 }
 
-async function sendTwilioMessage(opts: {
-  accountSid: string;
-  authToken: string;
-  from: string;
-  to: string;
-  body: string;
-  statusCallback?: string;
-}) {
-  const form = new URLSearchParams();
-  form.set("From", opts.from);
-  form.set("To", opts.to);
-  form.set("Body", opts.body);
-  if (opts.statusCallback) {
-    form.set("StatusCallback", opts.statusCallback);
-  }
-
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${opts.accountSid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + btoa(`${opts.accountSid}:${opts.authToken}`),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form.toString(),
-    },
-  );
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const msg = data?.message || `Twilio error ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return data;
-}
-
 function buildStatusCallbackUrl(supabaseUrl: string, queueId: string): string {
   const override = Deno.env.get("TWILIO_STATUS_CALLBACK_URL");
   const token = Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN") || "";
@@ -89,13 +52,11 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioFrom = Deno.env.get("TWILIO_PHONE");
+    const defaultFrom = Deno.env.get("TWILIO_FROM_NUMBER") || Deno.env.get("TWILIO_PHONE") || Deno.env.get("ANDROID_OUTREACH_GATEWAY_DEVICE_ID") || "";
 
-    if (!supabaseUrl || !serviceRoleKey || !twilioSid || !twilioToken || !twilioFrom) {
+    if (!supabaseUrl || !serviceRoleKey) {
       throw new Error(
-        "Missing required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_PHONE",
+        "Missing required secrets: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
       );
     }
 
@@ -154,7 +115,7 @@ serve(async (req) => {
       );
     }
 
-    if (row.review_status === "opted_out") {
+    if (row.review_status === "opted_out" || row.review_status === "android_opted_out") {
       return new Response(
         JSON.stringify({ ok: false, error: "Cannot send manual reply to opted-out contact" }, null, 2),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -171,32 +132,36 @@ serve(async (req) => {
       );
     }
 
-    const twilioRes = await sendTwilioMessage({
-      accountSid: twilioSid,
-      authToken: twilioToken,
-      from: twilioFrom,
+    const smsRes = await sendSMS({
+      supabase,
       to,
       body: messageBody,
+      category: "manual_outreach",
       statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id),
+      metadata: {
+        queue_row_id: row.id,
+        open_house_id: row.open_house_id || null,
+        step: "manual_reply",
+      },
     });
 
     const sentAt = new Date().toISOString();
-    const followupDeliveryStatus = String(twilioRes.status || "queued").toLowerCase();
+    const followupDeliveryStatus = String(smsRes.status || "queued").toLowerCase();
 
     const { error: replyInsertError } = await supabase
       .from("agent_outreach_replies")
       .insert({
         queue_row_id: row.id,
         open_house_id: row.open_house_id || null,
-        from_phone: twilioFrom,
-        from_phone_normalized: normalizePhone(twilioFrom),
+        from_phone: smsRes.from || smsRes.deviceId || defaultFrom,
+        from_phone_normalized: normalizePhone(String(smsRes.from || defaultFrom || "")),
         to_phone: to,
-        body: messageBody,
-        message_sid: twilioRes.sid,
-        account_sid: twilioSid,
+        body: smsRes.body || messageBody,
+        message_sid: smsRes.externalId || smsRes.sid || `manual-${row.id}-${Date.now()}`,
+        account_sid: smsRes.provider,
         direction: "outbound",
         opt_out: false,
-        raw_payload: twilioRes,
+        raw_payload: smsRes.raw || smsRes,
         received_at: sentAt,
       });
 
@@ -207,10 +172,10 @@ serve(async (req) => {
       .update({
         send_mode: "manual",
         approved_for_send: false,
-        followup_sms: messageBody,
+        followup_sms: smsRes.body || messageBody,
         followup_send_status: "sent",
         followup_sent_at: sentAt,
-        twilio_sid_followup: twilioRes.sid,
+        twilio_sid_followup: smsRes.externalId || smsRes.sid || null,
         followup_delivery_status: followupDeliveryStatus,
         followup_delivery_status_updated_at: sentAt,
         followup_delivery_error_code: null,
@@ -235,7 +200,8 @@ serve(async (req) => {
           ok: true,
           id: row.id,
           agent_name: row.agent_name,
-          sid: twilioRes.sid,
+          sid: smsRes.externalId || smsRes.sid || null,
+          provider: smsRes.provider,
           sent_at: sentAt,
         },
         null,

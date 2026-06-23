@@ -1,13 +1,15 @@
 # Android SMS Gateway Fallback
 
-Temporary A2P fallback while Twilio approval is pending. Twilio remains in place; switch providers with `SMS_PROVIDER`.
+Temporary A2P fallback for outreach volume. Twilio remains in place; use route-scoped provider env vars so outreach can run on Android while buyer/event/system messages stay on Twilio.
 
 ## Environment
 
 Set these in Vercel/Supabase environments that send SMS:
 
 ```text
-SMS_PROVIDER=android_gateway
+SMS_PROVIDER=twilio
+SMS_OUTREACH_PROVIDER=android_gateway
+SMS_EVENTS_PROVIDER=twilio
 
 ANDROID_EVENTS_GATEWAY_URL=https://api.sms-gate.app
 ANDROID_EVENTS_GATEWAY_USERNAME=
@@ -31,15 +33,17 @@ TWILIO_AUTH_TOKEN=
 TWILIO_PHONE=
 ```
 
-Use the events device for buyer/event traffic and the outreach device for outreach traffic. Do not share one device across both routes.
+Use the outreach device for outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. If Android is ever used for events too, use the events device and do not share one device across both routes.
 
-To switch back:
+To put all routes back on Twilio:
 
 ```text
 SMS_PROVIDER=twilio
+SMS_OUTREACH_PROVIDER=twilio
+SMS_EVENTS_PROVIDER=twilio
 ```
 
-When Twilio is active, use `docs/twilio-outreach-sms-runbook.md` for the current outreach number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
+When Twilio is active for any route, use `docs/twilio-outreach-sms-runbook.md` for the current number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
 
 ## Routing
 

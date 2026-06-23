@@ -5,6 +5,8 @@ export type SmsCategory =
   | "agent_checkin_alert"
   | "loan_officer_alert"
   | "buyer_loan_officer_intro"
+  | "event_chat_buyer_alert"
+  | "event_chat_loan_officer_alert"
   | "owner_fallback_alert"
   | "event_transactional"
   | "outreach"
@@ -13,6 +15,7 @@ export type SmsCategory =
   | "manual_outreach";
 
 type SmsRoute = "events" | "outreach";
+type SmsProvider = "twilio" | "android_gateway";
 
 type SendSmsOptions = {
   to: string;
@@ -42,6 +45,8 @@ const EVENT_CATEGORIES = new Set([
   "agent_checkin_alert",
   "loan_officer_alert",
   "buyer_loan_officer_intro",
+  "event_chat_buyer_alert",
+  "event_chat_loan_officer_alert",
   "owner_fallback_alert",
   "event_transactional",
 ]);
@@ -78,10 +83,22 @@ function clean(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function providerName(): "twilio" | "android_gateway" {
-  return clean(Deno.env.get("SMS_PROVIDER") || "twilio").toLowerCase() === "android_gateway"
-    ? "android_gateway"
-    : "twilio";
+function normalizeProvider(value: unknown, fallback: SmsProvider = "twilio"): SmsProvider {
+  const normalized = clean(value).toLowerCase();
+  if (normalized === "android_gateway") return "android_gateway";
+  if (normalized === "twilio") return "twilio";
+  return fallback;
+}
+
+function providerName(): SmsProvider {
+  return normalizeProvider(Deno.env.get("SMS_PROVIDER"), "twilio");
+}
+
+function providerForRoute(route: SmsRoute): SmsProvider {
+  const override = route === "outreach"
+    ? Deno.env.get("SMS_OUTREACH_PROVIDER")
+    : Deno.env.get("SMS_EVENTS_PROVIDER");
+  return normalizeProvider(override, providerName());
 }
 
 export function normalizePhoneDigits(phone: string | null | undefined): string {
@@ -318,10 +335,10 @@ async function sendViaTwilio(opts: {
 }
 
 export async function sendSMS(options: SendSmsOptions) {
-  const provider = providerName();
   const category = clean(options.category || "event_transactional").toLowerCase();
   const metadata = options.metadata || {};
   const route = routeForCategory(category);
+  const provider = providerForRoute(route);
   const supabase = options.supabase || smsClient();
   const to = toE164(options.to);
   const routeLabel = provider === "twilio" ? "twilio" : route;

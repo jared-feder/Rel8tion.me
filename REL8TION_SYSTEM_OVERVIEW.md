@@ -52,7 +52,7 @@ REL8TION is deliberately lightweight:
 - `[IMPLEMENTED]` Root Vercel serverless API routes under `api/`.
 - `[IMPLEMENTED]` Supabase REST/RPC calls from browser code where allowed by anon policies.
 - `[IMPLEMENTED]` Supabase Edge Functions under `supabase/functions`.
-- `[PARTIAL]` Android SMS Gateway as a temporary provider fallback while Twilio paths remain intact.
+- `[PARTIAL]` Android SMS Gateway as a temporary outreach-volume provider fallback while Twilio paths remain intact.
 - `[PARTIAL]` A separate website-builder app under `apps/agent-website-builder`.
 - `[PARTIAL]` WordPress-side local tracking files under `wordpress/`, not automatically synced to production.
 
@@ -134,8 +134,9 @@ Important tables and fields:
 - `[NEEDS VERIFICATION]` Deployed function source/version, provider env, and live SMS behavior still need verification.
 - `[IMPLEMENTED]` `/event` sends buyer/agent SMS only after local check-in validation and disclosure completion.
 - `[IMPLEMENTED]` Automated outreach sends are throttled for Android SMS Gateway safety: the Vercel send cron defaults to 3 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with default limits of 3 per run and 6 per rolling hour. Automatic initial and follow-up sends require `approved_for_send=true`.
+- `[IMPLEMENTED]` SMS provider selection is route-scoped: `SMS_OUTREACH_PROVIDER` controls outreach/manual outreach, `SMS_EVENTS_PROVIDER` controls buyer/event/owner operational traffic, and both fall back to `SMS_PROVIDER`.
 - `[IMPLEMENTED]` Durable Twilio outreach recovery settings live in `docs/twilio-outreach-sms-runbook.md`; keep that runbook and the source-of-truth docs aligned.
-- `[IMPLEMENTED]` As of 2026-06-23, live outreach SMS is back on Twilio via `SMS_PROVIDER=twilio` and `TWILIO_PHONE=+15168885461`.
+- `[IMPLEMENTED]` As of 2026-06-23, Twilio SMS is restored via `SMS_PROVIDER=twilio` and `TWILIO_PHONE=+15168885461`, but outreach volume should use `SMS_OUTREACH_PROVIDER=android_gateway` when protecting the Twilio number.
 - `[IMPLEMENTED]` Twilio inbound outreach replies enter through the public `twilio-inbound-router` Edge Function, which routes replies into the protected `twilio-inbound-reply` handler. Matched replies link to outreach queue rows using tolerant 10/11-digit phone matching; unmatched replies are still stored with `queue_row_id=null`.
 - `[RISK]` Twilio Messaging Service inbound handling must be set to `Send a webhook`, not `Receive the message`, or REL8TION will not see inbound replies. Delivery status callbacks must use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>`.
 - `[IMPLEMENTED]` Buyer financing outreach only happens after explicit buyer opt-in.

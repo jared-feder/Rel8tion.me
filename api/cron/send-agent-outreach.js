@@ -15,7 +15,9 @@ module.exports = async function handler(req, res) {
     }
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
-    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_SEND_LIMIT || 5), 50));
+    const maxPerRun = Math.max(1, Math.min(Number(process.env.OUTREACH_SEND_MAX_PER_RUN || 3), 50));
+    const requestedLimit = Number(body.limit || process.env.OUTREACH_SEND_LIMIT || maxPerRun);
+    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : maxPerRun, maxPerRun));
     const requestedMode = String(body.mode || '').trim();
     const mode = req.method === 'POST' && ['dry_run', 'diagnostic_no_send'].includes(requestedMode)
       ? requestedMode

@@ -9,7 +9,15 @@ const corsHeaders = {
 
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) return digits.slice(1);
+  return digits;
+}
+
+function phoneLookupVariants(phone: string | null): string[] {
+  const rawDigits = phone ? phone.replace(/\D/g, "") : "";
+  const normalized = normalizePhone(phone);
+  return Array.from(new Set([normalized, rawDigits].filter(Boolean)));
 }
 
 function toFormBody(payload: Record<string, unknown>) {
@@ -75,7 +83,7 @@ serve(async (req) => {
         last_outreach_at,
         updated_at
       `)
-      .eq("agent_phone_normalized", fromPhoneNormalized)
+      .in("agent_phone_normalized", phoneLookupVariants(fromPhone))
       .order("last_outreach_at", { ascending: false, nullsFirst: false })
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -84,21 +92,13 @@ serve(async (req) => {
     if (lookupError) throw lookupError;
 
     const routeToOutreach = !!matchingRow;
-    if (!routeToOutreach) {
-      return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/xml",
-          "X-Twilio-Routed-To": "default-empty",
-        },
-      });
-    }
 
     const forwardRes = await fetch(outreachReplyUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "apikey": serviceRoleKey,
       },
       body: toFormBody(payload),
     });
@@ -110,7 +110,7 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": forwardRes.headers.get("content-type") || "text/plain",
-        "X-Twilio-Routed-To": "outreach",
+        "X-Twilio-Routed-To": routeToOutreach ? "outreach" : "outreach-unmatched",
       },
     });
   } catch (err) {
