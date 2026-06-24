@@ -631,6 +631,7 @@ module.exports = async function handler(req, res) {
     });
 
     const outreachSendCandidates = outreach.filter(isOutreachSendCandidate);
+    const outreachPaused = outreach.filter((row) => row.send_mode !== 'automatic' && isOutreachSendCandidate({ ...row, send_mode: 'automatic' }));
 
     sendJson(res, 200, {
       ok: true,
@@ -645,8 +646,10 @@ module.exports = async function handler(req, res) {
         loan_officer_coverage_signs: loanOfficerCoverageSignRows.length,
         outreach_queue: outreach.length,
         outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
-        outreach_queue_needs_approval: outreachSendCandidates.filter((row) => row.approved_for_send !== true).length,
-        outreach_queue_approved_ready: outreachSendCandidates.filter((row) => row.approved_for_send === true).length,
+        outreach_queue_cron_ready: outreachSendCandidates.length,
+        outreach_queue_paused: outreachPaused.length,
+        outreach_queue_needs_approval: 0,
+        outreach_queue_approved_ready: outreachSendCandidates.length,
         active_signs: signs.filter((row) => row.status === 'active').length,
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,

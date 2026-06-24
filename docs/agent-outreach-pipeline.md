@@ -84,15 +84,14 @@ Instead of generating images itself, the Supabase-side orchestration should call
 The send function should assume:
 
 - mockup generation is already complete
-- `approved_for_send = true`
 - `send_mode = "automatic"`
 - `selected_sms` and `followup_sms` are already populated
 
-It should not need to know how the image was generated.
+It should not require a hidden `approved_for_send` gate. Normal cron sends are eligible when the row is automatic, generated, rendered, due, has a listing photo, and has pending SMS copy.
 
-Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. To protect Twilio, keep `SMS_PROVIDER=twilio`, set `SMS_EVENTS_PROVIDER=twilio`, and set `SMS_OUTREACH_PROVIDER=android_gateway`.
+Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production outreach is intended to run through Twilio with `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, and `SMS_OUTREACH_PROVIDER=twilio`.
 
-Brokerage-specific outreach can override that route setting with `SMS_TWILIO_OUTREACH_BROKERAGES`. Production uses this for Douglas Elliman so those rows send through Twilio/MMS while general outreach remains on Android.
+Brokerage-specific outreach can override that route setting with `SMS_TWILIO_OUTREACH_BROKERAGES`; this is optional while all outreach already routes through Twilio.
 
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 

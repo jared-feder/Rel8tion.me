@@ -1,16 +1,24 @@
 # Android SMS Gateway Fallback
 
-Temporary A2P fallback for outreach volume. Twilio remains in place; use route-scoped provider env vars so outreach can run on Android while buyer/event/system messages stay on Twilio.
+Temporary A2P fallback for outreach volume. Twilio remains the active outreach cron route unless provider health requires a temporary switch. Use route-scoped provider env vars so outreach can move to Android while buyer/event/system messages stay on Twilio.
 
 ## Environment
 
-Set these in Vercel/Supabase environments that send SMS:
+Current Twilio cron route:
+
+```text
+SMS_PROVIDER=twilio
+SMS_OUTREACH_PROVIDER=twilio
+SMS_EVENTS_PROVIDER=twilio
+```
+
+Set these only when intentionally switching outreach to the Android fallback:
 
 ```text
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=android_gateway
 SMS_EVENTS_PROVIDER=twilio
-SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
+SMS_TWILIO_OUTREACH_BROKERAGES=
 
 ANDROID_EVENTS_GATEWAY_URL=https://api.sms-gate.app
 ANDROID_EVENTS_GATEWAY_USERNAME=
@@ -34,7 +42,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_PHONE=
 ```
 
-Use the outreach device for general outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
+Use the outreach device only for fallback outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
 
 To put all routes back on Twilio:
 

@@ -1,6 +1,6 @@
 # Twilio Outreach SMS Runbook
 
-Last verified: 2026-06-23.
+Last verified: 2026-06-24.
 
 This is the durable recovery note for REL8TION outreach SMS. Keep this file in source control. Do not paste private Twilio auth tokens, Supabase service-role keys, or callback token values into this file.
 
@@ -9,10 +9,10 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - Live Twilio sender: `+15168885461`.
 - Supabase sender secret: `TWILIO_PHONE`.
 - Default provider secret: `SMS_PROVIDER=twilio`.
-- Outreach-volume protection: set `SMS_OUTREACH_PROVIDER=android_gateway` so automated/manual outreach uses the Android Gateway while Twilio stays available for inbound tests, delivery-sensitive system traffic, and owner alerts.
+- Outreach provider secret: `SMS_OUTREACH_PROVIDER=twilio` so automated/manual outreach runs through Twilio on the cron lane.
 - Event/system provider override: set `SMS_EVENTS_PROVIDER=twilio`.
-- Brokerage-specific Twilio/MMS override: set `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` to route Douglas Elliman outreach through Twilio while other outreach follows `SMS_OUTREACH_PROVIDER`.
-- To intentionally send outreach through Twilio, set `SMS_OUTREACH_PROVIDER=twilio` or unset it while `SMS_PROVIDER=twilio`.
+- Brokerage-specific Twilio/MMS override: `SMS_TWILIO_OUTREACH_BROKERAGES` is optional when `SMS_OUTREACH_PROVIDER=twilio`; use it only if the default outreach provider is temporarily changed away from Twilio.
+- Temporary Android fallback: set `SMS_OUTREACH_PROVIDER=android_gateway` only when intentionally protecting Twilio provider health, and leave `SMS_EVENTS_PROVIDER=twilio`.
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
@@ -86,7 +86,7 @@ Inbound reply test:
 - Inbound webhook returns `401`: Twilio is pointed directly at `twilio-inbound-reply` instead of `twilio-inbound-router`, or the router was deployed with JWT verification enabled.
 - Inbound saves but does not match a queue row: check `agent_phone_normalized` values. The router/reply handler now searches both 10-digit and 11-digit forms.
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
-- Outreach volume risk: keep automated outreach on `SMS_OUTREACH_PROVIDER=android_gateway` when protecting Twilio, and keep `OUTREACH_SEND_MAX_PER_RUN` and `OUTREACH_SEND_MAX_PER_HOUR` low unless the owner explicitly approves a provider health check and higher caps.
+- Outreach volume risk: keep `OUTREACH_SEND_MAX_PER_RUN` and `OUTREACH_SEND_MAX_PER_HOUR` low unless the owner explicitly approves a provider health check and higher caps. If Twilio provider health degrades, temporarily move outreach to `SMS_OUTREACH_PROVIDER=android_gateway`.
 
 ## Quick Verification Queries
 

@@ -442,7 +442,6 @@ serve(async (req) => {
       .eq("send_mode", "automatic")
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
-      .eq("approved_for_send", true)
       .not("listing_photo_url", "is", null)
       .or(`and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
       .order("initial_send_at", { ascending: true, nullsFirst: false })
@@ -557,7 +556,6 @@ serve(async (req) => {
           row.initial_send_at &&
           row.initial_send_at <= nowIso &&
           row.selected_sms &&
-          row.approved_for_send === true &&
           (isMissedOpenHouseCampaign || !openEnd || openEnd > now);
 
         const followupDue =
@@ -565,7 +563,6 @@ serve(async (req) => {
           row.followup_send_at &&
           row.followup_send_at <= nowIso &&
           row.followup_sms &&
-          row.approved_for_send === true &&
           row.initial_send_status === "sent" &&
           row.initial_sent_at &&
           (isAdminScheduledDrip || !openStart || openStart > now);

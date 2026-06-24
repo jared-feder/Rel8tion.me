@@ -1698,29 +1698,34 @@
       return Boolean(initialPending || followupPending);
     }
 
+    function isOutreachCronReady(row) {
+      if (!row) return false;
+      return isOutreachSendCandidate({ ...row, send_mode: 'automatic' });
+    }
+
     function sendApprovalBadge(row) {
-      if (row?.approved_for_send === true) return badge('Approved to send', 'ok');
-      if (isOutreachSendCandidate(row)) return badge('Needs approval', 'warn');
-      if (row?.generation_status === 'generated' && row?.mockup_status === 'rendered') return badge('Holding', 'info');
+      if (isOutreachSendCandidate(row)) return badge('Cron ready', 'ok');
+      if (row?.send_mode && row.send_mode !== 'automatic') return badge('Paused', 'info');
+      if (row?.generation_status === 'generated' && row?.mockup_status === 'rendered') return badge('Not due', 'info');
       return '';
     }
 
     function sendApprovalControls(row, key) {
       if (!row?.queue_row_id && !row?.id) return '';
-      const candidate = isOutreachSendCandidate(row);
-      const approved = row.approved_for_send === true;
+      const candidate = isOutreachCronReady(row);
+      const paused = row.send_mode && row.send_mode !== 'automatic';
       const approveBusy = state.actionKey === actionId('approve_send', key);
       const holdBusy = state.actionKey === actionId('hold_send', key);
-      if (approved) {
+      if (!paused) {
         return `
           <button class="btn soft" data-hold-send="${esc(key)}" ${holdBusy ? 'disabled' : ''}>
-            <i data-lucide="pause-circle"></i><span>${holdBusy ? 'Holding...' : 'Hold send'}</span>
+            <i data-lucide="pause-circle"></i><span>${holdBusy ? 'Pausing...' : 'Pause cron'}</span>
           </button>
         `;
       }
       return `
         <button class="btn primary" data-approve-send="${esc(key)}" ${!candidate || approveBusy ? 'disabled' : ''}>
-          <i data-lucide="check-circle"></i><span>${approveBusy ? 'Approving...' : 'Approve send'}</span>
+          <i data-lucide="play-circle"></i><span>${approveBusy ? 'Resuming...' : 'Resume cron'}</span>
         </button>
       `;
     }
@@ -2388,16 +2393,16 @@
         return;
       }
       const target = thread.address || thread.agent_name || 'this outreach row';
-      if (!window.confirm(`Approve ${target} for the next automated outreach send?`)) return;
-      runOutreachAction(key, 'approve_send', {}, 'Approved for the next send run.');
+      if (!window.confirm(`Resume ${target} for automated outreach cron sends?`)) return;
+      runOutreachAction(key, 'approve_send', {}, 'Resumed for the outreach cron.');
     }
 
     function holdOutreachSend(key) {
       const thread = findThread(key);
       if (!thread) return;
       const target = thread.address || thread.agent_name || 'this outreach row';
-      if (!window.confirm(`Hold ${target} so automation will not send it?`)) return;
-      runOutreachAction(key, 'hold_send', {}, 'Send approval removed.');
+      if (!window.confirm(`Pause ${target} so the outreach cron will not send it?`)) return;
+      runOutreachAction(key, 'hold_send', {}, 'Paused for outreach cron.');
     }
 
     function coveragePickerThread() {
@@ -3324,10 +3329,10 @@
       const o = state.command?.overview || {};
       const inbound = state.counts.inbound || o.incoming_threads || 0;
       const needs = state.counts.needs_reply || o.needs_reply || 0;
-      const needsApproval = o.outreach_queue_needs_approval || 0;
+      const cronReady = o.outreach_queue_cron_ready || o.outreach_queue_approved_ready || 0;
       const stats = [
         { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4, area: 'outreach', filter: 'needs_reply' },
-        { label: 'Needs approval', value: needsApproval, icon: 'check-circle', tone: needsApproval ? 'orange' : 'green', meter: needsApproval ? Math.min(100, needsApproval * 8) : 4, area: 'outreach', filter: 'all' },
+        { label: 'Cron ready', value: cronReady, icon: 'play-circle', tone: cronReady ? 'orange' : 'green', meter: cronReady ? Math.min(100, cronReady * 8) : 4, area: 'outreach', filter: 'all' },
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
         { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
@@ -3367,13 +3372,13 @@
     function renderOutreach() {
       const rows = filteredInbox();
       const latestInbound = latestInboundThreads(8);
-      const approvalCount = state.command?.overview?.outreach_queue_needs_approval || 0;
-      const approvedReady = state.command?.overview?.outreach_queue_approved_ready || 0;
+      const cronReady = state.command?.overview?.outreach_queue_cron_ready || state.command?.overview?.outreach_queue_approved_ready || 0;
+      const paused = state.command?.overview?.outreach_queue_paused || 0;
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | ${esc(approvalCount)} need approval | ${esc(approvedReady)} approved ready</div>
+            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | ${esc(cronReady)} cron ready | ${esc(paused)} paused</div>
           </div>
           <div class="header-actions">
             <a class="btn primary" href="/manual-sms-outreach">
@@ -3540,11 +3545,11 @@
     function renderOutreachQueue() {
       const rows = filterByQuery(state.command?.outreach?.recent || []);
       const pendingCount = state.command?.overview?.outreach_queue_pending || 0;
-      const approvalCount = state.command?.overview?.outreach_queue_needs_approval || 0;
-      const approvedReady = state.command?.overview?.outreach_queue_approved_ready || 0;
+      const cronReady = state.command?.overview?.outreach_queue_cron_ready || state.command?.overview?.outreach_queue_approved_ready || 0;
+      const paused = state.command?.overview?.outreach_queue_paused || 0;
       const totalCount = state.command?.overview?.outreach_queue || rows.length;
       const shownCount = Math.min(rows.length, 80);
-      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${approvalCount} need approval | ${approvedReady} approved ready | ${totalCount} total`, rows.slice(0, 80), (row) => {
+      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${cronReady} cron ready | ${paused} paused | ${totalCount} total`, rows.slice(0, 80), (row) => {
         const thread = queueRowToThread(row);
         const key = thread.thread_key;
         return `

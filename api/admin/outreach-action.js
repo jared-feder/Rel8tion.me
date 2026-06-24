@@ -58,8 +58,8 @@ function isOptedOut(queue) {
   return queue?.review_status === 'opted_out' || queue?.review_status === 'android_opted_out';
 }
 
-function isQueueReadyForApproval(queue) {
-  if (!queue || queue.send_mode !== 'automatic') return false;
+function isQueueReadyForCron(queue) {
+  if (!queue) return false;
   if (queue.generation_status !== 'generated' || queue.mockup_status !== 'rendered') return false;
   if (!queue.listing_photo_url) return false;
   const initialPending = queue.initial_send_status === 'pending' && queue.selected_sms;
@@ -404,8 +404,8 @@ async function approveSend(body) {
     error.status = 409;
     throw error;
   }
-  if (!isQueueReadyForApproval(queue)) {
-    const error = new Error('This row is not ready for approval yet. It must be generated, rendered, have a listing photo, and have a pending initial or follow-up send.');
+  if (!isQueueReadyForCron(queue)) {
+    const error = new Error('This row is not ready for cron yet. It must be generated, rendered, have a listing photo, and have a pending initial or follow-up send.');
     error.status = 409;
     throw error;
   }
@@ -427,6 +427,7 @@ async function holdSend(body) {
   const queue = await loadQueueRow(body.queue_row_id);
   const updated = await patchQueue(queue.id, {
     approved_for_send: false,
+    send_mode: 'manual',
     review_status: queue.review_status === 'approved' ? 'pending' : queue.review_status || 'pending',
     send_error: null
   });
