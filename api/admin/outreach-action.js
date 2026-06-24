@@ -58,6 +58,15 @@ function isOptedOut(queue) {
   return queue?.review_status === 'opted_out' || queue?.review_status === 'android_opted_out';
 }
 
+function isQueueReadyForApproval(queue) {
+  if (!queue || queue.send_mode !== 'automatic') return false;
+  if (queue.generation_status !== 'generated' || queue.mockup_status !== 'rendered') return false;
+  if (!queue.listing_photo_url) return false;
+  const initialPending = queue.initial_send_status === 'pending' && queue.selected_sms;
+  const followupPending = queue.followup_send_status === 'pending' && queue.followup_sms;
+  return Boolean(initialPending || followupPending);
+}
+
 async function loadQueueRow(rowId) {
   const row = one(await supabaseRest(`agent_outreach_queue?id=eq.${enc(rowId)}&select=*&limit=1`));
   if (!row) {
@@ -383,6 +392,48 @@ async function saveReportNote(body) {
   return { queue: updated || queue };
 }
 
+async function approveSend(body) {
+  const queue = await loadQueueRow(body.queue_row_id);
+  if (isOptedOut(queue)) {
+    const error = new Error('This contact is opted out.');
+    error.status = 409;
+    throw error;
+  }
+  if (!cleanPhone(queue.agent_phone_normalized || queue.agent_phone)) {
+    const error = new Error('Cannot approve send without a valid agent phone.');
+    error.status = 409;
+    throw error;
+  }
+  if (!isQueueReadyForApproval(queue)) {
+    const error = new Error('This row is not ready for approval yet. It must be generated, rendered, have a listing photo, and have a pending initial or follow-up send.');
+    error.status = 409;
+    throw error;
+  }
+
+  const updated = await patchQueue(queue.id, {
+    approved_for_send: true,
+    approved_at: new Date().toISOString(),
+    send_mode: 'automatic',
+    review_status: 'approved',
+    initial_block_reason: null,
+    followup_block_reason: null,
+    send_error: null
+  });
+
+  return { queue: updated || queue };
+}
+
+async function holdSend(body) {
+  const queue = await loadQueueRow(body.queue_row_id);
+  const updated = await patchQueue(queue.id, {
+    approved_for_send: false,
+    review_status: queue.review_status === 'approved' ? 'pending' : queue.review_status || 'pending',
+    send_error: null
+  });
+
+  return { queue: updated || queue };
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -431,6 +482,18 @@ module.exports = async function handler(req, res) {
 
     if (action === 'save_report_note') {
       const result = await saveReportNote(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'approve_send') {
+      const result = await approveSend(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'hold_send') {
+      const result = await holdSend(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

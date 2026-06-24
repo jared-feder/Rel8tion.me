@@ -1689,6 +1689,42 @@
       return badge(`${normalized}${errorCode ? ` ${errorCode}` : ''}`, tone);
     }
 
+    function isOutreachSendCandidate(row) {
+      if (!row || row.send_mode !== 'automatic') return false;
+      if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
+      if (!row.listing_photo_url) return false;
+      const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
+      const followupPending = row.followup_send_status === 'pending' && row.followup_sms;
+      return Boolean(initialPending || followupPending);
+    }
+
+    function sendApprovalBadge(row) {
+      if (row?.approved_for_send === true) return badge('Approved to send', 'ok');
+      if (isOutreachSendCandidate(row)) return badge('Needs approval', 'warn');
+      if (row?.generation_status === 'generated' && row?.mockup_status === 'rendered') return badge('Holding', 'info');
+      return '';
+    }
+
+    function sendApprovalControls(row, key) {
+      if (!row?.queue_row_id && !row?.id) return '';
+      const candidate = isOutreachSendCandidate(row);
+      const approved = row.approved_for_send === true;
+      const approveBusy = state.actionKey === actionId('approve_send', key);
+      const holdBusy = state.actionKey === actionId('hold_send', key);
+      if (approved) {
+        return `
+          <button class="btn soft" data-hold-send="${esc(key)}" ${holdBusy ? 'disabled' : ''}>
+            <i data-lucide="pause-circle"></i><span>${holdBusy ? 'Holding...' : 'Hold send'}</span>
+          </button>
+        `;
+      }
+      return `
+        <button class="btn primary" data-approve-send="${esc(key)}" ${!candidate || approveBusy ? 'disabled' : ''}>
+          <i data-lucide="check-circle"></i><span>${approveBusy ? 'Approving...' : 'Approve send'}</span>
+        </button>
+      `;
+    }
+
     function statusBadge(thread) {
       if (isOptOutThread(thread)) return badge('Opted out', 'bad');
       if (thread.review_status === 'confirmed_open_house') return badge('Confirmed OH', 'ok');
@@ -2342,6 +2378,26 @@
         return;
       }
       runOutreachAction(key, 'mark_interested', {}, 'Marked interested.');
+    }
+
+    function approveOutreachSend(key) {
+      const thread = findThread(key);
+      if (!thread) return;
+      if (isOptOutThread(thread)) {
+        showToast('This contact is opted out.');
+        return;
+      }
+      const target = thread.address || thread.agent_name || 'this outreach row';
+      if (!window.confirm(`Approve ${target} for the next automated outreach send?`)) return;
+      runOutreachAction(key, 'approve_send', {}, 'Approved for the next send run.');
+    }
+
+    function holdOutreachSend(key) {
+      const thread = findThread(key);
+      if (!thread) return;
+      const target = thread.address || thread.agent_name || 'this outreach row';
+      if (!window.confirm(`Hold ${target} so automation will not send it?`)) return;
+      runOutreachAction(key, 'hold_send', {}, 'Send approval removed.');
     }
 
     function coveragePickerThread() {
@@ -3187,6 +3243,12 @@
       document.querySelectorAll('[data-confirm-open-house]').forEach((button) => {
         button.addEventListener('click', () => confirmOpenHouse(button.dataset.confirmOpenHouse));
       });
+      document.querySelectorAll('[data-approve-send]').forEach((button) => {
+        button.addEventListener('click', () => approveOutreachSend(button.dataset.approveSend));
+      });
+      document.querySelectorAll('[data-hold-send]').forEach((button) => {
+        button.addEventListener('click', () => holdOutreachSend(button.dataset.holdSend));
+      });
       document.querySelectorAll('[data-coverage-choice]').forEach((button) => {
         button.addEventListener('click', () => confirmCoverageChoice(Number(button.dataset.coverageChoice)));
       });
@@ -3262,8 +3324,10 @@
       const o = state.command?.overview || {};
       const inbound = state.counts.inbound || o.incoming_threads || 0;
       const needs = state.counts.needs_reply || o.needs_reply || 0;
+      const needsApproval = o.outreach_queue_needs_approval || 0;
       const stats = [
         { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4, area: 'outreach', filter: 'needs_reply' },
+        { label: 'Needs approval', value: needsApproval, icon: 'check-circle', tone: needsApproval ? 'orange' : 'green', meter: needsApproval ? Math.min(100, needsApproval * 8) : 4, area: 'outreach', filter: 'all' },
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
         { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
@@ -3303,11 +3367,13 @@
     function renderOutreach() {
       const rows = filteredInbox();
       const latestInbound = latestInboundThreads(8);
+      const approvalCount = state.command?.overview?.outreach_queue_needs_approval || 0;
+      const approvedReady = state.command?.overview?.outreach_queue_approved_ready || 0;
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply</div>
+            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | ${esc(approvalCount)} need approval | ${esc(approvedReady)} approved ready</div>
           </div>
           <div class="header-actions">
             <a class="btn primary" href="/manual-sms-outreach">
@@ -3387,6 +3453,7 @@
           <div>${badge(listingOnly ? 'listing feed' : row.review_status || 'pending', confirmed ? 'ok' : optedOut ? 'bad' : listingOnly ? 'warn' : 'info')}</div>
           <div class="badges">
             ${badge(listingOnly ? 'not queued' : row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}
+            ${listingOnly ? '' : sendApprovalBadge(thread)}
             ${row.initial_sent_at ? badge(fmtDate(row.initial_sent_at), 'info') : ''}
           </div>
           <div>
@@ -3398,6 +3465,7 @@
               </div>
             ` : `
               <div class="row-actions">
+                ${sendApprovalControls(thread, key)}
                 <button class="btn soft" data-mark-interested="${esc(key)}" ${optedOut || markBusy ? 'disabled' : ''}>
                   <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Interested'}</span>
                 </button>
@@ -3472,26 +3540,34 @@
     function renderOutreachQueue() {
       const rows = filterByQuery(state.command?.outreach?.recent || []);
       const pendingCount = state.command?.overview?.outreach_queue_pending || 0;
+      const approvalCount = state.command?.overview?.outreach_queue_needs_approval || 0;
+      const approvedReady = state.command?.overview?.outreach_queue_approved_ready || 0;
       const totalCount = state.command?.overview?.outreach_queue || rows.length;
       const shownCount = Math.min(rows.length, 80);
-      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${totalCount} total`, rows.slice(0, 80), (row) => `
-        <div>
-          <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
-          <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
-        </div>
-        <div>
-          <div class="primary">${esc(row.address || row.open_house_id || 'No property')}</div>
-          <div class="secondary">${esc([fmtDate(row.open_start), money(row.price)].filter(Boolean).join(' | '))}</div>
-        </div>
-        <div>${badge(row.review_status || 'pending', row.review_status === 'accepted_open_house' || row.review_status === 'confirmed_open_house' ? 'ok' : 'info')}</div>
-        <div class="badges">
-          ${badge(row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}
-          ${deliveryBadge(row, 'initial')}
-        </div>
-        <div>
-          <div class="secondary">${esc(row.selected_sms || 'No outreach copy stored.')}</div>
-        </div>
-      `);
+      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${approvalCount} need approval | ${approvedReady} approved ready | ${totalCount} total`, rows.slice(0, 80), (row) => {
+        const thread = queueRowToThread(row);
+        const key = thread.thread_key;
+        return `
+          <div>
+            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>
+            <div class="primary">${esc(row.address || row.open_house_id || 'No property')}</div>
+            <div class="secondary">${esc([fmtDate(row.open_start), money(row.price)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${badge(row.review_status || 'pending', row.review_status === 'accepted_open_house' || row.review_status === 'confirmed_open_house' ? 'ok' : 'info')}</div>
+          <div class="badges">
+            ${badge(row.initial_send_status || 'not sent', row.initial_sent_at ? 'ok' : 'warn')}
+            ${sendApprovalBadge(thread)}
+            ${deliveryBadge(row, 'initial')}
+          </div>
+          <div>
+            <div class="row-actions">${sendApprovalControls(thread, key)}</div>
+            <div class="secondary" style="margin-top:6px;">${esc(row.selected_sms || 'No outreach copy stored.')}</div>
+          </div>
+        `;
+      });
     }
 
     function renderReportNoteEditor(queueId, value = '', updatedAt = '') {

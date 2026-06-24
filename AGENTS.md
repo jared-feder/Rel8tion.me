@@ -116,6 +116,7 @@ Preserve these priorities:
 - `[IMPLEMENTED]` Twilio outreach recovery and webhook settings are documented in `docs/twilio-outreach-sms-runbook.md`. Do not delete that runbook; update it when Twilio numbers, Messaging Service settings, callback tokens, or inbound routing behavior changes.
 - `[IMPLEMENTED]` SMS provider selection supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. To protect Twilio, use `SMS_OUTREACH_PROVIDER=android_gateway`, `SMS_EVENTS_PROVIDER=twilio`, and `SMS_PROVIDER=twilio`.
 - `[IMPLEMENTED]` Brokerage-specific outreach can override the default outreach provider with `SMS_TWILIO_OUTREACH_BROKERAGES`; Douglas Elliman outreach is routed to Twilio/MMS while other outreach can remain on Android.
+- `[IMPLEMENTED]` Automatic outreach requires `approved_for_send=true`; REL8TION COMMAND must surface this gate with visible Needs approval state plus Approve send/Hold send controls.
 - `[IMPLEMENTED]` Current Twilio sender path uses `SMS_PROVIDER=twilio` and `TWILIO_PHONE` for the sender number. Twilio inbound replies must point to the public `twilio-inbound-router` webhook, not directly to `twilio-inbound-reply`.
 - `[RISK]` In Twilio Messaging Service settings, inbound messages must be set to `Send a webhook`; `Receive the message` stores replies at Twilio but does not invoke REL8TION.
 - `[RISK]` Replay endpoints such as `/api/admin/android-inbox-replay` and `/api/cron/replay-android-inbox` must never send SMS.

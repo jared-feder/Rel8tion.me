@@ -52,7 +52,7 @@ async function loadDashboardInbox(warnings) {
   return mergeRows(inboundRows, recentRows).slice(0, 250);
 }
 
-const OUTREACH_QUEUE_SELECT = 'id,open_house_id,outreach_code,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,report_note,report_note_updated_at,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at';
+const OUTREACH_QUEUE_SELECT = 'id,open_house_id,outreach_code,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,city,state,zip,price,beds,baths,open_start,open_end,template_key,listing_photo_url,agent_photo_url,mockup_image_url,selected_sms,review_status,report_note,report_note_updated_at,generation_status,mockup_status,approved_for_send,initial_send_at,initial_send_status,initial_sent_at,initial_delivery_status,initial_delivery_status_updated_at,initial_delivery_error_code,initial_delivery_error_message,followup_sms,followup_send_status,followup_send_at,followup_sent_at,followup_delivery_status,followup_delivery_status_updated_at,followup_delivery_error_code,followup_delivery_error_message,last_delivery_status,last_delivery_status_updated_at,last_delivery_error_code,last_delivery_error_message,send_mode,last_outreach_at,created_at';
 
 async function loadSmartSignInventory(warnings) {
   const extended = await safeRest(
@@ -87,6 +87,15 @@ function firstPresent(...values) {
     if (value !== undefined && value !== null && String(value).trim() !== '') return value;
   }
   return '';
+}
+
+function isOutreachSendCandidate(row) {
+  if (!row || row.send_mode !== 'automatic') return false;
+  if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
+  if (!row.listing_photo_url) return false;
+  const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
+  const followupPending = row.followup_send_status === 'pending' && row.followup_sms;
+  return Boolean(initialPending || followupPending);
 }
 
 async function safeRestInChunks(ids, buildPath, fallback, warnings, label, chunkSize = 80) {
@@ -621,6 +630,8 @@ module.exports = async function handler(req, res) {
       loanSessions
     });
 
+    const outreachSendCandidates = outreach.filter(isOutreachSendCandidate);
+
     sendJson(res, 200, {
       ok: true,
       loaded_at: new Date().toISOString(),
@@ -634,6 +645,8 @@ module.exports = async function handler(req, res) {
         loan_officer_coverage_signs: loanOfficerCoverageSignRows.length,
         outreach_queue: outreach.length,
         outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
+        outreach_queue_needs_approval: outreachSendCandidates.filter((row) => row.approved_for_send !== true).length,
+        outreach_queue_approved_ready: outreachSendCandidates.filter((row) => row.approved_for_send === true).length,
         active_signs: signs.filter((row) => row.status === 'active').length,
         open_events: events.filter((row) => row.status === 'active' && !row.ended_at).length,
         checkins: checkins.length,
