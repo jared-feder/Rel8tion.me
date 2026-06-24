@@ -11,6 +11,7 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - Default provider secret: `SMS_PROVIDER=twilio`.
 - Outreach-volume protection: set `SMS_OUTREACH_PROVIDER=android_gateway` so automated/manual outreach uses the Android Gateway while Twilio stays available for inbound tests, delivery-sensitive system traffic, and owner alerts.
 - Event/system provider override: set `SMS_EVENTS_PROVIDER=twilio`.
+- Brokerage-specific Twilio/MMS override: set `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` to route Douglas Elliman outreach through Twilio while other outreach follows `SMS_OUTREACH_PROVIDER`.
 - To intentionally send outreach through Twilio, set `SMS_OUTREACH_PROVIDER=twilio` or unset it while `SMS_PROVIDER=twilio`.
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
@@ -47,8 +48,9 @@ Use the real Supabase secret value for `TWILIO_STATUS_CALLBACK_TOKEN`; do not pa
 - `twilio-inbound-router` forwards inbound payloads into `twilio-inbound-reply` using service-role auth.
 - `twilio-inbound-reply` is protected and should not be used directly as the Twilio public webhook.
 - `twilio-message-status` is protected by `TWILIO_STATUS_CALLBACK_TOKEN`.
-- `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the outreach route is using Twilio.
+- `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the outreach route or brokerage override is using Twilio.
 - The shared SMS layer supports route-scoped provider selection with `SMS_OUTREACH_PROVIDER` and `SMS_EVENTS_PROVIDER`, falling back to `SMS_PROVIDER`.
+- The outreach functions can pass a per-message provider override for brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES`.
 
 Inbound behavior:
 

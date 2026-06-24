@@ -200,8 +200,9 @@ Automatic outreach supports Twilio or Android SMS Gateway selected by route-scop
 - `SMS_PROVIDER=twilio`
 - `SMS_OUTREACH_PROVIDER=android_gateway`
 - `SMS_EVENTS_PROVIDER=twilio`
+- `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`
 
-Android Gateway is the preferred outreach-volume fallback when protecting Twilio. It supports separate event/buyer and outreach devices, inbound webhook logging, provider-scoped STOP suppression, and SMS logging. Keep buyer/event/owner operational messages on Twilio with `SMS_EVENTS_PROVIDER=twilio` unless there is a provider outage.
+Android Gateway is the preferred outreach-volume fallback when protecting Twilio. It supports separate event/buyer and outreach devices, inbound webhook logging, provider-scoped STOP suppression, and SMS logging. Keep buyer/event/owner operational messages on Twilio with `SMS_EVENTS_PROVIDER=twilio` unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass Android and use Twilio/MMS for outreach.
 
 Important safety:
 
@@ -293,7 +294,7 @@ Core Vercel env areas:
 - Admin auth: `KEY_RESET_ADMIN_TOKEN`, `ADMIN_KEYCHAIN_UIDS`
 - Stripe: Stripe secret and price IDs for Open House Kit checkout
 - Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE`; current Twilio outreach recovery settings live in `docs/twilio-outreach-sms-runbook.md`
-- SMS routing: `SMS_PROVIDER`, `SMS_OUTREACH_PROVIDER`, `SMS_EVENTS_PROVIDER`
+- SMS routing: `SMS_PROVIDER`, `SMS_OUTREACH_PROVIDER`, `SMS_EVENTS_PROVIDER`, `SMS_TWILIO_OUTREACH_BROKERAGES`
 - Android Gateway: event and outreach gateway URLs, usernames, passwords, device IDs, inbound webhook secret/signing key
 - Cron: `CRON_SECRET`, `CRON_SHARED_SECRET`
 

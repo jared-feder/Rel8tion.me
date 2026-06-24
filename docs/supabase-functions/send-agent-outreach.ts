@@ -25,6 +25,7 @@ type OutreachRow = {
   agent_name?: string | null;
   agent_phone?: string | null;
   agent_phone_normalized?: string | null;
+  brokerage?: string | null;
   address?: string | null;
   listing_photo_url?: string | null;
   mockup_image_url?: string | null;
@@ -96,6 +97,25 @@ function usesAndroidGateway(): boolean {
   return String(Deno.env.get("SMS_PROVIDER") || "").trim().toLowerCase() === "android_gateway";
 }
 
+function twilioOutreachBrokeragePatterns(): string[] {
+  return String(Deno.env.get("SMS_TWILIO_OUTREACH_BROKERAGES") || "douglas elliman")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function outreachProviderOverrideForRow(row: OutreachRow): "twilio" | null {
+  const brokerage = String(row.brokerage || "").toLowerCase();
+  if (!brokerage) return null;
+  return twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern))
+    ? "twilio"
+    : null;
+}
+
+function usesAndroidGatewayForRow(row: OutreachRow): boolean {
+  return outreachProviderOverrideForRow(row) !== "twilio" && usesAndroidGateway();
+}
+
 function positiveIntEnv(name: string, fallback: number, max: number): number {
   const parsed = Number(Deno.env.get(name) || "");
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -114,8 +134,13 @@ async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise
   return count || 0;
 }
 
-function buildOutreachPreviewUrl(rowId: string | null, outreachCode?: string | null, mockupImageUrl?: string | null): string {
-  if (!usesAndroidGateway()) return "";
+function buildOutreachPreviewUrl(
+  row: OutreachRow,
+  outreachCode?: string | null,
+  mockupImageUrl?: string | null,
+): string {
+  if (!usesAndroidGatewayForRow(row)) return "";
+  const rowId = row.id || null;
   const token = outreachCode || rowId;
   if (!token || !mockupImageUrl) return "";
   return `${PUBLIC_APP_BASE_URL}/o/${encodeURIComponent(token)}`;
@@ -208,18 +233,20 @@ function isWithinAllowedSendWindow(): boolean {
 }
 
 function isBlockedReviewStatus(reviewStatus: string | null): boolean {
-  if (reviewStatus === "opted_out") return true;
-  return usesAndroidGateway() && reviewStatus === "android_opted_out";
+  return reviewStatus === "opted_out" || reviewStatus === "android_opted_out";
 }
 
-function getTerminalSmsBlock(message: string): { status: string; reason: string; reviewStatus?: string } | null {
+function getTerminalSmsBlock(
+  message: string,
+  provider: string,
+): { status: string; reason: string; reviewStatus?: string } | null {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("sms_suppressed") || normalized.includes("suppression list")) {
     return {
       status: "blocked_opted_out",
       reason: "sms_suppressed",
-      reviewStatus: usesAndroidGateway() ? "android_opted_out" : "opted_out",
+      reviewStatus: provider === "android_gateway" ? "android_opted_out" : "opted_out",
     };
   }
 
@@ -392,6 +419,7 @@ serve(async (req) => {
         agent_name,
         agent_phone,
         agent_phone_normalized,
+        brokerage,
         address,
         selected_sms,
         followup_sms,
@@ -546,7 +574,9 @@ serve(async (req) => {
           continue;
         }
 
-        const previewUrl = buildOutreachPreviewUrl(row.id, row.outreach_code, row.mockup_image_url);
+        const providerOverride = outreachProviderOverrideForRow(row);
+        const selectedProvider = providerOverride || (usesAndroidGateway() ? "android_gateway" : "twilio");
+        const previewUrl = buildOutreachPreviewUrl(row, row.outreach_code, row.mockup_image_url);
         const initialBody = initialDue
           ? addPreviewLinkBeforeStop(buildInitialOutreachBody(row), previewUrl)
           : "";
@@ -570,6 +600,9 @@ serve(async (req) => {
             open_start: row.open_start,
             open_end: row.open_end,
             review_status: row.review_status,
+            brokerage: row.brokerage || null,
+            provider: selectedProvider,
+            provider_override: providerOverride,
             preview_url: previewUrl || null,
             message_preview: (initialDue ? initialBody : followupBody || "").slice(0, 360),
           });
@@ -606,13 +639,16 @@ serve(async (req) => {
             to,
             body: initialBody,
             category: row.template_key === "missed_open_house" ? "outreach_followup" : "outreach",
+            providerOverride: providerOverride || undefined,
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
             statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "initial"),
             metadata: {
               queue_row_id: row.id,
               open_house_id: row.open_house_id || null,
+              brokerage: row.brokerage || null,
               step: "initial",
               template_key: row.template_key || null,
+              provider_override: providerOverride,
               mockup_image_url: row.mockup_image_url || null,
               outreach_preview_url: previewUrl || null,
             },
@@ -672,13 +708,16 @@ serve(async (req) => {
             to,
             body: followupBody || row.followup_sms || "",
             category: "outreach_followup",
+            providerOverride: providerOverride || undefined,
             mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
             statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "followup"),
             metadata: {
               queue_row_id: row.id,
               open_house_id: row.open_house_id || null,
+              brokerage: row.brokerage || null,
               step: "followup",
               template_key: row.template_key || null,
+              provider_override: providerOverride,
               mockup_image_url: row.mockup_image_url || null,
               outreach_preview_url: previewUrl || null,
             },
@@ -726,7 +765,8 @@ serve(async (req) => {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const terminalBlock = getTerminalSmsBlock(message);
+        const attemptedProvider = outreachProviderOverrideForRow(row) || (usesAndroidGateway() ? "android_gateway" : "twilio");
+        const terminalBlock = getTerminalSmsBlock(message, attemptedProvider);
         const update: Record<string, unknown> = { send_error: message };
 
         if (terminalBlock && attemptedStep === "initial") {

@@ -33,6 +33,21 @@ function isServiceRoleRequest(req: Request, serviceRoleKey: string): boolean {
   return authHeader === `Bearer ${serviceRoleKey}`;
 }
 
+function twilioOutreachBrokeragePatterns(): string[] {
+  return String(Deno.env.get("SMS_TWILIO_OUTREACH_BROKERAGES") || "douglas elliman")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function outreachProviderOverrideForRow(row: Record<string, unknown>): "twilio" | null {
+  const brokerage = String(row.brokerage || "").toLowerCase();
+  if (!brokerage) return null;
+  return twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern))
+    ? "twilio"
+    : null;
+}
+
 function buildStatusCallbackUrl(supabaseUrl: string, queueId: string): string {
   const override = Deno.env.get("TWILIO_STATUS_CALLBACK_URL");
   const token = Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN") || "";
@@ -101,6 +116,7 @@ serve(async (req) => {
         agent_name,
         agent_phone,
         agent_phone_normalized,
+        brokerage,
         review_status,
         send_mode
       `)
@@ -132,15 +148,19 @@ serve(async (req) => {
       );
     }
 
+    const providerOverride = outreachProviderOverrideForRow(row);
     const smsRes = await sendSMS({
       supabase,
       to,
       body: messageBody,
       category: "manual_outreach",
+      providerOverride: providerOverride || undefined,
       statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id),
       metadata: {
         queue_row_id: row.id,
         open_house_id: row.open_house_id || null,
+        brokerage: row.brokerage || null,
+        provider_override: providerOverride,
         step: "manual_reply",
       },
     });

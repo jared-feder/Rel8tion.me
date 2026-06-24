@@ -37,3 +37,4 @@ This repo uses branch separation to reduce production risk.
 - The public Supabase anon key can exist in browser code when intentionally used as a public client key, but private service credentials must never be exposed in frontend code.
 - Twilio sender number belongs in Supabase secret `TWILIO_PHONE`; delivery callback token belongs in `TWILIO_STATUS_CALLBACK_TOKEN`. Store the secret names and URL shapes in docs, not the actual token values.
 - SMS provider routing should use `SMS_PROVIDER=twilio` as the default, `SMS_EVENTS_PROVIDER=twilio` for buyer/event/owner operational texts, and `SMS_OUTREACH_PROVIDER=android_gateway` when protecting Twilio from outreach volume.
+- Use `SMS_TWILIO_OUTREACH_BROKERAGES` for brokerage-specific Twilio/MMS outreach overrides such as Douglas Elliman.

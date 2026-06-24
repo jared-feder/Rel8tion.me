@@ -10,6 +10,7 @@ Set these in Vercel/Supabase environments that send SMS:
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=android_gateway
 SMS_EVENTS_PROVIDER=twilio
+SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
 
 ANDROID_EVENTS_GATEWAY_URL=https://api.sms-gate.app
 ANDROID_EVENTS_GATEWAY_USERNAME=
@@ -33,7 +34,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_PHONE=
 ```
 
-Use the outreach device for outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. If Android is ever used for events too, use the events device and do not share one device across both routes.
+Use the outreach device for general outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
 
 To put all routes back on Twilio:
 

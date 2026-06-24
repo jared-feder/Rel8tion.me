@@ -23,6 +23,7 @@ type SendSmsOptions = {
   category?: SmsCategory | string;
   metadata?: Record<string, unknown>;
   mediaUrls?: string[];
+  providerOverride?: SmsProvider | string;
   statusCallback?: string;
   supabase?: any;
 };
@@ -94,11 +95,11 @@ function providerName(): SmsProvider {
   return normalizeProvider(Deno.env.get("SMS_PROVIDER"), "twilio");
 }
 
-function providerForRoute(route: SmsRoute): SmsProvider {
+function providerForRoute(route: SmsRoute, providerOverride?: SmsProvider | string): SmsProvider {
   const override = route === "outreach"
     ? Deno.env.get("SMS_OUTREACH_PROVIDER")
     : Deno.env.get("SMS_EVENTS_PROVIDER");
-  return normalizeProvider(override, providerName());
+  return normalizeProvider(providerOverride, normalizeProvider(override, providerName()));
 }
 
 export function normalizePhoneDigits(phone: string | null | undefined): string {
@@ -338,7 +339,7 @@ export async function sendSMS(options: SendSmsOptions) {
   const category = clean(options.category || "event_transactional").toLowerCase();
   const metadata = options.metadata || {};
   const route = routeForCategory(category);
-  const provider = providerForRoute(route);
+  const provider = providerForRoute(route, options.providerOverride);
   const supabase = options.supabase || smsClient();
   const to = toE164(options.to);
   const routeLabel = provider === "twilio" ? "twilio" : route;

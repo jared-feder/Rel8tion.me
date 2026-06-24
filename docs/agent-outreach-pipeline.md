@@ -92,6 +92,8 @@ It should not need to know how the image was generated.
 
 Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. To protect Twilio, keep `SMS_PROVIDER=twilio`, set `SMS_EVENTS_PROVIDER=twilio`, and set `SMS_OUTREACH_PROVIDER=android_gateway`.
 
+Brokerage-specific outreach can override that route setting with `SMS_TWILIO_OUTREACH_BROKERAGES`. Production uses this for Douglas Elliman so those rows send through Twilio/MMS while general outreach remains on Android.
+
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 
 ## Hot-List UI Changes
