@@ -89,9 +89,9 @@ The send function should assume:
 
 It should not require a hidden `approved_for_send` gate. Normal cron sends are eligible when the row is automatic, generated, rendered, due, has a listing photo, and has pending SMS copy.
 
-Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production outreach is intended to run through Twilio with `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, and `SMS_OUTREACH_PROVIDER=twilio`.
+Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production routing should use `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, `SMS_OUTREACH_PROVIDER=android_gateway`, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`.
 
-Brokerage-specific outreach can override that route setting with `SMS_TWILIO_OUTREACH_BROKERAGES`; this is optional while all outreach already routes through Twilio.
+Douglas Elliman outreach is the Twilio/MMS auto-send lane. Non-Douglas Elliman outreach waits for manual send when `rel8tion_runtime_settings.outreach_operator_mode` is `live`, and uses Android Gateway when that mode is `away`.
 
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 

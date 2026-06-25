@@ -37,6 +37,8 @@ type OutreachRow = {
   template_key?: string | null;
 };
 
+type OutreachOperatorMode = "live" | "away";
+
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
   return phone.replace(/\D/g, "");
@@ -112,8 +114,29 @@ function outreachProviderOverrideForRow(row: OutreachRow): "twilio" | null {
     : null;
 }
 
-function usesAndroidGatewayForRow(row: OutreachRow): boolean {
-  return outreachProviderOverrideForRow(row) !== "twilio" && usesAndroidGateway();
+function normalizeOperatorMode(value: unknown, fallback: OutreachOperatorMode = "live"): OutreachOperatorMode {
+  return String(value || "").trim().toLowerCase() === "away" ? "away" : fallback;
+}
+
+async function loadOutreachOperatorMode(supabase: any): Promise<OutreachOperatorMode> {
+  const fallback = normalizeOperatorMode(Deno.env.get("OUTREACH_OPERATOR_MODE"), "live");
+  try {
+    const { data, error } = await supabase
+      .from("rel8tion_runtime_settings")
+      .select("value")
+      .eq("key", "outreach_operator_mode")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[send-agent-outreach] outreach operator mode lookup failed", error.message || error);
+      return fallback;
+    }
+
+    return normalizeOperatorMode(data?.value?.mode || data?.value, fallback);
+  } catch (error) {
+    console.warn("[send-agent-outreach] outreach operator mode lookup failed", error);
+    return fallback;
+  }
 }
 
 function positiveIntEnv(name: string, fallback: number, max: number): number {
@@ -135,12 +158,12 @@ async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise
 }
 
 function buildOutreachPreviewUrl(
-  row: OutreachRow,
+  selectedProvider: string,
+  rowId?: string | null,
   outreachCode?: string | null,
   mockupImageUrl?: string | null,
 ): string {
-  if (!usesAndroidGatewayForRow(row)) return "";
-  const rowId = row.id || null;
+  if (selectedProvider !== "android_gateway") return "";
   const token = outreachCode || rowId;
   if (!token || !mockupImageUrl) return "";
   return `${PUBLIC_APP_BASE_URL}/o/${encodeURIComponent(token)}`;
@@ -365,6 +388,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const outreachOperatorMode = await loadOutreachOperatorMode(supabase);
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
     const requestedLimit = Number(body.limit ?? maxPerRun);
@@ -397,6 +421,7 @@ serve(async (req) => {
             max_per_hour: maxPerHour,
             recent_outreach_sends_1h: recentSendCount,
             hourly_remaining: hourlyRemaining,
+            outreach_operator_mode: outreachOperatorMode,
             message: "Outreach send throttle is active. No messages sent this run.",
             results: [],
           },
@@ -464,6 +489,7 @@ serve(async (req) => {
       if (dryRun && results.length >= inspectionLimit) break;
 
       let attemptedStep: "initial" | "followup" | null = null;
+      let attemptedProvider: string | null = null;
 
       try {
         const phoneNormalized = row.agent_phone_normalized || normalizePhone(row.agent_phone);
@@ -571,9 +597,17 @@ serve(async (req) => {
           continue;
         }
 
-        const providerOverride = outreachProviderOverrideForRow(row);
-        const selectedProvider = providerOverride || (usesAndroidGateway() ? "android_gateway" : "twilio");
-        const previewUrl = buildOutreachPreviewUrl(row, row.outreach_code, row.mockup_image_url);
+        const twilioBrokerageOverride = outreachProviderOverrideForRow(row) === "twilio";
+        const selectedProvider = twilioBrokerageOverride
+          ? "twilio"
+          : outreachOperatorMode === "away"
+            ? "android_gateway"
+            : "manual";
+        const providerOverride = selectedProvider === "manual"
+          ? null
+          : selectedProvider as "twilio" | "android_gateway";
+        attemptedProvider = selectedProvider;
+        const previewUrl = buildOutreachPreviewUrl(selectedProvider, row.id, row.outreach_code, row.mockup_image_url);
         const initialBody = initialDue
           ? addPreviewLinkBeforeStop(buildInitialOutreachBody(row), previewUrl)
           : "";
@@ -600,8 +634,35 @@ serve(async (req) => {
             brokerage: row.brokerage || null,
             provider: selectedProvider,
             provider_override: providerOverride,
+            outreach_operator_mode: outreachOperatorMode,
+            manual_ready: selectedProvider === "manual",
             preview_url: previewUrl || null,
             message_preview: (initialDue ? initialBody : followupBody || "").slice(0, 360),
+          });
+          continue;
+        }
+
+        if (selectedProvider === "manual") {
+          if (row.review_status !== "manual_ready") {
+            await supabase
+              .from("agent_outreach_queue")
+              .update({
+                review_status: "manual_ready",
+                send_error: null,
+              })
+              .eq("id", row.id);
+          }
+
+          results.push({
+            id: row.id,
+            agent_name: row.agent_name,
+            step: initialDue ? "initial" : followupDue ? "followup" : null,
+            ok: true,
+            skipped: true,
+            manual_ready: true,
+            reason: "Operator is live; non-Douglas Elliman outreach is waiting for manual send.",
+            outreach_operator_mode: outreachOperatorMode,
+            provider: "manual",
           });
           continue;
         }
@@ -646,6 +707,7 @@ serve(async (req) => {
               step: "initial",
               template_key: row.template_key || null,
               provider_override: providerOverride,
+              outreach_operator_mode: outreachOperatorMode,
               mockup_image_url: row.mockup_image_url || null,
               outreach_preview_url: previewUrl || null,
             },
@@ -715,6 +777,7 @@ serve(async (req) => {
               step: "followup",
               template_key: row.template_key || null,
               provider_override: providerOverride,
+              outreach_operator_mode: outreachOperatorMode,
               mockup_image_url: row.mockup_image_url || null,
               outreach_preview_url: previewUrl || null,
             },
@@ -762,8 +825,8 @@ serve(async (req) => {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const attemptedProvider = outreachProviderOverrideForRow(row) || (usesAndroidGateway() ? "android_gateway" : "twilio");
-        const terminalBlock = getTerminalSmsBlock(message, attemptedProvider);
+        const providerForBlock = attemptedProvider || outreachProviderOverrideForRow(row) || (usesAndroidGateway() ? "android_gateway" : "twilio");
+        const terminalBlock = getTerminalSmsBlock(message, providerForBlock);
         const update: Record<string, unknown> = { send_error: message };
 
         if (terminalBlock && attemptedStep === "initial") {
@@ -790,6 +853,7 @@ serve(async (req) => {
           agent_name: row.agent_name,
           step: attemptedStep,
           blocked: Boolean(terminalBlock),
+          provider: providerForBlock,
           ok: false,
           error: message,
         });
@@ -810,6 +874,7 @@ serve(async (req) => {
           max_per_hour: maxPerHour,
           recent_outreach_sends_1h: recentSendCount,
           hourly_remaining: hourlyRemaining,
+          outreach_operator_mode: outreachOperatorMode,
           duplicate_phone_cooldown: "disabled",
           results,
         },

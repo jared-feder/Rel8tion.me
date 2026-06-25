@@ -9,10 +9,10 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - Live Twilio sender: `+15168885461`.
 - Supabase sender secret: `TWILIO_PHONE`.
 - Default provider secret: `SMS_PROVIDER=twilio`.
-- Outreach provider secret: `SMS_OUTREACH_PROVIDER=twilio` so automated/manual outreach runs through Twilio on the cron lane.
+- Outreach provider secret: `SMS_OUTREACH_PROVIDER=android_gateway` so non-Douglas Elliman automated outreach does not use Twilio.
 - Event/system provider override: set `SMS_EVENTS_PROVIDER=twilio`.
-- Brokerage-specific Twilio/MMS override: `SMS_TWILIO_OUTREACH_BROKERAGES` is optional when `SMS_OUTREACH_PROVIDER=twilio`; use it only if the default outreach provider is temporarily changed away from Twilio.
-- Temporary Android fallback: set `SMS_OUTREACH_PROVIDER=android_gateway` only when intentionally protecting Twilio provider health, and leave `SMS_EVENTS_PROVIDER=twilio`.
+- Brokerage-specific Twilio/MMS override: set `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` so Douglas Elliman outreach auto-sends through Twilio/MMS.
+- Runtime operator mode: REL8TION COMMAND stores `outreach_operator_mode` in `rel8tion_runtime_settings`; `live` makes non-Douglas Elliman rows wait for manual send, and `away` lets them send through Android Gateway.
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
@@ -86,7 +86,7 @@ Inbound reply test:
 - Inbound webhook returns `401`: Twilio is pointed directly at `twilio-inbound-reply` instead of `twilio-inbound-router`, or the router was deployed with JWT verification enabled.
 - Inbound saves but does not match a queue row: check `agent_phone_normalized` values. The router/reply handler now searches both 10-digit and 11-digit forms.
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
-- Outreach volume risk: keep `OUTREACH_SEND_MAX_PER_RUN` and `OUTREACH_SEND_MAX_PER_HOUR` low unless the owner explicitly approves a provider health check and higher caps. If Twilio provider health degrades, temporarily move outreach to `SMS_OUTREACH_PROVIDER=android_gateway`.
+- Outreach volume risk: keep `OUTREACH_SEND_MAX_PER_RUN` and `OUTREACH_SEND_MAX_PER_HOUR` low unless the owner explicitly approves a provider health check and higher caps. Do not route non-Douglas Elliman automated outreach through Twilio until the toll-free lane is intentionally added.
 
 ## Quick Verification Queries
 

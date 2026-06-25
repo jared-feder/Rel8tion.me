@@ -191,6 +191,10 @@ function isOptedOut(row) {
     statuses.includes('stop');
 }
 
+function isDouglasEllimanOutreach(row) {
+  return /douglas\s+elliman/i.test(String(row?.brokerage || ''));
+}
+
 function isDeliveryFailure(row) {
   const status = normalizedStatus(firstPresent(row.initial_delivery_status, row.last_delivery_status));
   return ['failed', 'undelivered', 'canceled', 'cancelled'].includes(status);
@@ -280,7 +284,7 @@ async function loadQueueRows(selectColumns, mode = 'future') {
 
 function readyCandidates(rows) {
   const now = new Date();
-  return sortCandidates((rows || []).filter((row) => isReady(row, now)), now);
+  return sortCandidates((rows || []).filter((row) => !isDouglasEllimanOutreach(row) && isReady(row, now)), now);
 }
 
 async function loadNext() {

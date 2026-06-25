@@ -1,24 +1,30 @@
 # Android SMS Gateway Fallback
 
-Temporary A2P fallback for outreach volume. Twilio remains the active outreach cron route unless provider health requires a temporary switch. Use route-scoped provider env vars so outreach can move to Android while buyer/event/system messages stay on Twilio.
+Android Gateway is the general non-Douglas Elliman outreach route when REL8TION COMMAND is in Away mode. Twilio remains active for buyer/event/system messages and for Douglas Elliman outreach.
 
 ## Environment
 
-Current Twilio cron route:
-
-```text
-SMS_PROVIDER=twilio
-SMS_OUTREACH_PROVIDER=twilio
-SMS_EVENTS_PROVIDER=twilio
-```
-
-Set these only when intentionally switching outreach to the Android fallback:
+Current split outreach route:
 
 ```text
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=android_gateway
 SMS_EVENTS_PROVIDER=twilio
-SMS_TWILIO_OUTREACH_BROKERAGES=
+SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
+```
+
+Runtime mode is stored in `rel8tion_runtime_settings` as `outreach_operator_mode`:
+
+- `live`: non-Douglas Elliman waits for manual send in COMMAND.
+- `away`: non-Douglas Elliman sends through Android Gateway on cron.
+
+Android route settings:
+
+```text
+SMS_PROVIDER=twilio
+SMS_OUTREACH_PROVIDER=android_gateway
+SMS_EVENTS_PROVIDER=twilio
+SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
 
 ANDROID_EVENTS_GATEWAY_URL=https://api.sms-gate.app
 ANDROID_EVENTS_GATEWAY_USERNAME=
@@ -42,15 +48,17 @@ TWILIO_AUTH_TOKEN=
 TWILIO_PHONE=
 ```
 
-Use the outreach device only for fallback outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
+Use the outreach device only for non-Douglas Elliman outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
 
-To put all routes back on Twilio:
+Emergency all-Twilio route, not current production:
 
 ```text
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=twilio
 SMS_EVENTS_PROVIDER=twilio
 ```
+
+Do not use that route for non-Douglas Elliman automated outreach until the toll-free outreach lane is intentionally added and verified.
 
 When Twilio is active for any route, use `docs/twilio-outreach-sms-runbook.md` for the current number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
 

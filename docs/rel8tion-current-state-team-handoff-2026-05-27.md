@@ -195,14 +195,14 @@ Status: `[PARTIAL]` / `[RISK]`
 
 Outreach uses `agent_outreach_queue`, enrichment, rendered outreach mockups, reply tracking, and admin inbox views.
 
-Automatic outreach supports Twilio or Android SMS Gateway selected by route-scoped env. As of 2026-06-24, the intended active route is Twilio on the cron lane:
+Automatic outreach supports Twilio or Android SMS Gateway selected by route-scoped env. As of 2026-06-24, the intended active route is split by brokerage and operator mode:
 
 - `SMS_PROVIDER=twilio`
-- `SMS_OUTREACH_PROVIDER=twilio`
+- `SMS_OUTREACH_PROVIDER=android_gateway`
 - `SMS_EVENTS_PROVIDER=twilio`
-- optional fallback override: `SMS_TWILIO_OUTREACH_BROKERAGES`
+- `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`
 
-Android Gateway is an outreach-volume fallback when protecting Twilio. It supports separate event/buyer and outreach devices, inbound webhook logging, provider-scoped STOP suppression, and SMS logging. Keep buyer/event/owner operational messages on Twilio with `SMS_EVENTS_PROVIDER=twilio` unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass Android and use Twilio/MMS for outreach if the default outreach provider is temporarily changed away from Twilio.
+Douglas Elliman outreach auto-sends through Twilio/MMS. Non-Douglas Elliman outreach waits for manual send when `rel8tion_runtime_settings.outreach_operator_mode` is `live`, and sends through Android Gateway when that mode is `away`. Keep buyer/event/owner operational messages on Twilio with `SMS_EVENTS_PROVIDER=twilio` unless there is a provider outage.
 
 Important safety:
 

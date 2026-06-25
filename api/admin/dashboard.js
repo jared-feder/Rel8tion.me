@@ -89,6 +89,22 @@ function firstPresent(...values) {
   return '';
 }
 
+function normalizeOutreachOperatorMode(value, fallback = 'live') {
+  return String(value || '').trim().toLowerCase() === 'away' ? 'away' : fallback;
+}
+
+function twilioOutreachBrokeragePatterns() {
+  return String(process.env.SMS_TWILIO_OUTREACH_BROKERAGES || 'Douglas Elliman')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isTwilioOutreachBrokerage(row) {
+  const brokerage = String(row?.brokerage || '').toLowerCase();
+  return Boolean(brokerage && twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern)));
+}
+
 function isOutreachSendCandidate(row) {
   if (!row || row.send_mode !== 'automatic') return false;
   if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
@@ -96,6 +112,22 @@ function isOutreachSendCandidate(row) {
   const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
   const followupPending = row.followup_send_status === 'pending' && row.followup_sms;
   return Boolean(initialPending || followupPending);
+}
+
+async function loadOutreachOperatorMode(warnings) {
+  const fallback = normalizeOutreachOperatorMode(process.env.OUTREACH_OPERATOR_MODE, 'live');
+  const rows = await safeRest(
+    'rel8tion_runtime_settings?key=eq.outreach_operator_mode&select=key,value,updated_at,updated_by&limit=1',
+    [],
+    warnings,
+    'rel8tion_runtime_settings_outreach_operator_mode'
+  );
+  const row = Array.isArray(rows) ? rows[0] || null : null;
+  return {
+    mode: normalizeOutreachOperatorMode(row?.value?.mode || row?.value, fallback),
+    updated_at: row?.updated_at || null,
+    updated_by: row?.updated_by || null
+  };
 }
 
 async function safeRestInChunks(ids, buildPath, fallback, warnings, label, chunkSize = 80) {
@@ -605,6 +637,7 @@ module.exports = async function handler(req, res) {
       )
     ]);
 
+    const outreachOperator = await loadOutreachOperatorMode(warnings);
     const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
     const signRows = buildSigns({ signs, inventory, events });
     const eventPassRows = buildEventPasses({ inventory, signs, events, keys, verifiedProfiles, coverageConsents });
@@ -631,6 +664,10 @@ module.exports = async function handler(req, res) {
     });
 
     const outreachSendCandidates = outreach.filter(isOutreachSendCandidate);
+    const outreachTwilioCandidates = outreachSendCandidates.filter(isTwilioOutreachBrokerage);
+    const outreachNonTwilioCandidates = outreachSendCandidates.filter((row) => !isTwilioOutreachBrokerage(row));
+    const outreachManualReady = outreachOperator.mode === 'live' ? outreachNonTwilioCandidates : [];
+    const outreachAndroidReady = outreachOperator.mode === 'away' ? outreachNonTwilioCandidates : [];
     const outreachPaused = outreach.filter((row) => row.send_mode !== 'automatic' && isOutreachSendCandidate({ ...row, send_mode: 'automatic' }));
 
     sendJson(res, 200, {
@@ -646,7 +683,10 @@ module.exports = async function handler(req, res) {
         loan_officer_coverage_signs: loanOfficerCoverageSignRows.length,
         outreach_queue: outreach.length,
         outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
-        outreach_queue_cron_ready: outreachSendCandidates.length,
+        outreach_queue_cron_ready: outreachTwilioCandidates.length + outreachAndroidReady.length,
+        outreach_queue_twilio_ready: outreachTwilioCandidates.length,
+        outreach_queue_manual_ready: outreachManualReady.length,
+        outreach_queue_android_ready: outreachAndroidReady.length,
         outreach_queue_paused: outreachPaused.length,
         outreach_queue_needs_approval: 0,
         outreach_queue_approved_ready: outreachSendCandidates.length,
@@ -663,6 +703,7 @@ module.exports = async function handler(req, res) {
         needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
         payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length
       },
+      outreach_operator: outreachOperator,
       crm: crmRows,
       leads: leadRows,
       signs: signRows,

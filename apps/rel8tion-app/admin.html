@@ -1676,6 +1676,10 @@
       return `<span class="badge ${type}">${esc(text)}</span>`;
     }
 
+    function countValue(primary, fallback = 0) {
+      return primary === undefined || primary === null ? fallback : primary;
+    }
+
     function deliveryBadge(row, step = 'initial') {
       const status = row?.[`${step}_delivery_status`] || '';
       const errorCode = row?.[`${step}_delivery_error_code`] || '';
@@ -1698,13 +1702,23 @@
       return Boolean(initialPending || followupPending);
     }
 
+    function outreachOperatorMode() {
+      return state.command?.outreach_operator?.mode === 'away' ? 'away' : 'live';
+    }
+
+    function isDouglasEllimanOutreach(row) {
+      return /douglas\s+elliman/i.test(String(row?.brokerage || ''));
+    }
+
     function isOutreachCronReady(row) {
       if (!row) return false;
       return isOutreachSendCandidate({ ...row, send_mode: 'automatic' });
     }
 
     function sendApprovalBadge(row) {
-      if (isOutreachSendCandidate(row)) return badge('Cron ready', 'ok');
+      if (isOutreachSendCandidate(row) && isDouglasEllimanOutreach(row)) return badge('Twilio ready', 'ok');
+      if (isOutreachSendCandidate(row) && outreachOperatorMode() === 'live') return badge('Manual ready', 'warn');
+      if (isOutreachSendCandidate(row)) return badge('Android ready', 'ok');
       if (row?.send_mode && row.send_mode !== 'automatic') return badge('Paused', 'info');
       if (row?.generation_status === 'generated' && row?.mockup_status === 'rendered') return badge('Not due', 'info');
       return '';
@@ -2080,6 +2094,31 @@
       } catch (error) {
         state.actionKey = '';
         showToast(error.message || 'Unable to replay Android inbox.');
+        render();
+      }
+    }
+
+    async function setOutreachOperatorMode(mode) {
+      const normalized = mode === 'away' ? 'away' : 'live';
+      if (normalized === outreachOperatorMode()) return;
+      const prompt = normalized === 'away'
+        ? 'Switch outreach to Away mode? Non-Douglas Elliman ready rows can send through the Android Gateway on the next cron run.'
+        : 'Switch outreach to Live mode? Non-Douglas Elliman ready rows will wait for manual SMS instead of auto-sending.';
+      if (!window.confirm(prompt)) return;
+
+      state.actionKey = `outreach_mode:${normalized}`;
+      render();
+      try {
+        await api('/api/admin/outreach-mode', {
+          method: 'POST',
+          body: JSON.stringify({ mode: normalized })
+        });
+        showToast(normalized === 'away' ? 'Away mode enabled.' : 'Live manual mode enabled.');
+        state.actionKey = '';
+        await loadAll({ showLoading: false });
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to update outreach mode.');
         render();
       }
     }
@@ -3254,6 +3293,9 @@
       document.querySelectorAll('[data-hold-send]').forEach((button) => {
         button.addEventListener('click', () => holdOutreachSend(button.dataset.holdSend));
       });
+      document.querySelectorAll('[data-outreach-mode]').forEach((button) => {
+        button.addEventListener('click', () => setOutreachOperatorMode(button.dataset.outreachMode));
+      });
       document.querySelectorAll('[data-coverage-choice]').forEach((button) => {
         button.addEventListener('click', () => confirmCoverageChoice(Number(button.dataset.coverageChoice)));
       });
@@ -3329,10 +3371,12 @@
       const o = state.command?.overview || {};
       const inbound = state.counts.inbound || o.incoming_threads || 0;
       const needs = state.counts.needs_reply || o.needs_reply || 0;
-      const cronReady = o.outreach_queue_cron_ready || o.outreach_queue_approved_ready || 0;
+      const cronReady = countValue(o.outreach_queue_cron_ready, o.outreach_queue_approved_ready || 0);
+      const manualReady = o.outreach_queue_manual_ready || 0;
       const stats = [
         { label: 'Needs reply', value: needs, icon: 'message-square-reply', tone: needs ? 'orange' : 'green', meter: inbound ? (needs / inbound) * 100 : 4, area: 'outreach', filter: 'needs_reply' },
-        { label: 'Cron ready', value: cronReady, icon: 'play-circle', tone: cronReady ? 'orange' : 'green', meter: cronReady ? Math.min(100, cronReady * 8) : 4, area: 'outreach', filter: 'all' },
+        { label: 'Auto ready', value: cronReady, icon: 'play-circle', tone: cronReady ? 'orange' : 'green', meter: cronReady ? Math.min(100, cronReady * 8) : 4, area: 'outreach', filter: 'all' },
+        { label: 'Manual ready', value: manualReady, icon: 'hand', tone: manualReady ? 'orange' : 'green', meter: manualReady ? Math.min(100, manualReady * 8) : 4, area: 'outreach', filter: 'all' },
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
         { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
@@ -3372,15 +3416,20 @@
     function renderOutreach() {
       const rows = filteredInbox();
       const latestInbound = latestInboundThreads(8);
-      const cronReady = state.command?.overview?.outreach_queue_cron_ready || state.command?.overview?.outreach_queue_approved_ready || 0;
+      const cronReady = countValue(state.command?.overview?.outreach_queue_cron_ready, state.command?.overview?.outreach_queue_approved_ready || 0);
       const paused = state.command?.overview?.outreach_queue_paused || 0;
+      const twilioReady = state.command?.overview?.outreach_queue_twilio_ready || 0;
+      const manualReady = state.command?.overview?.outreach_queue_manual_ready || 0;
+      const androidReady = state.command?.overview?.outreach_queue_android_ready || 0;
+      const operatorMode = outreachOperatorMode();
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | ${esc(cronReady)} cron ready | ${esc(paused)} paused</div>
+            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(androidReady)} Android | ${esc(paused)} paused</div>
           </div>
           <div class="header-actions">
+            ${renderOutreachModeControls()}
             <a class="btn primary" href="/manual-sms-outreach">
               <i data-lucide="smartphone"></i><span>Manual SMS Backup</span>
             </a>
@@ -3509,6 +3558,21 @@
       `;
     }
 
+    function renderOutreachModeControls() {
+      const mode = outreachOperatorMode();
+      const busy = String(state.actionKey || '').startsWith('outreach_mode:');
+      return `
+        <div class="row-actions">
+          <button class="btn ${mode === 'live' ? 'primary' : 'soft'}" data-outreach-mode="live" ${busy || mode === 'live' ? 'disabled' : ''}>
+            <i data-lucide="hand"></i><span>${busy && state.actionKey === 'outreach_mode:live' ? 'Switching...' : 'Live: manual'}</span>
+          </button>
+          <button class="btn ${mode === 'away' ? 'primary' : 'soft'}" data-outreach-mode="away" ${busy || mode === 'away' ? 'disabled' : ''}>
+            <i data-lucide="send"></i><span>${busy && state.actionKey === 'outreach_mode:away' ? 'Switching...' : 'Away: Android'}</span>
+          </button>
+        </div>
+      `;
+    }
+
     function renderLatestInboundReplies(rows) {
       return `
         <div class="glass-card" style="padding:14px; display:grid; gap:10px;">
@@ -3545,11 +3609,14 @@
     function renderOutreachQueue() {
       const rows = filterByQuery(state.command?.outreach?.recent || []);
       const pendingCount = state.command?.overview?.outreach_queue_pending || 0;
-      const cronReady = state.command?.overview?.outreach_queue_cron_ready || state.command?.overview?.outreach_queue_approved_ready || 0;
+      const cronReady = countValue(state.command?.overview?.outreach_queue_cron_ready, state.command?.overview?.outreach_queue_approved_ready || 0);
+      const twilioReady = state.command?.overview?.outreach_queue_twilio_ready || 0;
+      const manualReady = state.command?.overview?.outreach_queue_manual_ready || 0;
+      const androidReady = state.command?.overview?.outreach_queue_android_ready || 0;
       const paused = state.command?.overview?.outreach_queue_paused || 0;
       const totalCount = state.command?.overview?.outreach_queue || rows.length;
       const shownCount = Math.min(rows.length, 80);
-      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${cronReady} cron ready | ${paused} paused | ${totalCount} total`, rows.slice(0, 80), (row) => {
+      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${cronReady} auto ready | ${twilioReady} Twilio | ${manualReady} manual | ${androidReady} Android | ${paused} paused | ${totalCount} total`, rows.slice(0, 80), (row) => {
         const thread = queueRowToThread(row);
         const key = thread.thread_key;
         return `
