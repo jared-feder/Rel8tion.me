@@ -14,8 +14,9 @@ const BUSINESS_CARD_URL =
 const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
-const DEFAULT_SEND_MAX_PER_RUN = 3;
-const DEFAULT_SEND_MAX_PER_HOUR = 6;
+const DEFAULT_SEND_MAX_PER_RUN = 20;
+const DEFAULT_SEND_MAX_PER_HOUR = 20;
+const DEFAULT_SEND_MAX_PER_DAY = 150;
 
 type OutreachRow = {
   id?: string | null;
@@ -365,6 +366,7 @@ serve(async (req) => {
 
     const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, 50);
     const maxPerHour = positiveIntEnv("OUTREACH_SEND_MAX_PER_HOUR", DEFAULT_SEND_MAX_PER_HOUR, 200);
+    const maxPerDay = positiveIntEnv("OUTREACH_SEND_MAX_PER_DAY", DEFAULT_SEND_MAX_PER_DAY, 150);
 
     if (!isWithinAllowedSendWindow()) {
       return new Response(
@@ -376,6 +378,7 @@ serve(async (req) => {
             timezone: "America/New_York",
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
+            max_per_day: maxPerDay,
             message: "Current time is outside allowed send window (8:00 AM-9:00 PM ET). No messages sent.",
           },
           null,
@@ -397,11 +400,14 @@ serve(async (req) => {
       Math.min(Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : maxPerRun, 50),
     );
     const hourlyWindowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const recentSendCount = await recentOutreachSendCount(supabase, hourlyWindowStart);
-    const hourlyRemaining = Math.max(0, maxPerHour - recentSendCount);
+    const dailyWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const recentHourlySendCount = await recentOutreachSendCount(supabase, hourlyWindowStart);
+    const recentDailySendCount = await recentOutreachSendCount(supabase, dailyWindowStart);
+    const hourlyRemaining = Math.max(0, maxPerHour - recentHourlySendCount);
+    const dailyRemaining = Math.max(0, maxPerDay - recentDailySendCount);
     const limit = dryRun
       ? normalizedRequestedLimit
-      : Math.min(normalizedRequestedLimit, maxPerRun, hourlyRemaining);
+      : Math.min(normalizedRequestedLimit, maxPerRun, hourlyRemaining, dailyRemaining);
     const inspectionLimit = dryRun ? Math.max(1, limit || 25) : limit;
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
@@ -419,8 +425,11 @@ serve(async (req) => {
             effective_limit: limit,
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
-            recent_outreach_sends_1h: recentSendCount,
+            max_per_day: maxPerDay,
+            recent_outreach_sends_1h: recentHourlySendCount,
+            recent_outreach_sends_24h: recentDailySendCount,
             hourly_remaining: hourlyRemaining,
+            daily_remaining: dailyRemaining,
             outreach_operator_mode: outreachOperatorMode,
             message: "Outreach send throttle is active. No messages sent this run.",
             results: [],
@@ -872,8 +881,11 @@ serve(async (req) => {
           effective_limit: limit,
           max_per_run: maxPerRun,
           max_per_hour: maxPerHour,
-          recent_outreach_sends_1h: recentSendCount,
+          max_per_day: maxPerDay,
+          recent_outreach_sends_1h: recentHourlySendCount,
+          recent_outreach_sends_24h: recentDailySendCount,
           hourly_remaining: hourlyRemaining,
+          daily_remaining: dailyRemaining,
           outreach_operator_mode: outreachOperatorMode,
           duplicate_phone_cooldown: "disabled",
           results,

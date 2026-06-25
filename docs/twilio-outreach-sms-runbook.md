@@ -86,7 +86,7 @@ Inbound reply test:
 - Inbound webhook returns `401`: Twilio is pointed directly at `twilio-inbound-reply` instead of `twilio-inbound-router`, or the router was deployed with JWT verification enabled.
 - Inbound saves but does not match a queue row: check `agent_phone_normalized` values. The router/reply handler now searches both 10-digit and 11-digit forms.
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
-- Outreach volume risk: keep `OUTREACH_SEND_MAX_PER_RUN` and `OUTREACH_SEND_MAX_PER_HOUR` low unless the owner explicitly approves a provider health check and higher caps. Do not route non-Douglas Elliman automated outreach through Twilio until the toll-free lane is intentionally added.
+- Outreach volume risk: owner-approved automatic caps are `OUTREACH_SEND_MAX_PER_RUN=20`, `OUTREACH_SEND_MAX_PER_HOUR=20`, and `OUTREACH_SEND_MAX_PER_DAY=150`. The daily cap is enforced as a hard rolling-24-hour ceiling in `send-agent-outreach`. Do not raise these caps or route non-Douglas Elliman automated outreach through Twilio until the toll-free lane is intentionally added.
 
 ## Quick Verification Queries
 
