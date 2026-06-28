@@ -163,6 +163,10 @@ function importRowPayload(uploadId, row) {
     transaction_count: row.transaction_count || 0,
     active_listing_count: row.active_listing_count || 0,
     sold_listing_count: row.sold_listing_count || 0,
+    listings_days_since_last: row.listings_days_since_last || 0,
+    listings_active_last_12_months: row.listings_active_last_12_months || 0,
+    buyside_last_90_days: row.buyside_last_90_days || 0,
+    buyside_last_12_months: row.buyside_last_12_months || 0,
     average_price: row.average_price || 0,
     raw: {
       ...(row.raw || {}),
@@ -206,6 +210,9 @@ function rankingStrength(row) {
   return [
     Number(row.agent_rank_score || 0),
     Number(row.opportunity_gap_score || 0),
+    Number(row.active_listing_count || 0),
+    Number(row.listings_active_last_12_months || 0),
+    Number(row.buyside_last_12_months || 0),
     Number(row.production_volume || 0),
     Number(row.transaction_count || 0),
     Number(row.raw_sources?.match_confidence || 0)
@@ -295,12 +302,26 @@ async function upsertRankings(rankings) {
 
 function summarizeRankings(rankings) {
   const totalVolume = rankings.reduce((sum, row) => sum + Number(row.production_volume || 0), 0);
+  const totalActiveListings = rankings.reduce((sum, row) => sum + Number(row.active_listing_count || 0), 0);
+  const totalListingSide12 = rankings.reduce((sum, row) => sum + Number(row.listings_active_last_12_months || 0), 0);
+  const totalBuySide90 = rankings.reduce((sum, row) => sum + Number(row.buyside_last_90_days || 0), 0);
+  const totalBuySide12 = rankings.reduce((sum, row) => sum + Number(row.buyside_last_12_months || 0), 0);
+  const daysValues = rankings
+    .map((row) => Number(row.listings_days_since_last || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
   const missingCapture = rankings.filter((row) => Number(row.opportunity_gap_score || 0) >= 55).length;
   return {
     total_agents_analyzed: rankings.length,
     a_plus_agents: rankings.filter((row) => row.recommended_tier === 'A+').length,
     a_tier_agents: rankings.filter((row) => row.recommended_tier === 'A').length,
     total_production_volume_imported: totalVolume,
+    total_active_listings: totalActiveListings,
+    total_listings_active_last_12_months: totalListingSide12,
+    total_buyside_last_90_days: totalBuySide90,
+    total_buyside_last_12_months: totalBuySide12,
+    average_days_since_last_listing: daysValues.length
+      ? daysValues.reduce((sum, value) => sum + value, 0) / daysValues.length
+      : 0,
     average_agent_production: rankings.length ? totalVolume / rankings.length : 0,
     agents_with_open_houses_this_weekend: rankings.filter((row) => row.has_open_house_this_weekend).length,
     agents_missing_buyer_capture_opportunity: missingCapture

@@ -404,6 +404,8 @@
     const CANONICAL_FIELDS = [
       'agent_name', 'first_name', 'last_name', 'brokerage', 'phone', 'email',
       'production_volume', 'transaction_count', 'active_listing_count', 'sold_listing_count',
+      'listings_days_since_last', 'listings_active_last_12_months',
+      'buyside_last_90_days', 'buyside_last_12_months',
       'average_price', 'market_area', 'city', 'county', 'state'
     ];
 
@@ -422,10 +424,10 @@
         tier: 'all',
         brokerage: 'all',
         market: 'all',
-        volumeMin: '',
-        volumeMax: '',
-        txMin: '',
-        txMax: '',
+        activeMin: '',
+        daysMax: '',
+        listing12Min: '',
+        buy12Min: '',
         weekend: 'all',
         phone: 'all',
         email: 'all',
@@ -604,10 +606,10 @@
         if (f.weekend !== 'all' && String(Boolean(row.has_open_house_this_weekend)) !== f.weekend) return false;
         if (f.phone !== 'all' && String(Boolean(row.has_phone)) !== f.phone) return false;
         if (f.email !== 'all' && String(Boolean(row.has_email)) !== f.email) return false;
-        if (f.volumeMin && Number(row.production_volume || 0) < Number(f.volumeMin)) return false;
-        if (f.volumeMax && Number(row.production_volume || 0) > Number(f.volumeMax)) return false;
-        if (f.txMin && Number(row.transaction_count || 0) < Number(f.txMin)) return false;
-        if (f.txMax && Number(row.transaction_count || 0) > Number(f.txMax)) return false;
+        if (f.activeMin && Number(row.active_listing_count || 0) < Number(f.activeMin)) return false;
+        if (f.daysMax && Number(row.listings_days_since_last || 0) > Number(f.daysMax)) return false;
+        if (f.listing12Min && Number(row.listings_active_last_12_months || 0) < Number(f.listing12Min)) return false;
+        if (f.buy12Min && Number(row.buyside_last_12_months || 0) < Number(f.buy12Min)) return false;
         return true;
       });
     }
@@ -646,8 +648,9 @@
         ['Total agents analyzed', num(s.total_agents_analyzed)],
         ['A+ agents', num(s.a_plus_agents)],
         ['A tier agents', num(s.a_tier_agents)],
-        ['Total production volume', compactMoney(s.total_production_volume_imported)],
-        ['Average production', compactMoney(s.average_agent_production)],
+        ['Active listings', num(s.total_active_listings)],
+        ['Listing side 12m', num(s.total_listings_active_last_12_months)],
+        ['Buyside 12m', num(s.total_buyside_last_12_months)],
         ['Weekend open houses', num(s.agents_with_open_houses_this_weekend)]
       ];
       return cards.map(([label, value]) => `
@@ -661,12 +664,12 @@
     function renderInfoCards() {
       return `
         <div class="info-card">
-          <h3>Import production reports</h3>
-          <p>Import agent production data from CSV reports and turn it into ranked outreach opportunities.</p>
+          <h3>Import ListReports exports</h3>
+          <p>Import active-listing, recency, and buyside activity from ListReports and turn it into ranked outreach opportunities.</p>
         </div>
         <div class="info-card" id="gaps">
           <h3>Opportunity gap</h3>
-          <p>Rel8tion does not replace agent production. It captures the buyers their production is already bringing through the door.</p>
+          <p>Rel8tion does not replace agent activity. It captures the buyers their listings and open houses are already bringing through the door.</p>
         </div>
         <div class="info-card">
           <h3>No-tech value</h3>
@@ -702,10 +705,10 @@
               <label>Open house <select class="select" data-filter="weekend"><option value="all">All</option><option value="true"${f.weekend === 'true' ? ' selected' : ''}>This weekend</option><option value="false"${f.weekend === 'false' ? ' selected' : ''}>No weekend OH</option></select></label>
               <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
               <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
-              <label>Min volume <input class="field" data-filter="volumeMin" value="${esc(f.volumeMin)}" inputmode="numeric"></label>
-              <label>Max volume <input class="field" data-filter="volumeMax" value="${esc(f.volumeMax)}" inputmode="numeric"></label>
-              <label>Min transactions <input class="field" data-filter="txMin" value="${esc(f.txMin)}" inputmode="numeric"></label>
-              <label>Max transactions <input class="field" data-filter="txMax" value="${esc(f.txMax)}" inputmode="numeric"></label>
+              <label>Min active listings <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
+              <label>Max days since listing <input class="field" data-filter="daysMax" value="${esc(f.daysMax)}" inputmode="numeric"></label>
+              <label>Min listing side 12m <input class="field" data-filter="listing12Min" value="${esc(f.listing12Min)}" inputmode="numeric"></label>
+              <label>Min buyside 12m <input class="field" data-filter="buy12Min" value="${esc(f.buy12Min)}" inputmode="numeric"></label>
             </div>
           </div>
         </div>
@@ -721,12 +724,13 @@
               <tr>
                 <th>Rank</th>
                 <th>Agent</th>
-                <th>Brokerage</th>
-                <th>Market</th>
-                <th>Production Volume</th>
-                <th>Transactions</th>
-                <th>Average Price</th>
+                <th>Company</th>
+                <th>Phone</th>
                 <th>Active Listings</th>
+                <th>Days Since Last</th>
+                <th>Listing Side 12m</th>
+                <th>Buyside 90d</th>
+                <th>Buyside 12m</th>
                 <th>Open Houses</th>
                 <th>Opportunity Gap</th>
                 <th>Tier</th>
@@ -738,13 +742,14 @@
               ${rows.map((row, index) => `
                 <tr>
                   <td><strong>${index + 1}</strong><div class="small">${num(row.agent_rank_score)} score</div></td>
-                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc([row.phone, row.email].filter(Boolean).join(' | ') || 'No contact')}</div></td>
+                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.email || '')}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
-                  <td>${esc(row.market_area || '')}</td>
-                  <td><strong>${compactMoney(row.production_volume)}</strong></td>
-                  <td>${num(row.transaction_count)}</td>
-                  <td>${compactMoney(row.average_price)}</td>
+                  <td>${esc(row.phone || '')}</td>
                   <td>${num(row.active_listing_count)}</td>
+                  <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
+                  <td>${num(row.listings_active_last_12_months)}</td>
+                  <td>${num(row.buyside_last_90_days)}</td>
+                  <td>${num(row.buyside_last_12_months)}</td>
                   <td>${num(row.open_house_count)} ${row.has_open_house_this_weekend ? badge('This weekend', 'ok') : ''}</td>
                   <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
                   <td>${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}</td>
@@ -860,16 +865,19 @@
                       <div class="small" style="margin-top:10px;">Unmapped columns: ${esc((preview.unmapped_columns || []).join(', ') || 'None')}</div>
                     </details>
                     <div class="table-wrap">
-                      <table style="min-width:900px;">
-                        <thead><tr><th>Agent</th><th>Brokerage</th><th>Contact</th><th>Volume</th><th>Transactions</th><th>Match</th></tr></thead>
+                      <table style="min-width:1120px;">
+                        <thead><tr><th>Agent</th><th>Company</th><th>Phone</th><th>Active Total</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
                         <tbody>
                           ${(preview.preview_rows || []).map((row) => `
                             <tr>
                               <td><strong>${esc(row.agent_name || 'Unknown')}</strong><div class="small">${esc([row.city, row.county, row.state].filter(Boolean).join(', '))}</div></td>
                               <td>${esc(row.brokerage || '')}</td>
                               <td><div>${esc(row.phone || '')}</div><div class="small">${esc(row.email || '')}</div></td>
-                              <td>${compactMoney(row.production_volume)}</td>
-                              <td>${num(row.transaction_count)}</td>
+                              <td>${num(row.active_listing_count)}</td>
+                              <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
+                              <td>${num(row.listings_active_last_12_months)}</td>
+                              <td>${num(row.buyside_last_90_days)}</td>
+                              <td>${num(row.buyside_last_12_months)}</td>
                               <td>${row.matched_agent_id ? badge(`${row.match_confidence}% matched`, row.needs_review ? 'warn' : 'ok') : badge('Unmatched import', 'info')}<div class="small">${esc(row.matched_agent_name || row.match_reason || '')}</div></td>
                             </tr>
                           `).join('')}
@@ -907,13 +915,13 @@
             <div class="modal-body profile-grid">
               <div class="grid" style="gap:14px;">
                 <div class="profile-box">
-                  <h3>Production</h3>
+                  <h3>ListReports Activity</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
-                    <div><div class="mini-title">Volume</div><strong>${money(row.production_volume)}</strong></div>
-                    <div><div class="mini-title">Transactions</div><strong>${num(row.transaction_count)}</strong></div>
-                    <div><div class="mini-title">Average price</div><strong>${money(row.average_price)}</strong></div>
                     <div><div class="mini-title">Active listings</div><strong>${num(row.active_listing_count)}</strong></div>
-                    <div><div class="mini-title">Sold listings</div><strong>${num(row.sold_listing_count)}</strong></div>
+                    <div><div class="mini-title">Days since last</div><strong>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : 'N/A'}</strong></div>
+                    <div><div class="mini-title">Listing side 12m</div><strong>${num(row.listings_active_last_12_months)}</strong></div>
+                    <div><div class="mini-title">Buyside 90d</div><strong>${num(row.buyside_last_90_days)}</strong></div>
+                    <div><div class="mini-title">Buyside 12m</div><strong>${num(row.buyside_last_12_months)}</strong></div>
                     <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
                   </div>
                   <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
@@ -1199,8 +1207,8 @@
       });
       document.getElementById('clearFilters')?.addEventListener('click', () => {
         state.filters = {
-          q: '', tier: 'all', brokerage: 'all', market: 'all', volumeMin: '', volumeMax: '',
-          txMin: '', txMax: '', weekend: 'all', phone: 'all', email: 'all', upload: 'all',
+          q: '', tier: 'all', brokerage: 'all', market: 'all', activeMin: '', daysMax: '',
+          listing12Min: '', buy12Min: '', weekend: 'all', phone: 'all', email: 'all', upload: 'all',
           periodStart: '', periodEnd: ''
         };
         render();

@@ -9,6 +9,10 @@ export type CanonicalAgentProductionField =
   | 'transaction_count'
   | 'active_listing_count'
   | 'sold_listing_count'
+  | 'listings_days_since_last'
+  | 'listings_active_last_12_months'
+  | 'buyside_last_90_days'
+  | 'buyside_last_12_months'
   | 'average_price'
   | 'market_area'
   | 'city'
@@ -33,6 +37,10 @@ export type ProductionImportRow = {
   transaction_count: number;
   active_listing_count: number;
   sold_listing_count: number;
+  listings_days_since_last: number;
+  listings_active_last_12_months: number;
+  buyside_last_90_days: number;
+  buyside_last_12_months: number;
   average_price: number;
   raw?: Record<string, unknown>;
   match_confidence?: number;
@@ -54,6 +62,10 @@ export type AgentRanking = {
   transaction_count: number;
   active_listing_count: number;
   sold_listing_count: number;
+  listings_days_since_last: number;
+  listings_active_last_12_months: number;
+  buyside_last_90_days: number;
+  buyside_last_12_months: number;
   average_price: number;
   open_house_count: number;
   rel8tion_lead_capture_score: number;

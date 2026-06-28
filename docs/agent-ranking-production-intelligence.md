@@ -1,10 +1,10 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the new objects on 2026-06-28. Deployment and end-to-end upload testing still need verification after release.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the new objects and ListReports activity columns on 2026-06-28. Deployment and end-to-end upload testing still need verification after release.
 
 ## Purpose
 
-Agent Ranking / Production Intelligence is an admin-only REL8TION COMMAND module for importing permitted agent production reports and turning them into opportunity-ranked targets for Event Pass, Open House Kit, and Rel8tionChip conversations.
+Agent Ranking / Production Intelligence is an admin-only REL8TION COMMAND module for importing permitted ListReports-style agent activity reports and turning them into opportunity-ranked targets for Event Pass, Open House Kit, and Rel8tionChip conversations.
 
 It is not a scraping tool, login automation tool, consumer lead resale workflow, or automatic SMS sender.
 
@@ -38,6 +38,7 @@ The parser accepts common variants for:
 - Phone, mobile, email
 - Production volume, transactions/sides/units
 - Active listings, sold listings
+- ListReports columns: `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, `buyside_last_12_months`
 - Average price
 - Market, city, county, state
 
@@ -60,6 +61,10 @@ Signals include:
 - Production volume
 - Transaction count
 - Active and sold listing counts
+- ListReports active-listing total
+- Days since last listing activity
+- Listing-side activity in the last 12 months
+- Buyside activity in the last 90 days and 12 months
 - Average price
 - Known open-house activity from outreach data
 - Contactability by phone/email
