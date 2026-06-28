@@ -6,7 +6,7 @@ This repo owns the Vercel mockup renderer. The Supabase edge functions and the h
 
 1. A new open-house row lands in `agent_outreach_queue`.
 2. Enrichment fills in the agent name and phone.
-3. `generate-agent-outreach` builds the SMS variants and follow-up copy.
+3. `generate-agent-outreach` builds the initial SMS variants.
 4. The Vercel Sharp renderer generates the personalized mockup image.
 5. `rel8tion.me/hot-list` shows the real stored `mockup_image_url`, lets Jared edit/approve the texts, and then marks rows ready for send.
 6. The send function delivers the approved messages on schedule.
@@ -49,7 +49,7 @@ It writes back:
 This function should:
 
 - stop treating image generation as a prompt-only step
-- fix the missing `followup` value in `buildVariants()`
+- leave follow-up fields unscheduled while follow-ups are disabled for opt-out recovery
 - set the queue into a renderer-ready state
 
 Recommended output fields:
@@ -58,9 +58,11 @@ Recommended output fields:
 - `sms_variant_2`
 - `sms_variant_3`
 - `selected_sms`
-- `followup_sms`
 - `sms_link`
-- `followup_sms_link`
+- `followup_sms = null`
+- `followup_sms_link = null`
+- `followup_send_status = "not_scheduled"`
+- `followup_block_reason = "followups_disabled"`
 - `generation_status = "generated"`
 - `review_status = "pending"`
 - `mockup_status = "pending"`
@@ -85,9 +87,9 @@ The send function should assume:
 
 - mockup generation is already complete
 - `send_mode = "automatic"`
-- `selected_sms` and `followup_sms` are already populated
+- `selected_sms` is already populated
 
-It should not require a hidden `approved_for_send` gate. Normal cron sends are eligible when the row is automatic, generated, rendered, due, has a listing photo, and has pending SMS copy.
+It should not require a hidden `approved_for_send` gate. Normal cron sends are eligible when the row is automatic, generated, rendered, due, has a listing photo, and has pending initial SMS copy. As of 2026-06-28, follow-up/drip sends are disabled while opt-out health is recovered; generator and sender code should keep follow-up rows unscheduled with `followup_block_reason = "followups_disabled"`.
 
 Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production routing should use `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, `SMS_OUTREACH_PROVIDER=android_gateway`, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`.
 

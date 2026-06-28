@@ -1,0 +1,90 @@
+export type CanonicalAgentProductionField =
+  | 'agent_name'
+  | 'first_name'
+  | 'last_name'
+  | 'brokerage'
+  | 'phone'
+  | 'email'
+  | 'production_volume'
+  | 'transaction_count'
+  | 'active_listing_count'
+  | 'sold_listing_count'
+  | 'average_price'
+  | 'market_area'
+  | 'city'
+  | 'county'
+  | 'state';
+
+export type ProductionImportRow = {
+  id?: string | null;
+  matched_agent_id?: string | null;
+  agent_name: string;
+  first_name: string;
+  last_name: string;
+  brokerage: string;
+  phone: string;
+  phone_normalized: string;
+  email: string;
+  market_area: string;
+  city: string;
+  county: string;
+  state: string;
+  production_volume: number;
+  transaction_count: number;
+  active_listing_count: number;
+  sold_listing_count: number;
+  average_price: number;
+  raw?: Record<string, unknown>;
+  match_confidence?: number;
+  match_reason?: string;
+  needs_review?: boolean;
+};
+
+export type AgentRanking = {
+  id?: string;
+  agent_id?: string | null;
+  latest_import_row_id?: string | null;
+  agent_name: string | null;
+  brokerage: string | null;
+  phone: string | null;
+  phone_normalized: string | null;
+  email: string | null;
+  market_area: string | null;
+  production_volume: number;
+  transaction_count: number;
+  active_listing_count: number;
+  sold_listing_count: number;
+  average_price: number;
+  open_house_count: number;
+  rel8tion_lead_capture_score: number;
+  opportunity_gap_score: number;
+  agent_rank_score: number;
+  recommended_tier: 'A+' | 'A' | 'B' | 'C' | 'Unknown' | string;
+  recommended_pitch: string;
+  next_best_action: string;
+  gap_summary: string;
+  rel8tion_value_summary: string;
+  has_open_house_this_weekend: boolean;
+  has_phone: boolean;
+  has_email: boolean;
+  raw_sources?: Record<string, unknown>;
+};
+
+export type ProductionParseResult = {
+  headers: string[];
+  normalized_headers: string[];
+  mapping: Record<CanonicalAgentProductionField, { index: number; source: string; confidence: number; manual: boolean }>;
+  unmapped_columns: string[];
+  rows: ProductionImportRow[];
+  row_count: number;
+  duplicate_count: number;
+};
+
+export function normalizeImportRows(csvText: string, options?: {
+  market_area?: string;
+  column_overrides?: Partial<Record<CanonicalAgentProductionField, string>>;
+}): ProductionParseResult;
+
+export function matchImportedRows(rows: ProductionImportRow[], agents: Array<Record<string, unknown>>): ProductionImportRow[];
+export function rankingFromImportRow(row: ProductionImportRow, averages?: Record<string, number>, signals?: Record<string, unknown>): AgentRanking;
+export function outreachPayloadFromRanking(ranking: AgentRanking): Record<string, unknown>;

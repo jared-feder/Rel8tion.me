@@ -122,6 +122,7 @@ module.exports = async function handler(req, res) {
     const linkedInbox = inboxRows.filter(linkedThread).sort((a, b) => rowTime(b) - rowTime(a));
     const needsReplyRows = linkedInbox.filter(needsReply);
     const outboundAttempts = smsAttempts.filter((row) => row.status === 'sent' || row.status === 'queued');
+    const hasInboundSignal = androidInbound.length || outreachReplies.length || inboxRows.length;
 
     const checks = [
       check(
@@ -141,20 +142,22 @@ module.exports = async function handler(req, res) {
       ),
       check(
         'android_inbound',
-        androidInbound.length ? 'ok' : 'warn',
+        'ok',
         'Inbound webhook storage',
         androidInbound.length
           ? `${androidInbound.length} Android inbound messages stored in the last ${hours} hours.`
-          : `No Android inbound webhook rows stored in the last ${hours} hours.`,
+          : `No Android inbound webhook rows stored in the last ${hours} hours. That is normal when no Android replies arrived.`,
         { count: androidInbound.length }
       ),
       check(
         'reply_linking',
-        linkedReplies.length || !androidInbound.length ? 'ok' : 'bad',
+        linkedReplies.length ? 'ok' : hasInboundSignal ? 'warn' : 'ok',
         'Reply linking',
         linkedReplies.length
           ? `${linkedReplies.length} inbound replies are linked to outreach rows.`
-          : 'Inbound SMS exists, but no outreach replies are linked.',
+          : hasInboundSignal
+            ? 'Inbound activity exists, but no linked outreach replies were found in this window.'
+            : `No inbound replies found in the last ${hours} hours.`,
         { linked: linkedReplies.length, total_replies: outreachReplies.length }
       ),
       check(
@@ -172,18 +175,20 @@ module.exports = async function handler(req, res) {
         'Admin inbox view',
         linkedInbox.length
           ? `${linkedInbox.length} linked inbound threads are visible to the admin inbox.`
-          : 'Linked replies exist, but the admin inbox view returned no linked inbound threads.',
+          : linkedReplies.length
+            ? 'Linked replies exist, but the admin inbox view returned no linked inbound threads.'
+            : `No linked inbound threads found in the last ${hours} hours.`,
         { linked_inbox: linkedInbox.length }
       ),
       check(
         'needs_reply',
-        needsReplyRows.length ? 'ok' : linkedInbox.length ? 'warn' : 'bad',
+        needsReplyRows.length ? 'ok' : linkedInbox.length ? 'warn' : 'ok',
         'Needs reply queue',
         needsReplyRows.length
           ? `${needsReplyRows.length} linked threads need a reply.`
           : linkedInbox.length
             ? 'Inbound threads are visible, but none currently need reply.'
-            : 'No linked inbound threads are visible.',
+            : `No linked inbound threads are visible in the last ${hours} hours.`,
         { count: needsReplyRows.length }
       )
     ];

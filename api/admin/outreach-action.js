@@ -1,5 +1,7 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 
+const OUTREACH_FOLLOWUPS_DISABLED = true;
+
 function parseBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'object') return req.body;
@@ -63,7 +65,7 @@ function isQueueReadyForCron(queue) {
   if (queue.generation_status !== 'generated' || queue.mockup_status !== 'rendered') return false;
   if (!queue.listing_photo_url) return false;
   const initialPending = queue.initial_send_status === 'pending' && queue.selected_sms;
-  const followupPending = queue.followup_send_status === 'pending' && queue.followup_sms;
+  const followupPending = !OUTREACH_FOLLOWUPS_DISABLED && queue.followup_send_status === 'pending' && queue.followup_sms;
   return Boolean(initialPending || followupPending);
 }
 
@@ -337,6 +339,11 @@ async function scheduleDrip(body) {
   const text = String(body.body || '').replace(/\s+\n/g, '\n').trim();
   const sendAt = new Date(body.send_at || '');
 
+  if (OUTREACH_FOLLOWUPS_DISABLED) {
+    const error = new Error('Follow-up scheduling is currently disabled.');
+    error.status = 409;
+    throw error;
+  }
   if (isOptedOut(queue)) {
     const error = new Error('This contact is opted out.');
     error.status = 409;

@@ -1,5 +1,7 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 
+const OUTREACH_FOLLOWUPS_DISABLED = true;
+
 async function safeRest(path, fallback, warnings, label) {
   try {
     const rows = await supabaseRest(path);
@@ -110,7 +112,7 @@ function isOutreachSendCandidate(row) {
   if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
   if (!row.listing_photo_url) return false;
   const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
-  const followupPending = row.followup_send_status === 'pending' && row.followup_sms;
+  const followupPending = !OUTREACH_FOLLOWUPS_DISABLED && row.followup_send_status === 'pending' && row.followup_sms;
   return Boolean(initialPending || followupPending);
 }
 

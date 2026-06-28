@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Ranking & Production Intelligence | REL8TION</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef5ff;
+      --ink: #17224f;
+      --muted: #64748b;
+      --line: #d9e3f0;
+      --blue: #2455d6;
+      --sky: #0ea5c8;
+      --green: #0f766e;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --shadow: 0 18px 48px rgba(31, 42, 90, .10);
+      font-family: Inter, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(238,245,255,.92), rgba(245,247,251,.96)),
+        var(--bg);
+      color: #0f172a;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      padding: 20px 14px;
+      border-right: 1px solid rgba(148,163,184,.28);
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(18px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 18px;
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 8px 16px;
+      border-bottom: 1px solid rgba(148,163,184,.18);
+    }
+
+    .brand img { width: 60px; height: auto; }
+    .brand strong {
+      display: block;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .brand span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .nav { display: grid; gap: 6px; }
+    .nav-title {
+      margin: 12px 10px 4px;
+      color: #7a8da3;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .nav a {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 11px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      color: #31465f;
+      text-decoration: none;
+      font-weight: 900;
+    }
+    .nav a:hover, .nav a.active {
+      color: var(--blue);
+      border-color: rgba(36,85,214,.18);
+      background: linear-gradient(90deg, #fff, #edf5ff);
+      box-shadow: 0 10px 24px rgba(72,91,150,.08);
+    }
+    .nav svg { width: 18px; height: 18px; color: #66839e; }
+
+    .side-note {
+      margin: 0 6px;
+      padding: 14px;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(31,42,90,.06);
+    }
+
+    .main {
+      min-width: 0;
+      padding: 22px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    h1, h2, h3 {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      letter-spacing: 0;
+      margin: 0;
+      color: var(--ink);
+    }
+    h1 { font-size: clamp(28px, 4vw, 44px); line-height: 1.02; }
+    h2 { font-size: 20px; line-height: 1.15; }
+    h3 { font-size: 15px; line-height: 1.25; }
+    .sub {
+      margin-top: 8px;
+      color: var(--muted);
+      max-width: 860px;
+      line-height: 1.45;
+      font-weight: 600;
+    }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #21304f;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn svg { width: 16px; height: 16px; }
+    .btn.primary {
+      background: linear-gradient(135deg, #2563eb, #0ea5c8);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(37,99,235,.18);
+    }
+    .btn.warn { color: var(--amber); border-color: #fed7aa; background: #fff7ed; }
+    .btn.bad { color: var(--red); border-color: #fecaca; background: #fff5f5; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+    .summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .info-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 16px; }
+    .filter-grid { grid-template-columns: repeat(8, minmax(130px, 1fr)); }
+
+    .panel, .metric, .info-card {
+      border: 1px solid rgba(148,163,184,.28);
+      border-radius: 8px;
+      background: rgba(255,255,255,.92);
+      box-shadow: var(--shadow);
+    }
+    .metric, .info-card { padding: 16px; }
+    .metric .label, .mini-title {
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .metric .value {
+      margin-top: 6px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .info-card p {
+      margin: 8px 0 0;
+      color: #44546a;
+      line-height: 1.45;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      border-bottom: 1px solid rgba(148,163,184,.20);
+    }
+    .panel-body { padding: 16px; }
+
+    .field, .select, textarea {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: #17224f;
+      padding: 9px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+    }
+    textarea { min-height: 82px; resize: vertical; }
+    label {
+      display: grid;
+      gap: 6px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .table-wrap { overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1120px;
+    }
+    th, td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(148,163,184,.18);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+    th {
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      background: #f8fbff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td strong { color: #17224f; }
+    .muted { color: var(--muted); }
+    .small { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 600; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .badge.ok { color: #047857; background: #ecfdf5; }
+    .badge.info { color: #2455d6; background: #eef5ff; }
+    .badge.warn { color: #b45309; background: #fff7ed; }
+    .badge.bad { color: #b91c1c; background: #fff1f2; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .row-actions .btn { min-height: 32px; padding: 6px 8px; font-size: 12px; }
+
+    .empty {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(15,23,42,.42);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+    .modal {
+      width: min(1080px, 100%);
+      max-height: 92vh;
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.82);
+      background: #fff;
+      box-shadow: 0 30px 80px rgba(15,23,42,.28);
+    }
+    .modal.small { width: min(760px, 100%); }
+    .modal-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      padding: 18px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-body { padding: 18px; }
+    .modal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .mapping-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .profile-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+    .profile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .profile-box {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+    }
+    .profile-box p, .profile-box li { color: #344256; line-height: 1.5; font-size: 13px; font-weight: 600; }
+    .profile-box ul { margin: 10px 0 0; padding-left: 18px; }
+    .pitch-box {
+      white-space: pre-wrap;
+      border-left: 3px solid var(--sky);
+      padding: 10px 12px;
+      background: #eefbff;
+      border-radius: 0 8px 8px 0;
+      color: #17224f;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 60;
+      max-width: min(420px, calc(100vw - 36px));
+      border-radius: 8px;
+      background: #111827;
+      color: #fff;
+      padding: 12px 14px;
+      font-weight: 800;
+      box-shadow: 0 24px 60px rgba(15,23,42,.26);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1180px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .main { padding: 12px; }
+      .topbar, .profile-grid, .modal-grid, .mapping-grid, .info-grid { grid-template-columns: 1fr; }
+      .summary-grid, .profile-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const ADMIN_UID_KEY = 'rel8tion_admin_uid';
+    const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
+    const API = '/api/admin/agent-ranking';
+    const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const NUMBER = new Intl.NumberFormat('en-US');
+    const app = document.getElementById('app');
+    const toast = document.getElementById('toast');
+
+    const CANONICAL_FIELDS = [
+      'agent_name', 'first_name', 'last_name', 'brokerage', 'phone', 'email',
+      'production_volume', 'transaction_count', 'active_listing_count', 'sold_listing_count',
+      'average_price', 'market_area', 'city', 'county', 'state'
+    ];
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('uid') || params.get('admin_uid')) window.localStorage.setItem(ADMIN_UID_KEY, params.get('uid') || params.get('admin_uid'));
+    if (params.get('token') || params.get('admin_token')) window.localStorage.setItem(ADMIN_TOKEN_KEY, params.get('token') || params.get('admin_token'));
+
+    const state = {
+      verified: false,
+      loading: false,
+      action: '',
+      error: '',
+      data: { rankings: [], uploads: [], summary: {} },
+      filters: {
+        q: '',
+        tier: 'all',
+        brokerage: 'all',
+        market: 'all',
+        volumeMin: '',
+        volumeMax: '',
+        txMin: '',
+        txMax: '',
+        weekend: 'all',
+        phone: 'all',
+        email: 'all',
+        upload: 'all',
+        periodStart: '',
+        periodEnd: ''
+      },
+      uploadOpen: false,
+      upload: freshUploadState(),
+      profile: null,
+      pitchVariants: null
+    };
+
+    function freshUploadState() {
+      return {
+        fileName: '',
+        fileText: '',
+        source_name: 'ListReports',
+        market_area: '',
+        period_start: '',
+        period_end: '',
+        notes: '',
+        column_overrides: {},
+        preview: null
+      };
+    }
+
+    function credential() {
+      return {
+        uid: window.localStorage.getItem(ADMIN_UID_KEY) || '',
+        token: window.localStorage.getItem(ADMIN_TOKEN_KEY) || ''
+      };
+    }
+
+    function authHeaders() {
+      const cred = credential();
+      const headers = { 'Content-Type': 'application/json' };
+      if (cred.uid) headers['x-admin-uid'] = cred.uid;
+      if (cred.token) headers['x-admin-token'] = cred.token;
+      return headers;
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: { ...authHeaders(), ...(options.headers || {}) }
+      });
+      const raw = await res.text();
+      let payload = null;
+      try { payload = raw ? JSON.parse(raw) : null; } catch (_) { payload = { raw }; }
+      if (!res.ok || payload?.ok === false) throw new Error(payload?.error || raw || 'Request failed.');
+      return payload;
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function money(value) {
+      const number = Number(value || 0);
+      return Number.isFinite(number) ? CURRENCY.format(number) : '$0';
+    }
+
+    function compactMoney(value) {
+      const number = Number(value || 0);
+      if (!Number.isFinite(number) || number <= 0) return '$0';
+      if (number >= 1000000) return `$${(number / 1000000).toFixed(number >= 10000000 ? 0 : 1)}M`;
+      if (number >= 1000) return `$${Math.round(number / 1000)}K`;
+      return money(number);
+    }
+
+    function num(value) {
+      const number = Number(value || 0);
+      return NUMBER.format(Number.isFinite(number) ? number : 0);
+    }
+
+    function fmtDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : '';
+    }
+
+    function badge(label, tone = 'info') {
+      return `<span class="badge ${tone}">${esc(label)}</span>`;
+    }
+
+    function tierTone(tier) {
+      if (tier === 'A+' || tier === 'A') return 'ok';
+      if (tier === 'B') return 'info';
+      if (tier === 'C') return 'warn';
+      if (tier === 'Not a Fit') return 'bad';
+      return 'info';
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    async function verify() {
+      try {
+        await api('/api/admin/auth', { method: 'POST', body: '{}' });
+        state.verified = true;
+        await loadData();
+      } catch (error) {
+        state.verified = false;
+        state.error = error.message || 'Admin credentials required.';
+        render();
+      }
+    }
+
+    async function loadData() {
+      state.loading = true;
+      render();
+      try {
+        const data = await api(`${API}?limit=1500`);
+        state.data = {
+          rankings: data.rankings || [],
+          uploads: data.uploads || [],
+          summary: data.summary || {}
+        };
+        state.error = '';
+      } catch (error) {
+        state.error = error.message || 'Unable to load rankings.';
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+
+    function uploadIdFor(row) {
+      return row?.raw_sources?.upload_id || row?.raw_sources?.source_upload_id || '';
+    }
+
+    function dateKey(value) {
+      return String(value || '').slice(0, 10);
+    }
+
+    function overlapsPeriod(row, filters) {
+      if (!filters.periodStart && !filters.periodEnd) return true;
+      const raw = row?.raw_sources || {};
+      const rowStart = dateKey(raw.period_start || raw.source_period_start);
+      const rowEnd = dateKey(raw.period_end || raw.source_period_end) || rowStart;
+      const start = rowStart || rowEnd;
+      const end = rowEnd || rowStart;
+      if (!start && !end) return false;
+      if (filters.periodStart && end < filters.periodStart) return false;
+      if (filters.periodEnd && start > filters.periodEnd) return false;
+      return true;
+    }
+
+    function uniqueOptions(rows, pick) {
+      return [...new Set(rows.map(pick).filter(Boolean).map(String))]
+        .sort((a, b) => a.localeCompare(b));
+    }
+
+    function filteredRankings() {
+      const f = state.filters;
+      const q = f.q.trim().toLowerCase();
+      return (state.data.rankings || []).filter((row) => {
+        const haystack = [row.agent_name, row.brokerage, row.market_area, row.email, row.phone].join(' ').toLowerCase();
+        if (q && !haystack.includes(q)) return false;
+        if (f.tier !== 'all' && row.recommended_tier !== f.tier) return false;
+        if (f.brokerage !== 'all' && row.brokerage !== f.brokerage) return false;
+        if (f.market !== 'all' && row.market_area !== f.market) return false;
+        if (f.upload !== 'all' && uploadIdFor(row) !== f.upload) return false;
+        if (!overlapsPeriod(row, f)) return false;
+        if (f.weekend !== 'all' && String(Boolean(row.has_open_house_this_weekend)) !== f.weekend) return false;
+        if (f.phone !== 'all' && String(Boolean(row.has_phone)) !== f.phone) return false;
+        if (f.email !== 'all' && String(Boolean(row.has_email)) !== f.email) return false;
+        if (f.volumeMin && Number(row.production_volume || 0) < Number(f.volumeMin)) return false;
+        if (f.volumeMax && Number(row.production_volume || 0) > Number(f.volumeMax)) return false;
+        if (f.txMin && Number(row.transaction_count || 0) < Number(f.txMin)) return false;
+        if (f.txMax && Number(row.transaction_count || 0) > Number(f.txMax)) return false;
+        return true;
+      });
+    }
+
+    function renderLock() {
+      const cred = credential();
+      app.innerHTML = `
+        <main class="app" style="display:grid;place-items:center;padding:20px;">
+          <section class="modal small" style="max-height:none;">
+            <div class="modal-head">
+              <div>
+                <h1 style="font-size:30px;">Agent Ranking & Production Intelligence</h1>
+                <div class="sub">Enter admin credentials to open the production intelligence module.</div>
+              </div>
+            </div>
+            <div class="modal-body grid" style="gap:12px;">
+              <label>Admin UID <input id="loginUid" class="field" value="${esc(cred.uid)}" autocomplete="off"></label>
+              <label>Admin token <input id="loginToken" class="field" value="${esc(cred.token)}" type="password" autocomplete="off"></label>
+              ${state.error ? `<div>${badge(state.error, 'bad')}</div>` : ''}
+              <button class="btn primary" id="loginBtn"><i data-lucide="lock-keyhole"></i><span>Unlock module</span></button>
+            </div>
+          </section>
+        </main>
+      `;
+      document.getElementById('loginBtn')?.addEventListener('click', () => {
+        window.localStorage.setItem(ADMIN_UID_KEY, document.getElementById('loginUid')?.value || '');
+        window.localStorage.setItem(ADMIN_TOKEN_KEY, document.getElementById('loginToken')?.value || '');
+        verify();
+      });
+      window.lucide?.createIcons();
+    }
+
+    function renderSummaryCards() {
+      const s = state.data.summary || {};
+      const cards = [
+        ['Total agents analyzed', num(s.total_agents_analyzed)],
+        ['A+ agents', num(s.a_plus_agents)],
+        ['A tier agents', num(s.a_tier_agents)],
+        ['Total production volume', compactMoney(s.total_production_volume_imported)],
+        ['Average production', compactMoney(s.average_agent_production)],
+        ['Weekend open houses', num(s.agents_with_open_houses_this_weekend)]
+      ];
+      return cards.map(([label, value]) => `
+        <div class="metric">
+          <div class="label">${esc(label)}</div>
+          <div class="value">${esc(value)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderInfoCards() {
+      return `
+        <div class="info-card">
+          <h3>Import production reports</h3>
+          <p>Import agent production data from CSV reports and turn it into ranked outreach opportunities.</p>
+        </div>
+        <div class="info-card" id="gaps">
+          <h3>Opportunity gap</h3>
+          <p>Rel8tion does not replace agent production. It captures the buyers their production is already bringing through the door.</p>
+        </div>
+        <div class="info-card">
+          <h3>No-tech value</h3>
+          <p>The strongest agents are often too busy to set up another app. Rel8tion works because the hardware is already live, branded, and ready to use.</p>
+        </div>
+      `;
+    }
+
+    function renderFilters(rows) {
+      const brokerages = uniqueOptions(state.data.rankings, (row) => row.brokerage);
+      const markets = uniqueOptions(state.data.rankings, (row) => row.market_area);
+      const tiers = ['A+', 'A', 'B', 'C', 'Unknown', 'Not a Fit'];
+      const uploads = state.data.uploads || [];
+      const f = state.filters;
+      return `
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Filters</h2>
+              <div class="small">${rows.length} visible targets after filters</div>
+            </div>
+            <button class="btn" id="clearFilters"><i data-lucide="x"></i><span>Clear</span></button>
+          </div>
+          <div class="panel-body">
+            <div class="grid filter-grid">
+              <label>Search <input class="field" data-filter="q" value="${esc(f.q)}" placeholder="Agent, brokerage, market"></label>
+              <label>Tier <select class="select" data-filter="tier"><option value="all">All</option>${tiers.map((tier) => `<option value="${esc(tier)}"${f.tier === tier ? ' selected' : ''}>${esc(tier)}</option>`).join('')}</select></label>
+              <label>Brokerage <select class="select" data-filter="brokerage"><option value="all">All</option>${brokerages.map((value) => `<option value="${esc(value)}"${f.brokerage === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>Market <select class="select" data-filter="market"><option value="all">All</option>${markets.map((value) => `<option value="${esc(value)}"${f.market === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>Upload <select class="select" data-filter="upload"><option value="all">All</option>${uploads.map((upload) => `<option value="${esc(upload.id)}"${f.upload === upload.id ? ' selected' : ''}>${esc(upload.source_name || 'Upload')} ${esc(fmtDate(upload.created_at))}</option>`).join('')}</select></label>
+              <label>Period start <input class="field" data-filter="periodStart" type="date" value="${esc(f.periodStart)}"></label>
+              <label>Period end <input class="field" data-filter="periodEnd" type="date" value="${esc(f.periodEnd)}"></label>
+              <label>Open house <select class="select" data-filter="weekend"><option value="all">All</option><option value="true"${f.weekend === 'true' ? ' selected' : ''}>This weekend</option><option value="false"${f.weekend === 'false' ? ' selected' : ''}>No weekend OH</option></select></label>
+              <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
+              <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
+              <label>Min volume <input class="field" data-filter="volumeMin" value="${esc(f.volumeMin)}" inputmode="numeric"></label>
+              <label>Max volume <input class="field" data-filter="volumeMax" value="${esc(f.volumeMax)}" inputmode="numeric"></label>
+              <label>Min transactions <input class="field" data-filter="txMin" value="${esc(f.txMin)}" inputmode="numeric"></label>
+              <label>Max transactions <input class="field" data-filter="txMax" value="${esc(f.txMax)}" inputmode="numeric"></label>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRankingTable(rows) {
+      if (!rows.length) return '<div class="empty">No agent rankings yet. Upload a production report to build the first ranking set.</div>';
+      return `
+        <div class="table-wrap" id="targets">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Agent</th>
+                <th>Brokerage</th>
+                <th>Market</th>
+                <th>Production Volume</th>
+                <th>Transactions</th>
+                <th>Average Price</th>
+                <th>Active Listings</th>
+                <th>Open Houses</th>
+                <th>Opportunity Gap</th>
+                <th>Tier</th>
+                <th>Next Best Action</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, index) => `
+                <tr>
+                  <td><strong>${index + 1}</strong><div class="small">${num(row.agent_rank_score)} score</div></td>
+                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc([row.phone, row.email].filter(Boolean).join(' | ') || 'No contact')}</div></td>
+                  <td>${esc(row.brokerage || '')}</td>
+                  <td>${esc(row.market_area || '')}</td>
+                  <td><strong>${compactMoney(row.production_volume)}</strong></td>
+                  <td>${num(row.transaction_count)}</td>
+                  <td>${compactMoney(row.average_price)}</td>
+                  <td>${num(row.active_listing_count)}</td>
+                  <td>${num(row.open_house_count)} ${row.has_open_house_this_weekend ? badge('This weekend', 'ok') : ''}</td>
+                  <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
+                  <td>${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}</td>
+                  <td><div class="small">${esc(row.next_best_action || '')}</div></td>
+                  <td>
+                    <div class="row-actions">
+                      <button class="btn" data-profile="${esc(row.id)}"><i data-lucide="user-round-search"></i><span>Profile</span></button>
+                      <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
+                      <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
+                      <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Prospect</span></button>
+                      <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
+                      <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderUploads() {
+      const uploads = state.data.uploads || [];
+      return `
+        <section class="panel" id="uploads">
+          <div class="panel-head">
+            <div>
+              <h2>Production Uploads</h2>
+              <div class="small">${uploads.length} recent uploads</div>
+            </div>
+            <button class="btn primary" data-open-upload><i data-lucide="upload-cloud"></i><span>Upload Production Report</span></button>
+          </div>
+          <div class="table-wrap">
+            <table style="min-width:760px;">
+              <thead><tr><th>Source</th><th>Market</th><th>Period</th><th>Rows</th><th>Uploaded</th><th>Notes</th></tr></thead>
+              <tbody>
+                ${uploads.length ? uploads.map((upload) => `
+                  <tr>
+                    <td><strong>${esc(upload.source_name || 'Manual Upload')}</strong><div class="small">${esc(upload.original_filename || '')}</div></td>
+                    <td>${esc(upload.market_area || '')}</td>
+                    <td>${esc([fmtDate(upload.period_start), fmtDate(upload.period_end)].filter(Boolean).join(' - '))}</td>
+                    <td>${num(upload.row_count)}</td>
+                    <td>${esc(fmtDate(upload.created_at))}</td>
+                    <td><div class="small">${esc(upload.notes || '')}</div></td>
+                  </tr>
+                `).join('') : '<tr><td colspan="6" class="empty">No uploads yet.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderUploadModal() {
+      if (!state.uploadOpen) return '';
+      const u = state.upload;
+      const preview = u.preview;
+      const headers = preview?.headers || [];
+      return `
+        <div class="modal-backdrop" data-close-upload>
+          <section class="modal" role="dialog" aria-modal="true" aria-labelledby="uploadTitle" onclick="event.stopPropagation()">
+            <div class="modal-head">
+              <div>
+                <h2 id="uploadTitle">Upload Production Report</h2>
+                <div class="small">CSV is parsed server-side. XLSX is held until a package-backed parser is added.</div>
+              </div>
+              <button class="btn" data-close-upload-button><i data-lucide="x"></i><span>Close</span></button>
+            </div>
+            <div class="modal-body grid" style="gap:16px;">
+              <div class="modal-grid">
+                <label>File upload
+                  <input id="uploadFile" class="field" type="file" accept=".csv,.xlsx,.xls,text/csv">
+                  <span class="small">${esc(u.fileName || 'CSV, XLSX if supported later')}</span>
+                </label>
+                <label>Source name
+                  <select class="select" data-upload-field="source_name">
+                    ${['ListReports', 'MLS Export', 'Brokerage Report', 'Manual Upload', 'Other'].map((value) => `<option value="${value}"${u.source_name === value ? ' selected' : ''}>${value}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Market area <input class="field" data-upload-field="market_area" value="${esc(u.market_area)}" placeholder="Optional"></label>
+                <label>Report period start <input class="field" data-upload-field="period_start" type="date" value="${esc(u.period_start)}"></label>
+                <label>Report period end <input class="field" data-upload-field="period_end" type="date" value="${esc(u.period_end)}"></label>
+                <label>Notes <textarea data-upload-field="notes" placeholder="Optional import notes">${esc(u.notes)}</textarea></label>
+              </div>
+              <div class="actions" style="justify-content:flex-start;">
+                <button class="btn primary" id="previewUpload" ${state.action ? 'disabled' : ''}><i data-lucide="table-properties"></i><span>${state.action === 'preview_upload' ? 'Parsing...' : 'Preview import'}</span></button>
+                ${preview ? `<button class="btn primary" id="confirmImport" ${state.action ? 'disabled' : ''}><i data-lucide="check-circle-2"></i><span>${state.action === 'confirm_import' ? 'Importing...' : 'Confirm import'}</span></button>` : ''}
+                <button class="btn" data-close-upload-button><i data-lucide="x"></i><span>Cancel</span></button>
+              </div>
+              ${preview ? `
+                <div class="panel" style="box-shadow:none;">
+                  <div class="panel-head">
+                    <div>
+                      <h3>Preview before final import</h3>
+                      <div class="small">${num(preview.row_count)} rows | ${num(preview.matched_count)} matched | ${num(preview.unmatched_count)} unmatched | ${num(preview.duplicate_count)} duplicate signals</div>
+                    </div>
+                    ${preview.needs_review_count ? badge(`${preview.needs_review_count} need review`, 'warn') : badge('Ready', 'ok')}
+                  </div>
+                  <div class="panel-body grid" style="gap:14px;">
+                    <details>
+                      <summary style="font-weight:900;cursor:pointer;">Detected columns and manual mapping</summary>
+                      <div class="mapping-grid" style="margin-top:12px;">
+                        ${CANONICAL_FIELDS.map((field) => `
+                          <label>${esc(field.replace(/_/g, ' '))}
+                            <select class="select" data-map-field="${esc(field)}">
+                              <option value="">Auto / unmapped</option>
+                              ${headers.map((header) => `<option value="${esc(header)}"${(u.column_overrides[field] || preview.mapping?.[field]?.source || '') === header ? ' selected' : ''}>${esc(header)}</option>`).join('')}
+                            </select>
+                          </label>
+                        `).join('')}
+                      </div>
+                      <div class="small" style="margin-top:10px;">Unmapped columns: ${esc((preview.unmapped_columns || []).join(', ') || 'None')}</div>
+                    </details>
+                    <div class="table-wrap">
+                      <table style="min-width:900px;">
+                        <thead><tr><th>Agent</th><th>Brokerage</th><th>Contact</th><th>Volume</th><th>Transactions</th><th>Match</th></tr></thead>
+                        <tbody>
+                          ${(preview.preview_rows || []).map((row) => `
+                            <tr>
+                              <td><strong>${esc(row.agent_name || 'Unknown')}</strong><div class="small">${esc([row.city, row.county, row.state].filter(Boolean).join(', '))}</div></td>
+                              <td>${esc(row.brokerage || '')}</td>
+                              <td><div>${esc(row.phone || '')}</div><div class="small">${esc(row.email || '')}</div></td>
+                              <td>${compactMoney(row.production_volume)}</td>
+                              <td>${num(row.transaction_count)}</td>
+                              <td>${row.matched_agent_id ? badge(`${row.match_confidence}% matched`, row.needs_review ? 'warn' : 'ok') : badge('Unmatched import', 'info')}<div class="small">${esc(row.matched_agent_name || row.match_reason || '')}</div></td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderProfileModal() {
+      const row = state.profile;
+      if (!row) return '';
+      const labels = row.raw_sources?.labels || [];
+      const variants = state.pitchVariants;
+      return `
+        <div class="modal-backdrop" data-close-profile>
+          <section class="modal" role="dialog" aria-modal="true" aria-labelledby="profileTitle" onclick="event.stopPropagation()">
+            <div class="modal-head">
+              <div>
+                <h2 id="profileTitle">${esc(row.agent_name || 'Agent production profile')}</h2>
+                <div class="small">${esc([row.brokerage, row.market_area, row.phone, row.email].filter(Boolean).join(' | '))}</div>
+              </div>
+              <div class="actions">
+                ${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}
+                ${badge(`${num(row.agent_rank_score)} rank score`, 'info')}
+                <button class="btn" data-close-profile-button><i data-lucide="x"></i><span>Close</span></button>
+              </div>
+            </div>
+            <div class="modal-body profile-grid">
+              <div class="grid" style="gap:14px;">
+                <div class="profile-box">
+                  <h3>Production</h3>
+                  <div class="profile-metrics" style="margin-top:12px;">
+                    <div><div class="mini-title">Volume</div><strong>${money(row.production_volume)}</strong></div>
+                    <div><div class="mini-title">Transactions</div><strong>${num(row.transaction_count)}</strong></div>
+                    <div><div class="mini-title">Average price</div><strong>${money(row.average_price)}</strong></div>
+                    <div><div class="mini-title">Active listings</div><strong>${num(row.active_listing_count)}</strong></div>
+                    <div><div class="mini-title">Sold listings</div><strong>${num(row.sold_listing_count)}</strong></div>
+                    <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
+                  </div>
+                  <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
+                </div>
+                <div class="profile-box">
+                  <h3>Gap Analysis</h3>
+                  <p>${esc(row.gap_summary || 'No gap summary calculated yet.')}</p>
+                  <p>This agent is active enough to benefit from Rel8tion because the system removes setup friction. The agent does not need to download an app, create a login, print a QR code, or learn new software.</p>
+                </div>
+                <div class="profile-box">
+                  <h3>Rel8tion Value</h3>
+                  <p>${esc(row.rel8tion_value_summary || '')}</p>
+                  <ul>
+                    <li>Physical smart sign and Rel8tionChip</li>
+                    <li>Tap or scan activation</li>
+                    <li>Buyer check-in and signed disclosures</li>
+                    <li>Instant SMS to the agent</li>
+                    <li>Loan officer coverage and dashboard recap</li>
+                    <li>No app, password, printing, or tech setup required</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="grid" style="gap:14px;">
+                <div class="profile-box">
+                  <h3>Recommended Pitch</h3>
+                  <div class="pitch-box" style="margin-top:10px;">${esc(row.recommended_pitch || '')}</div>
+                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
+                    <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Generate Pitch</span></button>
+                    <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
+                  </div>
+                </div>
+                ${variants ? `
+                  <div class="profile-box">
+                    <h3>Pitch Variants</h3>
+                    ${Object.entries(variants).map(([key, value]) => `
+                      <div style="margin-top:12px;">
+                        <div class="mini-title">${esc(key.replace(/_/g, ' '))}</div>
+                        <p>${esc(value)}</p>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+                <div class="profile-box">
+                  <h3>Next Best Action</h3>
+                  <p>${esc(row.next_best_action || '')}</p>
+                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
+                    <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
+                    <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Create Rel8tion Prospect</span></button>
+                    <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Mark Not a Fit</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderShell() {
+      const rows = filteredRankings();
+      app.innerHTML = `
+        <main class="app">
+          <aside class="sidebar">
+            <div>
+              <div class="brand">
+                <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+                <div><strong>REL8TION</strong><span>Intelligence</span></div>
+              </div>
+              <nav class="nav" aria-label="Agent Intelligence">
+                <a href="/admin"><i data-lucide="layout-dashboard"></i><span>Command Center</span></a>
+                <div class="nav-title">Agent Intelligence</div>
+                <a class="active" href="/admin/agent-ranking"><i data-lucide="bar-chart-3"></i><span>Agent Ranking</span></a>
+                <a href="#uploads"><i data-lucide="upload-cloud"></i><span>Production Uploads</span></a>
+                <a href="#gaps"><i data-lucide="radar"></i><span>Opportunity Gaps</span></a>
+                <a href="#targets"><i data-lucide="send"></i><span>Outreach Targets</span></a>
+              </nav>
+            </div>
+            <div class="side-note">
+              <div class="mini-title">Safe data posture</div>
+              <p class="small">Use permitted CSV exports or manually collected production files. No scraping, no login automation, no hidden tracking.</p>
+            </div>
+            <button class="btn" id="lockBtn"><i data-lucide="log-out"></i><span>Lock module</span></button>
+          </aside>
+          <section class="main">
+            <header class="topbar">
+              <div>
+                <h1>Agent Ranking & Production Intelligence</h1>
+                <div class="sub">Upload production reports, identify high-value agents, and rank who is most likely to benefit from Rel8tion's no-setup open house capture system.</div>
+              </div>
+              <div class="actions">
+                ${state.loading ? badge('Loading', 'info') : badge('Live admin', 'ok')}
+                ${state.error ? badge(state.error, 'bad') : ''}
+                <button class="btn" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+                <button class="btn primary" data-open-upload><i data-lucide="upload-cloud"></i><span>Upload Production Report</span></button>
+              </div>
+            </header>
+            <section class="grid summary-grid">${renderSummaryCards()}</section>
+            <section class="grid info-grid" style="margin-top:16px;">${renderInfoCards()}</section>
+            <section style="margin-top:16px;">${renderFilters(rows)}</section>
+            <section class="panel" style="margin-top:16px;">
+              <div class="panel-head">
+                <div>
+                  <h2>Ranked Outreach Targets</h2>
+                  <div class="small">${rows.length} agents ranked by opportunity, not just production</div>
+                </div>
+              </div>
+              ${renderRankingTable(rows)}
+            </section>
+            <div style="margin-top:16px;">${renderUploads()}</div>
+          </section>
+          ${renderUploadModal()}
+          ${renderProfileModal()}
+        </main>
+      `;
+      bind();
+      window.lucide?.createIcons();
+    }
+
+    function render() {
+      if (!state.verified) renderLock();
+      else renderShell();
+    }
+
+    function updateUploadFromInputs() {
+      document.querySelectorAll('[data-upload-field]').forEach((input) => {
+        state.upload[input.dataset.uploadField] = input.value;
+      });
+    }
+
+    async function readSelectedFile(file) {
+      if (!file) return;
+      state.upload.fileName = file.name;
+      if (/\.xlsx?$/i.test(file.name)) {
+        state.upload.fileText = '';
+        showToast('XLSX upload is not finalized yet. Export this report as CSV for now.');
+        render();
+        return;
+      }
+      state.upload.fileText = await file.text();
+      state.upload.preview = null;
+      render();
+    }
+
+    function uploadPayload(action) {
+      updateUploadFromInputs();
+      return {
+        action,
+        original_filename: state.upload.fileName,
+        file_text: state.upload.fileText,
+        source_name: state.upload.source_name,
+        market_area: state.upload.market_area,
+        period_start: state.upload.period_start,
+        period_end: state.upload.period_end,
+        notes: state.upload.notes,
+        column_overrides: state.upload.column_overrides
+      };
+    }
+
+    async function previewUpload() {
+      state.action = 'preview_upload';
+      render();
+      try {
+        const result = await api(API, { method: 'POST', body: JSON.stringify(uploadPayload('preview_upload')) });
+        state.upload.preview = result;
+        showToast(`Preview ready: ${result.row_count || 0} rows parsed.`);
+      } catch (error) {
+        showToast(error.message || 'Unable to preview upload.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    async function confirmImport() {
+      if (!window.confirm('Confirm this production import and update agent rankings?')) return;
+      state.action = 'confirm_import';
+      render();
+      try {
+        const result = await api(API, { method: 'POST', body: JSON.stringify(uploadPayload('confirm_import')) });
+        showToast(`Imported ${result.imported_rows || 0} rows. Updated rankings.`);
+        state.uploadOpen = false;
+        state.upload = freshUploadState();
+        await loadData();
+      } catch (error) {
+        showToast(error.message || 'Unable to confirm import.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    function findRanking(id) {
+      return (state.data.rankings || []).find((row) => row.id === id) || null;
+    }
+
+    async function generatePitch(id) {
+      state.action = `pitch:${id}`;
+      const row = findRanking(id);
+      if (row) state.profile = row;
+      render();
+      try {
+        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'generate_pitch', ranking_id: id }) });
+        state.pitchVariants = result.variants || null;
+        showToast('Pitch variants generated.');
+      } catch (error) {
+        showToast(error.message || 'Unable to generate pitch.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    async function addToOutreach(id, label = 'Added to outreach queue.') {
+      if (!window.confirm('Create or update a manual, non-sending outreach queue row for this agent?')) return;
+      state.action = `outreach:${id}`;
+      render();
+      try {
+        await api(API, { method: 'POST', body: JSON.stringify({ action: 'add_to_outreach', ranking_id: id }) });
+        showToast(label);
+      } catch (error) {
+        showToast(error.message || 'Unable to add to outreach.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    async function markNotFit(id) {
+      const reason = window.prompt('Optional reason for marking this agent not a fit:', '') || '';
+      state.action = `not-fit:${id}`;
+      render();
+      try {
+        await api(API, { method: 'POST', body: JSON.stringify({ action: 'mark_not_fit', ranking_id: id, reason }) });
+        showToast('Marked not a fit.');
+        await loadData();
+      } catch (error) {
+        showToast(error.message || 'Unable to mark not a fit.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    function bind() {
+      document.getElementById('refreshBtn')?.addEventListener('click', loadData);
+      document.getElementById('lockBtn')?.addEventListener('click', () => {
+        window.localStorage.removeItem(ADMIN_UID_KEY);
+        window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+        state.verified = false;
+        render();
+      });
+      document.querySelectorAll('[data-open-upload]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.uploadOpen = true;
+          state.upload = freshUploadState();
+          render();
+        });
+      });
+      document.querySelectorAll('[data-close-upload], [data-close-upload-button]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.uploadOpen = false;
+          state.upload = freshUploadState();
+          render();
+        });
+      });
+      document.getElementById('uploadFile')?.addEventListener('change', (event) => readSelectedFile(event.target.files?.[0]));
+      document.querySelectorAll('[data-upload-field]').forEach((input) => {
+        input.addEventListener('input', () => { state.upload[input.dataset.uploadField] = input.value; });
+        input.addEventListener('change', () => { state.upload[input.dataset.uploadField] = input.value; });
+      });
+      document.querySelectorAll('[data-map-field]').forEach((select) => {
+        select.addEventListener('change', () => {
+          if (select.value) state.upload.column_overrides[select.dataset.mapField] = select.value;
+          else delete state.upload.column_overrides[select.dataset.mapField];
+        });
+      });
+      document.getElementById('previewUpload')?.addEventListener('click', previewUpload);
+      document.getElementById('confirmImport')?.addEventListener('click', confirmImport);
+      document.querySelectorAll('[data-filter]').forEach((input) => {
+        input.addEventListener('input', () => { state.filters[input.dataset.filter] = input.value; render(); });
+        input.addEventListener('change', () => { state.filters[input.dataset.filter] = input.value; render(); });
+      });
+      document.getElementById('clearFilters')?.addEventListener('click', () => {
+        state.filters = {
+          q: '', tier: 'all', brokerage: 'all', market: 'all', volumeMin: '', volumeMax: '',
+          txMin: '', txMax: '', weekend: 'all', phone: 'all', email: 'all', upload: 'all',
+          periodStart: '', periodEnd: ''
+        };
+        render();
+      });
+      document.querySelectorAll('[data-profile]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.profile = findRanking(button.dataset.profile);
+          state.pitchVariants = null;
+          render();
+        });
+      });
+      document.querySelectorAll('[data-close-profile], [data-close-profile-button]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.profile = null;
+          state.pitchVariants = null;
+          render();
+        });
+      });
+      document.querySelectorAll('[data-pitch]').forEach((button) => {
+        button.addEventListener('click', () => generatePitch(button.dataset.pitch));
+      });
+      document.querySelectorAll('[data-outreach]').forEach((button) => {
+        button.addEventListener('click', () => addToOutreach(button.dataset.outreach));
+      });
+      document.querySelectorAll('[data-prospect]').forEach((button) => {
+        button.addEventListener('click', () => addToOutreach(button.dataset.prospect, 'Rel8tion prospect staged in outreach queue.'));
+      });
+      document.querySelectorAll('[data-match]').forEach((button) => {
+        button.addEventListener('click', () => showToast('Rows above 75% confidence are matched automatically. Lower-confidence manual matching is the next review pass.'));
+      });
+      document.querySelectorAll('[data-not-fit]').forEach((button) => {
+        button.addEventListener('click', () => markNotFit(button.dataset.notFit));
+      });
+    }
+
+    verify();
+  </script>
+</body>
+</html>

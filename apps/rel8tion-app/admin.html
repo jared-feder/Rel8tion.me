@@ -189,6 +189,15 @@
       align-content: start;
     }
 
+    .nav-section-title {
+      margin: 14px 10px 4px;
+      color: #7a8da3;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
     .nav-button {
       width: 100%;
       min-height: 42px;
@@ -202,6 +211,7 @@
       padding: 10px 11px;
       text-align: left;
       font-weight: 900;
+      text-decoration: none;
     }
 
     .nav-button svg {
@@ -1317,6 +1327,7 @@
     const ADMIN_LOCAL_LOCK_KEY = 'rel8tion_admin_local_lock_v1';
     const ADMIN_LOCK_SESSION_KEY = 'rel8tion_admin_lock_session_v1';
     const ADMIN_LOCK_DURATION_MS = 8 * 60 * 60 * 1000;
+    const OUTREACH_FOLLOWUPS_DISABLED = true;
     const DRAFTS_KEY = 'rel8tion_admin_reply_drafts';
     const AREA_KEY = 'rel8tion_admin_area';
 
@@ -1698,7 +1709,7 @@
       if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
       if (!row.listing_photo_url) return false;
       const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
-      const followupPending = row.followup_send_status === 'pending' && row.followup_sms;
+      const followupPending = !OUTREACH_FOLLOWUPS_DISABLED && row.followup_send_status === 'pending' && row.followup_sms;
       return Boolean(initialPending || followupPending);
     }
 
@@ -2546,6 +2557,10 @@
     function scheduleDrip(key) {
       const thread = findThread(key);
       if (!thread) return;
+      if (OUTREACH_FOLLOWUPS_DISABLED) {
+        showToast('Follow-up scheduling is currently disabled.');
+        return;
+      }
       if (isOptOutThread(thread)) {
         showToast('This contact is opted out.');
         return;
@@ -3170,6 +3185,19 @@
                 </div>
                 <nav class="area-nav" aria-label="Command areas">
                   ${renderAreaNav()}
+                  <div class="nav-section-title">Agent Intelligence</div>
+                  <a class="nav-button" href="/admin/agent-ranking">
+                    <i data-lucide="bar-chart-3"></i><span>Agent Ranking</span>
+                  </a>
+                  <a class="nav-button" href="/admin/agent-ranking#uploads">
+                    <i data-lucide="upload-cloud"></i><span>Production Uploads</span>
+                  </a>
+                  <a class="nav-button" href="/admin/agent-ranking#gaps">
+                    <i data-lucide="radar"></i><span>Opportunity Gaps</span>
+                  </a>
+                  <a class="nav-button" href="/admin/agent-ranking#targets">
+                    <i data-lucide="send"></i><span>Outreach Targets</span>
+                  </a>
                 </nav>
               </div>
 
@@ -3799,6 +3827,8 @@
       const confirmLabel = accepted || confirmed || hasVisit ? 'Update date' : 'Confirm true OH';
       const dripText = thread.followup_sms || defaultDripText(thread);
       const dripAt = defaultDripSendAt(thread);
+      const dripDisabled = disabled || dripBusy || OUTREACH_FOLLOWUPS_DISABLED;
+      const dripLabel = OUTREACH_FOLLOWUPS_DISABLED ? 'Follow-ups off' : dripBusy ? 'Scheduling...' : 'Schedule drip';
       return `
         <div class="mini-panel action-panel">
           <div class="reply-footer">
@@ -3825,10 +3855,10 @@
             </button>
           </div>
           <div class="drip-grid">
-            <textarea id="drip_${domId(key)}" ${disabled || dripBusy ? 'disabled' : ''} maxlength="1200">${esc(dripText)}</textarea>
-            <input id="drip_at_${domId(key)}" class="field" type="datetime-local" value="${esc(dripAt)}" ${disabled || dripBusy ? 'disabled' : ''}>
-            <button class="btn soft" data-schedule-drip="${esc(key)}" ${disabled || dripBusy ? 'disabled' : ''}>
-              <i data-lucide="alarm-clock"></i><span>${dripBusy ? 'Scheduling...' : 'Schedule drip'}</span>
+            <textarea id="drip_${domId(key)}" ${dripDisabled ? 'disabled' : ''} maxlength="1200">${esc(dripText)}</textarea>
+            <input id="drip_at_${domId(key)}" class="field" type="datetime-local" value="${esc(dripAt)}" ${dripDisabled ? 'disabled' : ''}>
+            <button class="btn soft" data-schedule-drip="${esc(key)}" ${dripDisabled ? 'disabled' : ''}>
+              <i data-lucide="alarm-clock"></i><span>${dripLabel}</span>
             </button>
           </div>
         </div>

@@ -17,6 +17,7 @@ const PUBLIC_APP_BASE_URL =
 const DEFAULT_SEND_MAX_PER_RUN = 20;
 const DEFAULT_SEND_MAX_PER_HOUR = 20;
 const DEFAULT_SEND_MAX_PER_DAY = 150;
+const FOLLOWUPS_DISABLED = true;
 
 type OutreachRow = {
   id?: string | null;
@@ -477,7 +478,9 @@ serve(async (req) => {
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
       .not("listing_photo_url", "is", null)
-      .or(`and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
+      .or(FOLLOWUPS_DISABLED
+        ? `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso})`
+        : `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
       .order("initial_send_at", { ascending: true, nullsFirst: false })
       .order("followup_send_at", { ascending: true, nullsFirst: false })
       .limit(fetchLimit);
@@ -529,7 +532,7 @@ serve(async (req) => {
         const isMissedOpenHouseCampaign = row.template_key === "missed_open_house";
         const isAdminScheduledDrip = row.review_status === "drip_scheduled";
         const initialStale = !isMissedOpenHouseCampaign && !!openEnd && openEnd <= now;
-        const followupStale = !isAdminScheduledDrip && !!openStart && openStart <= now;
+        const followupStale = !FOLLOWUPS_DISABLED && !isAdminScheduledDrip && !!openStart && openStart <= now;
 
         if (dryRun && (initialStale || followupStale)) {
           results.push({
@@ -594,6 +597,7 @@ serve(async (req) => {
           (isMissedOpenHouseCampaign || !openEnd || openEnd > now);
 
         const followupDue =
+          !FOLLOWUPS_DISABLED &&
           row.followup_send_status === "pending" &&
           row.followup_send_at &&
           row.followup_send_at <= nowIso &&
@@ -623,7 +627,9 @@ serve(async (req) => {
         const followupBody = followupDue
           ? addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl)
           : null;
-        const storedFollowupBody = addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl) || null;
+        const storedFollowupBody = FOLLOWUPS_DISABLED
+          ? null
+          : addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl) || null;
 
         if (dryRun) {
           results.push({
@@ -735,7 +741,10 @@ serve(async (req) => {
               sms_variant_1: initialBody,
               sms_link: buildSmsLink(row.agent_phone, initialBody),
               followup_sms: storedFollowupBody,
-              followup_sms_link: storedFollowupBody ? buildSmsLink(row.agent_phone, storedFollowupBody) : null,
+              followup_sms_link: null,
+              followup_send_status: "not_scheduled",
+              followup_send_at: null,
+              followup_block_reason: "followups_disabled",
               initial_send_status: "sent",
               initial_sent_at: sentAt,
               twilio_sid_initial: smsRes.externalId || smsRes.sid || null,

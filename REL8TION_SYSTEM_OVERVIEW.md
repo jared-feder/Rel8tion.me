@@ -28,6 +28,7 @@ The current product connects:
 - `[IMPLEMENTED]` Loan Officer Coverage Signs that stay with the loan officer and route through `/lo-sign`.
 - `[IMPLEMENTED]` Live open house event records, buyer check-ins, disclosures, and optional financing-help routing.
 - `[PARTIAL]` REL8TION COMMAND admin operations.
+- `[PARTIAL]` Agent Ranking / Production Intelligence for admin-only production-report imports, opportunity scoring, and manual outreach staging.
 - `[PARTIAL]` Agent outreach, enrichment, and SMS follow-up.
 - `[PARTIAL]` Agent website builder and AI Studio tooling.
 
@@ -102,6 +103,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
 - `[IMPLEMENTED]` `/agent-dashboard` is the host-agent live event dashboard.
 - `[PARTIAL]` REL8TION COMMAND at `/admin` is the operational admin dashboard.
+- `[PARTIAL]` `/admin/agent-ranking` is the Agent Ranking / Production Intelligence module. It accepts CSV production reports, normalizes agent/contact/production fields, scores opportunity fit, and can stage reviewed prospects into outreach manually. XLS/XLSX import and manual low-confidence match review are not complete.
 
 ### Open House Kit And Website Builder
 
@@ -126,6 +128,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `event_loan_officer_sessions` stores live LO coverage.
 - `[IMPLEMENTED]` `event_pass_coverage_consents` stores Sponsored Event Pass per-event consent.
 - `[PARTIAL]` `agent_outreach_queue`, `agent_outreach_replies`, and delivery-event tables support outreach.
+- `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28; deployed route and upload-flow behavior still need verification.
 - `[PARTIAL]` `agent_websites` and `agent_website_listings` support the website-builder app.
 
 ## Messaging, Outreach, And Compliance
@@ -133,10 +136,13 @@ Important tables and fields:
 - `[PARTIAL]` `send-lead-sms` source is checked in under `supabase/functions/send-lead-sms` and uses the shared SMS provider layer.
 - `[NEEDS VERIFICATION]` Deployed function source/version, provider env, and live SMS behavior still need verification.
 - `[IMPLEMENTED]` `/event` sends buyer/agent SMS only after local check-in validation and disclosure completion.
-- `[IMPLEMENTED]` Automated outreach sends are throttled for provider safety: the Vercel send cron defaults to 20 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with default limits of 20 per run, 20 per rolling hour, and 150 per rolling 24 hours. Automatic initial and follow-up sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending SMS copy.
+- `[IMPLEMENTED]` Automated outreach sends are throttled for provider safety: the Vercel send cron defaults to 20 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with default limits of 20 per run, 20 per rolling hour, and 150 per rolling 24 hours. Automatic initial sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending initial SMS copy.
+- `[IMPLEMENTED]` As of 2026-06-28, outreach follow-up/drip scheduling is disabled while opt-out health is recovered. Existing live pending follow-ups were cleared to `followups_disabled`, and the current generator/sender leave future follow-up fields unscheduled unless intentionally re-enabled.
 - `[IMPLEMENTED]` SMS provider selection is route-scoped: `SMS_OUTREACH_PROVIDER` controls outreach/manual outreach, `SMS_EVENTS_PROVIDER` controls buyer/event/owner operational traffic, and both fall back to `SMS_PROVIDER`.
 - `[IMPLEMENTED]` Production outreach is split by brokerage and operator mode: Douglas Elliman outreach routes through Twilio/MMS; non-Douglas Elliman outreach waits for manual send when `outreach_operator_mode=live`; non-Douglas Elliman outreach routes through Android Gateway when `outreach_operator_mode=away`. Event/owner/system traffic remains on Twilio.
 - `[IMPLEMENTED]` REL8TION COMMAND shows Twilio ready, Manual ready, and Android ready rows. Live: manual / Away: Android changes `rel8tion_runtime_settings.outreach_operator_mode`, while Pause cron / Resume cron intentionally changes row `send_mode`.
+- `[IMPLEMENTED]` REL8TION COMMAND outreach health treats an empty inbound window as quiet/normal instead of a broken inbox; actual warnings remain for raw/unlinked inbound rows and linked replies missing from the inbox view.
+- `[PARTIAL]` Agent Ranking / Production Intelligence stages ranked agents into `agent_outreach_queue` with manual send mode and follow-ups disabled. It should not be used to send automatic SMS or to game opt-out-rate metrics.
 - `[IMPLEMENTED]` Durable Twilio outreach recovery settings live in `docs/twilio-outreach-sms-runbook.md`; keep that runbook and the source-of-truth docs aligned.
 - `[IMPLEMENTED]` As of 2026-06-24, Twilio SMS is restored via `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, and `TWILIO_PHONE=+15168885461`. Outreach default should be Android Gateway with Douglas Elliman as the Twilio override until toll-free outreach is intentionally added.
 - `[IMPLEMENTED]` Twilio inbound outreach replies enter through the public `twilio-inbound-router` Edge Function, which routes replies into the protected `twilio-inbound-reply` handler. Matched replies link to outreach queue rows using tolerant 10/11-digit phone matching; unmatched replies are still stored with `queue_row_id=null`.

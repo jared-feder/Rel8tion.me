@@ -22,6 +22,7 @@ Status labels used in this file:
 - `[NEEDS VERIFICATION]` Test LO Coverage Sign setup/activation.
 - `[NEEDS VERIFICATION]` Test `/event` buyer check-in, disclosures, SMS, and financing-help opt-in.
 - `[NEEDS VERIFICATION]` Test Agent Dashboard and Loan Officer Dashboard visibility.
+- `[NEEDS VERIFICATION]` Test `/admin/agent-ranking` after Vercel deploy.
 - `[NEEDS VERIFICATION]` Verify Supabase migrations, RLS, and env vars.
 
 ## Current Code Anchor
@@ -69,6 +70,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/loan-officer-support` stores public loan-officer open-house-support requests and surfaces them in REL8TION COMMAND.
 - `[PARTIAL]` `/key-reset` is a token-protected admin/beta reset utility, not a full admin dashboard.
 - `[PARTIAL]` `/admin` is REL8TION COMMAND. It supports important operational workflows, but broader CRM edits, sign inventory edits, LO calendar/availability edits, billing automation, and full project controls are not complete.
+- `[PARTIAL]` `/admin/agent-ranking` is an admin-only Agent Ranking / Production Intelligence module for permitted production-report CSV imports, opportunity scoring, and manual outreach staging. XLS/XLSX parsing, manual low-confidence match review, deployed route verification, and end-to-end upload testing remain `[NEEDS VERIFICATION]`.
 
 ## NFC, Sign, Event Pass, And QR State
 
@@ -129,8 +131,11 @@ Status labels used in this file:
 - `[IMPLEMENTED]` The shared SMS layer supports route-scoped provider env vars: `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic. Both fall back to `SMS_PROVIDER`.
 - `[IMPLEMENTED]` Production outreach is split by brokerage and operator mode: Douglas Elliman outreach routes through Twilio/MMS; non-Douglas Elliman outreach waits for manual send when `outreach_operator_mode=live`; non-Douglas Elliman outreach routes through Android Gateway when `outreach_operator_mode=away`. Event/owner/system traffic remains on Twilio.
 - `[IMPLEMENTED]` Runtime outreach operator mode is stored in `rel8tion_runtime_settings` and can be changed in REL8TION COMMAND with Live: manual / Away: Android controls.
-- `[IMPLEMENTED]` Root cron code includes outreach generation and send endpoints. Outreach sending is throttled for provider safety: the send cron defaults to 20 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with `OUTREACH_SEND_MAX_PER_RUN` defaulting to 20, `OUTREACH_SEND_MAX_PER_HOUR` defaulting to 20, and `OUTREACH_SEND_MAX_PER_DAY` defaulting to a hard ceiling of 150 per rolling 24 hours. Automatic initial and follow-up sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending SMS copy.
+- `[IMPLEMENTED]` Root cron code includes outreach generation and send endpoints. Outreach sending is throttled for provider safety: the send cron defaults to 20 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with `OUTREACH_SEND_MAX_PER_RUN` defaulting to 20, `OUTREACH_SEND_MAX_PER_HOUR` defaulting to 20, and `OUTREACH_SEND_MAX_PER_DAY` defaulting to a hard ceiling of 150 per rolling 24 hours. Automatic initial sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending initial SMS copy.
+- `[IMPLEMENTED]` As of 2026-06-28, outreach follow-up/drip scheduling is disabled while opt-out health is recovered. Pending live follow-ups were marked `followup_send_status=not_scheduled`, `followup_send_at=null`, `followup_sms=null`, `followup_sms_link=null`, and `followup_block_reason=followups_disabled`; the generator and sender keep future follow-ups unscheduled until this is intentionally re-enabled.
 - `[IMPLEMENTED]` REL8TION COMMAND surfaces generated/rendered due outreach rows as Twilio ready, Manual ready, or Android ready and can explicitly Pause cron/Resume cron by changing `send_mode`. Do not reintroduce a hidden approval gate for normal cron sends without owner confirmation.
+- `[IMPLEMENTED]` REL8TION COMMAND outreach health treats an empty inbound window as quiet/normal instead of a broken inbox; it still warns on unlinked raw rows and fails only when linked replies are missing from the inbox view.
+- `[PARTIAL]` Agent Ranking / Production Intelligence can stage ranked agents into `agent_outreach_queue` with `source=agent_ranking`, `send_mode=manual`, `initial_send_status=not_queued`, and follow-ups disabled. This is a review queue action, not an automatic sender.
 - `[IMPLEMENTED]` `docs/twilio-outreach-sms-runbook.md` is the durable Twilio outreach recovery/runbook document. Keep it in source control and update it whenever provider settings change.
 - `[IMPLEMENTED]` On 2026-06-23, Twilio SMS was restored with `SMS_PROVIDER=twilio` and `TWILIO_PHONE=+15168885461` in live Supabase secrets. Outbound smoke test queued from `+15168885461`, inbound reply to that number saved into `agent_outreach_replies`, owner alert queued, and the matched outreach queue row moved to `review_status=replied`.
 - `[INTENDED]` Toll-free Twilio outreach can be evaluated later. Until then, do not send non-Douglas Elliman automated outreach through Twilio.
@@ -148,6 +153,7 @@ Status labels used in this file:
 - `[NEEDS VERIFICATION]` Live RLS policy state is not fully confirmed.
 - `[NEEDS VERIFICATION]` Live schema and repo migrations must be checked before frontend assumptions are changed.
 - `[NEEDS VERIFICATION]` RPC definitions used by app code but not proven from checked-in SQL include `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
+- `[PARTIAL]` Agent Ranking / Production Intelligence migration source exists for `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings`. On 2026-06-28, the linked Supabase schema was applied with RLS enabled, service-role-only policies, catalog verification, and filtered advisor verification for the new objects.
 - `[RISK]` `event_loan_officer_sessions` grants and policies should be verified before broad public use.
 
 ## Current High-Risk Areas

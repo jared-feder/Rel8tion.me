@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const FOLLOWUPS_DISABLED = true;
+
 type QueueRow = {
   id: string;
   agent_first_name: string | null;
@@ -80,6 +82,7 @@ function isPast(dateString: string | null): boolean {
 }
 
 function computeFollowupSendAt(openStart: string | null, initialSendAt: string): string | null {
+  if (FOLLOWUPS_DISABLED) return null;
   if (!openStart) return null;
 
   const openStartDate = new Date(openStart);
@@ -107,9 +110,10 @@ function buildVariants(row: QueueRow) {
     `I’m also sponsoring a Rel8tion Event Pass for you — paperless check-in, e-sign disclosures, and lead capture with no app needed.\n\n` +
     `Looking forward to meeting you. Reply STOP to opt out.`;
 
-  const followup =
-    `Hey ${firstName} 👋 Just circling back before your open house at ${addr} ${when}. ` +
-    `I’d still love to stop by with quick pre-approval support and sponsor a Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture. Reply STOP to opt out.`;
+  const followup = FOLLOWUPS_DISABLED
+    ? null
+    : `Hey ${firstName} 👋 Just circling back before your open house at ${addr} ${when}. ` +
+      `I’d still love to stop by with quick pre-approval support and sponsor a Rel8tion Event Pass for paperless check-in, e-sign disclosures, and lead capture. Reply STOP to opt out.`;
 
   return { v1: main, v2: null, v3: null, selected: main, followup };
 }
@@ -274,7 +278,7 @@ serve(async (req) => {
             initial_send_status: "pending",
             followup_send_status: followupSendAt ? "pending" : "not_scheduled",
             initial_block_reason: null,
-            followup_block_reason: followupSendAt ? null : "followup_not_scheduled",
+            followup_block_reason: followupSendAt ? null : "followups_disabled",
           })
           .eq("id", row.id);
 
