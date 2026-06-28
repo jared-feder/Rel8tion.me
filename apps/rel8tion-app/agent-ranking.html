@@ -534,7 +534,7 @@
 
     async function verify() {
       try {
-        await api('/api/admin/auth', { method: 'POST', body: '{}' });
+        await api('/api/admin/auth');
         state.verified = true;
         await loadData();
       } catch (error) {
