@@ -4,9 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rel8tion Agent Ranking</title>
+  <meta http-equiv="Cache-Control" content="no-store">
   <meta http-equiv="refresh" content="0; url=/apps/rel8tion-app/agent-ranking.html">
   <script>
-    window.location.replace(`/apps/rel8tion-app/agent-ranking.html${window.location.search}${window.location.hash}`);
+    const target = new URL('/apps/rel8tion-app/agent-ranking.html', window.location.origin);
+    for (const [key, value] of new URLSearchParams(window.location.search).entries()) {
+      target.searchParams.set(key, value);
+    }
+    target.searchParams.set('v', '5af7105');
+    window.location.replace(`${target.pathname}${target.search}${window.location.hash}`);
   </script>
 </head>
 <body>
