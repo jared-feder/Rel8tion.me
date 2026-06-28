@@ -1093,7 +1093,8 @@
       render();
       try {
         const result = await api(API, { method: 'POST', body: JSON.stringify(uploadPayload('confirm_import')) });
-        showToast(`Imported ${result.imported_rows || 0} rows. Updated rankings.`);
+        const collapsed = Number(result.rankings_collapsed_duplicates || 0);
+        showToast(`Imported ${result.imported_rows || 0} rows. Updated rankings.${collapsed ? ` Collapsed ${collapsed} duplicate ranking rows.` : ''}`);
         state.uploadOpen = false;
         state.upload = freshUploadState();
         await loadData();

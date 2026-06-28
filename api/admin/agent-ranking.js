@@ -192,21 +192,90 @@ async function insertRows(table, rows, chunkSize = 200) {
 
 function rankingIdentity(row) {
   if (row.agent_id) return `agent:${row.agent_id}`;
-  if (row.phone_normalized) return `phone:${row.phone_normalized}`;
-  if (row.email) return `email:${String(row.email).toLowerCase()}`;
-  return `name:${normalizeName(row.agent_name)}|${normalizeName(row.brokerage)}`;
+  const phone = normalizePhone(row.phone_normalized || row.phone);
+  if (phone) return `phone:${phone}`;
+  const email = String(row.email || '').trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const name = normalizeName(row.agent_name);
+  const brokerage = normalizeName(row.brokerage);
+  if (name || brokerage) return `name:${name}|${brokerage}`;
+  return '';
+}
+
+function rankingStrength(row) {
+  return [
+    Number(row.agent_rank_score || 0),
+    Number(row.opportunity_gap_score || 0),
+    Number(row.production_volume || 0),
+    Number(row.transaction_count || 0),
+    Number(row.raw_sources?.match_confidence || 0)
+  ];
+}
+
+function strongerRanking(left, right) {
+  const a = rankingStrength(left);
+  const b = rankingStrength(right);
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return a[index] > b[index] ? left : right;
+  }
+  return left;
+}
+
+function mergeDuplicateRanking(kept, duplicate, key) {
+  const keptIds = kept.raw_sources?.duplicate_import_row_ids || [];
+  const duplicateIds = duplicate.raw_sources?.duplicate_import_row_ids || [];
+  return {
+    ...kept,
+    raw_sources: {
+      ...(kept.raw_sources || {}),
+      duplicate_identity_key: key,
+      duplicate_ranking_count: Number(kept.raw_sources?.duplicate_ranking_count || 1) + Number(duplicate.raw_sources?.duplicate_ranking_count || 1),
+      duplicate_import_row_ids: [
+        ...new Set([
+          ...keptIds,
+          ...duplicateIds,
+          kept.latest_import_row_id,
+          duplicate.latest_import_row_id
+        ].filter(Boolean))
+      ]
+    }
+  };
+}
+
+function dedupeRankings(rankings) {
+  const map = new Map();
+  let collapsed = 0;
+
+  for (const ranking of rankings || []) {
+    const key = rankingIdentity(ranking);
+    if (!key) continue;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, ranking);
+      continue;
+    }
+    collapsed += 1;
+    const strongest = strongerRanking(existing, ranking);
+    const duplicate = strongest === existing ? ranking : existing;
+    map.set(key, mergeDuplicateRanking(strongest, duplicate, key));
+  }
+
+  return { rankings: [...map.values()], collapsed };
 }
 
 async function upsertRankings(rankings) {
-  const existing = await supabaseRest('agent_rankings?select=id,agent_id,phone_normalized,email,agent_name,brokerage&limit=10000')
+  const deduped = dedupeRankings(rankings);
+  const existing = await supabaseRest('agent_rankings?select=id,agent_id,phone_normalized,email,agent_name,brokerage&limit=50000')
     .catch(() => []);
   const existingMap = new Map((existing || []).map((row) => [rankingIdentity(row), row]));
   const created = [];
   const updated = [];
   const toCreate = [];
 
-  for (const ranking of rankings) {
-    const match = existingMap.get(rankingIdentity(ranking));
+  for (const ranking of deduped.rankings) {
+    const key = rankingIdentity(ranking);
+    if (!key) continue;
+    const match = existingMap.get(key);
     if (match?.id) {
       const patched = one(await supabaseRest(`agent_rankings?id=eq.${enc(match.id)}`, {
         method: 'PATCH',
@@ -216,11 +285,12 @@ async function upsertRankings(rankings) {
       if (patched) updated.push(patched);
     } else {
       toCreate.push(ranking);
+      existingMap.set(key, ranking);
     }
   }
 
   created.push(...await insertRows('agent_rankings', toCreate, 100));
-  return { created, updated };
+  return { created, updated, collapsed_duplicates: deduped.collapsed };
 }
 
 function summarizeRankings(rankings) {
@@ -299,6 +369,7 @@ async function handleConfirm(body, auth) {
     imported_rows: importRows.length,
     rankings_created: upserted.created.length,
     rankings_updated: upserted.updated.length,
+    rankings_collapsed_duplicates: upserted.collapsed_duplicates || 0,
     summary: summarizeRankings(savedRankings),
     top_rankings: savedRankings.slice(0, 20)
   };
