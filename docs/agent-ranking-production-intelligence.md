@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. A 2026-06-30 migration adds county/location intelligence and open-house match columns; live schema/deploy verification is required after release.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location and open-house match migration was applied and live production routes were verified on 2026-06-30. Authenticated end-to-end upload testing still needs verification.
 
 ## Purpose
 
@@ -116,4 +116,4 @@ This stages a reviewed opportunity. It does not automatically send SMS, bypass c
 
 - CSV only; XLS/XLSX support is not finalized.
 - Manual low-confidence row matching is not yet a full backend workflow.
-- Deployed route and end-to-end upload behavior must be verified after release.
+- Authenticated end-to-end upload behavior must be verified after release.

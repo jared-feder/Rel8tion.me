@@ -128,7 +128,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `event_loan_officer_sessions` stores live LO coverage.
 - `[IMPLEMENTED]` `event_pass_coverage_consents` stores Sponsored Event Pass per-event consent.
 - `[PARTIAL]` `agent_outreach_queue`, `agent_outreach_replies`, and delivery-event tables support outreach.
-- `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns. A 2026-06-30 migration adds location/source/confidence fields and matched open-house counts/ids/timestamps; deployed route, migration, and upload-flow behavior still need verification.
+- `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns. On 2026-06-30, location/source/confidence fields and matched open-house counts/ids/timestamps were applied to linked Supabase and column verification passed; authenticated upload-flow behavior still needs verification.
 - `[PARTIAL]` `agent_websites` and `agent_website_listings` support the website-builder app.
 
 ## Messaging, Outreach, And Compliance
