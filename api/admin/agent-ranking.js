@@ -1,6 +1,8 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 const {
   buildPitchVariants,
+  dedupeRowsByIdentityKey,
+  identityKeyForAgentRanking,
   marketAverages,
   matchImportedRows,
   normalizeImportRows,
@@ -205,6 +207,8 @@ function importRowPayload(uploadId, row) {
       ...(row.raw || {}),
       duplicate_key: row.duplicate_key || null,
       is_duplicate: Boolean(row.is_duplicate),
+      identity_key: row.identity_key || null,
+      identity_missing_reason: row.identity_missing_reason || null,
       match_reason: row.match_reason || 'unmatched',
       needs_review: Boolean(row.needs_review)
     },
@@ -227,16 +231,45 @@ async function insertRows(table, rows, chunkSize = 200) {
   return inserted;
 }
 
+async function postRowsResilient(path, rows, options = {}, chunkSize = 100) {
+  const inserted = [];
+  const failed = [];
+
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    const chunk = rows.slice(index, index + chunkSize);
+    if (!chunk.length) continue;
+    try {
+      const result = await supabaseRest(path, {
+        method: 'POST',
+        ...(options || {}),
+        body: JSON.stringify(chunk)
+      });
+      inserted.push(...(Array.isArray(result) ? result : []));
+    } catch (error) {
+      for (const row of chunk) {
+        try {
+          const result = await supabaseRest(path, {
+            method: 'POST',
+            ...(options || {}),
+            body: JSON.stringify([row])
+          });
+          inserted.push(...(Array.isArray(result) ? result : []));
+        } catch (rowError) {
+          failed.push({
+            identity_key: row.identity_key || null,
+            agent_name: row.agent_name || null,
+            error: rowError.message || 'Row failed'
+          });
+        }
+      }
+    }
+  }
+
+  return { inserted, failed };
+}
+
 function rankingIdentity(row) {
-  if (row.agent_id) return `agent:${row.agent_id}`;
-  const phone = normalizePhone(row.phone_normalized || row.phone);
-  if (phone) return `phone:${phone}`;
-  const email = String(row.email || '').trim().toLowerCase();
-  if (email) return `email:${email}`;
-  const name = normalizeName(row.agent_name);
-  const brokerage = normalizeName(row.brokerage);
-  if (name || brokerage) return `name:${name}|${brokerage}`;
-  return '';
+  return row.identity_key || identityKeyForAgentRanking(row);
 }
 
 function rankingStrength(row) {
@@ -306,33 +339,34 @@ function dedupeRankings(rankings) {
 }
 
 async function upsertRankings(rankings) {
-  const deduped = dedupeRankings(rankings);
-  const existing = await supabaseRest('agent_rankings?select=id,agent_id,phone_normalized,email,agent_name,brokerage&limit=50000')
+  const deduped = dedupeRowsByIdentityKey(rankings);
+  const existing = await supabaseRest('agent_rankings?select=id,identity_key&limit=50000')
     .catch(() => []);
-  const existingMap = new Map((existing || []).map((row) => [rankingIdentity(row), row]));
+  const existingIdentityKeys = new Set((existing || []).map((row) => row.identity_key).filter(Boolean));
+  const payloadRows = deduped.rows.map((ranking) => ({
+    ...ranking,
+    identity_key: ranking.identity_key || identityKeyForAgentRanking(ranking)
+  })).filter((ranking) => ranking.identity_key);
+
+  const result = await postRowsResilient('agent_rankings?on_conflict=identity_key', payloadRows, {
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' }
+  }, 100);
+
   const created = [];
   const updated = [];
-  const toCreate = [];
-
-  for (const ranking of deduped.rankings) {
-    const key = rankingIdentity(ranking);
-    if (!key) continue;
-    const match = existingMap.get(key);
-    if (match?.id) {
-      const patched = one(await supabaseRest(`agent_rankings?id=eq.${enc(match.id)}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify(ranking)
-      }));
-      if (patched) updated.push(patched);
-    } else {
-      toCreate.push(ranking);
-      existingMap.set(key, ranking);
-    }
+  for (const row of result.inserted) {
+    if (existingIdentityKeys.has(row.identity_key)) updated.push(row);
+    else created.push(row);
   }
 
-  created.push(...await insertRows('agent_rankings', toCreate, 100));
-  return { created, updated, collapsed_duplicates: deduped.collapsed };
+  return {
+    created,
+    updated,
+    failed: result.failed,
+    collapsed_duplicates: deduped.duplicates_skipped,
+    skipped_missing_identity: deduped.skipped_missing_identity,
+    skipped_missing_identity_count: deduped.skipped_missing_identity_count
+  };
 }
 
 function rescoreRanking(ranking, averages) {
@@ -677,12 +711,16 @@ function sortRankings(rankings, sortBy, direction) {
 
 async function handlePreview(body) {
   const parsed = await parseAndMatch(body);
+  const finalRows = dedupeRowsByIdentityKey(parsed.rows);
   return {
     headers: parsed.headers,
     mapping: parsed.mapping,
     unmapped_columns: parsed.unmapped_columns,
     row_count: parsed.row_count,
     duplicate_count: parsed.duplicate_count,
+    valid_count: finalRows.rows.length,
+    skipped_missing_phone_name: finalRows.skipped_missing_identity_count,
+    duplicates_skipped: finalRows.duplicates_skipped,
     matched_count: parsed.matched_count,
     unmatched_count: parsed.unmatched_count,
     needs_review_count: parsed.needs_review_count,
@@ -692,6 +730,7 @@ async function handlePreview(body) {
 
 async function handleConfirm(body, auth) {
   const parsed = await parseAndMatch(body);
+  const finalRows = dedupeRowsByIdentityKey(parsed.rows);
   const metadata = uploadMetadata(body, auth);
   const defaults = locationDefaults(body);
   const upload = one(await supabaseRest('agent_production_uploads', {
@@ -704,6 +743,8 @@ async function handleConfirm(body, auth) {
         mapping: parsed.mapping,
         unmapped_columns: parsed.unmapped_columns,
         duplicate_count: parsed.duplicate_count,
+        duplicates_skipped: finalRows.duplicates_skipped,
+        skipped_missing_identity_count: finalRows.skipped_missing_identity_count,
         matched_count: parsed.matched_count,
         unmatched_count: parsed.unmatched_count,
         needs_review_count: parsed.needs_review_count,
@@ -712,10 +753,13 @@ async function handleConfirm(body, auth) {
     })
   }));
 
-  const importRows = await insertRows(
+  const importInsert = await postRowsResilient(
     'agent_production_import_rows',
-    parsed.rows.map((row) => importRowPayload(upload.id, row))
+    finalRows.rows.map((row) => importRowPayload(upload.id, row)),
+    { headers: { Prefer: 'return=representation' } },
+    200
   );
+  const importRows = importInsert.inserted;
   const [signals, openHouseRows] = await Promise.all([
     loadOpenHouseSignals(),
     loadOpenHouseRows()
@@ -724,6 +768,7 @@ async function handleConfirm(body, auth) {
   const rankings = importRows.map((row) => {
     const base = rankingFromImportRow(row, avgs, signals);
     let ranking = applyOpenHouseMatchToRanking(base, openHouseRows, avgs);
+    ranking.identity_key = identityKeyForAgentRanking(ranking) || row.raw?.identity_key || null;
     ranking.raw_sources = {
       ...(ranking.raw_sources || {}),
       upload_id: upload.id,
@@ -737,6 +782,15 @@ async function handleConfirm(body, auth) {
   });
   const upserted = await upsertRankings(rankings);
   const savedRankings = [...upserted.updated, ...upserted.created].sort((a, b) => Number(b.agent_rank_score || 0) - Number(a.agent_rank_score || 0));
+  const importSummary = {
+    uploaded_rows: parsed.row_count,
+    valid_rows: importRows.length,
+    skipped_missing_phone_name: finalRows.skipped_missing_identity_count,
+    duplicates_skipped: finalRows.duplicates_skipped + Number(upserted.collapsed_duplicates || 0),
+    new_rankings_inserted: upserted.created.length,
+    existing_rankings_updated: upserted.updated.length,
+    failed_rows: importInsert.failed.length + (upserted.failed?.length || 0)
+  };
 
   return {
     upload,
@@ -744,6 +798,8 @@ async function handleConfirm(body, auth) {
     rankings_created: upserted.created.length,
     rankings_updated: upserted.updated.length,
     rankings_collapsed_duplicates: upserted.collapsed_duplicates || 0,
+    failed_rows: [...importInsert.failed, ...(upserted.failed || [])],
+    import_summary: importSummary,
     summary: summarizeRankings(savedRankings),
     top_rankings: savedRankings.slice(0, 20)
   };
@@ -878,6 +934,7 @@ async function handleFixLocation(body) {
       location_fixed_note: String(body.note || '').trim() || null
     }
   };
+  payload.identity_key = identityKeyForAgentRanking({ ...ranking, ...payload }) || ranking.identity_key || null;
   const updated = one(await supabaseRest(`agent_rankings?id=eq.${enc(ranking.id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },

@@ -52,10 +52,13 @@ export type ProductionImportRow = {
   match_confidence?: number;
   match_reason?: string;
   needs_review?: boolean;
+  identity_key?: string;
+  identity_missing_reason?: string;
 };
 
 export type AgentRanking = {
   id?: string;
+  identity_key?: string | null;
   agent_id?: string | null;
   latest_import_row_id?: string | null;
   agent_name: string | null;
@@ -121,6 +124,14 @@ export function normalizeImportRows(csvText: string, options?: {
   column_overrides?: Partial<Record<CanonicalAgentProductionField, string>>;
 }): ProductionParseResult;
 
+export function identityKeyForAgentRanking(row: Partial<ProductionImportRow | AgentRanking>): string;
+export function dedupeRowsByIdentityKey<T extends Partial<ProductionImportRow | AgentRanking>>(rows: T[]): {
+  rows: Array<T & { identity_key: string }>;
+  duplicate_rows: T[];
+  duplicates_skipped: number;
+  skipped_missing_identity: T[];
+  skipped_missing_identity_count: number;
+};
 export function matchImportedRows(rows: ProductionImportRow[], agents: Array<Record<string, unknown>>): ProductionImportRow[];
 export function rankingFromImportRow(row: ProductionImportRow, averages?: Record<string, number>, signals?: Record<string, unknown>): AgentRanking;
 export function outreachPayloadFromRanking(ranking: AgentRanking): Record<string, unknown>;

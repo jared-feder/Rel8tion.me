@@ -479,6 +479,7 @@
       pageSize: 50,
       uploadOpen: false,
       upload: freshUploadState(),
+      lastImportSummary: null,
       locationFix: null,
       profile: null,
       pitchVariants: null
@@ -790,6 +791,41 @@
       `;
     }
 
+    function renderLastImportSummary() {
+      const s = state.lastImportSummary;
+      if (!s) return '';
+      const cards = [
+        ['Uploaded rows', s.uploaded_rows],
+        ['Valid rows', s.valid_rows],
+        ['Skipped missing phone/name', s.skipped_missing_phone_name],
+        ['Duplicates skipped', s.duplicates_skipped],
+        ['New rankings inserted', s.new_rankings_inserted],
+        ['Existing rankings updated', s.existing_rankings_updated],
+        ['Failed rows', s.failed_rows]
+      ];
+      return `
+        <section class="panel" style="margin-top:16px;">
+          <div class="panel-head">
+            <div>
+              <h2>Final Import Summary</h2>
+              <div class="small">Batch identity uses agent name, brokerage, phone, and county/market. Phone alone is never the unique identity.</div>
+            </div>
+            ${Number(s.failed_rows || 0) ? badge(`${num(s.failed_rows)} failed`, 'bad') : badge('Import completed', 'ok')}
+          </div>
+          <div class="panel-body">
+            <div class="grid summary-grid">
+              ${cards.map(([label, value]) => `
+                <div class="metric" style="box-shadow:none;">
+                  <div class="label">${esc(label)}</div>
+                  <div class="value">${num(value)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
     function renderFilters(rows) {
       const options = state.data.options || {};
       const brokerages = options.brokerages || [];
@@ -1021,7 +1057,7 @@
                   <div class="panel-head">
                     <div>
                       <h3>Preview before final import</h3>
-                      <div class="small">${num(preview.row_count)} rows | ${num(preview.matched_count)} matched | ${num(preview.unmatched_count)} unmatched | ${num(preview.duplicate_count)} duplicate signals</div>
+                      <div class="small">${num(preview.row_count)} uploaded | ${num(preview.valid_count)} valid | ${num(preview.skipped_missing_phone_name)} skipped missing phone/name | ${num(preview.duplicates_skipped)} duplicates skipped | ${num(preview.matched_count)} matched | ${num(preview.unmatched_count)} unmatched</div>
                     </div>
                     ${preview.needs_review_count ? badge(`${preview.needs_review_count} need review`, 'warn') : badge('Ready', 'ok')}
                   </div>
@@ -1055,7 +1091,11 @@
                               <td>${num(row.listings_active_last_12_months)}</td>
                               <td>${num(row.buyside_last_90_days)}</td>
                               <td>${num(row.buyside_last_12_months)}</td>
-                              <td>${row.matched_agent_id ? badge(`${row.match_confidence}% matched`, row.needs_review ? 'warn' : 'ok') : badge('Unmatched import', 'info')}<div class="small">${esc(row.matched_agent_name || row.match_reason || '')}</div></td>
+                              <td>
+                                ${row.identity_missing_reason ? badge(row.identity_missing_reason.replace(/_/g, ' '), 'bad') : row.is_duplicate ? badge('Duplicate identity', 'warn') : badge('Valid identity', 'ok')}
+                                ${row.matched_agent_id ? badge(`${row.match_confidence}% matched`, row.needs_review ? 'warn' : 'ok') : badge('Unmatched import', 'info')}
+                                <div class="small">${esc(row.matched_agent_name || row.match_reason || '')}</div>
+                              </td>
                             </tr>
                           `).join('')}
                         </tbody>
@@ -1246,6 +1286,7 @@
             </header>
             <section class="grid summary-grid">${renderSummaryCards()}</section>
             <section class="grid info-grid" style="margin-top:16px;">${renderInfoCards()}</section>
+            ${renderLastImportSummary()}
             <section style="margin-top:16px;">${renderFilters(rows)}</section>
             <section class="panel" style="margin-top:16px;">
               <div class="panel-head">
@@ -1334,8 +1375,9 @@
       render();
       try {
         const result = await api(API, { method: 'POST', body: JSON.stringify(uploadPayload('confirm_import')) });
-        const collapsed = Number(result.rankings_collapsed_duplicates || 0);
-        showToast(`Imported ${result.imported_rows || 0} rows. Updated rankings.${collapsed ? ` Collapsed ${collapsed} duplicate ranking rows.` : ''}`);
+        const summary = result.import_summary || {};
+        state.lastImportSummary = summary;
+        showToast(`Import complete: ${summary.valid_rows || result.imported_rows || 0} valid, ${summary.duplicates_skipped || 0} duplicate skipped, ${summary.failed_rows || 0} failed.`);
         state.uploadOpen = false;
         state.upload = freshUploadState();
         await loadData();

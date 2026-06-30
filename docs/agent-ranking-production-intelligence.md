@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location and open-house match migration was applied and live production routes were verified on 2026-06-30. Authenticated end-to-end upload testing still needs verification.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. Authenticated end-to-end upload testing still needs verification.
 
 ## Purpose
 
@@ -18,6 +18,7 @@ It is not a scraping tool, login automation tool, consumer lead resale workflow,
 - Open-house matcher: `lib/agent-ranking-open-house.js`
 - Base schema migration: `supabase/migrations/20260628125530_agent_ranking_production_intelligence.sql`
 - Location/open-house migration: `supabase/migrations/20260630065516_agent_ranking_location_open_house_matching.sql`
+- Identity-key migration: `supabase/migrations/20260630075547_agent_ranking_identity_key.sql`
 
 The page uses the same admin UID/token headers as REL8TION COMMAND.
 
@@ -47,6 +48,18 @@ The parser accepts common variants for:
 
 Phones are normalized to 10 digits for matching. Email is lowercased. Existing REL8TION agents are matched by phone, email, then conservative name/brokerage similarity.
 
+## Ranking Identity
+
+Rankings use `agent_rankings.identity_key`, not phone alone, as the database upsert identity.
+
+Identity format:
+
+`import:{normalized_agent_name}|{normalized_brokerage}|{normalized_phone}|{normalized_county_or_market}`
+
+Rows missing agent name or phone are skipped during final import and counted in the final import summary. Multiple agents sharing the same office/brokerage phone remain separate when their names, brokerages, or county/market values differ. Upload batches are deduped by `identity_key` before ranking upsert, and the admin API uses Supabase/PostgREST upsert with `on_conflict=identity_key`.
+
+Final import summaries include uploaded rows, valid rows, skipped missing phone/name, duplicates skipped, new rankings inserted, existing rankings updated, and failed rows.
+
 ## Location Intelligence
 
 Each imported row stores `county`, `primary_county`, `market_area`, `city`, `state`, `zip`, `inferred_county`, `location_confidence`, and `location_source`.
@@ -68,7 +81,7 @@ County inference is local-rule based for NY markets; it does not call a paid geo
 
 - `agent_production_uploads`: upload metadata, source, period, notes, parse summary
 - `agent_production_import_rows`: normalized rows from each upload, match confidence, location fields, raw row snapshot
-- `agent_rankings`: current opportunity ranking for each agent/contact identity, location fields, matched open-house counts, matched open-house ids, and last matched open-house timestamp
+- `agent_rankings`: current opportunity ranking for each `identity_key`, location fields, matched open-house counts, matched open-house ids, and last matched open-house timestamp
 
 All three tables have RLS enabled and service-role-only policies in the migration.
 
