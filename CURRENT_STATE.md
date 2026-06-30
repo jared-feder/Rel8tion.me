@@ -70,7 +70,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/loan-officer-support` stores public loan-officer open-house-support requests and surfaces them in REL8TION COMMAND.
 - `[PARTIAL]` `/key-reset` is a token-protected admin/beta reset utility, not a full admin dashboard.
 - `[PARTIAL]` `/admin` is REL8TION COMMAND. It supports important operational workflows, but broader CRM edits, sign inventory edits, LO calendar/availability edits, billing automation, and full project controls are not complete.
-- `[PARTIAL]` `/admin/agent-ranking` is an admin-only Agent Ranking / Production Intelligence module for permitted ListReports-style CSV imports, opportunity scoring, and manual outreach staging. It supports `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, and `buyside_last_12_months`. XLS/XLSX parsing, manual low-confidence match review, deployed route verification, and end-to-end upload testing remain `[NEEDS VERIFICATION]`.
+- `[PARTIAL]` `/admin/agent-ranking` is an admin-only Agent Ranking / Production Intelligence module for permitted ListReports-style CSV imports, opportunity scoring, county/location tagging, open-house matching, server-side sorting/filtering/pagination, and manual outreach staging. It supports ListReports fields including `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, and `buyside_last_12_months`, plus location columns such as county, market, city, state, and ZIP. XLS/XLSX parsing, manual low-confidence match review, deployed route verification, and end-to-end upload testing remain `[NEEDS VERIFICATION]`.
 
 ## NFC, Sign, Event Pass, And QR State
 
@@ -153,7 +153,7 @@ Status labels used in this file:
 - `[NEEDS VERIFICATION]` Live RLS policy state is not fully confirmed.
 - `[NEEDS VERIFICATION]` Live schema and repo migrations must be checked before frontend assumptions are changed.
 - `[NEEDS VERIFICATION]` RPC definitions used by app code but not proven from checked-in SQL include `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
-- `[PARTIAL]` Agent Ranking / Production Intelligence migration source exists for `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings`. On 2026-06-28, the linked Supabase schema was applied with RLS enabled, service-role-only policies, ListReports activity columns, catalog verification, and filtered advisor verification for the new objects.
+- `[PARTIAL]` Agent Ranking / Production Intelligence migration source exists for `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings`. On 2026-06-28, the linked Supabase schema was applied with RLS enabled, service-role-only policies, ListReports activity columns, catalog verification, and filtered advisor verification for the new objects. A 2026-06-30 migration adds location/source/confidence fields plus matched open-house counts/ids/timestamps and must be applied/verified against linked Supabase before calling the feature live.
 - `[RISK]` `event_loan_officer_sessions` grants and policies should be verified before broad public use.
 
 ## Current High-Risk Areas

@@ -103,7 +103,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
 - `[IMPLEMENTED]` `/agent-dashboard` is the host-agent live event dashboard.
 - `[PARTIAL]` REL8TION COMMAND at `/admin` is the operational admin dashboard.
-- `[PARTIAL]` `/admin/agent-ranking` is the Agent Ranking / Production Intelligence module. It accepts ListReports-style CSV exports, normalizes agent/contact/listing/buyside activity fields, scores opportunity fit, and can stage reviewed prospects into outreach manually. XLS/XLSX import and manual low-confidence match review are not complete.
+- `[PARTIAL]` `/admin/agent-ranking` is the Agent Ranking / Production Intelligence module. It accepts ListReports-style CSV exports, normalizes agent/contact/listing/buyside/location activity fields, infers county/source/confidence, matches rankings to `open_houses`/`listing_agents`, scores opportunity fit, supports server-side sorting/filtering/pagination, and can stage reviewed prospects into outreach manually. XLS/XLSX import and manual low-confidence match review are not complete.
 
 ### Open House Kit And Website Builder
 
@@ -128,7 +128,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `event_loan_officer_sessions` stores live LO coverage.
 - `[IMPLEMENTED]` `event_pass_coverage_consents` stores Sponsored Event Pass per-event consent.
 - `[PARTIAL]` `agent_outreach_queue`, `agent_outreach_replies`, and delivery-event tables support outreach.
-- `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns; deployed route and upload-flow behavior still need verification.
+- `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns. A 2026-06-30 migration adds location/source/confidence fields and matched open-house counts/ids/timestamps; deployed route, migration, and upload-flow behavior still need verification.
 - `[PARTIAL]` `agent_websites` and `agent_website_listings` support the website-builder app.
 
 ## Messaging, Outreach, And Compliance

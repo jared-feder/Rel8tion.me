@@ -272,6 +272,20 @@
       top: 0;
       z-index: 1;
     }
+    .sort-btn {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      cursor: pointer;
+    }
+    .sort-btn svg { width: 12px; height: 12px; }
     td strong { color: #17224f; }
     .muted { color: var(--muted); }
     .small { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 600; }
@@ -292,6 +306,15 @@
     .badge.bad { color: #b91c1c; background: #fff1f2; }
     .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .row-actions .btn { min-height: 32px; padding: 6px 8px; font-size: 12px; }
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(148,163,184,.18);
+      flex-wrap: wrap;
+    }
 
     .empty {
       padding: 28px;
@@ -406,7 +429,7 @@
       'production_volume', 'transaction_count', 'active_listing_count', 'sold_listing_count',
       'listings_days_since_last', 'listings_active_last_12_months',
       'buyside_last_90_days', 'buyside_last_12_months',
-      'average_price', 'market_area', 'city', 'county', 'state'
+      'average_price', 'market_area', 'city', 'county', 'zip', 'state'
     ];
 
     const params = new URLSearchParams(window.location.search);
@@ -418,16 +441,31 @@
       loading: false,
       action: '',
       error: '',
-      data: { rankings: [], uploads: [], summary: {} },
+      data: { rankings: [], uploads: [], summary: {}, options: {}, total: 0, page: 1, page_size: 50 },
       filters: {
         q: '',
         tier: 'all',
         brokerage: 'all',
         market: 'all',
+        county: 'all',
+        city: 'all',
+        state: 'all',
+        hasLocation: 'all',
+        locationSource: 'all',
+        minLocationConfidence: '',
+        matchedOpenHouse: 'all',
+        weekendOpenHouse: 'all',
+        minOpenHouseCount: '',
+        minWeekendOpenHouseCount: '',
+        productionMin: '',
+        productionMax: '',
         activeMin: '',
+        activeMax: '',
         daysMax: '',
         listing12Min: '',
+        listing12Max: '',
         buy12Min: '',
+        buy12Max: '',
         weekend: 'all',
         phone: 'all',
         email: 'all',
@@ -435,8 +473,13 @@
         periodStart: '',
         periodEnd: ''
       },
+      sortBy: '',
+      sortDirection: 'desc',
+      page: 1,
+      pageSize: 50,
       uploadOpen: false,
       upload: freshUploadState(),
+      locationFix: null,
       profile: null,
       pitchVariants: null
     };
@@ -447,6 +490,12 @@
         fileText: '',
         source_name: 'ListReports',
         market_area: '',
+        default_county: '',
+        default_market_area: '',
+        default_state: 'NY',
+        apply_location_defaults: true,
+        try_county_inference: true,
+        location_notes: '',
         period_start: '',
         period_end: '',
         notes: '',
@@ -528,6 +577,48 @@
       return 'info';
     }
 
+    function sourceLabel(source) {
+      return ({
+        manual_admin: 'County manual',
+        imported_county: 'County imported',
+        zip_city_inferred: 'County inferred',
+        imported_city_zip_inferred: 'County inferred',
+        open_house_match: 'Open house location',
+        upload_default: 'Upload default',
+        missing: 'Needs location review'
+      }[source] || source || 'Needs location review');
+    }
+
+    function locationBadges(row) {
+      const badges = [];
+      const source = row.location_source || 'missing';
+      const tone = source === 'manual_admin' || source === 'imported_county'
+        ? 'ok'
+        : source === 'missing'
+          ? 'bad'
+          : 'warn';
+      badges.push(badge(sourceLabel(source), tone));
+      if (!row.primary_county && !row.county) badges.push(badge('Needs location review', 'bad'));
+      if (Number(row.matched_open_house_count || 0) > 0) badges.push(badge('Open house match', 'ok'));
+      if (Number(row.matched_weekend_open_house_count || 0) > 0) badges.push(badge('Weekend open house', 'ok'));
+      return badges.join(' ');
+    }
+
+    function sortHeader(label, key) {
+      const active = state.sortBy === key;
+      const icon = active && state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down';
+      return `<button class="sort-btn" data-sort="${esc(key)}"><span>${esc(label)}</span><i data-lucide="${icon}"></i></button>`;
+    }
+
+    function rankOffset() {
+      return (Math.max(1, Number(state.data.page || state.page || 1)) - 1) * Number(state.data.page_size || state.pageSize || 50);
+    }
+
+    function pageCount() {
+      const size = Number(state.data.page_size || state.pageSize || 50);
+      return Math.max(1, Math.ceil(Number(state.data.total || 0) / size));
+    }
+
     function showToast(message) {
       toast.textContent = message;
       toast.classList.add('show');
@@ -547,16 +638,55 @@
       }
     }
 
+    function filtersForApi() {
+      return {
+        ...state.filters,
+        has_location: state.filters.hasLocation,
+        location_source: state.filters.locationSource,
+        min_location_confidence: state.filters.minLocationConfidence,
+        has_matched_open_house: state.filters.matchedOpenHouse,
+        has_weekend_open_house: state.filters.weekendOpenHouse,
+        min_open_house_count: state.filters.minOpenHouseCount,
+        min_weekend_open_house_count: state.filters.minWeekendOpenHouseCount,
+        production_min: state.filters.productionMin,
+        production_max: state.filters.productionMax,
+        active_min: state.filters.activeMin,
+        active_max: state.filters.activeMax,
+        listing_min: state.filters.listing12Min,
+        listing_max: state.filters.listing12Max,
+        buyer_min: state.filters.buy12Min,
+        buyer_max: state.filters.buy12Max
+      };
+    }
+
+    function listUrl() {
+      const params = new URLSearchParams();
+      params.set('page', String(state.page));
+      params.set('pageSize', String(state.pageSize));
+      if (state.sortBy) params.set('sortBy', state.sortBy);
+      params.set('sortDirection', state.sortDirection);
+      params.set('filters', JSON.stringify(filtersForApi()));
+      return `${API}?${params.toString()}`;
+    }
+
     async function loadData() {
       state.loading = true;
       render();
       try {
-        const data = await api(`${API}?limit=1500`);
+        const data = await api(listUrl());
         state.data = {
           rankings: data.rankings || [],
           uploads: data.uploads || [],
-          summary: data.summary || {}
+          summary: data.summary || {},
+          options: data.options || {},
+          total: data.total || 0,
+          page: data.page || state.page,
+          page_size: data.page_size || state.pageSize
         };
+        state.page = data.page || state.page;
+        state.pageSize = data.page_size || state.pageSize;
+        state.sortBy = data.sort_by || state.sortBy || '';
+        state.sortDirection = data.sort_direction || state.sortDirection || 'desc';
         state.error = '';
       } catch (error) {
         state.error = error.message || 'Unable to load rankings.';
@@ -593,25 +723,7 @@
     }
 
     function filteredRankings() {
-      const f = state.filters;
-      const q = f.q.trim().toLowerCase();
-      return (state.data.rankings || []).filter((row) => {
-        const haystack = [row.agent_name, row.brokerage, row.market_area, row.email, row.phone].join(' ').toLowerCase();
-        if (q && !haystack.includes(q)) return false;
-        if (f.tier !== 'all' && row.recommended_tier !== f.tier) return false;
-        if (f.brokerage !== 'all' && row.brokerage !== f.brokerage) return false;
-        if (f.market !== 'all' && row.market_area !== f.market) return false;
-        if (f.upload !== 'all' && uploadIdFor(row) !== f.upload) return false;
-        if (!overlapsPeriod(row, f)) return false;
-        if (f.weekend !== 'all' && String(Boolean(row.has_open_house_this_weekend)) !== f.weekend) return false;
-        if (f.phone !== 'all' && String(Boolean(row.has_phone)) !== f.phone) return false;
-        if (f.email !== 'all' && String(Boolean(row.has_email)) !== f.email) return false;
-        if (f.activeMin && Number(row.active_listing_count || 0) < Number(f.activeMin)) return false;
-        if (f.daysMax && Number(row.listings_days_since_last || 0) > Number(f.daysMax)) return false;
-        if (f.listing12Min && Number(row.listings_active_last_12_months || 0) < Number(f.listing12Min)) return false;
-        if (f.buy12Min && Number(row.buyside_last_12_months || 0) < Number(f.buy12Min)) return false;
-        return true;
-      });
+      return state.data.rankings || [];
     }
 
     function renderLock() {
@@ -649,9 +761,9 @@
         ['A+ agents', num(s.a_plus_agents)],
         ['A tier agents', num(s.a_tier_agents)],
         ['Active listings', num(s.total_active_listings)],
-        ['Listing side 12m', num(s.total_listings_active_last_12_months)],
-        ['Buyside 12m', num(s.total_buyside_last_12_months)],
-        ['Weekend open houses', num(s.agents_with_open_houses_this_weekend)]
+        ['Matched open houses', num(s.matched_open_house_total)],
+        ['Weekend open houses', num(s.matched_weekend_open_house_total)],
+        ['Needs location review', num(s.location_review_needed)]
       ];
       return cards.map(([label, value]) => `
         <div class="metric">
@@ -668,20 +780,25 @@
           <p>Import active-listing, recency, and buyside activity from ListReports and turn it into ranked outreach opportunities.</p>
         </div>
         <div class="info-card" id="gaps">
-          <h3>Opportunity gap</h3>
-          <p>Rel8tion does not replace agent activity. It captures the buyers their listings and open houses are already bringing through the door.</p>
+          <h3>Location intelligence</h3>
+          <p>County, city, market, and confidence tags keep outreach focused by local production context instead of a flat imported list.</p>
         </div>
         <div class="info-card">
-          <h3>No-tech value</h3>
-          <p>The strongest agents are often too busy to set up another app. Rel8tion works because the hardware is already live, branded, and ready to use.</p>
+          <h3>Open-house match</h3>
+          <p>Matched current and weekend open houses surface the fastest Event Pass and Open House Kit opportunities first.</p>
         </div>
       `;
     }
 
     function renderFilters(rows) {
-      const brokerages = uniqueOptions(state.data.rankings, (row) => row.brokerage);
-      const markets = uniqueOptions(state.data.rankings, (row) => row.market_area);
-      const tiers = ['A+', 'A', 'B', 'C', 'Unknown', 'Not a Fit'];
+      const options = state.data.options || {};
+      const brokerages = options.brokerages || [];
+      const markets = options.markets || [];
+      const counties = options.counties || [];
+      const cities = options.cities || [];
+      const states = options.states || [];
+      const locationSources = options.location_sources || [];
+      const tiers = options.tiers?.length ? options.tiers : ['A+', 'A', 'B', 'C', 'Unknown', 'Not a Fit'];
       const uploads = state.data.uploads || [];
       const f = state.filters;
       return `
@@ -689,7 +806,7 @@
           <div class="panel-head">
             <div>
               <h2>Filters</h2>
-              <div class="small">${rows.length} visible targets after filters</div>
+              <div class="small">${num(state.data.total || rows.length)} matching targets across all pages</div>
             </div>
             <button class="btn" id="clearFilters"><i data-lucide="x"></i><span>Clear</span></button>
           </div>
@@ -699,16 +816,30 @@
               <label>Tier <select class="select" data-filter="tier"><option value="all">All</option>${tiers.map((tier) => `<option value="${esc(tier)}"${f.tier === tier ? ' selected' : ''}>${esc(tier)}</option>`).join('')}</select></label>
               <label>Brokerage <select class="select" data-filter="brokerage"><option value="all">All</option>${brokerages.map((value) => `<option value="${esc(value)}"${f.brokerage === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
               <label>Market <select class="select" data-filter="market"><option value="all">All</option>${markets.map((value) => `<option value="${esc(value)}"${f.market === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>County <select class="select" data-filter="county"><option value="all">All</option>${counties.map((value) => `<option value="${esc(value)}"${f.county === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>City <select class="select" data-filter="city"><option value="all">All</option>${cities.map((value) => `<option value="${esc(value)}"${f.city === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>State <select class="select" data-filter="state"><option value="all">All</option>${states.map((value) => `<option value="${esc(value)}"${f.state === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
+              <label>Has location <select class="select" data-filter="hasLocation"><option value="all">All</option><option value="true"${f.hasLocation === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.hasLocation === 'false' ? ' selected' : ''}>Needs review</option></select></label>
+              <label>Location source <select class="select" data-filter="locationSource"><option value="all">All</option>${locationSources.map((value) => `<option value="${esc(value)}"${f.locationSource === value ? ' selected' : ''}>${esc(sourceLabel(value))}</option>`).join('')}</select></label>
+              <label>Min confidence <input class="field" data-filter="minLocationConfidence" value="${esc(f.minLocationConfidence)}" inputmode="numeric" placeholder="0-100"></label>
               <label>Upload <select class="select" data-filter="upload"><option value="all">All</option>${uploads.map((upload) => `<option value="${esc(upload.id)}"${f.upload === upload.id ? ' selected' : ''}>${esc(upload.source_name || 'Upload')} ${esc(fmtDate(upload.created_at))}</option>`).join('')}</select></label>
               <label>Period start <input class="field" data-filter="periodStart" type="date" value="${esc(f.periodStart)}"></label>
               <label>Period end <input class="field" data-filter="periodEnd" type="date" value="${esc(f.periodEnd)}"></label>
-              <label>Open house <select class="select" data-filter="weekend"><option value="all">All</option><option value="true"${f.weekend === 'true' ? ' selected' : ''}>This weekend</option><option value="false"${f.weekend === 'false' ? ' selected' : ''}>No weekend OH</option></select></label>
+              <label>Matched OH <select class="select" data-filter="matchedOpenHouse"><option value="all">All</option><option value="true"${f.matchedOpenHouse === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.matchedOpenHouse === 'false' ? ' selected' : ''}>No</option></select></label>
+              <label>Weekend OH <select class="select" data-filter="weekendOpenHouse"><option value="all">All</option><option value="true"${f.weekendOpenHouse === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.weekendOpenHouse === 'false' ? ' selected' : ''}>No</option></select></label>
+              <label>Min OH count <input class="field" data-filter="minOpenHouseCount" value="${esc(f.minOpenHouseCount)}" inputmode="numeric"></label>
+              <label>Min weekend OH <input class="field" data-filter="minWeekendOpenHouseCount" value="${esc(f.minWeekendOpenHouseCount)}" inputmode="numeric"></label>
               <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
               <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
+              <label>Min production <input class="field" data-filter="productionMin" value="${esc(f.productionMin)}" inputmode="numeric"></label>
+              <label>Max production <input class="field" data-filter="productionMax" value="${esc(f.productionMax)}" inputmode="numeric"></label>
               <label>Min active listings <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
+              <label>Max active listings <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
               <label>Max days since listing <input class="field" data-filter="daysMax" value="${esc(f.daysMax)}" inputmode="numeric"></label>
               <label>Min listing side 12m <input class="field" data-filter="listing12Min" value="${esc(f.listing12Min)}" inputmode="numeric"></label>
+              <label>Max listing side 12m <input class="field" data-filter="listing12Max" value="${esc(f.listing12Max)}" inputmode="numeric"></label>
               <label>Min buyside 12m <input class="field" data-filter="buy12Min" value="${esc(f.buy12Min)}" inputmode="numeric"></label>
+              <label>Max buyside 12m <input class="field" data-filter="buy12Max" value="${esc(f.buy12Max)}" inputmode="numeric"></label>
             </div>
           </div>
         </div>
@@ -717,23 +848,30 @@
 
     function renderRankingTable(rows) {
       if (!rows.length) return '<div class="empty">No agent rankings yet. Upload a production report to build the first ranking set.</div>';
+      const offset = rankOffset();
       return `
         <div class="table-wrap" id="targets">
-          <table>
+          <table style="min-width:1980px;">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Agent</th>
-                <th>Company</th>
-                <th>Phone</th>
-                <th>Active Listings</th>
-                <th>Days Since Last</th>
-                <th>Listing Side 12m</th>
-                <th>Buyside 90d</th>
-                <th>Buyside 12m</th>
-                <th>Open Houses</th>
-                <th>Opportunity Gap</th>
-                <th>Tier</th>
+                <th>${sortHeader('Rank', 'agent_rank_score')}</th>
+                <th>${sortHeader('Agent', 'agent_name')}</th>
+                <th>${sortHeader('Brokerage', 'brokerage')}</th>
+                <th>${sortHeader('County', 'primary_county')}</th>
+                <th>${sortHeader('Market', 'market_area')}</th>
+                <th>${sortHeader('Production Volume', 'production_volume')}</th>
+                <th>${sortHeader('Listing Side', 'listings_active_last_12_months')}</th>
+                <th>${sortHeader('Buyer Side', 'buyside_last_12_months')}</th>
+                <th>${sortHeader('Transactions', 'transaction_count')}</th>
+                <th>${sortHeader('Average Price', 'average_price')}</th>
+                <th>${sortHeader('Active Listings', 'active_listing_count')}</th>
+                <th>${sortHeader('Open Houses', 'matched_open_house_count')}</th>
+                <th>${sortHeader('Weekend Open Houses', 'matched_weekend_open_house_count')}</th>
+                <th>${sortHeader('Opportunity Gap', 'opportunity_gap_score')}</th>
+                <th>${sortHeader('Tier', 'recommended_tier')}</th>
+                <th>${sortHeader('Phone', 'phone_normalized')}</th>
+                <th>${sortHeader('Email', 'email')}</th>
+                <th>${sortHeader('Last Activity', 'last_activity_at')}</th>
                 <th>Next Best Action</th>
                 <th>Actions</th>
               </tr>
@@ -741,24 +879,31 @@
             <tbody>
               ${rows.map((row, index) => `
                 <tr>
-                  <td><strong>${index + 1}</strong><div class="small">${num(row.agent_rank_score)} score</div></td>
-                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.email || '')}</div></td>
+                  <td><strong>${offset + index + 1}</strong><div class="small">${num(row.agent_rank_score)} score</div></td>
+                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
-                  <td>${esc(row.phone || '')}</td>
+                  <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
+                  <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
+                  <td>${compactMoney(row.production_volume)}</td>
+                  <td>${num(row.listings_active_last_12_months)}<div class="small">${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days since last` : ''}</div></td>
+                  <td>${num(row.buyside_last_12_months)}<div class="small">${num(row.buyside_last_90_days)} in 90d</div></td>
+                  <td>${num(row.transaction_count)}</td>
+                  <td>${compactMoney(row.average_price)}</td>
                   <td>${num(row.active_listing_count)}</td>
-                  <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
-                  <td>${num(row.listings_active_last_12_months)}</td>
-                  <td>${num(row.buyside_last_90_days)}</td>
-                  <td>${num(row.buyside_last_12_months)}</td>
-                  <td>${num(row.open_house_count)} ${row.has_open_house_this_weekend ? badge('This weekend', 'ok') : ''}</td>
-                  <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
+                  <td>${num(row.matched_open_house_count || row.open_house_count)}<div class="small">${num(row.matched_active_listing_count)} active linked</div></td>
+                  <td>${num(row.matched_weekend_open_house_count)} ${row.has_open_house_this_weekend ? badge('Weekend', 'ok') : ''}</td>
+                  <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.gap_summary || '')}</div></td>
                   <td>${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}</td>
+                  <td>${esc(row.phone || '')}</td>
+                  <td>${esc(row.email || '')}</td>
+                  <td>${esc(fmtDate(row.last_activity_at || row.last_matched_open_house_at || row.updated_at))}</td>
                   <td><div class="small">${esc(row.next_best_action || '')}</div></td>
                   <td>
                     <div class="row-actions">
                       <button class="btn" data-profile="${esc(row.id)}"><i data-lucide="user-round-search"></i><span>Profile</span></button>
                       <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
                       <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
+                      <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
                       <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Prospect</span></button>
                       <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
                       <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
@@ -768,6 +913,27 @@
               `).join('')}
             </tbody>
           </table>
+        </div>
+        ${renderPager()}
+      `;
+    }
+
+    function renderPager() {
+      const total = Number(state.data.total || 0);
+      const page = Number(state.data.page || state.page || 1);
+      const pages = pageCount();
+      return `
+        <div class="pager">
+          <div class="small">Page ${num(page)} of ${num(pages)} | ${num(total)} matching agents</div>
+          <div class="actions">
+            <label style="display:flex;align-items:center;gap:8px;">Rows
+              <select class="select" style="width:auto;" id="pageSizeSelect">
+                ${[25, 50, 100, 250].map((value) => `<option value="${value}"${Number(state.pageSize) === value ? ' selected' : ''}>${value}</option>`).join('')}
+              </select>
+            </label>
+            <button class="btn" id="prevPage" ${page <= 1 ? 'disabled' : ''}><i data-lucide="chevron-left"></i><span>Prev</span></button>
+            <button class="btn" id="nextPage" ${page >= pages ? 'disabled' : ''}><span>Next</span><i data-lucide="chevron-right"></i></button>
+          </div>
         </div>
       `;
     }
@@ -831,8 +997,18 @@
                   </select>
                 </label>
                 <label>Market area <input class="field" data-upload-field="market_area" value="${esc(u.market_area)}" placeholder="Optional"></label>
+                <label>Default county <input class="field" data-upload-field="default_county" value="${esc(u.default_county)}" placeholder="Nassau, Suffolk, Queens"></label>
+                <label>Default market area <input class="field" data-upload-field="default_market_area" value="${esc(u.default_market_area)}" placeholder="Optional"></label>
+                <label>Default state <input class="field" data-upload-field="default_state" value="${esc(u.default_state)}" maxlength="2"></label>
+                <label style="align-content:start;">Apply defaults
+                  <span class="small"><input data-upload-field="apply_location_defaults" type="checkbox" ${u.apply_location_defaults ? 'checked' : ''}> Use default county when a row has no location.</span>
+                </label>
+                <label style="align-content:start;">Infer county
+                  <span class="small"><input data-upload-field="try_county_inference" type="checkbox" ${u.try_county_inference ? 'checked' : ''}> Infer from city, ZIP, market, or address.</span>
+                </label>
                 <label>Report period start <input class="field" data-upload-field="period_start" type="date" value="${esc(u.period_start)}"></label>
                 <label>Report period end <input class="field" data-upload-field="period_end" type="date" value="${esc(u.period_end)}"></label>
+                <label>Location notes <textarea data-upload-field="location_notes" placeholder="Optional notes about county/default assumptions">${esc(u.location_notes)}</textarea></label>
                 <label>Notes <textarea data-upload-field="notes" placeholder="Optional import notes">${esc(u.notes)}</textarea></label>
               </div>
               <div class="actions" style="justify-content:flex-start;">
@@ -866,12 +1042,13 @@
                     </details>
                     <div class="table-wrap">
                       <table style="min-width:1120px;">
-                        <thead><tr><th>Agent</th><th>Company</th><th>Phone</th><th>Active Total</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
+                        <thead><tr><th>Agent</th><th>Company</th><th>Location</th><th>Phone</th><th>Active Total</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
                         <tbody>
                           ${(preview.preview_rows || []).map((row) => `
                             <tr>
-                              <td><strong>${esc(row.agent_name || 'Unknown')}</strong><div class="small">${esc([row.city, row.county, row.state].filter(Boolean).join(', '))}</div></td>
+                              <td><strong>${esc(row.agent_name || 'Unknown')}</strong></td>
                               <td>${esc(row.brokerage || '')}</td>
+                              <td><strong>${esc(row.primary_county || row.county || '')}</strong><div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div><div>${badge(sourceLabel(row.location_source), row.location_source === 'missing' ? 'bad' : 'info')}</div></td>
                               <td><div>${esc(row.phone || '')}</div><div class="small">${esc(row.email || '')}</div></td>
                               <td>${num(row.active_listing_count)}</td>
                               <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
@@ -927,6 +1104,21 @@
                   <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
                 </div>
                 <div class="profile-box">
+                  <h3>Location Intelligence</h3>
+                  <div class="profile-metrics" style="margin-top:12px;">
+                    <div><div class="mini-title">County</div><strong>${esc(row.primary_county || row.county || 'Needs review')}</strong></div>
+                    <div><div class="mini-title">Market</div><strong>${esc(row.market_area || 'N/A')}</strong></div>
+                    <div><div class="mini-title">City/state</div><strong>${esc([row.city, row.state].filter(Boolean).join(', ') || 'N/A')}</strong></div>
+                    <div><div class="mini-title">Source</div><strong>${esc(sourceLabel(row.location_source))}</strong></div>
+                    <div><div class="mini-title">Confidence</div><strong>${num(row.location_confidence)}%</strong></div>
+                    <div><div class="mini-title">ZIP</div><strong>${esc(row.zip || 'N/A')}</strong></div>
+                  </div>
+                  <div style="margin-top:12px;">${locationBadges(row)}</div>
+                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
+                    <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
+                  </div>
+                </div>
+                <div class="profile-box">
                   <h3>Gap Analysis</h3>
                   <p>${esc(row.gap_summary || 'No gap summary calculated yet.')}</p>
                   <p>This agent is active enough to benefit from Rel8tion because the system removes setup friction. The agent does not need to download an app, create a login, print a QR code, or learn new software.</p>
@@ -980,6 +1172,39 @@
       `;
     }
 
+    function renderLocationFixModal() {
+      const fix = state.locationFix;
+      if (!fix) return '';
+      return `
+        <div class="modal-backdrop" data-close-location-fix>
+          <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="locationFixTitle" onclick="event.stopPropagation()">
+            <div class="modal-head">
+              <div>
+                <h2 id="locationFixTitle">Fix Location</h2>
+                <div class="small">${esc(fix.agent_name || 'Agent')} | ${esc(fix.brokerage || '')}</div>
+              </div>
+              <button class="btn" data-close-location-fix-button><i data-lucide="x"></i><span>Close</span></button>
+            </div>
+            <div class="modal-body grid" style="gap:14px;">
+              <div class="modal-grid">
+                <label>County <input class="field" data-location-field="primary_county" value="${esc(fix.primary_county || fix.county || '')}" placeholder="Nassau"></label>
+                <label>Market <input class="field" data-location-field="market_area" value="${esc(fix.market_area || '')}" placeholder="Long Island"></label>
+                <label>City <input class="field" data-location-field="city" value="${esc(fix.city || '')}" placeholder="Garden City"></label>
+                <label>State <input class="field" data-location-field="state" value="${esc(fix.state || 'NY')}" maxlength="2"></label>
+                <label>ZIP <input class="field" data-location-field="zip" value="${esc(fix.zip || '')}" inputmode="numeric"></label>
+                <label>Note <textarea data-location-field="note" placeholder="Optional reason or source">${esc(fix.note || '')}</textarea></label>
+              </div>
+              <div class="small">Saving marks this ranking as manual_admin with 100% location confidence.</div>
+              <div class="actions" style="justify-content:flex-start;">
+                <button class="btn primary" id="saveLocationFix" ${state.action === 'fix_location' ? 'disabled' : ''}><i data-lucide="check-circle-2"></i><span>${state.action === 'fix_location' ? 'Saving...' : 'Save location'}</span></button>
+                <button class="btn" data-close-location-fix-button><i data-lucide="x"></i><span>Cancel</span></button>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderShell() {
       const rows = filteredRankings();
       app.innerHTML = `
@@ -1015,6 +1240,7 @@
                 ${state.loading ? badge('Loading', 'info') : badge('Live admin', 'ok')}
                 ${state.error ? badge(state.error, 'bad') : ''}
                 <button class="btn" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+                <button class="btn" id="refreshMatchesBtn"><i data-lucide="radar"></i><span>Refresh Matches</span></button>
                 <button class="btn primary" data-open-upload><i data-lucide="upload-cloud"></i><span>Upload Production Report</span></button>
               </div>
             </header>
@@ -1025,7 +1251,7 @@
               <div class="panel-head">
                 <div>
                   <h2>Ranked Outreach Targets</h2>
-                  <div class="small">${rows.length} agents ranked by opportunity, not just production</div>
+                  <div class="small">${num(state.data.total || rows.length)} agents ranked by opportunity, not just production</div>
                 </div>
               </div>
               ${renderRankingTable(rows)}
@@ -1034,6 +1260,7 @@
           </section>
           ${renderUploadModal()}
           ${renderProfileModal()}
+          ${renderLocationFixModal()}
         </main>
       `;
       bind();
@@ -1047,7 +1274,7 @@
 
     function updateUploadFromInputs() {
       document.querySelectorAll('[data-upload-field]').forEach((input) => {
-        state.upload[input.dataset.uploadField] = input.value;
+        state.upload[input.dataset.uploadField] = input.type === 'checkbox' ? input.checked : input.value;
       });
     }
 
@@ -1073,6 +1300,12 @@
         file_text: state.upload.fileText,
         source_name: state.upload.source_name,
         market_area: state.upload.market_area,
+        default_county: state.upload.default_county,
+        default_market_area: state.upload.default_market_area,
+        default_state: state.upload.default_state || 'NY',
+        apply_location_defaults: state.upload.apply_location_defaults,
+        try_county_inference: state.upload.try_county_inference,
+        location_notes: state.upload.location_notes,
         period_start: state.upload.period_start,
         period_end: state.upload.period_end,
         notes: state.upload.notes,
@@ -1116,6 +1349,68 @@
 
     function findRanking(id) {
       return (state.data.rankings || []).find((row) => row.id === id) || null;
+    }
+
+    function openLocationFix(id) {
+      const row = findRanking(id);
+      if (!row) return;
+      state.locationFix = {
+        id: row.id,
+        agent_name: row.agent_name,
+        brokerage: row.brokerage,
+        primary_county: row.primary_county || row.county || '',
+        market_area: row.market_area || '',
+        city: row.city || '',
+        state: row.state || 'NY',
+        zip: row.zip || '',
+        note: ''
+      };
+      render();
+    }
+
+    async function saveLocationFix() {
+      const fix = state.locationFix;
+      if (!fix?.id) return;
+      state.action = 'fix_location';
+      render();
+      try {
+        await api(API, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'fix_location',
+            ranking_id: fix.id,
+            primary_county: fix.primary_county,
+            market_area: fix.market_area,
+            city: fix.city,
+            state: fix.state,
+            zip: fix.zip,
+            note: fix.note
+          })
+        });
+        state.locationFix = null;
+        showToast('Location fixed.');
+        await loadData();
+      } catch (error) {
+        showToast(error.message || 'Unable to fix location.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
+    async function refreshMatches() {
+      state.action = 'refresh_matches';
+      render();
+      try {
+        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'refresh_matches' }) });
+        showToast(`Open-house matches refreshed for ${num(result.updated_count || 0)} rankings.`);
+        await loadData();
+      } catch (error) {
+        showToast(error.message || 'Unable to refresh matches.');
+      } finally {
+        state.action = '';
+        render();
+      }
     }
 
     async function generatePitch(id) {
@@ -1166,8 +1461,14 @@
       }
     }
 
+    function scheduleLoadData(delay = 220) {
+      window.clearTimeout(scheduleLoadData.timer);
+      scheduleLoadData.timer = window.setTimeout(loadData, delay);
+    }
+
     function bind() {
       document.getElementById('refreshBtn')?.addEventListener('click', loadData);
+      document.getElementById('refreshMatchesBtn')?.addEventListener('click', refreshMatches);
       document.getElementById('lockBtn')?.addEventListener('click', () => {
         window.localStorage.removeItem(ADMIN_UID_KEY);
         window.localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -1190,8 +1491,9 @@
       });
       document.getElementById('uploadFile')?.addEventListener('change', (event) => readSelectedFile(event.target.files?.[0]));
       document.querySelectorAll('[data-upload-field]').forEach((input) => {
-        input.addEventListener('input', () => { state.upload[input.dataset.uploadField] = input.value; });
-        input.addEventListener('change', () => { state.upload[input.dataset.uploadField] = input.value; });
+        const update = () => { state.upload[input.dataset.uploadField] = input.type === 'checkbox' ? input.checked : input.value; };
+        input.addEventListener('input', update);
+        input.addEventListener('change', update);
       });
       document.querySelectorAll('[data-map-field]').forEach((select) => {
         select.addEventListener('change', () => {
@@ -1202,16 +1504,50 @@
       document.getElementById('previewUpload')?.addEventListener('click', previewUpload);
       document.getElementById('confirmImport')?.addEventListener('click', confirmImport);
       document.querySelectorAll('[data-filter]').forEach((input) => {
-        input.addEventListener('input', () => { state.filters[input.dataset.filter] = input.value; render(); });
-        input.addEventListener('change', () => { state.filters[input.dataset.filter] = input.value; render(); });
+        const update = () => {
+          state.filters[input.dataset.filter] = input.value;
+          state.page = 1;
+          scheduleLoadData(input.tagName === 'SELECT' ? 0 : 220);
+        };
+        input.addEventListener('input', update);
+        input.addEventListener('change', update);
       });
       document.getElementById('clearFilters')?.addEventListener('click', () => {
         state.filters = {
-          q: '', tier: 'all', brokerage: 'all', market: 'all', activeMin: '', daysMax: '',
-          listing12Min: '', buy12Min: '', weekend: 'all', phone: 'all', email: 'all', upload: 'all',
-          periodStart: '', periodEnd: ''
+          q: '', tier: 'all', brokerage: 'all', market: 'all', county: 'all', city: 'all', state: 'all',
+          hasLocation: 'all', locationSource: 'all', minLocationConfidence: '',
+          matchedOpenHouse: 'all', weekendOpenHouse: 'all', minOpenHouseCount: '', minWeekendOpenHouseCount: '',
+          productionMin: '', productionMax: '', activeMin: '', activeMax: '', daysMax: '',
+          listing12Min: '', listing12Max: '', buy12Min: '', buy12Max: '', weekend: 'all',
+          phone: 'all', email: 'all', upload: 'all', periodStart: '', periodEnd: ''
         };
-        render();
+        state.page = 1;
+        loadData();
+      });
+      document.querySelectorAll('[data-sort]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const key = button.dataset.sort;
+          if (state.sortBy === key) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          else {
+            state.sortBy = key;
+            state.sortDirection = 'desc';
+          }
+          state.page = 1;
+          loadData();
+        });
+      });
+      document.getElementById('prevPage')?.addEventListener('click', () => {
+        state.page = Math.max(1, Number(state.page || 1) - 1);
+        loadData();
+      });
+      document.getElementById('nextPage')?.addEventListener('click', () => {
+        state.page = Math.min(pageCount(), Number(state.page || 1) + 1);
+        loadData();
+      });
+      document.getElementById('pageSizeSelect')?.addEventListener('change', (event) => {
+        state.pageSize = Number(event.target.value || 50);
+        state.page = 1;
+        loadData();
       });
       document.querySelectorAll('[data-profile]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -1226,6 +1562,24 @@
           state.pitchVariants = null;
           render();
         });
+      });
+      document.querySelectorAll('[data-close-location-fix], [data-close-location-fix-button]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.locationFix = null;
+          render();
+        });
+      });
+      document.querySelectorAll('[data-location-field]').forEach((input) => {
+        input.addEventListener('input', () => {
+          if (state.locationFix) state.locationFix[input.dataset.locationField] = input.value;
+        });
+        input.addEventListener('change', () => {
+          if (state.locationFix) state.locationFix[input.dataset.locationField] = input.value;
+        });
+      });
+      document.getElementById('saveLocationFix')?.addEventListener('click', saveLocationFix);
+      document.querySelectorAll('[data-fix-location]').forEach((button) => {
+        button.addEventListener('click', () => openLocationFix(button.dataset.fixLocation));
       });
       document.querySelectorAll('[data-pitch]').forEach((button) => {
         button.addEventListener('click', () => generatePitch(button.dataset.pitch));

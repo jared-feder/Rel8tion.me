@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the new objects and ListReports activity columns on 2026-06-28. Deployment and end-to-end upload testing still need verification after release.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. A 2026-06-30 migration adds county/location intelligence and open-house match columns; live schema/deploy verification is required after release.
 
 ## Purpose
 
@@ -14,7 +14,10 @@ It is not a scraping tool, login automation tool, consumer lead resale workflow,
 - Static page: `apps/rel8tion-app/agent-ranking.html`
 - Admin API: `api/admin/agent-ranking.js`
 - Shared parser/scoring utilities: `lib/agent-ranking.js`
-- Schema migration: `supabase/migrations/20260628125530_agent_ranking_production_intelligence.sql`
+- Location inference utility: `lib/location-intelligence.js`
+- Open-house matcher: `lib/agent-ranking-open-house.js`
+- Base schema migration: `supabase/migrations/20260628125530_agent_ranking_production_intelligence.sql`
+- Location/open-house migration: `supabase/migrations/20260630065516_agent_ranking_location_open_house_matching.sql`
 
 The page uses the same admin UID/token headers as REL8TION COMMAND.
 
@@ -22,7 +25,7 @@ The page uses the same admin UID/token headers as REL8TION COMMAND.
 
 1. Open `/admin/agent-ranking`.
 2. Upload a CSV production report.
-3. Set source name, market area, optional period dates, and notes.
+3. Set source name, market area, optional period dates, location defaults, and notes.
 4. Preview the import.
 5. Review detected column mapping, duplicate count, match counts, and the first 20 normalized rows.
 6. Confirm import.
@@ -40,17 +43,38 @@ The parser accepts common variants for:
 - Active listings, sold listings
 - ListReports columns: `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, `buyside_last_12_months`
 - Average price
-- Market, city, county, state
+- Location columns: `county`, `agent_county`, `market_county`, `primary_county`, `area`, `market`, `market_area`, `city`, `town`, `municipality`, `zip`, `zipcode`, `postal_code`, `state`, `region`, `territory`, `board_area`, `mls_area`
 
 Phones are normalized to 10 digits for matching. Email is lowercased. Existing REL8TION agents are matched by phone, email, then conservative name/brokerage similarity.
+
+## Location Intelligence
+
+Each imported row stores `county`, `primary_county`, `market_area`, `city`, `state`, `zip`, `inferred_county`, `location_confidence`, and `location_source`.
+
+Source priority and confidence:
+
+- `manual_admin`: 100
+- `imported_county`: 100
+- `zip_city_inferred`: 85 for ZIP inference, 75 for city/market/address inference
+- `open_house_match`: 80
+- `upload_default`: 70
+- `missing`: 0
+
+The admin upload modal supports default county, market area, state, apply-defaults, county inference, and location notes. The ranking table and profile modal show source/confidence badges. The Fix Location action updates the ranking row only, marks `location_source=manual_admin`, and sets confidence to 100.
+
+County inference is local-rule based for NY markets; it does not call a paid geocoder.
 
 ## Tables
 
 - `agent_production_uploads`: upload metadata, source, period, notes, parse summary
-- `agent_production_import_rows`: normalized rows from each upload, match confidence, raw row snapshot
-- `agent_rankings`: current opportunity ranking for each agent/contact identity
+- `agent_production_import_rows`: normalized rows from each upload, match confidence, location fields, raw row snapshot
+- `agent_rankings`: current opportunity ranking for each agent/contact identity, location fields, matched open-house counts, matched open-house ids, and last matched open-house timestamp
 
 All three tables have RLS enabled and service-role-only policies in the migration.
+
+## Open-House Matching
+
+Imports are matched to current REL8TION `open_houses` and `listing_agents` data by phone, email, name plus brokerage, and name plus county/market/city. The API action `refresh_matches` recomputes matches for all rankings or an optional `upload_id`, `agent_id`, or `ranking_id`.
 
 ## Ranking Logic
 
@@ -67,6 +91,10 @@ Signals include:
 - Buyside activity in the last 90 days and 12 months
 - Average price
 - Known open-house activity from outreach data
+- Matched current open houses
+- Matched weekend open houses
+- Matched active listing count
+- Location confidence
 - Contactability by phone/email
 - Above-average production compared with the imported batch
 

@@ -11,7 +11,7 @@
     for (const [key, value] of new URLSearchParams(window.location.search).entries()) {
       target.searchParams.set(key, value);
     }
-    target.searchParams.set('v', '20260628-listreports');
+    target.searchParams.set('v', '20260630-location-open-house');
     window.location.replace(`${target.pathname}${target.search}${window.location.hash}`);
   </script>
 </head>

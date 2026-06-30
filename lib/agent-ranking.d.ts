@@ -17,6 +17,7 @@ export type CanonicalAgentProductionField =
   | 'market_area'
   | 'city'
   | 'county'
+  | 'zip'
   | 'state';
 
 export type ProductionImportRow = {
@@ -32,7 +33,12 @@ export type ProductionImportRow = {
   market_area: string;
   city: string;
   county: string;
+  primary_county: string;
+  inferred_county: string;
+  zip: string;
   state: string;
+  location_confidence: number;
+  location_source: string;
   production_volume: number;
   transaction_count: number;
   active_listing_count: number;
@@ -58,6 +64,14 @@ export type AgentRanking = {
   phone_normalized: string | null;
   email: string | null;
   market_area: string | null;
+  county?: string | null;
+  primary_county?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  inferred_county?: string | null;
+  location_confidence?: number;
+  location_source?: string | null;
   production_volume: number;
   transaction_count: number;
   active_listing_count: number;
@@ -68,6 +82,11 @@ export type AgentRanking = {
   buyside_last_12_months: number;
   average_price: number;
   open_house_count: number;
+  matched_open_house_count?: number;
+  matched_weekend_open_house_count?: number;
+  matched_active_listing_count?: number;
+  matched_open_house_ids?: string[];
+  last_matched_open_house_at?: string | null;
   rel8tion_lead_capture_score: number;
   opportunity_gap_score: number;
   agent_rank_score: number;
@@ -94,6 +113,11 @@ export type ProductionParseResult = {
 
 export function normalizeImportRows(csvText: string, options?: {
   market_area?: string;
+  default_county?: string;
+  default_market_area?: string;
+  default_state?: string;
+  apply_location_defaults?: boolean;
+  try_county_inference?: boolean;
   column_overrides?: Partial<Record<CanonicalAgentProductionField, string>>;
 }): ProductionParseResult;
 

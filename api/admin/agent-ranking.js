@@ -7,8 +7,11 @@ const {
   normalizeName,
   normalizePhone,
   outreachPayloadFromRanking,
-  rankingFromImportRow
+  rankingFromImportRow,
+  scoreRow
 } = require('../../lib/agent-ranking');
+const { buildOpenHouseRows, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
+const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -52,12 +55,23 @@ function readQuery(req, name) {
 function uploadMetadata(body, auth) {
   return {
     source_name: String(body.source_name || 'Manual Upload').trim(),
-    market_area: String(body.market_area || '').trim() || null,
+    market_area: String(body.market_area || body.default_market_area || '').trim() || null,
     period_start: body.period_start || null,
     period_end: body.period_end || null,
     original_filename: String(body.original_filename || '').trim() || null,
     notes: String(body.notes || '').trim() || null,
     uploaded_by: isUuid(auth.uid) ? auth.uid : null
+  };
+}
+
+function locationDefaults(body) {
+  return {
+    default_county: String(body.default_county || '').trim(),
+    default_market_area: String(body.default_market_area || body.market_area || '').trim(),
+    default_state: String(body.default_state || 'NY').trim() || 'NY',
+    apply_location_defaults: body.apply_location_defaults !== false,
+    try_county_inference: body.try_county_inference !== false,
+    location_notes: String(body.location_notes || '').trim()
   };
 }
 
@@ -125,11 +139,25 @@ async function loadOpenHouseSignals() {
   return signals;
 }
 
+async function loadOpenHouseRows() {
+  const [openHouses, listingAgents] = await Promise.all([
+    supabaseRest(
+      'open_houses?select=id,address,location,agent,brokerage,agent_phone,agent_email,open_start,open_end,created_at,updated_at&order=open_start.desc.nullslast&limit=10000'
+    ).catch(() => []),
+    supabaseRest(
+      'listing_agents?select=open_house_id,name,phone,phone_normalized,email,brokerage,office_city,office_state_or_province,active_listing_count,active_open_house_count&limit=10000'
+    ).catch(() => [])
+  ]);
+  return buildOpenHouseRows(openHouses || [], listingAgents || []);
+}
+
 async function parseAndMatch(body) {
   assertCsvUpload(body);
+  const defaults = locationDefaults(body);
   const parsed = normalizeImportRows(body.file_text, {
     market_area: body.market_area,
-    column_overrides: body.column_overrides || {}
+    column_overrides: body.column_overrides || {},
+    ...defaults
   });
   const agents = await loadAgents();
   const matchedRows = matchImportedRows(parsed.rows, agents);
@@ -158,6 +186,11 @@ function importRowPayload(uploadId, row) {
     market_area: row.market_area || null,
     city: row.city || null,
     county: row.county || null,
+    primary_county: row.primary_county || row.county || null,
+    zip: row.zip || null,
+    inferred_county: row.inferred_county || null,
+    location_confidence: row.location_confidence || 0,
+    location_source: row.location_source || 'missing',
     state: row.state || null,
     production_volume: row.production_volume || 0,
     transaction_count: row.transaction_count || 0,
@@ -210,6 +243,8 @@ function rankingStrength(row) {
   return [
     Number(row.agent_rank_score || 0),
     Number(row.opportunity_gap_score || 0),
+    Number(row.matched_weekend_open_house_count || 0),
+    Number(row.matched_open_house_count || 0),
     Number(row.active_listing_count || 0),
     Number(row.listings_active_last_12_months || 0),
     Number(row.buyside_last_12_months || 0),
@@ -300,12 +335,62 @@ async function upsertRankings(rankings) {
   return { created, updated, collapsed_duplicates: deduped.collapsed };
 }
 
+function rescoreRanking(ranking, averages) {
+  const scored = scoreRow(ranking, averages);
+  return {
+    ...ranking,
+    rel8tion_lead_capture_score: scored.rel8tion_lead_capture_score,
+    opportunity_gap_score: scored.opportunity_gap_score,
+    agent_rank_score: scored.agent_rank_score,
+    recommended_tier: scored.recommended_tier,
+    recommended_pitch: scored.recommended_pitch,
+    next_best_action: scored.next_best_action,
+    gap_summary: scored.gap_summary,
+    rel8tion_value_summary: scored.rel8tion_value_summary,
+    raw_sources: {
+      ...(ranking.raw_sources || {}),
+      labels: scored.labels,
+      above_average_volume: scored.above_average_volume,
+      above_average_transactions: scored.above_average_transactions,
+      above_average_listing_side_12_months: scored.above_average_listing_side_12_months,
+      above_average_buyside_12_months: scored.above_average_buyside_12_months,
+      above_average_price: scored.above_average_price,
+      below_average_capture_opportunity: scored.below_average_capture_opportunity,
+      needs_location_review: !ranking.primary_county && !ranking.county
+    }
+  };
+}
+
+function applyOpenHouseMatchToRanking(ranking, openHouseRows, averages) {
+  const match = matchOpenHousesForRanking(ranking, openHouseRows);
+  const matched = {
+    ...ranking,
+    ...(match.location || {}),
+    open_house_count: Math.max(Number(ranking.open_house_count || 0), Number(match.open_house_count || 0)),
+    matched_open_house_count: Number(match.matched_open_house_count || 0),
+    matched_weekend_open_house_count: Number(match.matched_weekend_open_house_count || 0),
+    matched_active_listing_count: Number(match.matched_active_listing_count || 0),
+    matched_open_house_ids: match.matched_open_house_ids || [],
+    last_matched_open_house_at: match.last_matched_open_house_at || null,
+    has_open_house_this_weekend: Boolean(ranking.has_open_house_this_weekend || match.has_open_house_this_weekend),
+    last_activity_at: match.last_activity_at || ranking.last_activity_at || null,
+    raw_sources: {
+      ...(ranking.raw_sources || {}),
+      open_house_match_confidence: Number(match.match_confidence || 0),
+      open_house_match_refreshed_at: new Date().toISOString()
+    }
+  };
+  return rescoreRanking(matched, averages);
+}
+
 function summarizeRankings(rankings) {
   const totalVolume = rankings.reduce((sum, row) => sum + Number(row.production_volume || 0), 0);
   const totalActiveListings = rankings.reduce((sum, row) => sum + Number(row.active_listing_count || 0), 0);
   const totalListingSide12 = rankings.reduce((sum, row) => sum + Number(row.listings_active_last_12_months || 0), 0);
   const totalBuySide90 = rankings.reduce((sum, row) => sum + Number(row.buyside_last_90_days || 0), 0);
   const totalBuySide12 = rankings.reduce((sum, row) => sum + Number(row.buyside_last_12_months || 0), 0);
+  const matchedOpenHouseTotal = rankings.reduce((sum, row) => sum + Number(row.matched_open_house_count || 0), 0);
+  const matchedWeekendTotal = rankings.reduce((sum, row) => sum + Number(row.matched_weekend_open_house_count || 0), 0);
   const daysValues = rankings
     .map((row) => Number(row.listings_days_since_last || 0))
     .filter((value) => Number.isFinite(value) && value > 0);
@@ -324,8 +409,270 @@ function summarizeRankings(rankings) {
       : 0,
     average_agent_production: rankings.length ? totalVolume / rankings.length : 0,
     agents_with_open_houses_this_weekend: rankings.filter((row) => row.has_open_house_this_weekend).length,
+    agents_with_matched_open_houses: rankings.filter((row) => Number(row.matched_open_house_count || 0) > 0).length,
+    agents_with_weekend_open_houses: rankings.filter((row) => Number(row.matched_weekend_open_house_count || 0) > 0).length,
+    matched_open_house_total: matchedOpenHouseTotal,
+    matched_weekend_open_house_total: matchedWeekendTotal,
+    located_agents: rankings.filter((row) => row.primary_county || row.county || row.city || row.zip).length,
+    location_review_needed: rankings.filter((row) => !row.primary_county && !row.county).length,
     agents_missing_buyer_capture_opportunity: missingCapture
   };
+}
+
+function parseJsonQuery(req, name) {
+  const raw = readQuery(req, name);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function plainValue(value) {
+  const text = String(value ?? '').trim();
+  return text && text !== 'all' ? text : '';
+}
+
+function boolValue(value) {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
+
+function numberValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function queryOrFilter(req, filters, key, aliases = []) {
+  const query = readQuery(req, key);
+  if (query !== '') return query;
+  if (filters[key] !== undefined) return filters[key];
+  for (const alias of aliases) {
+    const aliasQuery = readQuery(req, alias);
+    if (aliasQuery !== '') return aliasQuery;
+    if (filters[alias] !== undefined) return filters[alias];
+  }
+  return '';
+}
+
+function parseRankingFilters(req) {
+  const filters = parseJsonQuery(req, 'filters');
+  return {
+    q: plainValue(queryOrFilter(req, filters, 'q')),
+    tier: plainValue(queryOrFilter(req, filters, 'tier')),
+    brokerage: plainValue(queryOrFilter(req, filters, 'brokerage')),
+    market_area: plainValue(queryOrFilter(req, filters, 'market_area', ['market'])),
+    county: plainValue(queryOrFilter(req, filters, 'county')),
+    city: plainValue(queryOrFilter(req, filters, 'city')),
+    state: plainValue(queryOrFilter(req, filters, 'state')),
+    location_source: plainValue(queryOrFilter(req, filters, 'location_source', ['locationSource'])),
+    upload: plainValue(queryOrFilter(req, filters, 'upload', ['upload_id'])),
+    period_start: plainValue(queryOrFilter(req, filters, 'period_start', ['periodStart'])),
+    period_end: plainValue(queryOrFilter(req, filters, 'period_end', ['periodEnd'])),
+    has_location: boolValue(queryOrFilter(req, filters, 'has_location', ['hasLocation'])),
+    has_matched_open_house: boolValue(queryOrFilter(req, filters, 'has_matched_open_house', ['matchedOpenHouse'])),
+    has_weekend_open_house: boolValue(queryOrFilter(req, filters, 'has_weekend_open_house', ['weekendOpenHouse', 'weekend'])),
+    has_phone: boolValue(queryOrFilter(req, filters, 'has_phone', ['phone'])),
+    has_email: boolValue(queryOrFilter(req, filters, 'has_email', ['email'])),
+    min_location_confidence: numberValue(queryOrFilter(req, filters, 'min_location_confidence', ['minLocationConfidence'])),
+    min_open_house_count: numberValue(queryOrFilter(req, filters, 'min_open_house_count', ['minOpenHouseCount'])),
+    min_weekend_open_house_count: numberValue(queryOrFilter(req, filters, 'min_weekend_open_house_count', ['minWeekendOpenHouseCount'])),
+    production_min: numberValue(queryOrFilter(req, filters, 'production_min', ['productionMin'])),
+    production_max: numberValue(queryOrFilter(req, filters, 'production_max', ['productionMax'])),
+    active_min: numberValue(queryOrFilter(req, filters, 'active_min', ['activeMin'])),
+    active_max: numberValue(queryOrFilter(req, filters, 'active_max', ['activeMax'])),
+    days_max: numberValue(queryOrFilter(req, filters, 'days_max', ['daysMax'])),
+    buyer_min: numberValue(queryOrFilter(req, filters, 'buyer_min', ['buyerMin', 'buy12Min'])),
+    buyer_max: numberValue(queryOrFilter(req, filters, 'buyer_max', ['buyerMax'])),
+    listing_min: numberValue(queryOrFilter(req, filters, 'listing_min', ['listingMin', 'listing12Min'])),
+    listing_max: numberValue(queryOrFilter(req, filters, 'listing_max', ['listingMax']))
+  };
+}
+
+function uploadIdForRanking(row) {
+  return row?.raw_sources?.upload_id || row?.raw_sources?.source_upload_id || '';
+}
+
+function dateKey(value) {
+  return String(value || '').slice(0, 10);
+}
+
+function overlapsPeriod(row, filters) {
+  if (!filters.period_start && !filters.period_end) return true;
+  const raw = row?.raw_sources || {};
+  const rowStart = dateKey(raw.period_start || raw.source_period_start);
+  const rowEnd = dateKey(raw.period_end || raw.source_period_end) || rowStart;
+  const start = rowStart || rowEnd;
+  const end = rowEnd || rowStart;
+  if (!start && !end) return false;
+  if (filters.period_start && end < filters.period_start) return false;
+  if (filters.period_end && start > filters.period_end) return false;
+  return true;
+}
+
+function hasLocation(row) {
+  return Boolean(row.primary_county || row.county || row.city || row.zip);
+}
+
+function textEqual(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+function passesMin(value, min) {
+  return min === null || Number(value || 0) >= min;
+}
+
+function passesMax(value, max) {
+  return max === null || Number(value || 0) <= max;
+}
+
+function applyRankingFilters(rankings, filters) {
+  return (rankings || []).filter((row) => {
+    const haystack = [
+      row.agent_name,
+      row.brokerage,
+      row.market_area,
+      row.primary_county,
+      row.county,
+      row.city,
+      row.state,
+      row.email,
+      row.phone
+    ].join(' ').toLowerCase();
+    if (filters.q && !haystack.includes(filters.q.toLowerCase())) return false;
+    if (filters.tier && !textEqual(row.recommended_tier, filters.tier)) return false;
+    if (filters.brokerage && !textEqual(row.brokerage, filters.brokerage)) return false;
+    if (filters.market_area && !textEqual(row.market_area, filters.market_area)) return false;
+    if (filters.county && !textEqual(row.primary_county || row.county, filters.county)) return false;
+    if (filters.city && !textEqual(row.city, filters.city)) return false;
+    if (filters.state && !textEqual(row.state, filters.state)) return false;
+    if (filters.location_source && !textEqual(row.location_source, filters.location_source)) return false;
+    if (filters.upload && uploadIdForRanking(row) !== filters.upload) return false;
+    if (!overlapsPeriod(row, filters)) return false;
+    if (filters.has_location !== null && hasLocation(row) !== filters.has_location) return false;
+    if (filters.has_matched_open_house !== null && (Number(row.matched_open_house_count || 0) > 0) !== filters.has_matched_open_house) return false;
+    if (filters.has_weekend_open_house !== null && (Number(row.matched_weekend_open_house_count || 0) > 0 || Boolean(row.has_open_house_this_weekend)) !== filters.has_weekend_open_house) return false;
+    if (filters.has_phone !== null && Boolean(row.has_phone || row.phone_normalized || row.phone) !== filters.has_phone) return false;
+    if (filters.has_email !== null && Boolean(row.has_email || row.email) !== filters.has_email) return false;
+    if (!passesMin(row.location_confidence, filters.min_location_confidence)) return false;
+    if (!passesMin(row.matched_open_house_count, filters.min_open_house_count)) return false;
+    if (!passesMin(row.matched_weekend_open_house_count, filters.min_weekend_open_house_count)) return false;
+    if (!passesMin(row.production_volume, filters.production_min) || !passesMax(row.production_volume, filters.production_max)) return false;
+    if (!passesMin(row.active_listing_count, filters.active_min) || !passesMax(row.active_listing_count, filters.active_max)) return false;
+    if (!passesMax(row.listings_days_since_last, filters.days_max)) return false;
+    if (!passesMin(row.buyside_last_12_months, filters.buyer_min) || !passesMax(row.buyside_last_12_months, filters.buyer_max)) return false;
+    if (!passesMin(row.listings_active_last_12_months, filters.listing_min) || !passesMax(row.listings_active_last_12_months, filters.listing_max)) return false;
+    return true;
+  });
+}
+
+function uniqueSorted(rows, pick) {
+  return [...new Set((rows || []).map(pick).filter(Boolean).map(String))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function buildFilterOptions(rankings) {
+  return {
+    brokerages: uniqueSorted(rankings, (row) => row.brokerage),
+    markets: uniqueSorted(rankings, (row) => row.market_area),
+    counties: uniqueSorted(rankings, (row) => row.primary_county || row.county),
+    cities: uniqueSorted(rankings, (row) => row.city),
+    states: uniqueSorted(rankings, (row) => row.state),
+    location_sources: uniqueSorted(rankings, (row) => row.location_source),
+    tiers: uniqueSorted(rankings, (row) => row.recommended_tier)
+  };
+}
+
+const SORT_ALIASES = {
+  rank: 'agent_rank_score',
+  rank_score: 'agent_rank_score',
+  agent: 'agent_name',
+  company: 'brokerage',
+  market: 'market_area',
+  county: 'primary_county',
+  listing_side_count: 'listings_active_last_12_months',
+  buyer_side_count: 'buyside_last_12_months',
+  transactions: 'transaction_count',
+  active_listings: 'active_listing_count',
+  open_houses: 'matched_open_house_count',
+  weekend_open_houses: 'matched_weekend_open_house_count',
+  opportunity_gap: 'opportunity_gap_score',
+  tier: 'recommended_tier',
+  phone: 'phone_normalized',
+  last_activity: 'last_activity_at'
+};
+
+const SORT_FIELDS = new Set([
+  'agent_rank_score',
+  'agent_name',
+  'brokerage',
+  'primary_county',
+  'market_area',
+  'city',
+  'state',
+  'production_volume',
+  'transaction_count',
+  'average_price',
+  'active_listing_count',
+  'listings_active_last_12_months',
+  'buyside_last_90_days',
+  'buyside_last_12_months',
+  'matched_open_house_count',
+  'matched_weekend_open_house_count',
+  'matched_active_listing_count',
+  'opportunity_gap_score',
+  'recommended_tier',
+  'phone_normalized',
+  'email',
+  'location_confidence',
+  'location_source',
+  'last_activity_at',
+  'updated_at',
+  'created_at'
+]);
+
+const DEFAULT_SORT_CHAIN = ['matched_weekend_open_house_count', 'opportunity_gap_score', 'production_volume', 'agent_rank_score'];
+
+function canonicalSortBy(value) {
+  const key = String(value || '').trim();
+  const mapped = SORT_ALIASES[key] || key;
+  return SORT_FIELDS.has(mapped) ? mapped : '';
+}
+
+function sortValue(row, field) {
+  if (field === 'primary_county') return row.primary_county || row.county || '';
+  if (field === 'last_activity_at' || field === 'updated_at' || field === 'created_at') {
+    const date = new Date(row[field] || 0);
+    return Number.isFinite(date.getTime()) ? date.getTime() : 0;
+  }
+  return row[field];
+}
+
+function compareValues(a, b) {
+  const aNum = Number(a);
+  const bNum = Number(b);
+  if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
+  return String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+}
+
+function sortRankings(rankings, sortBy, direction) {
+  const requested = canonicalSortBy(sortBy);
+  const chain = requested ? [requested, ...DEFAULT_SORT_CHAIN.filter((field) => field !== requested), 'agent_name'] : [...DEFAULT_SORT_CHAIN, 'agent_name'];
+  const primaryDirection = String(direction || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+  return [...(rankings || [])].sort((left, right) => {
+    for (let index = 0; index < chain.length; index += 1) {
+      const field = chain[index];
+      const result = compareValues(sortValue(left, field), sortValue(right, field));
+      if (result !== 0) {
+        const directionForField = field === 'agent_name' ? 1 : -1;
+        return result * (index === 0 && requested ? primaryDirection : directionForField);
+      }
+    }
+    return 0;
+  });
 }
 
 async function handlePreview(body) {
@@ -346,6 +693,7 @@ async function handlePreview(body) {
 async function handleConfirm(body, auth) {
   const parsed = await parseAndMatch(body);
   const metadata = uploadMetadata(body, auth);
+  const defaults = locationDefaults(body);
   const upload = one(await supabaseRest('agent_production_uploads', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
@@ -358,7 +706,8 @@ async function handleConfirm(body, auth) {
         duplicate_count: parsed.duplicate_count,
         matched_count: parsed.matched_count,
         unmatched_count: parsed.unmatched_count,
-        needs_review_count: parsed.needs_review_count
+        needs_review_count: parsed.needs_review_count,
+        location_defaults: defaults
       }
     })
   }));
@@ -367,10 +716,14 @@ async function handleConfirm(body, auth) {
     'agent_production_import_rows',
     parsed.rows.map((row) => importRowPayload(upload.id, row))
   );
-  const signals = await loadOpenHouseSignals();
+  const [signals, openHouseRows] = await Promise.all([
+    loadOpenHouseSignals(),
+    loadOpenHouseRows()
+  ]);
   const avgs = marketAverages(importRows);
   const rankings = importRows.map((row) => {
-    const ranking = rankingFromImportRow(row, avgs, signals);
+    const base = rankingFromImportRow(row, avgs, signals);
+    let ranking = applyOpenHouseMatchToRanking(base, openHouseRows, avgs);
     ranking.raw_sources = {
       ...(ranking.raw_sources || {}),
       upload_id: upload.id,
@@ -397,15 +750,29 @@ async function handleConfirm(body, auth) {
 }
 
 async function handleList(req) {
-  const limit = clampLimit(readQuery(req, 'limit'));
+  const filters = parseRankingFilters(req);
+  const page = Math.max(1, Number.parseInt(readQuery(req, 'page') || '1', 10) || 1);
+  const pageSize = clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 250);
+  const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
+  const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
   const [rankings, uploads] = await Promise.all([
-    supabaseRest(`agent_rankings?select=*&order=agent_rank_score.desc,updated_at.desc&limit=${limit}`).catch(() => []),
+    supabaseRest('agent_rankings?select=*&limit=50000').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => [])
   ]);
+  const filtered = applyRankingFilters(rankings || [], filters);
+  const sorted = sortRankings(filtered, sortBy, sortDirection);
+  const start = (page - 1) * pageSize;
   return {
-    rankings,
+    rankings: sorted.slice(start, start + pageSize),
     uploads,
-    summary: summarizeRankings(rankings || []),
+    summary: summarizeRankings(filtered),
+    options: buildFilterOptions(rankings || []),
+    total: filtered.length,
+    page,
+    page_size: pageSize,
+    sort_by: sortBy || '',
+    sort_direction: sortDirection,
+    filters,
     loaded_at: new Date().toISOString()
   };
 }
@@ -418,6 +785,105 @@ async function findRanking(id) {
     throw error;
   }
   return ranking;
+}
+
+function rankingPatchPayload(ranking) {
+  const { id, created_at, ...payload } = ranking || {};
+  return payload;
+}
+
+async function refreshAgentRankingOpenHouseMatches(options = {}) {
+  const rankingId = String(options.ranking_id || '').trim();
+  const agentId = String(options.agent_id || '').trim();
+  const uploadId = String(options.upload_id || '').trim();
+  let path = 'agent_rankings?select=*&limit=50000';
+  if (rankingId) path = `agent_rankings?id=eq.${enc(rankingId)}&select=*&limit=1`;
+  else if (agentId) path = `agent_rankings?agent_id=eq.${enc(agentId)}&select=*&limit=5000`;
+
+  const rows = await supabaseRest(path).catch(() => []);
+  const scoped = uploadId ? (rows || []).filter((row) => uploadIdForRanking(row) === uploadId) : (rows || []);
+  const openHouseRows = await loadOpenHouseRows();
+  const averages = marketAverages(scoped);
+  const updated = [];
+
+  for (const row of scoped) {
+    const matched = applyOpenHouseMatchToRanking(row, openHouseRows, averages);
+    const patched = one(await supabaseRest(`agent_rankings?id=eq.${enc(row.id)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(rankingPatchPayload(matched))
+    }));
+    if (patched) updated.push(patched);
+  }
+
+  return {
+    updated_count: updated.length,
+    rankings: updated.slice(0, 50),
+    scoped_count: scoped.length
+  };
+}
+
+async function handleRefreshMatches(body) {
+  return refreshAgentRankingOpenHouseMatches({
+    ranking_id: body.ranking_id,
+    upload_id: body.upload_id,
+    agent_id: body.agent_id
+  });
+}
+
+async function handleFixLocation(body) {
+  const ranking = await findRanking(body.ranking_id);
+  const inferred = inferCountyFromRow({
+    county: body.primary_county || body.county,
+    city: body.city,
+    state: body.state || ranking.state || 'NY',
+    zip: body.zip,
+    market_area: body.market_area || ranking.market_area
+  }, { applyDefault: false, tryInference: true });
+  const primaryCounty = normalizeCounty(body.primary_county || body.county || inferred.primary_county || inferred.county);
+  const city = String(body.city || ranking.city || '').trim() || null;
+  const state = String(body.state || ranking.state || 'NY').trim().toUpperCase() || 'NY';
+  const zip = normalizeZip(body.zip || ranking.zip || '') || null;
+  const marketArea = String(body.market_area || ranking.market_area || primaryCounty || '').trim() || null;
+
+  if (!primaryCounty && !city && !zip && !marketArea) {
+    const error = new Error('Enter at least one location value before saving.');
+    error.status = 400;
+    throw error;
+  }
+
+  const previousLocationScore = Math.max(0, Number(ranking.location_confidence || 0) / 10);
+  const labels = [
+    ...new Set([
+      ...((ranking.raw_sources?.labels || []).filter((label) => label !== 'Needs Location Review')),
+      'Manual Location'
+    ])
+  ];
+  const payload = {
+    county: primaryCounty || ranking.county || null,
+    primary_county: primaryCounty || ranking.primary_county || null,
+    market_area: marketArea,
+    city,
+    state,
+    zip,
+    inferred_county: inferred.inferred_county || null,
+    location_confidence: 100,
+    location_source: 'manual_admin',
+    agent_rank_score: Math.round(Number(ranking.agent_rank_score || 0) - previousLocationScore + 10),
+    raw_sources: {
+      ...(ranking.raw_sources || {}),
+      labels,
+      needs_location_review: false,
+      location_fixed_at: new Date().toISOString(),
+      location_fixed_note: String(body.note || '').trim() || null
+    }
+  };
+  const updated = one(await supabaseRest(`agent_rankings?id=eq.${enc(ranking.id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload)
+  }));
+  return { ranking: updated || { ...ranking, ...payload } };
 }
 
 async function handleAddToOutreach(body) {
@@ -503,6 +969,16 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'confirm_import') {
       const result = await handleConfirm(body, auth);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'refresh_matches') {
+      const result = await handleRefreshMatches(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'fix_location') {
+      const result = await handleFixLocation(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }
