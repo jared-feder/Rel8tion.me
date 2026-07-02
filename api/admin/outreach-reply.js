@@ -42,7 +42,9 @@ module.exports = async function handler(req, res) {
 
     const payload = await callSupabaseFunction('send-agent-manual-reply', {
       id,
-      body: messageBody
+      body: messageBody,
+      provider_override: body.provider_override || body.provider || undefined,
+      campaign: body.campaign || undefined
     });
 
     sendJson(res, 200, {

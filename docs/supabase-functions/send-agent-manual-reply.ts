@@ -48,6 +48,13 @@ function outreachProviderOverrideForRow(row: Record<string, unknown>): "twilio" 
     : null;
 }
 
+function requestedProviderOverride(value: unknown): "twilio" | "android_gateway" | null {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "twilio" || normalized === "android_gateway") return normalized;
+  throw new Error("Unsupported provider override");
+}
+
 function buildStatusCallbackUrl(supabaseUrl: string, queueId: string): string {
   const override = Deno.env.get("TWILIO_STATUS_CALLBACK_URL");
   const token = Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN") || "";
@@ -86,6 +93,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const rowId = String(body.id || "").trim();
     const messageBody = String(body.body || "").trim();
+    const providerOverrideRequested = requestedProviderOverride(body.provider_override || body.provider);
 
     if (!rowId) {
       return new Response(
@@ -148,7 +156,7 @@ serve(async (req) => {
       );
     }
 
-    const providerOverride = outreachProviderOverrideForRow(row);
+    const providerOverride = providerOverrideRequested || outreachProviderOverrideForRow(row);
     const smsRes = await sendSMS({
       supabase,
       to,
@@ -161,6 +169,7 @@ serve(async (req) => {
         open_house_id: row.open_house_id || null,
         brokerage: row.brokerage || null,
         provider_override: providerOverride,
+        campaign: typeof body.campaign === "string" ? body.campaign : null,
         step: "manual_reply",
       },
     });

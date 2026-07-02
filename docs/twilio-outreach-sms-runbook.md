@@ -49,6 +49,7 @@ Use the real Supabase secret value for `TWILIO_STATUS_CALLBACK_TOKEN`; do not pa
 - `twilio-inbound-reply` is protected and should not be used directly as the Twilio public webhook.
 - `twilio-message-status` is protected by `TWILIO_STATUS_CALLBACK_TOKEN`.
 - `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the outreach route or brokerage override is using Twilio.
+- `send-agent-manual-reply` may accept a service-role/admin `provider_override` of `twilio` for owner-approved manual outreach campaigns that must be sent through Twilio while preserving `manual_outreach` logging, STOP text, suppression checks, and reply threading.
 - The shared SMS layer supports route-scoped provider selection with `SMS_OUTREACH_PROVIDER` and `SMS_EVENTS_PROVIDER`, falling back to `SMS_PROVIDER`.
 - The outreach functions can pass a per-message provider override for brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES`.
 
