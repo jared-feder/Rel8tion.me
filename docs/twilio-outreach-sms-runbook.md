@@ -89,6 +89,7 @@ Inbound reply test:
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
 - Outreach volume risk: owner-approved automatic caps are `OUTREACH_SEND_MAX_PER_RUN=7`, `OUTREACH_SEND_MAX_PER_HOUR=20`, and `OUTREACH_SEND_MAX_PER_DAY=150`. The per-run and daily caps are enforced as hard ceilings in `send-agent-outreach`. Do not raise these caps or route non-Douglas Elliman automated outreach through Twilio until the toll-free lane is intentionally added.
 - Emergency pause: set `rel8tion_runtime_settings.key='outreach_send_paused'` to a truthy JSON value such as `{ "paused": true }`, or set `OUTREACH_SEND_PAUSED=true`. The send cron can still fire, but `send-agent-outreach` will return `paused=true` and send nothing.
+- Recovery/manual generation: while that pause is truthy, `generate-agent-outreach` stages newly generated rows as `send_mode=manual`, `review_status=manual_ready`, so new outreach is available for cell sending instead of automatic sender pickup.
 - Manual cell-send backup: `/manual-sms-outreach` is a protected static page backed by `/api/manual-sms-outreach`. It opens the local SMS composer and then lets the operator mark sent/skipped; it does not call Twilio or Android Gateway directly, and it does not exclude Douglas Elliman rows that are otherwise manual-ready.
 
 ## Quick Verification Queries

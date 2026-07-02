@@ -129,6 +129,36 @@ function buildMissedOpenHouseVariants(row: QueueRow) {
   return { v1: main, v2: null, v3: null, selected: main, followup: null };
 }
 
+function truthySetting(value: unknown): boolean {
+  if (value === true) return true;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return truthySetting(record.paused ?? record.enabled ?? record.value);
+  }
+  return ["1", "true", "yes", "on", "paused"].includes(String(value || "").trim().toLowerCase());
+}
+
+async function loadOutreachSendPaused(supabase: any): Promise<boolean> {
+  if (truthySetting(Deno.env.get("OUTREACH_SEND_PAUSED"))) return true;
+  try {
+    const { data, error } = await supabase
+      .from("rel8tion_runtime_settings")
+      .select("value")
+      .eq("key", "outreach_send_paused")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[generate-agent-outreach] outreach send pause lookup failed", error.message || error);
+      return false;
+    }
+
+    return truthySetting(data?.value);
+  } catch (error) {
+    console.warn("[generate-agent-outreach] outreach send pause lookup failed", error);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -145,6 +175,9 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
     const limit = Math.max(1, Math.min(Number(body.limit || 25), 200));
+    const outreachSendPaused = await loadOutreachSendPaused(supabase);
+    const generatedSendMode = outreachSendPaused ? "manual" : "automatic";
+    const generatedReviewStatus = outreachSendPaused ? "manual_ready" : "pending";
 
     const select =
       "id, agent_first_name, agent_name, agent_phone, brokerage, address, open_start, open_end, listing_photo_url, template_key";
@@ -181,6 +214,8 @@ serve(async (req) => {
               campaign,
               processed: 0,
               blocked_by_future_render_backlog: blockingFuture.count,
+              generation_send_mode: generatedSendMode,
+              outreach_send_paused: outreachSendPaused,
               message: "Future outreach rows are still generating or waiting for mockups. Missed-open-house backlog is paused.",
             },
             null,
@@ -203,7 +238,13 @@ serve(async (req) => {
 
     if (!rows || rows.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, processed: 0, message: "No pending outreach rows found." }, null, 2),
+        JSON.stringify({
+          ok: true,
+          processed: 0,
+          generation_send_mode: generatedSendMode,
+          outreach_send_paused: outreachSendPaused,
+          message: "No pending outreach rows found.",
+        }, null, 2),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -265,13 +306,13 @@ serve(async (req) => {
             sms_link: buildSmsLink(row.agent_phone, selected),
             followup_sms_link: followup ? buildSmsLink(row.agent_phone, followup) : null,
             generation_status: "generated",
-            review_status: "pending",
+            review_status: generatedReviewStatus,
             mockup_status: "pending",
             mockup_error: null,
             send_error: null,
             last_error: null,
             approved_for_send: false,
-            send_mode: "automatic",
+            send_mode: generatedSendMode,
             template_key: campaign,
             initial_send_at: initialSendAt,
             followup_send_at: followupSendAt,
@@ -301,7 +342,14 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, campaign, processed: results.length, results }, null, 2),
+      JSON.stringify({
+        ok: true,
+        campaign,
+        processed: results.length,
+        generation_send_mode: generatedSendMode,
+        outreach_send_paused: outreachSendPaused,
+        results,
+      }, null, 2),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
