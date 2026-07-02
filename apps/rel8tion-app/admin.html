@@ -1704,13 +1704,18 @@
       return badge(`${normalized}${errorCode ? ` ${errorCode}` : ''}`, tone);
     }
 
-    function isOutreachSendCandidate(row) {
-      if (!row || row.send_mode !== 'automatic') return false;
+    function isOutreachReadyCandidate(row) {
+      if (!row) return false;
       if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
       if (!row.listing_photo_url) return false;
       const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
       const followupPending = !OUTREACH_FOLLOWUPS_DISABLED && row.followup_send_status === 'pending' && row.followup_sms;
       return Boolean(initialPending || followupPending);
+    }
+
+    function isOutreachSendCandidate(row) {
+      if (!row || row.send_mode !== 'automatic') return false;
+      return isOutreachReadyCandidate(row);
     }
 
     function outreachOperatorMode() {
@@ -1727,6 +1732,7 @@
     }
 
     function sendApprovalBadge(row) {
+      if (row?.send_mode && row.send_mode !== 'automatic' && isOutreachCronReady(row)) return badge('Manual ready', 'warn');
       if (isOutreachSendCandidate(row) && isDouglasEllimanOutreach(row)) return badge('Twilio ready', 'ok');
       if (isOutreachSendCandidate(row) && outreachOperatorMode() === 'live') return badge('Manual ready', 'warn');
       if (isOutreachSendCandidate(row)) return badge('Android ready', 'ok');

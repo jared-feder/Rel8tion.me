@@ -107,13 +107,18 @@ function isTwilioOutreachBrokerage(row) {
   return Boolean(brokerage && twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern)));
 }
 
-function isOutreachSendCandidate(row) {
-  if (!row || row.send_mode !== 'automatic') return false;
+function isOutreachReadyCandidate(row) {
+  if (!row) return false;
   if (row.generation_status !== 'generated' || row.mockup_status !== 'rendered') return false;
   if (!row.listing_photo_url) return false;
   const initialPending = row.initial_send_status === 'pending' && row.selected_sms;
   const followupPending = !OUTREACH_FOLLOWUPS_DISABLED && row.followup_send_status === 'pending' && row.followup_sms;
   return Boolean(initialPending || followupPending);
+}
+
+function isOutreachSendCandidate(row) {
+  if (!row || row.send_mode !== 'automatic') return false;
+  return isOutreachReadyCandidate(row);
 }
 
 async function loadOutreachOperatorMode(warnings) {
@@ -668,9 +673,12 @@ module.exports = async function handler(req, res) {
     const outreachSendCandidates = outreach.filter(isOutreachSendCandidate);
     const outreachTwilioCandidates = outreachSendCandidates.filter(isTwilioOutreachBrokerage);
     const outreachNonTwilioCandidates = outreachSendCandidates.filter((row) => !isTwilioOutreachBrokerage(row));
-    const outreachManualReady = outreachOperator.mode === 'live' ? outreachNonTwilioCandidates : [];
+    const outreachManualModeCandidates = outreach.filter((row) => row.send_mode !== 'automatic' && isOutreachReadyCandidate(row));
+    const outreachManualReady = outreachOperator.mode === 'live'
+      ? [...outreachNonTwilioCandidates, ...outreachManualModeCandidates]
+      : outreachManualModeCandidates;
     const outreachAndroidReady = outreachOperator.mode === 'away' ? outreachNonTwilioCandidates : [];
-    const outreachPaused = outreach.filter((row) => row.send_mode !== 'automatic' && isOutreachSendCandidate({ ...row, send_mode: 'automatic' }));
+    const outreachPaused = outreachManualModeCandidates;
 
     sendJson(res, 200, {
       ok: true,

@@ -95,6 +95,8 @@
     { "source": "/open-house-kit.html", "destination": "/apps/rel8tion-app/open-house-kit.html" },
     { "source": "/field-dashboard", "destination": "/apps/rel8tion-app/field-dashboard.html" },
     { "source": "/field-dashboard.html", "destination": "/apps/rel8tion-app/field-dashboard.html" },
+    { "source": "/manual-sms-outreach", "destination": "/apps/rel8tion-app/manual-sms-outreach.html" },
+    { "source": "/manual-sms-outreach.html", "destination": "/apps/rel8tion-app/manual-sms-outreach.html" },
     { "source": "/loan-officer-dashboard", "destination": "/apps/rel8tion-app/loan-officer-dashboard.html" },
     { "source": "/loan-officer-dashboard.html", "destination": "/apps/rel8tion-app/loan-officer-dashboard.html" },
     { "source": "/lo-field-dashboard", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },

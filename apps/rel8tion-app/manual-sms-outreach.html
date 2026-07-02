@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual SMS Backup | REL8TION</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17224f;
+      --muted: #64748b;
+      --line: rgba(140, 163, 190, .28);
+      --panel: rgba(255, 255, 255, .82);
+      --soft: #eef7ff;
+      --blue: #2563eb;
+      --cyan: #0ea5c8;
+      --green: #0f7b5f;
+      --amber: #9a5b00;
+      --rose: #b42318;
+      --shadow: 0 26px 70px rgba(23, 34, 79, .16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        linear-gradient(180deg, rgba(232,248,255,.96), rgba(246,250,255,.96)),
+        url("https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png");
+      background-size: cover;
+      background-position: center bottom;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .58; }
+
+    .shell {
+      width: min(920px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand img {
+      width: 58px;
+      height: auto;
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: clamp(25px, 6vw, 42px);
+      line-height: .96;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .panel {
+      border: 1px solid rgba(255,255,255,.92);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px) saturate(170%);
+      -webkit-backdrop-filter: blur(24px) saturate(170%);
+      overflow: hidden;
+    }
+
+    .panel-head,
+    .panel-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-foot {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+      flex-wrap: wrap;
+    }
+
+    .content {
+      display: grid;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: #31465f;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(104, 129, 156, .26);
+      border-radius: 8px;
+      background: rgba(255,255,255,.86);
+      color: var(--ink);
+      padding: 12px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 178px;
+      resize: vertical;
+      line-height: 1.42;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: rgba(37, 99, 235, .56);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+      gap: 12px;
+    }
+
+    .mini {
+      min-height: 78px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.58);
+      padding: 12px;
+    }
+
+    .mini strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .mini span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 1px solid rgba(104, 129, 156, .25);
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      color: var(--ink);
+      padding: 10px 14px;
+      font-weight: 900;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn svg { width: 18px; height: 18px; }
+    .btn.primary {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      color: white;
+    }
+
+    .btn.good {
+      border-color: transparent;
+      background: var(--green);
+      color: white;
+    }
+
+    .btn.warn {
+      border-color: rgba(154, 91, 0, .22);
+      background: #fff8eb;
+      color: var(--amber);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: #2b4b6f;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .pill svg { width: 15px; height: 15px; }
+
+    .status {
+      min-height: 24px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .status.bad { color: var(--rose); }
+    .status.ok { color: var(--green); }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .topbar,
+      .panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid,
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <img src="https://rel8tion.info/wp-content/uploads/2026/04/rel8tion-chip-logo.png" alt="REL8TION">
+        <div>
+          <h1>Manual SMS Backup</h1>
+          <span>REL8TION COMMAND</span>
+        </div>
+      </div>
+      <a class="btn" href="/admin"><i data-lucide="layout-dashboard"></i><span>Admin</span></a>
+    </div>
+
+    <section class="panel" id="loginPanel">
+      <div class="panel-head">
+        <strong>Admin unlock</strong>
+        <span class="pill"><i data-lucide="lock-keyhole"></i><span>Protected</span></span>
+      </div>
+      <div class="content">
+        <div class="grid">
+          <label>Admin UID
+            <input id="uidInput" autocomplete="off">
+          </label>
+          <label>Admin token
+            <input id="tokenInput" type="password" autocomplete="off">
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="unlockBtn"><i data-lucide="unlock"></i><span>Unlock</span></button>
+        </div>
+        <div class="status" id="loginStatus"></div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="queuePanel">
+      <div class="panel-head">
+        <div>
+          <strong id="queueTitle">Next manual text</strong>
+          <div class="status" id="queueStatus"></div>
+        </div>
+        <span class="pill" id="remainingPill"><i data-lucide="list-checks"></i><span>0 ready</span></span>
+      </div>
+      <div class="content" id="queueContent"></div>
+      <div class="panel-foot">
+        <div class="actions">
+          <a class="btn primary hidden" id="smsLink" href="#"><i data-lucide="smartphone"></i><span>Open SMS</span></a>
+          <button class="btn good hidden" id="sentBtn"><i data-lucide="check-circle-2"></i><span>Mark Sent</span></button>
+          <button class="btn warn hidden" id="skipBtn"><i data-lucide="skip-forward"></i><span>Skip</span></button>
+        </div>
+        <div class="actions">
+          <button class="btn" id="copyBtn"><i data-lucide="copy"></i><span>Copy</span></button>
+          <button class="btn" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+          <button class="btn" id="logoutBtn"><i data-lucide="log-out"></i><span>Clear</span></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ADMIN_UID_KEY = 'rel8tion_admin_uid';
+    const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
+    const state = { row: null, loading: false };
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+    const phoneDigits = (value) => String(value || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+
+    function credentials() {
+      return {
+        uid: window.localStorage.getItem(ADMIN_UID_KEY) || '',
+        token: window.localStorage.getItem(ADMIN_TOKEN_KEY) || ''
+      };
+    }
+
+    function saveCredentials() {
+      window.localStorage.setItem(ADMIN_UID_KEY, $('uidInput').value.trim());
+      window.localStorage.setItem(ADMIN_TOKEN_KEY, $('tokenInput').value.trim());
+    }
+
+    function headers() {
+      const cred = credentials();
+      const out = { 'Content-Type': 'application/json' };
+      if (cred.uid) out['x-admin-uid'] = cred.uid;
+      if (cred.token) out['x-admin-token'] = cred.token;
+      return out;
+    }
+
+    async function callApi(options = {}) {
+      const response = await fetch('/api/manual-sms-outreach', {
+        method: options.method || 'GET',
+        headers: headers(),
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || `Request failed (${response.status})`);
+      }
+      return payload;
+    }
+
+    function smsHref(row) {
+      const phone = phoneDigits(row?.phone_normalized || row?.agent_phone_normalized || row?.agent_phone);
+      const body = row?.outreach_message || '';
+      return phone ? `sms:${phone}?body=${encodeURIComponent(body)}` : '#';
+    }
+
+    function setStatus(text, tone = '') {
+      $('queueStatus').className = `status ${tone}`.trim();
+      $('queueStatus').textContent = text || '';
+    }
+
+    function renderEmpty(message) {
+      state.row = null;
+      $('queueTitle').textContent = 'Next manual text';
+      $('remainingPill').innerHTML = '<i data-lucide="list-checks"></i><span>0 ready</span>';
+      $('queueContent').innerHTML = `
+        <div class="mini">
+          <strong>${esc(message || 'No ready manual SMS rows.')}</strong>
+          <span>${esc(new Date().toLocaleString())}</span>
+        </div>
+      `;
+      $('smsLink').classList.add('hidden');
+      $('sentBtn').classList.add('hidden');
+      $('skipBtn').classList.add('hidden');
+      $('copyBtn').disabled = true;
+      lucide.createIcons();
+    }
+
+    function renderQueue(data) {
+      const row = data.row || null;
+      state.row = row;
+      const count = data.remaining_estimate || 0;
+      $('remainingPill').innerHTML = `<i data-lucide="list-checks"></i><span>${esc(count)} ready</span>`;
+
+      if (!row) {
+        setStatus(data.loaded_at ? `Checked ${new Date(data.loaded_at).toLocaleTimeString()}` : '');
+        renderEmpty('No ready manual SMS rows.');
+        return;
+      }
+
+      const phone = phoneDigits(row.phone_normalized || row.agent_phone_normalized || row.agent_phone);
+      $('queueTitle').textContent = row.agent_name || 'Next manual text';
+      setStatus(`${row.brokerage || 'No brokerage'} | ${phone ? formatPhone(phone) : 'No phone'}`);
+      $('queueContent').innerHTML = `
+        <div class="row">
+          <div class="mini">
+            <strong>${esc(row.property_address || row.address || 'Open house')}</strong>
+            <span>${esc([row.city, row.state, row.zip].filter(Boolean).join(' ') || row.open_start || '')}</span>
+          </div>
+          <div class="mini">
+            <strong>${esc(row.message_source || 'selected_sms')}</strong>
+            <span>${esc(row.send_mode || 'manual')} | ${esc(row.initial_send_status || 'pending')}</span>
+          </div>
+        </div>
+        <label>Message
+          <textarea id="messageText" readonly>${esc(row.outreach_message || '')}</textarea>
+        </label>
+      `;
+      $('smsLink').href = smsHref(row);
+      $('smsLink').classList.remove('hidden');
+      $('sentBtn').classList.remove('hidden');
+      $('skipBtn').classList.remove('hidden');
+      $('copyBtn').disabled = false;
+      lucide.createIcons();
+    }
+
+    function formatPhone(digits) {
+      return digits.length === 10 ? `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}` : digits;
+    }
+
+    async function loadNext() {
+      state.loading = true;
+      setStatus('Loading...');
+      try {
+        const data = await callApi();
+        $('loginPanel').classList.add('hidden');
+        $('queuePanel').classList.remove('hidden');
+        renderQueue(data);
+      } catch (error) {
+        $('loginPanel').classList.remove('hidden');
+        $('queuePanel').classList.add('hidden');
+        $('loginStatus').className = 'status bad';
+        $('loginStatus').textContent = error.message || 'Unable to unlock.';
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    async function updateRow(action) {
+      if (!state.row?.id || state.loading) return;
+      state.loading = true;
+      setStatus(action === 'mark_sent' ? 'Marking sent...' : 'Skipping...');
+      try {
+        const data = await callApi({
+          method: 'POST',
+          body: { action, id: state.row.id }
+        });
+        renderQueue(data.next || data);
+        setStatus(action === 'mark_sent' ? 'Marked sent.' : 'Skipped.', 'ok');
+      } catch (error) {
+        setStatus(error.message || 'Update failed.', 'bad');
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    async function copyMessage() {
+      const text = state.row?.outreach_message || '';
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus('Copied.', 'ok');
+      } catch {
+        const textarea = $('messageText');
+        textarea?.select();
+        document.execCommand('copy');
+        setStatus('Copied.', 'ok');
+      }
+    }
+
+    function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const uidParam = params.get('uid') || params.get('admin_uid') || '';
+      const tokenParam = params.get('token') || params.get('admin_token') || '';
+      if (uidParam) window.localStorage.setItem(ADMIN_UID_KEY, uidParam);
+      if (tokenParam) window.localStorage.setItem(ADMIN_TOKEN_KEY, tokenParam);
+
+      const cred = credentials();
+      $('uidInput').value = cred.uid;
+      $('tokenInput').value = cred.token;
+      $('unlockBtn').addEventListener('click', () => {
+        saveCredentials();
+        loadNext();
+      });
+      $('refreshBtn').addEventListener('click', loadNext);
+      $('sentBtn').addEventListener('click', () => updateRow('mark_sent'));
+      $('skipBtn').addEventListener('click', () => updateRow('skip'));
+      $('copyBtn').addEventListener('click', copyMessage);
+      $('logoutBtn').addEventListener('click', () => {
+        window.localStorage.removeItem(ADMIN_UID_KEY);
+        window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+        window.location.reload();
+      });
+
+      if (cred.uid || cred.token) loadNext();
+      lucide.createIcons();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
