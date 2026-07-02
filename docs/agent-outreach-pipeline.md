@@ -97,6 +97,8 @@ Douglas Elliman outreach is the Twilio/MMS auto-send lane. Non-Douglas Elliman o
 
 Automatic outreach is capped at 7 sends per run. The rolling hourly and daily caps still apply on top of that.
 
+Automatic outreach can be globally paused with `rel8tion_runtime_settings.key = "outreach_send_paused"` and a truthy JSON value such as `{ "paused": true }`, or with `OUTREACH_SEND_PAUSED=true`. When paused, `send-agent-outreach` exits before selecting queue rows and sends no messages.
+
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 
 ## Hot-List UI Changes

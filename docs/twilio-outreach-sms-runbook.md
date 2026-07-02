@@ -88,6 +88,7 @@ Inbound reply test:
 - Inbound saves but does not match a queue row: check `agent_phone_normalized` values. The router/reply handler now searches both 10-digit and 11-digit forms.
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
 - Outreach volume risk: owner-approved automatic caps are `OUTREACH_SEND_MAX_PER_RUN=7`, `OUTREACH_SEND_MAX_PER_HOUR=20`, and `OUTREACH_SEND_MAX_PER_DAY=150`. The per-run and daily caps are enforced as hard ceilings in `send-agent-outreach`. Do not raise these caps or route non-Douglas Elliman automated outreach through Twilio until the toll-free lane is intentionally added.
+- Emergency pause: set `rel8tion_runtime_settings.key='outreach_send_paused'` to a truthy JSON value such as `{ "paused": true }`, or set `OUTREACH_SEND_PAUSED=true`. The send cron can still fire, but `send-agent-outreach` will return `paused=true` and send nothing.
 
 ## Quick Verification Queries
 

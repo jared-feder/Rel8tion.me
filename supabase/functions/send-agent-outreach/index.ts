@@ -121,6 +121,15 @@ function normalizeOperatorMode(value: unknown, fallback: OutreachOperatorMode = 
   return String(value || "").trim().toLowerCase() === "away" ? "away" : fallback;
 }
 
+function truthySetting(value: unknown): boolean {
+  if (value === true) return true;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return truthySetting(record.paused ?? record.enabled ?? record.value);
+  }
+  return ["1", "true", "yes", "on", "paused"].includes(String(value || "").trim().toLowerCase());
+}
+
 async function loadOutreachOperatorMode(supabase: any): Promise<OutreachOperatorMode> {
   const fallback = normalizeOperatorMode(Deno.env.get("OUTREACH_OPERATOR_MODE"), "live");
   try {
@@ -139,6 +148,27 @@ async function loadOutreachOperatorMode(supabase: any): Promise<OutreachOperator
   } catch (error) {
     console.warn("[send-agent-outreach] outreach operator mode lookup failed", error);
     return fallback;
+  }
+}
+
+async function loadOutreachSendPaused(supabase: any): Promise<boolean> {
+  if (truthySetting(Deno.env.get("OUTREACH_SEND_PAUSED"))) return true;
+  try {
+    const { data, error } = await supabase
+      .from("rel8tion_runtime_settings")
+      .select("value")
+      .eq("key", "outreach_send_paused")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[send-agent-outreach] outreach send pause lookup failed", error.message || error);
+      return false;
+    }
+
+    return truthySetting(data?.value);
+  } catch (error) {
+    console.warn("[send-agent-outreach] outreach send pause lookup failed", error);
+    return false;
   }
 }
 
@@ -393,6 +423,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const outreachSendPaused = await loadOutreachSendPaused(supabase);
     const outreachOperatorMode = await loadOutreachOperatorMode(supabase);
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
@@ -414,6 +445,32 @@ serve(async (req) => {
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
+
+    if (outreachSendPaused) {
+      return new Response(
+        JSON.stringify(
+          {
+            ok: true,
+            processed: 0,
+            dry_run: dryRun,
+            paused: true,
+            requested_limit: normalizedRequestedLimit,
+            effective_limit: 0,
+            max_per_run: maxPerRun,
+            max_per_hour: maxPerHour,
+            max_per_day: maxPerDay,
+            outreach_operator_mode: outreachOperatorMode,
+            message: "Outbound outreach sending is paused. No messages sent this run.",
+            results: [],
+          },
+          null,
+          2,
+        ),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
     if (!dryRun && limit <= 0) {
       return new Response(
@@ -897,6 +954,7 @@ serve(async (req) => {
           hourly_remaining: hourlyRemaining,
           daily_remaining: dailyRemaining,
           outreach_operator_mode: outreachOperatorMode,
+          paused: outreachSendPaused,
           duplicate_phone_cooldown: "disabled",
           results,
         },
