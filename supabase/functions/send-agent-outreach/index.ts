@@ -14,7 +14,8 @@ const BUSINESS_CARD_URL =
 const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
-const DEFAULT_SEND_MAX_PER_RUN = 20;
+const DEFAULT_SEND_MAX_PER_RUN = 7;
+const SEND_MAX_PER_RUN_HARD_CAP = 7;
 const DEFAULT_SEND_MAX_PER_HOUR = 20;
 const DEFAULT_SEND_MAX_PER_DAY = 150;
 const FOLLOWUPS_DISABLED = true;
@@ -365,7 +366,7 @@ serve(async (req) => {
       );
     }
 
-    const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, 50);
+    const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, SEND_MAX_PER_RUN_HARD_CAP);
     const maxPerHour = positiveIntEnv("OUTREACH_SEND_MAX_PER_HOUR", DEFAULT_SEND_MAX_PER_HOUR, 200);
     const maxPerDay = positiveIntEnv("OUTREACH_SEND_MAX_PER_DAY", DEFAULT_SEND_MAX_PER_DAY, 150);
 
@@ -407,7 +408,7 @@ serve(async (req) => {
     const hourlyRemaining = Math.max(0, maxPerHour - recentHourlySendCount);
     const dailyRemaining = Math.max(0, maxPerDay - recentDailySendCount);
     const limit = dryRun
-      ? normalizedRequestedLimit
+      ? Math.min(normalizedRequestedLimit, maxPerRun)
       : Math.min(normalizedRequestedLimit, maxPerRun, hourlyRemaining, dailyRemaining);
     const inspectionLimit = dryRun ? Math.max(1, limit || 25) : limit;
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);

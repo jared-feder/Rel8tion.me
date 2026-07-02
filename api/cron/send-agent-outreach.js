@@ -1,5 +1,7 @@
 const { callSupabaseFunction, cronAuthorized, readJsonBody, send } = require('../../lib/outreach-cron-shared');
 
+const OUTREACH_SEND_MAX_PER_RUN_HARD_CAP = 7;
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'GET' && req.method !== 'POST') {
@@ -15,7 +17,14 @@ module.exports = async function handler(req, res) {
     }
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
-    const maxPerRun = Math.max(1, Math.min(Number(process.env.OUTREACH_SEND_MAX_PER_RUN || 20), 50));
+    const configuredMaxPerRun = Number(process.env.OUTREACH_SEND_MAX_PER_RUN || OUTREACH_SEND_MAX_PER_RUN_HARD_CAP);
+    const maxPerRun = Math.max(
+      1,
+      Math.min(
+        Number.isFinite(configuredMaxPerRun) ? configuredMaxPerRun : OUTREACH_SEND_MAX_PER_RUN_HARD_CAP,
+        OUTREACH_SEND_MAX_PER_RUN_HARD_CAP
+      )
+    );
     const requestedLimit = Number(body.limit || process.env.OUTREACH_SEND_LIMIT || maxPerRun);
     const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : maxPerRun, maxPerRun));
     const requestedMode = String(body.mode || '').trim();

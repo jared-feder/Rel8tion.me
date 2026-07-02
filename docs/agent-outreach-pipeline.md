@@ -95,6 +95,8 @@ Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md`
 
 Douglas Elliman outreach is the Twilio/MMS auto-send lane. Non-Douglas Elliman outreach waits for manual send when `rel8tion_runtime_settings.outreach_operator_mode` is `live`, and uses Android Gateway when that mode is `away`.
 
+Automatic outreach is capped at 7 sends per run. The rolling hourly and daily caps still apply on top of that.
+
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 
 ## Hot-List UI Changes
