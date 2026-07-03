@@ -187,6 +187,15 @@
     .summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .info-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 16px; }
     .filter-grid { grid-template-columns: repeat(8, minmax(130px, 1fr)); }
+    .search-filter { grid-column: span 2; }
+    .search-filter-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .search-filter-row .field { min-width: 0; }
+    .search-filter-row .btn { min-height: 38px; }
 
     .panel, .metric, .info-card {
       border: 1px solid rgba(148,163,184,.28);
@@ -580,6 +589,8 @@
       .summary-grid, .profile-metrics, .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .status-report { grid-template-columns: 1fr; }
       .status-badge-shell { width: 100%; }
+      .search-filter { grid-column: auto; }
+      .search-filter-row { grid-template-columns: 1fr; }
       .actions { justify-content: flex-start; }
     }
   </style>
@@ -609,14 +620,8 @@
     if (params.get('uid') || params.get('admin_uid')) window.localStorage.setItem(ADMIN_UID_KEY, params.get('uid') || params.get('admin_uid'));
     if (params.get('token') || params.get('admin_token')) window.localStorage.setItem(ADMIN_TOKEN_KEY, params.get('token') || params.get('admin_token'));
 
-    const state = {
-      verified: false,
-      loading: false,
-      requestSeq: 0,
-      action: '',
-      error: '',
-      data: { rankings: [], uploads: [], summary: {}, options: {}, total: 0, page: 1, page_size: 50 },
-      filters: {
+    function freshFilters() {
+      return {
         q: '',
         tier: 'all',
         brokerage: 'all',
@@ -646,7 +651,22 @@
         upload: 'all',
         periodStart: '',
         periodEnd: ''
-      },
+      };
+    }
+
+    function cloneFilters(filters) {
+      return { ...freshFilters(), ...(filters || {}) };
+    }
+
+    const state = {
+      verified: false,
+      loading: false,
+      requestSeq: 0,
+      action: '',
+      error: '',
+      data: { rankings: [], uploads: [], summary: {}, options: {}, total: 0, page: 1, page_size: 50 },
+      filters: freshFilters(),
+      filterDraft: freshFilters(),
       sortBy: '',
       sortDirection: 'desc',
       page: 1,
@@ -1270,7 +1290,7 @@
       const locationSources = options.location_sources || [];
       const tiers = options.tiers?.length ? options.tiers : ['A+', 'A', 'B', 'C', 'Unknown', 'Not a Fit'];
       const uploads = state.data.uploads || [];
-      const f = state.filters;
+      const f = state.filterDraft;
       return `
         <div class="panel">
           <div class="panel-head">
@@ -1278,11 +1298,19 @@
               <h2>Filters</h2>
               <div class="small">${num(state.data.total || rows.length)} matching targets across all pages</div>
             </div>
-            <button class="btn" id="clearFilters"><i data-lucide="x"></i><span>Clear</span></button>
+            <div class="actions">
+              <button class="btn primary" id="applyFilters"><i data-lucide="check"></i><span>Apply</span></button>
+              <button class="btn" id="clearFilters"><i data-lucide="x"></i><span>Clear</span></button>
+            </div>
           </div>
           <div class="panel-body">
             <div class="grid filter-grid">
-              <label>Search <input class="field" data-filter="q" value="${esc(f.q)}" placeholder="Agent, brokerage, market"></label>
+              <label class="search-filter">Search
+                <div class="search-filter-row">
+                  <input class="field" data-filter="q" value="${esc(f.q)}" placeholder="Agent, brokerage, market">
+                  <button class="btn primary" id="searchFilters" type="button"><i data-lucide="search"></i><span>Search</span></button>
+                </div>
+              </label>
               <label>Tier <select class="select" data-filter="tier"><option value="all">All</option>${tiers.map((tier) => `<option value="${esc(tier)}"${f.tier === tier ? ' selected' : ''}>${esc(tier)}</option>`).join('')}</select></label>
               <label>Brokerage <select class="select" data-filter="brokerage"><option value="all">All</option>${brokerages.map((value) => `<option value="${esc(value)}"${f.brokerage === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
               <label>Market <select class="select" data-filter="market"><option value="all">All</option>${markets.map((value) => `<option value="${esc(value)}"${f.market === value ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>
@@ -2063,9 +2091,10 @@
       }
     }
 
-    function scheduleLoadData(delay = 220) {
-      window.clearTimeout(scheduleLoadData.timer);
-      scheduleLoadData.timer = window.setTimeout(loadData, delay);
+    function applyFilters() {
+      state.filters = cloneFilters(state.filterDraft);
+      state.page = 1;
+      loadData();
     }
 
     function bind() {
@@ -2107,22 +2136,23 @@
       document.getElementById('confirmImport')?.addEventListener('click', confirmImport);
       document.querySelectorAll('[data-filter]').forEach((input) => {
         const update = () => {
-          state.filters[input.dataset.filter] = input.value;
-          state.page = 1;
-          scheduleLoadData(input.tagName === 'SELECT' ? 0 : 220);
+          state.filterDraft[input.dataset.filter] = input.value;
         };
         input.addEventListener('input', update);
         input.addEventListener('change', update);
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            update();
+            applyFilters();
+          }
+        });
       });
+      document.getElementById('applyFilters')?.addEventListener('click', applyFilters);
+      document.getElementById('searchFilters')?.addEventListener('click', applyFilters);
       document.getElementById('clearFilters')?.addEventListener('click', () => {
-        state.filters = {
-          q: '', tier: 'all', brokerage: 'all', market: 'all', county: 'all', city: 'all', state: 'all',
-          hasLocation: 'all', locationSource: 'all', minLocationConfidence: '',
-          matchedOpenHouse: 'all', weekendOpenHouse: 'all', minOpenHouseCount: '', minWeekendOpenHouseCount: '',
-          productionMin: '', productionMax: '', activeMin: '', activeMax: '', daysMax: '',
-          listing12Min: '', listing12Max: '', buy12Min: '', buy12Max: '', weekend: 'all',
-          phone: 'all', email: 'all', upload: 'all', periodStart: '', periodEnd: ''
-        };
+        state.filters = freshFilters();
+        state.filterDraft = freshFilters();
         state.page = 1;
         loadData();
       });
