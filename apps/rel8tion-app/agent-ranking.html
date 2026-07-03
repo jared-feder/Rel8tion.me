@@ -2049,7 +2049,10 @@
       render();
       try {
         const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'generate_pitch', ranking_id: id }) });
-        state.pitchModal = { row, variants: result.variants || null, loading: false, error: '' };
+        const pitchedRow = result.recommended_pitch ? { ...row, recommended_pitch: result.recommended_pitch } : row;
+        state.data.rankings = (state.data.rankings || []).map((item) => item.id === id ? { ...item, recommended_pitch: pitchedRow.recommended_pitch } : item);
+        if (state.profile?.id === id) state.profile = { ...state.profile, recommended_pitch: pitchedRow.recommended_pitch };
+        state.pitchModal = { row: pitchedRow, variants: result.variants || null, loading: false, error: '' };
         showToast('Pitch variants generated.');
       } catch (error) {
         state.pitchModal = { row, variants: null, loading: false, error: error.message || 'Unable to generate pitch.' };

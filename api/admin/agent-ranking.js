@@ -1,5 +1,6 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 const {
+  buildPitch,
   buildPitchVariants,
   dedupeRowsByIdentityKey,
   identityKeyForAgentRanking,
@@ -1132,6 +1133,13 @@ function rescoreRanking(ranking, averages) {
   };
 }
 
+function withFreshPitch(ranking = {}) {
+  return {
+    ...ranking,
+    recommended_pitch: buildPitch(ranking)
+  };
+}
+
 function uploadMapping(upload, field) {
   return upload?.raw_metadata?.mapping?.[field] || null;
 }
@@ -1670,7 +1678,7 @@ async function handleList(req) {
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => [])
   ]);
   const trustedView = trustedRankingView(rankings || [], uploads || []);
-  const visibleRankings = trustedView.rankings;
+  const visibleRankings = trustedView.rankings.map(withFreshPitch);
   const filtered = applyRankingFilters(visibleRankings, filters);
   const sorted = sortRankings(filtered, sortBy, sortDirection);
   const start = (page - 1) * pageSize;
@@ -1747,7 +1755,7 @@ async function handleRefreshMatches(body) {
 }
 
 async function handleProfileDetails(body) {
-  const ranking = await findRanking(body.ranking_id);
+  const ranking = withFreshPitch(await findRanking(body.ranking_id));
   return profileDetailsForRanking(ranking);
 }
 
@@ -1839,7 +1847,8 @@ async function handleAddToOutreach(body) {
 
 async function handleGeneratePitch(body) {
   const ranking = await findRanking(body.ranking_id);
-  return { ranking_id: ranking.id, variants: buildPitchVariants(ranking), recommended_pitch: ranking.recommended_pitch };
+  const recommendedPitch = buildPitch(ranking);
+  return { ranking_id: ranking.id, variants: buildPitchVariants(ranking), recommended_pitch: recommendedPitch };
 }
 
 async function handleNotFit(body) {
