@@ -934,11 +934,11 @@
     function statusBadgeImage(report) {
       const key = String(report?.level || '').toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');
       return ({
-        'rising-star': 'assets/agent-status-badges/rising-star.svg',
-        'shooting-star': 'assets/agent-status-badges/shooting-star.svg',
-        'all-star': 'assets/agent-status-badges/all-star.svg',
-        'rock-star': 'assets/agent-status-badges/rock-star.svg'
-      }[key] || 'assets/agent-status-badges/rising-star.svg');
+        'rising-star': 'assets/agent-status-badges/rising-star.png',
+        'shooting-star': 'assets/agent-status-badges/shooting-star.png',
+        'all-star': 'assets/agent-status-badges/all-star.png',
+        'rock-star': 'assets/agent-status-badges/rock-star.png'
+      }[key] || 'assets/agent-status-badges/rising-star.png');
     }
 
     function renderStatusReport(comparison) {
