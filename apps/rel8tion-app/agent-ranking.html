@@ -759,7 +759,7 @@
     function renderSummaryCards() {
       const s = state.data.summary || {};
       const cards = [
-        ['Trusted agents shown', num(s.total_agents_analyzed)],
+        ['Campaign-ready agents', num(s.total_agents_analyzed)],
         ['Active listings', num(s.total_active_listings)],
         ['Listing side 12m', num(s.total_listings_active_last_12_months)],
         ['Buyside 90d', num(s.total_buyside_last_90_days)],
@@ -1080,7 +1080,7 @@
                   <div class="panel-head">
                     <div>
                       <h3>Preview before final import</h3>
-                      <div class="small">${num(preview.row_count)} uploaded | ${num(preview.valid_count)} valid | ${num(preview.skipped_missing_phone_name)} skipped missing phone/name | ${num(preview.duplicates_skipped)} duplicates skipped | ${num(preview.matched_count)} matched | ${num(preview.unmatched_count)} unmatched</div>
+                      <div class="small">${num(preview.row_count)} uploaded | ${num(preview.valid_count)} campaign-ready | ${num(preview.skipped_missing_phone_name)} skipped missing phone/name | ${num(preview.duplicates_skipped)} duplicates skipped | ${num(preview.matched_count)} existing profile matches | ${num(preview.unmatched_count)} new imported prospects</div>
                     </div>
                     ${preview.needs_review_count ? badge(`${preview.needs_review_count} need review`, 'warn') : badge('Ready', 'ok')}
                   </div>
@@ -1116,7 +1116,7 @@
                               <td>${num(row.buyside_last_12_months)}</td>
                               <td>
                                 ${row.identity_missing_reason ? badge(row.identity_missing_reason.replace(/_/g, ' '), 'bad') : row.is_duplicate ? badge('Duplicate identity', 'warn') : badge('Valid identity', 'ok')}
-                                ${row.matched_agent_id ? badge(`${row.match_confidence}% matched`, row.needs_review ? 'warn' : 'ok') : badge('Unmatched import', 'info')}
+                                ${row.matched_agent_id ? badge(`${row.match_confidence}% existing profile`, row.needs_review ? 'warn' : 'ok') : badge('New imported prospect', 'info')}
                                 <div class="small">${esc(row.matched_agent_name || row.match_reason || '')}</div>
                               </td>
                             </tr>
