@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. The dashboard view now filters to trusted ListReports mappings with valid `identity_key`/phone and hides old bad-mapping rows without deleting stored history. Authenticated end-to-end upload testing still needs verification.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. The dashboard view now filters to trusted ListReports mappings with valid `identity_key`/phone and hides old bad-mapping rows without deleting stored history. As of 2026-07-03, blank numeric filter inputs are interpreted as no limit instead of zero so empty campaign criteria do not hide valid imported rows. Authenticated end-to-end upload testing still needs verification.
 
 ## Purpose
 

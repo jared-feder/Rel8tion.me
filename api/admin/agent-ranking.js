@@ -557,6 +557,8 @@ function boolValue(value) {
 }
 
 function numberValue(value) {
+  const text = String(value ?? '').trim();
+  if (!text || text === 'all') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
