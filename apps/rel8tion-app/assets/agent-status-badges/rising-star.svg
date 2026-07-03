@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">Rising Star badge</title>
+  <desc id="desc">Build the foundation status badge.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#b7e7ff"/>
+      <stop offset="1" stop-color="#5fb5d6"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7df9a"/>
+      <stop offset=".55" stop-color="#b88945"/>
+      <stop offset="1" stop-color="#6f4a22"/>
+    </linearGradient>
+  </defs>
+  <path d="M210 24 354 70 380 220 296 360 210 394 124 360 40 220 66 70Z" fill="url(#gold)" stroke="#4d351c" stroke-width="7"/>
+  <path d="M210 56 326 94 346 216 274 326 210 354 146 326 74 216 94 94Z" fill="url(#sky)" stroke="#efe2b7" stroke-width="6"/>
+  <path d="M114 280h192l28 46c-54 28-194 28-248 0Z" fill="#f6e5bd" stroke="#6b421f" stroke-width="6"/>
+  <path d="M140 292c42 12 98 12 140 0" fill="none" stroke="#9b6b36" stroke-width="5"/>
+  <rect x="162" y="162" width="96" height="82" rx="10" fill="#8c6a43" stroke="#593c22" stroke-width="5"/>
+  <path d="M210 160v-78M210 124c-32-8-44-26-50-52 30 4 49 19 50 52Zm0 8c31-12 51-31 58-65-36 7-57 27-58 65Zm-4 32c-23-4-42-14-57-32 27-5 47 4 57 32Zm8 2c23-5 42-18 55-38-29-3-48 8-55 38Z" fill="#6fa04f" stroke="#405b2e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M292 96 268 156h34l-26 70 70-92h-38l24-38Z" fill="#ffd257" stroke="#7b5a14" stroke-width="5" stroke-linejoin="round"/>
+  <text x="210" y="316" text-anchor="middle" font-family="Arial, sans-serif" font-size="31" font-weight="900" fill="#151515">RISING STAR</text>
+  <text x="210" y="344" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#151515">BUILD THE FOUNDATION.</text>
+  <text x="210" y="368" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#3b2b1f">Turn cold leads warm.</text>
+</svg>

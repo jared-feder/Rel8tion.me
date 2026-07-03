@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">All-Star badge</title>
+  <desc id="desc">Streamline success status badge.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c7f0ff"/>
+      <stop offset="1" stop-color="#6db4d6"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff3bb"/>
+      <stop offset=".55" stop-color="#c8964a"/>
+      <stop offset="1" stop-color="#6f4a22"/>
+    </linearGradient>
+  </defs>
+  <path d="M210 22 356 80 356 248 282 360H138L64 248V80Z" fill="url(#gold)" stroke="#4d351c" stroke-width="7"/>
+  <path d="M210 58 322 102 322 236 262 322H158L98 236V102Z" fill="url(#sky)" stroke="#efe2b7" stroke-width="6"/>
+  <path d="M90 284h240l28 48c-72 28-224 28-296 0Z" fill="#f6e5bd" stroke="#6b421f" stroke-width="6"/>
+  <path d="m210 66 16 34 37 5-27 26 7 37-33-18-33 18 7-37-27-26 37-5Z" fill="#f9d56b" stroke="#7b5a14" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M124 254h172v42H124Z" fill="#d7b178" stroke="#65401f" stroke-width="5"/>
+  <path d="M146 254v-72l64-54 64 54v72" fill="#f4dfbc" stroke="#65401f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M194 296v-48h34v48M160 206h28v26h-28zm72 0h28v26h-28z" fill="#6f4a22"/>
+  <circle cx="304" cy="114" r="22" fill="#f6d86d" stroke="#7b5a14" stroke-width="5"/>
+  <path d="M304 94v40M284 114h40" stroke="#7b5a14" stroke-width="5"/>
+  <text x="210" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="900" fill="#151515">ALL-STAR</text>
+  <text x="210" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#151515">STREAMLINE SUCCESS.</text>
+  <text x="210" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#3b2b1f">Systemize high production.</text>
+</svg>

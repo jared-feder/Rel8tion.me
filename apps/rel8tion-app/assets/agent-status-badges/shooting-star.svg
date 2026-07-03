@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">Shooting Star badge</title>
+  <desc id="desc">Maintain momentum status badge.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c6f3ff"/>
+      <stop offset="1" stop-color="#65b7dc"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff1b8"/>
+      <stop offset=".55" stop-color="#c9994e"/>
+      <stop offset="1" stop-color="#6f4a22"/>
+    </linearGradient>
+  </defs>
+  <path d="M210 28 360 92 340 330 210 386 80 330 60 92Z" fill="url(#gold)" stroke="#4d351c" stroke-width="7"/>
+  <path d="M210 62 328 110 310 306 210 350 110 306 92 110Z" fill="url(#sky)" stroke="#efe2b7" stroke-width="6"/>
+  <path d="M94 282h232l26 48c-68 28-216 28-284 0Z" fill="#f6e5bd" stroke="#6b421f" stroke-width="6"/>
+  <path d="M104 188 258 78l-86 134Z" fill="#f8d265" opacity=".9"/>
+  <path d="m274 72 17 34 38 6-28 27 7 38-34-18-34 18 7-38-28-27 38-6Z" fill="#f9d56b" stroke="#7b5a14" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M140 238h128v42H140Z" fill="#b88a54" stroke="#65401f" stroke-width="5"/>
+  <path d="M155 238v-42l50-38 50 38v42" fill="#f1d9ac" stroke="#65401f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M194 280v-34h32v34" fill="#76502c"/>
+  <circle cx="112" cy="154" r="26" fill="#f4cd69" stroke="#734c20" stroke-width="5"/>
+  <text x="112" y="164" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="900" fill="#2d2416">$</text>
+  <text x="210" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="29" font-weight="900" fill="#151515">SHOOTING STAR</text>
+  <text x="210" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#151515">MAINTAIN MOMENTUM.</text>
+  <text x="210" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#3b2b1f">Plug referral leaks.</text>
+</svg>

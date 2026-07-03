@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">Rock Star badge</title>
+  <desc id="desc">Scale the legacy status badge.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c6efff"/>
+      <stop offset="1" stop-color="#67afd6"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff0aa"/>
+      <stop offset=".55" stop-color="#bd8942"/>
+      <stop offset="1" stop-color="#65401f"/>
+    </linearGradient>
+  </defs>
+  <path d="M210 20 362 92 348 258 286 356H134L72 258 58 92Z" fill="url(#gold)" stroke="#4d351c" stroke-width="7"/>
+  <path d="M210 62 326 116 316 240 264 314H156L104 240 94 116Z" fill="url(#sky)" stroke="#efe2b7" stroke-width="6"/>
+  <path d="M94 282h232l30 50c-74 28-218 28-292 0Z" fill="#f6e5bd" stroke="#6b421f" stroke-width="6"/>
+  <path d="M142 226h136v52H142Z" fill="#d5b176" stroke="#65401f" stroke-width="5"/>
+  <path d="M154 226v-58h112v58" fill="#f3dfbe" stroke="#65401f" stroke-width="5"/>
+  <path d="M176 226v-34h24v34m44 0v-34h24v34m-54 52v-38h32v38" fill="#6f4a22"/>
+  <path d="M124 110h172l-22 62H146Z" fill="#f7e2ae" stroke="#65401f" stroke-width="5"/>
+  <path d="m130 82 32 28 34-44 34 44 34-44 34 44 32-28-16 74H146Z" fill="#d79b43" stroke="#65401f" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="196" cy="86" r="9" fill="#68b48b" stroke="#65401f" stroke-width="3"/>
+  <path d="M178 286c18-18 46-18 64 0" fill="none" stroke="#7b5a14" stroke-width="8" stroke-linecap="round"/>
+  <text x="210" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="900" fill="#151515">ROCK STAR</text>
+  <text x="210" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#151515">SCALE THE LEGACY.</text>
+  <text x="210" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#3b2b1f">Luxury relationship tool.</text>
+</svg>

@@ -444,15 +444,15 @@ function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') 
   const hasActivity = activeListings > 0 || listingSide12 > 0 || buySide12 > 0;
 
   let report = {
-    level: 'Foundation Builder',
-    title: 'Foundation Builder',
+    level: 'Rising Star',
+    title: 'Rising Star Foundation',
     hook: 'Build the foundation.',
-    tone: 'foundation',
-    initials: 'FB',
-    summary: 'There is not enough ListReports production signal yet, so the pitch should focus on getting the first repeatable capture system in place.',
-    system_gap: 'Start with a simple Event Pass or open-house kit so the next listing has a clean buyer-capture path.',
+    tone: 'rising',
+    initials: 'RS',
+    summary: `${ranking.agent_name || 'This agent'} is at the foundation stage in this ListReports view. Rel8tion should be framed as the shortcut that turns cold or one-off buyer interactions into a repeatable relationship system.`,
+    system_gap: 'Put the capture habit in place before production volume gets harder to manage manually.',
     score_label: 'Foundation',
-    score_value: 1
+    score_value: hasActivity ? 2 : 1
   };
 
   if (isRockStar) {

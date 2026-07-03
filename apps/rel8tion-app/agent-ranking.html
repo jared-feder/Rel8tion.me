@@ -354,6 +354,7 @@
       background: #fff;
       box-shadow: 0 30px 80px rgba(15,23,42,.28);
     }
+    .modal.profile-modal { width: min(1320px, 100%); }
     .modal.small { width: min(760px, 100%); }
     .modal-head {
       position: sticky;
@@ -370,14 +371,14 @@
     .modal-body { padding: 18px; }
     .modal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .mapping-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-    .profile-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
-    .profile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .profile-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .profile-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
     .profile-hero {
       display: grid;
-      grid-template-columns: 92px 1fr 150px;
-      gap: 14px;
+      grid-template-columns: 112px 1fr 170px;
+      gap: 18px;
       align-items: center;
-      padding: 14px;
+      padding: 18px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: linear-gradient(135deg, #f8fbff, #fff);
@@ -405,8 +406,8 @@
       margin-top: 4px;
     }
     .profile-avatar {
-      width: 92px;
-      height: 92px;
+      width: 112px;
+      height: 112px;
       border-radius: 8px;
       overflow: hidden;
       display: grid;
@@ -419,12 +420,12 @@
     }
     .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .profile-box {
-      padding: 14px;
+      padding: 18px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdff;
     }
-    .profile-box p, .profile-box li { color: #344256; line-height: 1.5; font-size: 13px; font-weight: 600; }
+    .profile-box p, .profile-box li { color: #344256; line-height: 1.55; font-size: 14px; font-weight: 650; }
     .profile-box ul { margin: 10px 0 0; padding-left: 18px; }
     .listing-list { display: grid; gap: 0; margin-top: 12px; }
     .listing-row {
@@ -474,11 +475,11 @@
     }
     .status-report {
       display: grid;
-      grid-template-columns: 86px 1fr;
-      gap: 12px;
+      grid-template-columns: 190px 1fr;
+      gap: 18px;
       align-items: center;
       margin-top: 12px;
-      padding: 12px;
+      padding: 16px;
       border-radius: 8px;
       border: 1px solid rgba(148,163,184,.28);
       background: #fff;
@@ -487,34 +488,34 @@
     .status-report.allstar { border-color: rgba(36,85,214,.24); background: linear-gradient(135deg, #eef5ff, #fff); }
     .status-report.shooting { border-color: rgba(14,165,200,.26); background: linear-gradient(135deg, #ecfeff, #fff); }
     .status-report.rising { border-color: rgba(15,118,110,.24); background: linear-gradient(135deg, #ecfdf5, #fff); }
-    .status-emblem {
-      width: 74px;
-      height: 74px;
-      border-radius: 50%;
+    .status-badge-shell {
+      width: 178px;
+      min-height: 154px;
       display: grid;
       place-items: center;
-      text-align: center;
-      color: #17224f;
-      background:
-        radial-gradient(circle at 50% 50%, #fff 0 48%, transparent 49%),
-        conic-gradient(from 0deg, #2455d6, #0ea5c8, #0f766e, #b45309, #2455d6);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.8), 0 12px 28px rgba(31,42,90,.12);
     }
-    .status-emblem strong {
-      font-family: "Plus Jakarta Sans", Inter, sans-serif;
-      font-size: 20px;
-      line-height: 1;
-      color: #17224f;
-    }
-    .status-emblem span {
+    .status-badge-img {
+      width: min(178px, 100%);
+      max-height: 168px;
+      object-fit: contain;
       display: block;
-      margin-top: 3px;
-      color: #64748b;
-      font-size: 9px;
-      font-weight: 900;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      filter: drop-shadow(0 14px 20px rgba(31,42,90,.16));
     }
+    .status-badge-fallback {
+      display: none;
+      min-height: 112px;
+      width: 132px;
+      place-items: center;
+      text-align: center;
+      border-radius: 8px;
+      border: 1px solid rgba(36,85,214,.18);
+      background: #eef5ff;
+      color: #17224f;
+      font-weight: 900;
+      padding: 12px;
+    }
+    .status-badge-shell.missing .status-badge-img { display: none; }
+    .status-badge-shell.missing .status-badge-fallback { display: grid; }
     .status-bars { display: grid; gap: 8px; margin-top: 12px; }
     .status-bar {
       display: grid;
@@ -577,6 +578,8 @@
       .main { padding: 12px; }
       .topbar, .profile-grid, .profile-hero, .listing-row, .modal-grid, .mapping-grid, .info-grid { grid-template-columns: 1fr; }
       .summary-grid, .profile-metrics, .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .status-report { grid-template-columns: 1fr; }
+      .status-badge-shell { width: 100%; }
       .actions { justify-content: flex-start; }
     }
   </style>
@@ -657,7 +660,7 @@
       profileDetailsLoading: false,
       profileDetailsError: '',
       profileDetailsSeq: 0,
-      pitchVariants: null
+      pitchModal: null
     };
 
     function freshUploadState() {
@@ -928,14 +931,25 @@
       return Math.max(8, Math.min(100, multiple * 12));
     }
 
+    function statusBadgeImage(report) {
+      const key = String(report?.level || '').toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');
+      return ({
+        'rising-star': 'assets/agent-status-badges/rising-star.svg',
+        'shooting-star': 'assets/agent-status-badges/shooting-star.svg',
+        'all-star': 'assets/agent-status-badges/all-star.svg',
+        'rock-star': 'assets/agent-status-badges/rock-star.svg'
+      }[key] || 'assets/agent-status-badges/rising-star.svg');
+    }
+
     function renderStatusReport(comparison) {
       const report = comparison?.status_report;
       if (!report) return '';
       const metrics = (comparison.metrics || []).filter((metric) => ['Active listings', 'Listing side 12m', 'Buyside 12m'].includes(metric.label));
       return `
         <div class="status-report ${esc(report.tone || '')}">
-          <div class="status-emblem" aria-label="${esc(report.level || 'Status')} status">
-            <div><strong>${esc(report.initials || 'RL')}</strong><span>Status</span></div>
+          <div class="status-badge-shell" aria-label="${esc(report.level || 'Status')} status badge">
+            <img class="status-badge-img" src="${esc(statusBadgeImage(report))}" alt="${esc(report.level || 'Production status')} badge" loading="lazy" onerror="this.closest('.status-badge-shell')?.classList.add('missing');">
+            <div class="status-badge-fallback">${esc(report.level || 'Production Status')}</div>
           </div>
           <div>
             <div class="mini-title">Production status</div>
@@ -1533,10 +1547,9 @@
       const row = details?.ranking || baseRow;
       const detailSummary = details?.summary || {};
       const labels = row.raw_sources?.labels || [];
-      const variants = state.pitchVariants;
       return `
         <div class="modal-backdrop" data-close-profile>
-          <section class="modal" role="dialog" aria-modal="true" aria-labelledby="profileTitle" onclick="event.stopPropagation()">
+          <section class="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profileTitle" onclick="event.stopPropagation()">
             <div class="modal-head">
               <div>
                 <h2 id="profileTitle">${esc(row.agent_name || 'Agent production profile')}</h2>
@@ -1613,6 +1626,17 @@
                   <p>This agent is active enough to benefit from Rel8tion because the system removes setup friction. The agent does not need to download an app, create a login, print a QR code, or learn new software.</p>
                 </div>
                 <div class="profile-box">
+                  <h3>Next Best Action</h3>
+                  <p>${esc(row.next_best_action || '')}</p>
+                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
+                    <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Open Pitch Modal</span></button>
+                    <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
+                    <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
+                    <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Create Rel8tion Prospect</span></button>
+                    <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Mark Not a Fit</span></button>
+                  </div>
+                </div>
+                <div class="profile-box">
                   <h3>Rel8tion Value</h3>
                   <p>${esc(row.rel8tion_value_summary || '')}</p>
                   <ul>
@@ -1625,14 +1649,34 @@
                   </ul>
                 </div>
               </div>
-              <div class="grid" style="gap:14px;">
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderPitchModal() {
+      const pitch = state.pitchModal;
+      if (!pitch) return '';
+      const row = pitch.row || {};
+      const variants = pitch.variants || null;
+      return `
+        <div class="modal-backdrop" data-close-pitch>
+          <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="pitchTitle" onclick="event.stopPropagation()">
+            <div class="modal-head">
+              <div>
+                <h2 id="pitchTitle">Pitch Studio</h2>
+                <div class="small">${esc([row.agent_name, row.brokerage, row.market_area].filter(Boolean).join(' | ') || 'Agent Ranking')}</div>
+              </div>
+              <button class="btn" data-close-pitch-button><i data-lucide="x"></i><span>Close</span></button>
+            </div>
+            <div class="modal-body grid" style="gap:14px;">
+              ${pitch.loading ? `<div class="empty">Generating pitch variants...</div>` : ''}
+              ${pitch.error ? `<div class="toast bad" style="position:static;box-shadow:none;">${esc(pitch.error)}</div>` : ''}
+              ${!pitch.loading ? `
                 <div class="profile-box">
                   <h3>Recommended Pitch</h3>
                   <div class="pitch-box" style="margin-top:10px;">${esc(row.recommended_pitch || '')}</div>
-                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
-                    <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Generate Pitch</span></button>
-                    <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
-                  </div>
                 </div>
                 ${variants ? `
                   <div class="profile-box">
@@ -1644,17 +1688,17 @@
                       </div>
                     `).join('')}
                   </div>
-                ` : ''}
-                <div class="profile-box">
-                  <h3>Next Best Action</h3>
-                  <p>${esc(row.next_best_action || '')}</p>
-                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
-                    <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
-                    <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Create Rel8tion Prospect</span></button>
-                    <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Mark Not a Fit</span></button>
+                ` : `
+                  <div class="profile-box">
+                    <h3>Pitch Variants</h3>
+                    <p>Use Generate Pitch to create objection, short SMS, and follow-up angles for this agent.</p>
                   </div>
+                `}
+                <div class="actions" style="justify-content:flex-start;">
+                  <button class="btn" data-pitch="${esc(row.id)}" ${state.action === `pitch:${row.id}` ? 'disabled' : ''}><i data-lucide="sparkles"></i><span>${variants ? 'Regenerate Pitch' : 'Generate Pitch'}</span></button>
+                  <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
                 </div>
-              </div>
+              ` : ''}
             </div>
           </section>
         </div>
@@ -1751,6 +1795,7 @@
           </section>
           ${renderUploadModal()}
           ${renderProfileModal()}
+          ${renderPitchModal()}
           ${renderLocationFixModal()}
         </main>
       `;
@@ -1872,7 +1917,6 @@
       const row = findRanking(id);
       if (!row) return;
       state.profile = row;
-      state.pitchVariants = null;
       state.profileDetails = null;
       state.profileDetailsError = '';
       state.profileDetailsLoading = true;
@@ -1970,23 +2014,17 @@
     }
 
     async function generatePitch(id) {
+      const row = findRanking(id) || (state.profile?.id === id ? state.profile : null) || state.pitchModal?.row;
+      if (!row) return;
       state.action = `pitch:${id}`;
-      const row = findRanking(id);
-      if (row) {
-        state.profile = row;
-        if (state.profileDetails?.ranking_id !== id) {
-          state.profileDetails = null;
-          state.profileDetailsError = '';
-          state.profileDetailsLoading = true;
-          loadProfileDetails(id);
-        }
-      }
+      state.pitchModal = { row, variants: state.pitchModal?.row?.id === id ? state.pitchModal.variants : null, loading: true, error: '' };
       render();
       try {
         const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'generate_pitch', ranking_id: id }) });
-        state.pitchVariants = result.variants || null;
+        state.pitchModal = { row, variants: result.variants || null, loading: false, error: '' };
         showToast('Pitch variants generated.');
       } catch (error) {
+        state.pitchModal = { row, variants: null, loading: false, error: error.message || 'Unable to generate pitch.' };
         showToast(error.message || 'Unable to generate pitch.');
       } finally {
         state.action = '';
@@ -2124,7 +2162,13 @@
           state.profileDetails = null;
           state.profileDetailsError = '';
           state.profileDetailsLoading = false;
-          state.pitchVariants = null;
+          state.profileDetailsSeq += 1;
+          render();
+        });
+      });
+      document.querySelectorAll('[data-close-pitch], [data-close-pitch-button]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.pitchModal = null;
           render();
         });
       });
