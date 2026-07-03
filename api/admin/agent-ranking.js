@@ -5,15 +5,67 @@ const {
   identityKeyForAgentRanking,
   marketAverages,
   matchImportedRows,
+  normalizeEmail,
   normalizeImportRows,
   normalizeName,
   normalizePhone,
   outreachPayloadFromRanking,
   rankingFromImportRow,
-  scoreRow
+  scoreRow,
+  tokenSimilarity
 } = require('../../lib/agent-ranking');
 const { buildOpenHouseRows, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
+
+const OPEN_HOUSE_BASE_SELECT = [
+  'id',
+  'address',
+  'location',
+  'agent',
+  'brokerage',
+  'agent_phone',
+  'agent_email',
+  'open_start',
+  'open_end',
+  'created_at',
+  'updated_at'
+].join(',');
+
+const OPEN_HOUSE_DETAIL_SELECT = [
+  OPEN_HOUSE_BASE_SELECT,
+  'link',
+  'source',
+  'image',
+  'price',
+  'beds',
+  'baths',
+  'sqft'
+].join(',');
+
+const LISTING_AGENT_BASE_SELECT = [
+  'open_house_id',
+  'name',
+  'phone',
+  'phone_normalized',
+  'email',
+  'brokerage',
+  'office_city',
+  'office_state_or_province',
+  'active_listing_count',
+  'active_open_house_count'
+].join(',');
+
+const LISTING_AGENT_DETAIL_SELECT = [
+  'id',
+  LISTING_AGENT_BASE_SELECT,
+  'source',
+  'is_primary',
+  'primary_photo_url',
+  'directory_photo_url',
+  'profile_url',
+  'created_at',
+  'scraped_at'
+].join(',');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -143,14 +195,216 @@ async function loadOpenHouseSignals() {
 
 async function loadOpenHouseRows() {
   const [openHouses, listingAgents] = await Promise.all([
-    supabaseRest(
-      'open_houses?select=id,address,location,agent,brokerage,agent_phone,agent_email,open_start,open_end,created_at,updated_at&order=open_start.desc.nullslast&limit=10000'
+    supabaseRestAll(
+      `open_houses?select=${OPEN_HOUSE_BASE_SELECT}&order=open_start.desc.nullslast`,
+      { pageSize: 1000, maxRows: 50000 }
     ).catch(() => []),
-    supabaseRest(
-      'listing_agents?select=open_house_id,name,phone,phone_normalized,email,brokerage,office_city,office_state_or_province,active_listing_count,active_open_house_count&limit=10000'
+    supabaseRestAll(
+      `listing_agents?select=${LISTING_AGENT_BASE_SELECT}`,
+      { pageSize: 1000, maxRows: 50000 }
     ).catch(() => [])
   ]);
   return buildOpenHouseRows(openHouses || [], listingAgents || []);
+}
+
+function firstPresent(...values) {
+  return values.find((value) => String(value || '').trim()) || '';
+}
+
+function arrayValue(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch (_) {
+      return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function inFilter(values) {
+  return `(${values.map(enc).join(',')})`;
+}
+
+async function loadOpenHouseDetailsByIds(ids) {
+  const uniqueIds = [...new Set(arrayValue(ids).map(String).filter(Boolean))].slice(0, 50);
+  if (!uniqueIds.length) return [];
+  return supabaseRest(
+    `open_houses?id=in.${inFilter(uniqueIds)}&select=${OPEN_HOUSE_DETAIL_SELECT}&limit=${uniqueIds.length}`
+  ).catch(() => []);
+}
+
+async function loadListingAgentDetailsByOpenHouseIds(ids) {
+  const uniqueIds = [...new Set(arrayValue(ids).map(String).filter(Boolean))].slice(0, 50);
+  if (!uniqueIds.length) return [];
+  return supabaseRest(
+    `listing_agents?open_house_id=in.${inFilter(uniqueIds)}&select=${LISTING_AGENT_DETAIL_SELECT}&order=is_primary.desc.nullslast,created_at.desc&limit=${Math.max(50, uniqueIds.length * 6)}`
+  ).catch(() => []);
+}
+
+function dedupeListingAgents(agents = []) {
+  const seen = new Set();
+  const deduped = [];
+  for (const agent of agents || []) {
+    const key = firstPresent(agent.id, `${agent.open_house_id || ''}|${normalizeName(agent.name)}|${normalizePhone(agent.phone_normalized || agent.phone)}`);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(agent);
+  }
+  return deduped;
+}
+
+async function loadListingAgentPhotoCandidates(ranking = {}) {
+  const tries = [];
+  const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
+  const email = normalizeEmail(ranking.email);
+  const name = String(ranking.agent_name || '').trim();
+  if (phone) tries.push(`listing_agents?phone_normalized=eq.${enc(phone)}&select=${LISTING_AGENT_DETAIL_SELECT}&order=created_at.desc&limit=20`);
+  if (email) tries.push(`listing_agents?email=eq.${enc(email)}&select=${LISTING_AGENT_DETAIL_SELECT}&order=created_at.desc&limit=20`);
+  if (name.length >= 3) tries.push(`listing_agents?name=ilike.${enc(`*${name}*`)}&select=${LISTING_AGENT_DETAIL_SELECT}&order=created_at.desc&limit=20`);
+  if (!tries.length) return [];
+  const results = await Promise.all(tries.map((path) => supabaseRest(path).catch(() => [])));
+  return dedupeListingAgents(results.flat());
+}
+
+function listingAgentPhoto(agent = {}) {
+  agent = agent || {};
+  return firstPresent(agent.primary_photo_url, agent.directory_photo_url, agent.image_url, agent.photo_url);
+}
+
+function listingAgentFitScore(ranking = {}, agent = {}) {
+  ranking = ranking || {};
+  agent = agent || {};
+  const rankingPhone = normalizePhone(ranking.phone_normalized || ranking.phone);
+  const agentPhone = normalizePhone(agent.phone_normalized || agent.phone);
+  if (rankingPhone && agentPhone && rankingPhone === agentPhone) return 100;
+
+  const rankingEmail = normalizeEmail(ranking.email);
+  const agentEmail = normalizeEmail(agent.email);
+  if (rankingEmail && agentEmail && rankingEmail === agentEmail) return 95;
+
+  const nameScore = tokenSimilarity(ranking.agent_name, agent.name);
+  const brokerageScore = tokenSimilarity(ranking.brokerage, agent.brokerage);
+  if (nameScore >= 0.76 && brokerageScore >= 0.35) return Math.round(70 + (nameScore * 20) + (brokerageScore * 10));
+  if (nameScore >= 0.76) return Math.round(55 + (nameScore * 25));
+  return Math.round(nameScore * 60);
+}
+
+function bestListingAgentForRanking(ranking = {}, agents = []) {
+  return [...(agents || [])]
+    .sort((left, right) => {
+      const scoreDelta = listingAgentFitScore(ranking, right) - listingAgentFitScore(ranking, left);
+      if (scoreDelta) return scoreDelta;
+      return Number(Boolean(listingAgentPhoto(right))) - Number(Boolean(listingAgentPhoto(left)));
+    })[0] || null;
+}
+
+function publicListingAgent(agent = {}, ranking = {}) {
+  agent = agent || {};
+  ranking = ranking || {};
+  return {
+    id: agent.id || '',
+    name: agent.name || '',
+    phone: agent.phone || agent.phone_normalized || '',
+    phone_normalized: normalizePhone(agent.phone_normalized || agent.phone),
+    email: agent.email || '',
+    brokerage: agent.brokerage || '',
+    office_city: agent.office_city || '',
+    office_state_or_province: agent.office_state_or_province || '',
+    active_listing_count: Number(agent.active_listing_count || 0),
+    active_open_house_count: Number(agent.active_open_house_count || 0),
+    profile_url: agent.profile_url || '',
+    photo_url: listingAgentPhoto(agent),
+    match_score: listingAgentFitScore(ranking, agent)
+  };
+}
+
+function listingPhoto(openHouse = {}) {
+  openHouse = openHouse || {};
+  return firstPresent(openHouse.image, openHouse.image_url, openHouse.listing_photo_url, openHouse.primary_photo_url, openHouse.photo_url);
+}
+
+function openHouseDetailRow(openHouse = {}, agents = [], ranking = {}) {
+  openHouse = openHouse || {};
+  ranking = ranking || {};
+  const bestAgent = bestListingAgentForRanking(ranking, agents);
+  return {
+    id: openHouse.id || '',
+    address: openHouse.address || openHouse.location || '',
+    listing_url: openHouse.link || '',
+    listing_photo_url: listingPhoto(openHouse),
+    source: openHouse.source || '',
+    price: openHouse.price || null,
+    beds: openHouse.beds || null,
+    baths: openHouse.baths || null,
+    sqft: openHouse.sqft || null,
+    open_start: openHouse.open_start || null,
+    open_end: openHouse.open_end || null,
+    updated_at: openHouse.updated_at || openHouse.created_at || null,
+    agent_name: firstPresent(bestAgent?.name, openHouse.agent),
+    brokerage: firstPresent(bestAgent?.brokerage, openHouse.brokerage),
+    agent_phone: firstPresent(bestAgent?.phone, bestAgent?.phone_normalized, openHouse.agent_phone),
+    agent_email: firstPresent(bestAgent?.email, openHouse.agent_email),
+    agent_photo_url: listingAgentPhoto(bestAgent),
+    agent_profile_url: bestAgent?.profile_url || '',
+    match_score: bestAgent ? listingAgentFitScore(ranking, bestAgent) : 0,
+    listing_agents: agents.map((agent) => publicListingAgent(agent, ranking))
+  };
+}
+
+async function profileDetailsForRanking(ranking) {
+  let ids = arrayValue(ranking.matched_open_house_ids);
+  let openHouses = await loadOpenHouseDetailsByIds(ids);
+  let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
+  let photoCandidates = [];
+
+  if (!openHouses.length && Number(ranking.matched_open_house_count || 0) > 0) {
+    const openHouseRows = await loadOpenHouseRows();
+    const match = matchOpenHousesForRanking(ranking, openHouseRows);
+    ids = match.matched_open_house_ids || [];
+    [openHouses, listingAgents] = await Promise.all([
+      loadOpenHouseDetailsByIds(ids),
+      loadListingAgentDetailsByOpenHouseIds(ids)
+    ]);
+  }
+
+  if (!listingAgents.some((agent) => listingAgentPhoto(agent))) {
+    photoCandidates = await loadListingAgentPhotoCandidates(ranking);
+  }
+  const allListingAgents = dedupeListingAgents([...(listingAgents || []), ...(photoCandidates || [])]);
+
+  const agentsByOpenHouse = new Map();
+  for (const agent of listingAgents || []) {
+    const key = String(agent.open_house_id || '');
+    if (!key) continue;
+    if (!agentsByOpenHouse.has(key)) agentsByOpenHouse.set(key, []);
+    agentsByOpenHouse.get(key).push(agent);
+  }
+
+  const rows = (openHouses || [])
+    .map((openHouse) => openHouseDetailRow(openHouse, agentsByOpenHouse.get(String(openHouse.id || '')) || [], ranking))
+    .sort((left, right) => new Date(right.open_start || right.updated_at || 0) - new Date(left.open_start || left.updated_at || 0));
+  const bestAgent = bestListingAgentForRanking(ranking, allListingAgents || []);
+  const bestAgentPhoto = listingAgentPhoto(bestAgent);
+  return {
+    ranking,
+    profile_photo_url: firstPresent(ranking.agent_photo_url, ranking.image_url, bestAgentPhoto),
+    profile_url: bestAgent?.profile_url || '',
+    current_listings: rows,
+    open_houses: rows,
+    listing_agents: allListingAgents.map((agent) => publicListingAgent(agent, ranking)),
+    summary: {
+      matched_open_house_count: rows.length,
+      matched_listing_agent_count: allListingAgents.length,
+      active_listing_count: Number(ranking.active_listing_count || 0),
+      matched_active_listing_count: Number(ranking.matched_active_listing_count || 0),
+      weekend_open_house_count: Number(ranking.matched_weekend_open_house_count || 0)
+    }
+  };
 }
 
 async function parseAndMatch(body) {
@@ -1025,6 +1279,11 @@ async function handleRefreshMatches(body) {
   });
 }
 
+async function handleProfileDetails(body) {
+  const ranking = await findRanking(body.ranking_id);
+  return profileDetailsForRanking(ranking);
+}
+
 async function handleFixLocation(body) {
   const ranking = await findRanking(body.ranking_id);
   const inferred = inferCountyFromRow({
@@ -1169,6 +1428,11 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'refresh_matches') {
       const result = await handleRefreshMatches(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'profile_details') {
+      const result = await handleProfileDetails(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

@@ -287,6 +287,18 @@
     }
     .sort-btn svg { width: 12px; height: 12px; }
     td strong { color: #17224f; }
+    .agent-link {
+      display: inline;
+      border: 0;
+      background: transparent;
+      color: #17224f;
+      padding: 0;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .agent-link strong { color: #17224f; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .agent-link:hover strong { color: #2563eb; }
     .muted { color: var(--muted); }
     .small { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 600; }
     .badge {
@@ -359,6 +371,30 @@
     .mapping-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .profile-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
     .profile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .profile-hero {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f8fbff, #fff);
+    }
+    .profile-avatar {
+      width: 92px;
+      height: 92px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: #dbeafe;
+      color: #17224f;
+      font-size: 26px;
+      font-weight: 900;
+      border: 1px solid rgba(37,99,235,.18);
+    }
+    .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .profile-box {
       padding: 14px;
       border: 1px solid var(--line);
@@ -367,6 +403,37 @@
     }
     .profile-box p, .profile-box li { color: #344256; line-height: 1.5; font-size: 13px; font-weight: 600; }
     .profile-box ul { margin: 10px 0 0; padding-left: 18px; }
+    .listing-list { display: grid; gap: 0; margin-top: 12px; }
+    .listing-row {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid rgba(148,163,184,.24);
+    }
+    .listing-row:first-child { border-top: 0; padding-top: 0; }
+    .listing-thumb {
+      width: 86px;
+      aspect-ratio: 4 / 3;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #e2e8f0;
+      display: grid;
+      place-items: center;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .listing-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .listing-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      margin-top: 8px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+    }
     .pitch-box {
       white-space: pre-wrap;
       border-left: 3px solid var(--sky);
@@ -405,7 +472,7 @@
     }
     @media (max-width: 760px) {
       .main { padding: 12px; }
-      .topbar, .profile-grid, .modal-grid, .mapping-grid, .info-grid { grid-template-columns: 1fr; }
+      .topbar, .profile-grid, .profile-hero, .listing-row, .modal-grid, .mapping-grid, .info-grid { grid-template-columns: 1fr; }
       .summary-grid, .profile-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .actions { justify-content: flex-start; }
     }
@@ -483,6 +550,10 @@
       lastImportSummary: null,
       locationFix: null,
       profile: null,
+      profileDetails: null,
+      profileDetailsLoading: false,
+      profileDetailsError: '',
+      profileDetailsSeq: 0,
       pitchVariants: null
     };
 
@@ -634,6 +705,90 @@
       if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
       if (digits.length === 11 && digits.startsWith('1')) return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
       return text;
+    }
+
+    function initials(name) {
+      const parts = String(name || 'Agent').trim().split(/\s+/).filter(Boolean);
+      return (parts[0]?.[0] || 'A') + (parts[1]?.[0] || '');
+    }
+
+    function fmtDateTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      return Number.isFinite(date.getTime())
+        ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '';
+    }
+
+    function propertyFacts(item) {
+      return [
+        item.price ? compactMoney(item.price) : '',
+        item.beds ? `${num(item.beds)} bd` : '',
+        item.baths ? `${num(item.baths)} ba` : '',
+        item.sqft ? `${num(item.sqft)} sqft` : ''
+      ].filter(Boolean);
+    }
+
+    function detailsForProfile(row) {
+      return state.profileDetails?.ranking_id === row?.id ? state.profileDetails : null;
+    }
+
+    function profilePhotoUrl(row, details) {
+      return details?.profile_photo_url || row?.agent_photo_url || row?.image_url || '';
+    }
+
+    function renderProfileAvatar(row, details) {
+      const fallback = esc(initials(row?.agent_name));
+      const url = profilePhotoUrl(row, details);
+      return `
+        <div class="profile-avatar" aria-label="${esc(row?.agent_name || 'Agent photo')}">
+          ${url ? `<img src="${esc(url)}" alt="${esc(row?.agent_name || 'Agent')}" onerror="this.outerHTML='<span>${fallback}</span>';">` : `<span>${fallback}</span>`}
+        </div>
+      `;
+    }
+
+    function renderListingMatches(row, details) {
+      if (state.profileDetailsLoading && state.profile?.id === row.id) {
+        return '<div class="empty" style="padding:18px;">Loading current listing and open-house matches...</div>';
+      }
+      if (state.profileDetailsError && state.profile?.id === row.id) {
+        return `<div class="empty" style="padding:18px;">${esc(state.profileDetailsError)}</div>`;
+      }
+      const rows = details?.open_houses || details?.current_listings || [];
+      if (!rows.length) {
+        return '<div class="empty" style="padding:18px;">No current open-house/listing records are matched to this agent yet.</div>';
+      }
+      return `
+        <div class="listing-list">
+          ${rows.map((item) => {
+            const facts = propertyFacts(item);
+            const openTime = [fmtDateTime(item.open_start), fmtDateTime(item.open_end)].filter(Boolean).join(' - ');
+            const photo = item.listing_photo_url || '';
+            return `
+              <div class="listing-row">
+                <div class="listing-thumb">
+                  ${photo ? `<img src="${esc(photo)}" alt="${esc(item.address || 'Listing')}" onerror="this.outerHTML='<span>Listing</span>';">` : '<span>Listing</span>'}
+                </div>
+                <div>
+                  <strong>${esc(item.address || 'Open house listing')}</strong>
+                  <div class="small">${openTime ? `Open house: ${esc(openTime)}` : `Updated: ${esc(fmtDateTime(item.updated_at) || 'N/A')}`}</div>
+                  <div class="listing-meta">
+                    ${facts.map((fact) => `<span>${esc(fact)}</span>`).join('')}
+                    ${item.source ? `<span>${esc(item.source)}</span>` : ''}
+                    ${item.match_score ? `<span>${num(item.match_score)}% match</span>` : ''}
+                  </div>
+                  <div class="small" style="margin-top:8px;">
+                    ${esc([item.agent_name, item.brokerage].filter(Boolean).join(' | '))}
+                    ${item.agent_phone ? ` | ${esc(formatPhone(item.agent_phone))}` : ''}
+                    ${item.agent_email ? ` | ${esc(item.agent_email)}` : ''}
+                  </div>
+                  ${item.listing_url ? `<div class="actions" style="justify-content:flex-start;margin-top:10px;"><a class="btn" href="${esc(item.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a></div>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
     }
 
     function pageCount() {
@@ -966,7 +1121,7 @@
               ${rows.map((row, index) => `
                 <tr>
                   <td><strong>${num(row.agent_rank_score)}</strong><div class="small">#${offset + index + 1} in current view</div></td>
-                  <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
+                  <td><button class="agent-link" data-profile="${esc(row.id)}"><strong>${esc(row.agent_name || 'Unknown agent')}</strong></button><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
                   <td><strong>${esc(formatPhone(phoneForRow(row)))}</strong><div class="small">${row.phone_normalized ? esc(row.phone_normalized) : ''}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
@@ -1160,8 +1315,11 @@
     }
 
     function renderProfileModal() {
-      const row = state.profile;
-      if (!row) return '';
+      const baseRow = state.profile;
+      if (!baseRow) return '';
+      const details = detailsForProfile(baseRow);
+      const row = details?.ranking || baseRow;
+      const detailSummary = details?.summary || {};
       const labels = row.raw_sources?.labels || [];
       const variants = state.pitchVariants;
       return `
@@ -1170,7 +1328,7 @@
             <div class="modal-head">
               <div>
                 <h2 id="profileTitle">${esc(row.agent_name || 'Agent production profile')}</h2>
-                <div class="small">${esc([row.brokerage, row.market_area, row.phone, row.email].filter(Boolean).join(' | '))}</div>
+                <div class="small">${esc([row.brokerage, row.market_area, formatPhone(phoneForRow(row)), row.email].filter(Boolean).join(' | '))}</div>
               </div>
               <div class="actions">
                 ${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}
@@ -1180,6 +1338,20 @@
             </div>
             <div class="modal-body profile-grid">
               <div class="grid" style="gap:14px;">
+                <div class="profile-hero">
+                  ${renderProfileAvatar(row, details)}
+                  <div>
+                    <div class="mini-title">Agent profile</div>
+                    <h3 style="margin-top:6px;">${esc(row.agent_name || 'Unknown agent')}</h3>
+                    <p class="small" style="margin-top:6px;">${esc([row.brokerage, row.primary_county || row.county, row.market_area].filter(Boolean).join(' | '))}</p>
+                    <div class="listing-meta">
+                      ${phoneForRow(row) ? `<span>${esc(formatPhone(phoneForRow(row)))}</span>` : ''}
+                      ${row.email ? `<span>${esc(row.email)}</span>` : ''}
+                      ${details?.profile_url ? `<a href="${esc(details.profile_url)}" target="_blank" rel="noopener">Agent source profile</a>` : ''}
+                    </div>
+                    ${state.profileDetailsLoading && state.profile?.id === row.id ? `<div style="margin-top:10px;">${badge('Loading live listing matches', 'info')}</div>` : ''}
+                  </div>
+                </div>
                 <div class="profile-box">
                   <h3>ListReports Activity</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
@@ -1191,6 +1363,15 @@
                     <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
                   </div>
                   <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
+                </div>
+                <div class="profile-box">
+                  <h3>Current Listings & Open Houses</h3>
+                  <div class="profile-metrics" style="margin-top:12px;">
+                    <div><div class="mini-title">Imported active</div><strong>${num(detailSummary.active_listing_count ?? row.active_listing_count)}</strong></div>
+                    <div><div class="mini-title">Matched OH</div><strong>${num(detailSummary.matched_open_house_count ?? row.matched_open_house_count)}</strong></div>
+                    <div><div class="mini-title">Weekend OH</div><strong>${num(detailSummary.weekend_open_house_count ?? row.matched_weekend_open_house_count)}</strong></div>
+                  </div>
+                  ${renderListingMatches(row, details)}
                 </div>
                 <div class="profile-box">
                   <h3>Location Intelligence</h3>
@@ -1443,6 +1624,44 @@
       return (state.data.rankings || []).find((row) => row.id === id) || null;
     }
 
+    function openProfile(id) {
+      const row = findRanking(id);
+      if (!row) return;
+      state.profile = row;
+      state.pitchVariants = null;
+      state.profileDetails = null;
+      state.profileDetailsError = '';
+      state.profileDetailsLoading = true;
+      render();
+      loadProfileDetails(id);
+    }
+
+    async function loadProfileDetails(id) {
+      const requestSeq = ++state.profileDetailsSeq;
+      try {
+        const result = await api(API, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'profile_details', ranking_id: id })
+        });
+        if (requestSeq !== state.profileDetailsSeq || state.profile?.id !== id) return;
+        state.profileDetails = {
+          ...result,
+          ranking_id: id,
+          ranking: result.ranking || state.profile
+        };
+        if (result.ranking) state.profile = result.ranking;
+        state.profileDetailsError = '';
+      } catch (error) {
+        if (requestSeq !== state.profileDetailsSeq || state.profile?.id !== id) return;
+        state.profileDetailsError = error.message || 'Unable to load current listing matches.';
+      } finally {
+        if (requestSeq === state.profileDetailsSeq && state.profile?.id === id) {
+          state.profileDetailsLoading = false;
+          render();
+        }
+      }
+    }
+
     function openLocationFix(id) {
       const row = findRanking(id);
       if (!row) return;
@@ -1508,7 +1727,15 @@
     async function generatePitch(id) {
       state.action = `pitch:${id}`;
       const row = findRanking(id);
-      if (row) state.profile = row;
+      if (row) {
+        state.profile = row;
+        if (state.profileDetails?.ranking_id !== id) {
+          state.profileDetails = null;
+          state.profileDetailsError = '';
+          state.profileDetailsLoading = true;
+          loadProfileDetails(id);
+        }
+      }
       render();
       try {
         const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'generate_pitch', ranking_id: id }) });
@@ -1643,14 +1870,15 @@
       });
       document.querySelectorAll('[data-profile]').forEach((button) => {
         button.addEventListener('click', () => {
-          state.profile = findRanking(button.dataset.profile);
-          state.pitchVariants = null;
-          render();
+          openProfile(button.dataset.profile);
         });
       });
       document.querySelectorAll('[data-close-profile], [data-close-profile-button]').forEach((button) => {
         button.addEventListener('click', () => {
           state.profile = null;
+          state.profileDetails = null;
+          state.profileDetailsError = '';
+          state.profileDetailsLoading = false;
           state.pitchVariants = null;
           render();
         });
