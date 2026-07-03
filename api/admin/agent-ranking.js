@@ -231,6 +231,26 @@ async function insertRows(table, rows, chunkSize = 200) {
   return inserted;
 }
 
+function pagedPath(path, limit, offset) {
+  const joiner = path.includes('?') ? '&' : '?';
+  return `${path}${joiner}limit=${limit}&offset=${offset}`;
+}
+
+async function supabaseRestAll(path, options = {}) {
+  const pageSize = Math.max(1, Math.min(Number(options.pageSize || 1000), 1000));
+  const maxRows = Math.max(pageSize, Number(options.maxRows || 100000));
+  const rows = [];
+
+  for (let offset = 0; offset < maxRows; offset += pageSize) {
+    const chunk = await supabaseRest(pagedPath(path, pageSize, offset)).catch(() => []);
+    if (!Array.isArray(chunk) || !chunk.length) break;
+    rows.push(...chunk);
+    if (chunk.length < pageSize) break;
+  }
+
+  return rows;
+}
+
 async function postRowsResilient(path, rows, options = {}, chunkSize = 100) {
   const inserted = [];
   const failed = [];
@@ -340,7 +360,7 @@ function dedupeRankings(rankings) {
 
 async function upsertRankings(rankings) {
   const deduped = dedupeRowsByIdentityKey(rankings);
-  const existing = await supabaseRest('agent_rankings?select=id,identity_key&limit=50000')
+  const existing = await supabaseRestAll('agent_rankings?select=id,identity_key&order=id.asc')
     .catch(() => []);
   const existingIdentityKeys = new Set((existing || []).map((row) => row.identity_key).filter(Boolean));
   const payloadRows = deduped.rows.map((ranking) => ({
@@ -925,7 +945,7 @@ async function handleList(req) {
   const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
   const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
   const [rankings, uploads] = await Promise.all([
-    supabaseRest('agent_rankings?select=*&limit=50000').catch(() => []),
+    supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => [])
   ]);
   const trustedView = trustedRankingView(rankings || [], uploads || []);
@@ -968,11 +988,13 @@ async function refreshAgentRankingOpenHouseMatches(options = {}) {
   const rankingId = String(options.ranking_id || '').trim();
   const agentId = String(options.agent_id || '').trim();
   const uploadId = String(options.upload_id || '').trim();
-  let path = 'agent_rankings?select=*&limit=50000';
+  let path = 'agent_rankings?select=*&order=id.asc';
   if (rankingId) path = `agent_rankings?id=eq.${enc(rankingId)}&select=*&limit=1`;
-  else if (agentId) path = `agent_rankings?agent_id=eq.${enc(agentId)}&select=*&limit=5000`;
+  else if (agentId) path = `agent_rankings?agent_id=eq.${enc(agentId)}&select=*&order=id.asc`;
 
-  const rows = await supabaseRest(path).catch(() => []);
+  const rows = rankingId
+    ? await supabaseRest(path).catch(() => [])
+    : await supabaseRestAll(path).catch(() => []);
   const scoped = uploadId ? (rows || []).filter((row) => uploadIdForRanking(row) === uploadId) : (rows || []);
   const openHouseRows = await loadOpenHouseRows();
   const averages = marketAverages(scoped);
