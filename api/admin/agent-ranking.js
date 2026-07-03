@@ -390,15 +390,23 @@ function ratioText(value, average, lowerIsBetter = false) {
   const delta = lowerIsBetter ? avg - current : current - avg;
   const pct = Math.round(Math.abs(delta / avg) * 100);
   if (pct < 8) return 'about area average';
+  if (!lowerIsBetter && current <= 0) return 'no recorded activity vs area average';
+  if (!lowerIsBetter && delta > 0) {
+    const multiple = current / avg;
+    if (multiple >= 3) return `${roundMetric(multiple, 1)}x area average`;
+  }
   const direction = delta > 0 ? (lowerIsBetter ? 'fresher than' : 'above') : (lowerIsBetter ? 'staler than' : 'below');
   return `${pct}% ${direction} area average`;
 }
 
 function comparisonMetric(label, value, average, options = {}) {
+  const current = Number(value || 0);
+  const avg = Number(average || 0);
   return {
     label,
     value: roundMetric(value, options.digits ?? 1),
     average: roundMetric(average, options.digits ?? 1),
+    multiple: avg > 0 ? roundMetric(current / avg, 1) : 0,
     unit: options.unit || '',
     lower_is_better: Boolean(options.lowerIsBetter),
     comparison: ratioText(value, average, Boolean(options.lowerIsBetter))
@@ -413,6 +421,121 @@ function beVerb(value) {
   return Number(value || 0) === 1 ? 'is' : 'are';
 }
 
+function metricByLabel(metrics = [], label) {
+  return metrics.find((metric) => metric.label === label) || {};
+}
+
+function metricMultiple(metrics = [], label) {
+  return Number(metricByLabel(metrics, label).multiple || 0);
+}
+
+function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') {
+  const activeListings = Number(ranking.active_listing_count || 0);
+  const listingSide12 = Number(ranking.listings_active_last_12_months || 0);
+  const buySide12 = Number(ranking.buyside_last_12_months || 0);
+  const daysSince = Number(ranking.listings_days_since_last || 0);
+  const activeMultiple = metricMultiple(metrics, 'Active listings');
+  const listingMultiple = metricMultiple(metrics, 'Listing side 12m');
+  const buyMultiple = metricMultiple(metrics, 'Buyside 12m');
+  const listingEngineScore = Math.max(activeMultiple, listingMultiple, buyMultiple);
+  const isRockStar = activeListings >= 25 || listingSide12 >= 75 || activeMultiple >= 8 || listingMultiple >= 8 || buyMultiple >= 8;
+  const isAllStar = activeListings >= 8 || listingSide12 >= 20 || buySide12 >= 10 || activeMultiple >= 3 || listingMultiple >= 3 || buyMultiple >= 3;
+  const isShootingStar = activeListings >= 3 || listingSide12 >= 8 || buySide12 >= 5 || activeMultiple >= 1.25 || listingMultiple >= 1.25 || buyMultiple >= 1.25;
+  const hasActivity = activeListings > 0 || listingSide12 > 0 || buySide12 > 0;
+
+  let report = {
+    level: 'Foundation Builder',
+    title: 'Foundation Builder',
+    hook: 'Build the foundation.',
+    tone: 'foundation',
+    initials: 'FB',
+    summary: 'There is not enough ListReports production signal yet, so the pitch should focus on getting the first repeatable capture system in place.',
+    system_gap: 'Start with a simple Event Pass or open-house kit so the next listing has a clean buyer-capture path.',
+    score_label: 'Foundation',
+    score_value: 1
+  };
+
+  if (isRockStar) {
+    report = {
+      level: 'Rock Star',
+      title: 'Rock Star Listing Engine',
+      hook: 'Scale the legacy.',
+      tone: 'rock',
+      initials: 'RK',
+      summary: `${ranking.agent_name || 'This agent'} is far beyond the ${label} average. This is a top-tier listing engine, so the conversation should be about protecting and scaling every buyer interaction that production creates.`,
+      system_gap: 'The risk is not lack of production; it is running elite production on a manual or inconsistent relationship system.',
+      score_label: 'Elite',
+      score_value: 5
+    };
+  } else if (isAllStar) {
+    report = {
+      level: 'All-Star',
+      title: 'All-Star Producer',
+      hook: 'Streamline the success.',
+      tone: 'allstar',
+      initials: 'AS',
+      summary: `${ranking.agent_name || 'This agent'} is operating above the normal ${label} peer set. Rel8tion should be positioned as the system that keeps production high while reducing manual follow-up drag.`,
+      system_gap: 'The missed opportunity is time and consistency: high activity needs a capture workflow that does not depend on memory, paper, or scattered tools.',
+      score_label: 'High Output',
+      score_value: 4
+    };
+  } else if (isShootingStar) {
+    report = {
+      level: 'Shooting Star',
+      title: 'Shooting Star Momentum',
+      hook: 'Maintain the momentum.',
+      tone: 'shooting',
+      initials: 'SS',
+      summary: `${ranking.agent_name || 'This agent'} has enough current activity to turn small leaks into meaningful lost opportunity. Rel8tion should be framed as the system that keeps momentum from slipping through follow-up gaps.`,
+      system_gap: 'The pitch is about converting active listing traffic into visible buyer relationships before momentum cools off.',
+      score_label: 'Momentum',
+      score_value: 3
+    };
+  } else if (hasActivity) {
+    report = {
+      level: 'Rising Star',
+      title: 'Rising Star Foundation',
+      hook: 'Build the foundation.',
+      tone: 'rising',
+      initials: 'RS',
+      summary: `${ranking.agent_name || 'This agent'} has early ListReports activity. Rel8tion should be framed as the shortcut that turns cold or one-off buyer interactions into a repeatable relationship system.`,
+      system_gap: 'The opportunity is to put the capture habit in place before production volume gets harder to manage manually.',
+      score_label: 'Foundation',
+      score_value: 2
+    };
+  }
+
+  const proofPoints = [];
+  if (activeListings > 0) {
+    proofPoints.push(activeMultiple >= 3
+      ? `${activeListings} active ${plural(activeListings, 'listing')} is ${roundMetric(activeMultiple, 1)}x the ${label} peer average.`
+      : `${activeListings} active ${plural(activeListings, 'listing')} shows current listing traffic.`);
+  }
+  if (listingSide12 > 0) {
+    proofPoints.push(listingMultiple >= 3
+      ? `${listingSide12} listing-side transactions in 12 months is ${roundMetric(listingMultiple, 1)}x the ${label} peer average.`
+      : `${listingSide12} listing-side transactions in 12 months shows repeatable listing activity.`);
+  }
+  if (buySide12 > 0) {
+    proofPoints.push(buyMultiple >= 3
+      ? `${buySide12} buyer-side transactions in 12 months is ${roundMetric(buyMultiple, 1)}x the ${label} peer average.`
+      : `${buySide12} buyer-side transactions in 12 months adds relationship upside.`);
+  }
+  if (daysSince > 0 && daysSince <= 14) {
+    proofPoints.push(`Last listing was ${daysSince} days ago, so the opportunity is current, not stale.`);
+  }
+  if (!proofPoints.length) proofPoints.push('ListReports has limited current production signal, so start with a low-friction capture offer.');
+
+  return {
+    ...report,
+    proof_points: proofPoints.slice(0, 4),
+    index_score: Math.min(100, Math.round(Math.max(listingEngineScore, hasActivity ? 1 : 0) * 12.5)),
+    active_multiple: roundMetric(activeMultiple, 1),
+    listing_multiple: roundMetric(listingMultiple, 1),
+    buyside_multiple: roundMetric(buyMultiple, 1)
+  };
+}
+
 function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   const agent = ranking.agent_name || 'This agent';
   const activeListings = Number(ranking.active_listing_count || 0);
@@ -420,11 +543,35 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   const buyside12 = Number(ranking.buyside_last_12_months || 0);
   const daysSince = Number(ranking.listings_days_since_last || 0);
   const matchedOpenHouses = Number(ranking.matched_open_house_count || 0);
-  const avgBuySide = Number(metrics.find((metric) => metric.label === 'Buyside 12m')?.average || 0);
-  const avgDays = Number(metrics.find((metric) => metric.label === 'Days since last listing')?.average || 0);
+  const status = productionStatusForRanking(ranking, metrics, label);
+  const avgBuySide = Number(metricByLabel(metrics, 'Buyside 12m').average || 0);
+  const avgDays = Number(metricByLabel(metrics, 'Days since last listing').average || 0);
   const hasFreshListing = daysSince > 0 && (!avgDays || daysSince <= Math.min(45, avgDays));
   const hasListingTraffic = activeListings > 0 || listingSide12 > 0;
   const buysideGap = avgBuySide > 0 && buyside12 < avgBuySide;
+  const matchedShare = activeListings > 0 ? roundMetric((matchedOpenHouses / activeListings) * 100, 1) : 0;
+
+  if (status.level === 'Rock Star') {
+    return {
+      status,
+      headline: `${agent} is in ${status.level} territory, far beyond the ${label} average.`,
+      opportunity: `${status.hook} This is a prestige conversation: ${agent} has a production engine big enough that the relationship system has to match it. Use Rel8tion as the luxury capture layer for listings, open houses, buyer conversations, and team follow-up.`,
+      capture: activeListings > 0
+        ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected against ${activeListings} active ${plural(activeListings, 'listing')} (${matchedShare}% visible capture coverage). That is the gap to press.`
+        : `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected. The next move is making every listing and open-house touchpoint visible.`
+    };
+  }
+
+  if (status.level === 'All-Star') {
+    return {
+      status,
+      headline: `${agent} is an ${status.level} producer with numbers above the ${label} peer set.`,
+      opportunity: `${status.hook} The pitch is not "get more active." It is "stop letting a strong business leak buyer conversations, referrals, and follow-up time."`,
+      capture: matchedOpenHouses > 0
+        ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} already connected. Use that as proof that the system can scale across the rest of the activity.`
+        : `No Rel8tion open-house capture is connected yet, so the first Event Pass can show how much invisible buyer traffic exists around an already-strong business.`
+    };
+  }
 
   if (hasListingTraffic && buysideGap) {
     const activeText = activeListings > 0
@@ -432,6 +579,7 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
       : `${listingSide12} listing-side ${plural(listingSide12, 'transaction')} in the last 12 months`;
     const recencyText = hasFreshListing ? ` and a listing ${daysSince} days ago` : '';
     return {
+      status,
       headline: `${agent} is creating listing traffic with ${activeText}${recencyText}, but the buyer-side number is not keeping up.`,
       opportunity: `ListReports shows ${buyside12} buyer-side ${plural(buyside12, 'transaction')} in the last 12 months versus a ${roundMetric(avgBuySide, 1)} ${label} peer average. That is the missed capture story: buyers are showing up around the listings, but they are not turning into visible buyer-side opportunity.`,
       capture: matchedOpenHouses > 0
@@ -443,6 +591,7 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   if (hasListingTraffic && matchedOpenHouses <= 0) {
     const recencyText = hasFreshListing ? `, including a listing ${daysSince} days ago,` : '';
     return {
+      status,
       headline: `${agent} has listing activity${recencyText} but no Rel8tion capture connected yet.`,
       opportunity: `The missed opportunity is not production volume; it is the buyer traffic around the listings they already have. Rel8tion gives that traffic a tap-or-scan capture point, instant follow-up, disclosures, and financing support without adding work for the agent.`,
       capture: `No matched Rel8tion open-house capture is connected yet, which means the first Event Pass can create new visibility immediately.`
@@ -450,6 +599,7 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   }
 
   return {
+    status,
     headline: `${agent} is close to the ${label} peer average, so the easiest win is improving buyer capture on the next listing.`,
     opportunity: `Rel8tion changes the outcome by giving them a no-setup Event Pass for the next listing, so even average production can create cleaner buyer capture and stronger follow-up.`,
     capture: matchedOpenHouses > 0
@@ -514,6 +664,7 @@ function areaComparisonForRanking(ranking = {}, peerContext = {}) {
       listings_days_since_last: roundMetric(averages.average_days_since_last_listing, 0)
     },
     metrics,
+    status_report: story.status,
     headline: story.headline,
     opportunity: story.opportunity,
     capture: story.capture

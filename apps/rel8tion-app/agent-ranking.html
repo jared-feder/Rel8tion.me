@@ -472,6 +472,71 @@
       border-radius: 0 8px 8px 0;
       padding: 10px 12px;
     }
+    .status-report {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,.28);
+      background: #fff;
+    }
+    .status-report.rock { border-color: rgba(180,83,9,.28); background: linear-gradient(135deg, #fff7ed, #fff); }
+    .status-report.allstar { border-color: rgba(36,85,214,.24); background: linear-gradient(135deg, #eef5ff, #fff); }
+    .status-report.shooting { border-color: rgba(14,165,200,.26); background: linear-gradient(135deg, #ecfeff, #fff); }
+    .status-report.rising { border-color: rgba(15,118,110,.24); background: linear-gradient(135deg, #ecfdf5, #fff); }
+    .status-emblem {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: #17224f;
+      background:
+        radial-gradient(circle at 50% 50%, #fff 0 48%, transparent 49%),
+        conic-gradient(from 0deg, #2455d6, #0ea5c8, #0f766e, #b45309, #2455d6);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.8), 0 12px 28px rgba(31,42,90,.12);
+    }
+    .status-emblem strong {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 20px;
+      line-height: 1;
+      color: #17224f;
+    }
+    .status-emblem span {
+      display: block;
+      margin-top: 3px;
+      color: #64748b;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .status-bars { display: grid; gap: 8px; margin-top: 12px; }
+    .status-bar {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      color: #344256;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .status-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e5edf7;
+      overflow: hidden;
+    }
+    .status-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #2455d6, #0ea5c8);
+    }
     .pitch-box {
       white-space: pre-wrap;
       border-left: 3px solid var(--sky);
@@ -857,6 +922,50 @@
       return metric.unit ? `${value} ${metric.unit}` : value;
     }
 
+    function metricMultipleWidth(metric) {
+      const multiple = Number(metric?.multiple || 0);
+      if (!Number.isFinite(multiple) || multiple <= 0) return 4;
+      return Math.max(8, Math.min(100, multiple * 12));
+    }
+
+    function renderStatusReport(comparison) {
+      const report = comparison?.status_report;
+      if (!report) return '';
+      const metrics = (comparison.metrics || []).filter((metric) => ['Active listings', 'Listing side 12m', 'Buyside 12m'].includes(metric.label));
+      return `
+        <div class="status-report ${esc(report.tone || '')}">
+          <div class="status-emblem" aria-label="${esc(report.level || 'Status')} status">
+            <div><strong>${esc(report.initials || 'RL')}</strong><span>Status</span></div>
+          </div>
+          <div>
+            <div class="mini-title">Production status</div>
+            <h3 style="margin-top:4px;">${esc(report.title || report.level || 'Production Status')}</h3>
+            <p style="margin:6px 0 0;">${esc(report.hook || '')} ${esc(report.summary || '')}</p>
+            <div style="margin-top:8px;">${badge(report.score_label || report.level || 'Status', report.level === 'Rock Star' || report.level === 'All-Star' ? 'ok' : 'info')}</div>
+          </div>
+        </div>
+        ${metrics.length ? `
+          <div class="status-bars">
+            ${metrics.map((metric) => `
+              <div class="status-bar">
+                <span>${esc(metric.label)}</span>
+                <div class="status-track"><span class="status-fill" style="width:${metricMultipleWidth(metric)}%;"></span></div>
+                <span>${Number(metric.multiple || 0) ? `${num(metric.multiple)}x` : '-'}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${report.proof_points?.length ? `
+          <div class="comparison-note">
+            <div class="mini-title">Why it matters</div>
+            <ul style="margin:8px 0 0;padding-left:18px;">
+              ${report.proof_points.map((point) => `<li>${esc(point)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+    }
+
     function renderAreaComparison(row, details) {
       const comparison = details?.area_comparison;
       if (state.profileDetailsLoading && state.profile?.id === row.id && !comparison) {
@@ -869,6 +978,7 @@
       return `
         <div class="profile-box">
           <h3>Area Opportunity</h3>
+          ${renderStatusReport(comparison)}
           <p>${esc(comparison.headline || '')}</p>
           <div class="small" style="margin-top:6px;">Compared with ${num(comparison.peer_count)} ${esc(comparison.label || 'area')} peer agents.</div>
           <div class="comparison-grid">
