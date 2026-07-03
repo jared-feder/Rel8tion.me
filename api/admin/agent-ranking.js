@@ -399,6 +399,31 @@ function uploadMapping(upload, field) {
   return upload?.raw_metadata?.mapping?.[field] || null;
 }
 
+function looksLikeEncodedGeometry(value) {
+  const text = String(value || '').trim();
+  return /^010[0-9a-f]{20,}$/i.test(text) || /^[0-9a-f]{32,}$/i.test(text);
+}
+
+function fallbackMarketArea(row = {}) {
+  const county = normalizeCounty(row.primary_county || row.county || '');
+  if (county) return county;
+  const state = String(row.state || '').trim().toUpperCase();
+  return state || '';
+}
+
+function canonicalMarketArea(value, row = {}) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!text || looksLikeEncodedGeometry(text)) return fallbackMarketArea(row);
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (['lng island', 'long island', 'li', 'nassau suffolk', 'nassau and suffolk'].includes(normalized)) {
+    return 'Long Island';
+  }
+  if (normalized === 'nassau county') return 'Nassau';
+  if (normalized === 'suffolk county') return 'Suffolk';
+  if (normalized === 'schenectady county') return 'Schenectady';
+  return text;
+}
+
 function isTrustedListReportsUpload(upload) {
   const source = String(upload?.source_name || '').trim().toLowerCase();
   if (source && source !== 'listreports') return false;
@@ -433,8 +458,10 @@ function hasRankingIdentity(row) {
 }
 
 function normalizeListReportsRanking(row) {
+  const marketArea = canonicalMarketArea(row.market_area, row);
   return {
     ...row,
+    market_area: marketArea || null,
     production_volume: 0,
     transaction_count: 0,
     sold_listing_count: 0,
@@ -442,6 +469,7 @@ function normalizeListReportsRanking(row) {
     raw_sources: {
       ...(row.raw_sources || {}),
       trusted_listreports_display: true,
+      original_market_area: row.market_area && row.market_area !== marketArea ? row.market_area : row.raw_sources?.original_market_area,
       display_metric_note: 'ListReports import does not provide production volume, transaction count, sold listings, or average price.'
     }
   };
@@ -581,7 +609,7 @@ function parseRankingFilters(req) {
     q: plainValue(queryOrFilter(req, filters, 'q')),
     tier: plainValue(queryOrFilter(req, filters, 'tier')),
     brokerage: plainValue(queryOrFilter(req, filters, 'brokerage')),
-    market_area: plainValue(queryOrFilter(req, filters, 'market_area', ['market'])),
+    market_area: canonicalMarketArea(plainValue(queryOrFilter(req, filters, 'market_area', ['market']))),
     county: plainValue(queryOrFilter(req, filters, 'county')),
     city: plainValue(queryOrFilter(req, filters, 'city')),
     state: plainValue(queryOrFilter(req, filters, 'state')),

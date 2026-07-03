@@ -439,6 +439,7 @@
     const state = {
       verified: false,
       loading: false,
+      requestSeq: 0,
       action: '',
       error: '',
       data: { rankings: [], uploads: [], summary: {}, options: {}, total: 0, page: 1, page_size: 50 },
@@ -566,6 +567,14 @@
       return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : '';
     }
 
+    function uploadLabel(upload) {
+      return [
+        upload.original_filename || upload.source_name || 'Upload',
+        fmtDate(upload.created_at),
+        upload.row_count ? `${num(upload.row_count)} rows` : ''
+      ].filter(Boolean).join(' | ');
+    }
+
     function badge(label, tone = 'info') {
       return `<span class="badge ${tone}">${esc(label)}</span>`;
     }
@@ -683,10 +692,12 @@
     }
 
     async function loadData() {
+      const requestSeq = ++state.requestSeq;
       state.loading = true;
       render();
       try {
         const data = await api(listUrl());
+        if (requestSeq !== state.requestSeq) return;
         state.data = {
           rankings: data.rankings || [],
           uploads: data.uploads || [],
@@ -703,10 +714,13 @@
         state.sortDirection = data.sort_direction || state.sortDirection || 'desc';
         state.error = '';
       } catch (error) {
+        if (requestSeq !== state.requestSeq) return;
         state.error = error.message || 'Unable to load rankings.';
       } finally {
-        state.loading = false;
-        render();
+        if (requestSeq === state.requestSeq) {
+          state.loading = false;
+          render();
+        }
       }
     }
 
@@ -897,7 +911,7 @@
               <label>Has location <select class="select" data-filter="hasLocation"><option value="all">All</option><option value="true"${f.hasLocation === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.hasLocation === 'false' ? ' selected' : ''}>Needs review</option></select></label>
               <label>Location source <select class="select" data-filter="locationSource"><option value="all">All</option>${locationSources.map((value) => `<option value="${esc(value)}"${f.locationSource === value ? ' selected' : ''}>${esc(sourceLabel(value))}</option>`).join('')}</select></label>
               <label>Min confidence <input class="field" data-filter="minLocationConfidence" value="${esc(f.minLocationConfidence)}" inputmode="numeric" placeholder="0-100"></label>
-              <label>Upload <select class="select" data-filter="upload"><option value="all">All</option>${uploads.map((upload) => `<option value="${esc(upload.id)}"${f.upload === upload.id ? ' selected' : ''}>${esc(upload.source_name || 'Upload')} ${esc(fmtDate(upload.created_at))}</option>`).join('')}</select></label>
+              <label>Upload <select class="select" data-filter="upload"><option value="all">All uploads</option>${uploads.map((upload) => `<option value="${esc(upload.id)}"${f.upload === upload.id ? ' selected' : ''}>${esc(uploadLabel(upload))}</option>`).join('')}</select></label>
               <label>Period start <input class="field" data-filter="periodStart" type="date" value="${esc(f.periodStart)}"></label>
               <label>Period end <input class="field" data-filter="periodEnd" type="date" value="${esc(f.periodEnd)}"></label>
               <label>Matched OH <select class="select" data-filter="matchedOpenHouse"><option value="all">All</option><option value="true"${f.matchedOpenHouse === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.matchedOpenHouse === 'false' ? ' selected' : ''}>No</option></select></label>
