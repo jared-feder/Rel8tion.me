@@ -390,7 +390,7 @@ function ratioText(value, average, lowerIsBetter = false) {
   const delta = lowerIsBetter ? avg - current : current - avg;
   const pct = Math.round(Math.abs(delta / avg) * 100);
   if (pct < 8) return 'about area average';
-  const direction = delta > 0 ? (lowerIsBetter ? 'better than' : 'above') : (lowerIsBetter ? 'slower than' : 'below');
+  const direction = delta > 0 ? (lowerIsBetter ? 'fresher than' : 'above') : (lowerIsBetter ? 'staler than' : 'below');
   return `${pct}% ${direction} area average`;
 }
 
@@ -405,17 +405,57 @@ function comparisonMetric(label, value, average, options = {}) {
   };
 }
 
-function strongestComparison(metrics = []) {
-  return [...metrics]
-    .map((metric) => {
-      const value = Number(metric.value || 0);
-      const average = Number(metric.average || 0);
-      const delta = average > 0
-        ? (metric.lower_is_better ? (average - value) / average : (value - average) / average)
-        : 0;
-      return { metric, delta };
-    })
-    .sort((left, right) => right.delta - left.delta)[0] || null;
+function plural(value, singular, pluralValue = `${singular}s`) {
+  return Number(value || 0) === 1 ? singular : pluralValue;
+}
+
+function beVerb(value) {
+  return Number(value || 0) === 1 ? 'is' : 'are';
+}
+
+function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
+  const agent = ranking.agent_name || 'This agent';
+  const activeListings = Number(ranking.active_listing_count || 0);
+  const listingSide12 = Number(ranking.listings_active_last_12_months || 0);
+  const buyside12 = Number(ranking.buyside_last_12_months || 0);
+  const daysSince = Number(ranking.listings_days_since_last || 0);
+  const matchedOpenHouses = Number(ranking.matched_open_house_count || 0);
+  const avgBuySide = Number(metrics.find((metric) => metric.label === 'Buyside 12m')?.average || 0);
+  const avgDays = Number(metrics.find((metric) => metric.label === 'Days since last listing')?.average || 0);
+  const hasFreshListing = daysSince > 0 && (!avgDays || daysSince <= Math.min(45, avgDays));
+  const hasListingTraffic = activeListings > 0 || listingSide12 > 0;
+  const buysideGap = avgBuySide > 0 && buyside12 < avgBuySide;
+
+  if (hasListingTraffic && buysideGap) {
+    const activeText = activeListings > 0
+      ? `${activeListings} active ${plural(activeListings, 'listing')}`
+      : `${listingSide12} listing-side ${plural(listingSide12, 'transaction')} in the last 12 months`;
+    const recencyText = hasFreshListing ? ` and a listing ${daysSince} days ago` : '';
+    return {
+      headline: `${agent} is creating listing traffic with ${activeText}${recencyText}, but the buyer-side number is not keeping up.`,
+      opportunity: `ListReports shows ${buyside12} buyer-side ${plural(buyside12, 'transaction')} in the last 12 months versus a ${roundMetric(avgBuySide, 1)} ${label} peer average. That is the missed capture story: buyers are showing up around the listings, but they are not turning into visible buyer-side opportunity.`,
+      capture: matchedOpenHouses > 0
+        ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected. Use that proof to show how much more buyer traffic can be captured.`
+        : `No Rel8tion open-house capture is connected yet, so the next open house is the moment to stop buyer conversations from disappearing after the sign-in sheet.`
+    };
+  }
+
+  if (hasListingTraffic && matchedOpenHouses <= 0) {
+    const recencyText = hasFreshListing ? `, including a listing ${daysSince} days ago,` : '';
+    return {
+      headline: `${agent} has listing activity${recencyText} but no Rel8tion capture connected yet.`,
+      opportunity: `The missed opportunity is not production volume; it is the buyer traffic around the listings they already have. Rel8tion gives that traffic a tap-or-scan capture point, instant follow-up, disclosures, and financing support without adding work for the agent.`,
+      capture: `No matched Rel8tion open-house capture is connected yet, which means the first Event Pass can create new visibility immediately.`
+    };
+  }
+
+  return {
+    headline: `${agent} is close to the ${label} peer average, so the easiest win is improving buyer capture on the next listing.`,
+    opportunity: `Rel8tion changes the outcome by giving them a no-setup Event Pass for the next listing, so even average production can create cleaner buyer capture and stronger follow-up.`,
+    capture: matchedOpenHouses > 0
+      ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} already connected.`
+      : `No matched Rel8tion open-house capture is connected yet, which means the first Event Pass can create new visibility immediately.`
+  };
 }
 
 async function loadAreaPeerRows(ranking = {}) {
@@ -461,19 +501,7 @@ function areaComparisonForRanking(ranking = {}, peerContext = {}) {
     comparisonMetric('Buyside 12m', ranking.buyside_last_12_months, averages.average_buyside_12_months, { digits: 1 }),
     comparisonMetric('Days since last listing', ranking.listings_days_since_last, averages.average_days_since_last_listing, { digits: 0, unit: 'days', lowerIsBetter: true })
   ];
-  const strongest = strongestComparison(metrics);
-  const strongMetric = strongest?.delta > 0.08 ? strongest.metric : null;
-  const activeListings = Number(ranking.active_listing_count || 0);
-  const matchedOpenHouses = Number(ranking.matched_open_house_count || 0);
-  const headline = strongMetric
-    ? `${ranking.agent_name || 'This agent'} is ${strongMetric.comparison} for ${strongMetric.label.toLowerCase()} in ${label}.`
-    : `${ranking.agent_name || 'This agent'} is close to the ${label} peer average, so the easiest win is improving buyer capture on the next listing.`;
-  const opportunity = activeListings > 0 || Number(ranking.listings_active_last_12_months || 0) > 0
-    ? `Rel8tion changes the outcome by turning the listing traffic they already create into identified buyers, instant follow-up, disclosures, and financing support without asking the agent to learn another system.`
-    : `Rel8tion changes the outcome by giving them a no-setup Event Pass for the next listing, so even average production can create cleaner buyer capture and stronger follow-up.`;
-  const capture = matchedOpenHouses > 0
-    ? `${matchedOpenHouses} matched Rel8tion open-house record${matchedOpenHouses === 1 ? '' : 's'} are already connected.`
-    : 'No matched Rel8tion open-house capture is connected yet, which means the first Event Pass can create new visibility immediately.';
+  const story = areaOpportunityStory(ranking, metrics, label);
 
   return {
     label,
@@ -486,9 +514,9 @@ function areaComparisonForRanking(ranking = {}, peerContext = {}) {
       listings_days_since_last: roundMetric(averages.average_days_since_last_listing, 0)
     },
     metrics,
-    headline,
-    opportunity,
-    capture
+    headline: story.headline,
+    opportunity: story.opportunity,
+    capture: story.capture
   };
 }
 
