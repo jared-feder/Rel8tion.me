@@ -67,6 +67,25 @@ const LISTING_AGENT_DETAIL_SELECT = [
   'scraped_at'
 ].join(',');
 
+const AREA_COMPARE_SELECT = [
+  'id',
+  'identity_key',
+  'agent_name',
+  'phone_normalized',
+  'market_area',
+  'primary_county',
+  'county',
+  'active_listing_count',
+  'listings_days_since_last',
+  'listings_active_last_12_months',
+  'buyside_last_90_days',
+  'buyside_last_12_months',
+  'matched_open_house_count',
+  'matched_weekend_open_house_count',
+  'agent_rank_score',
+  'recommended_tier'
+].join(',');
+
 function parseBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'object') return req.body;
@@ -357,11 +376,128 @@ function openHouseDetailRow(openHouse = {}, agents = [], ranking = {}) {
   };
 }
 
+function roundMetric(value, digits = 1) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return 0;
+  const factor = 10 ** digits;
+  return Math.round(number * factor) / factor;
+}
+
+function ratioText(value, average, lowerIsBetter = false) {
+  const current = Number(value || 0);
+  const avg = Number(average || 0);
+  if (!Number.isFinite(current) || !Number.isFinite(avg) || avg <= 0) return 'area average unavailable';
+  const delta = lowerIsBetter ? avg - current : current - avg;
+  const pct = Math.round(Math.abs(delta / avg) * 100);
+  if (pct < 8) return 'about area average';
+  const direction = delta > 0 ? (lowerIsBetter ? 'better than' : 'above') : (lowerIsBetter ? 'slower than' : 'below');
+  return `${pct}% ${direction} area average`;
+}
+
+function comparisonMetric(label, value, average, options = {}) {
+  return {
+    label,
+    value: roundMetric(value, options.digits ?? 1),
+    average: roundMetric(average, options.digits ?? 1),
+    unit: options.unit || '',
+    lower_is_better: Boolean(options.lowerIsBetter),
+    comparison: ratioText(value, average, Boolean(options.lowerIsBetter))
+  };
+}
+
+function strongestComparison(metrics = []) {
+  return [...metrics]
+    .map((metric) => {
+      const value = Number(metric.value || 0);
+      const average = Number(metric.average || 0);
+      const delta = average > 0
+        ? (metric.lower_is_better ? (average - value) / average : (value - average) / average)
+        : 0;
+      return { metric, delta };
+    })
+    .sort((left, right) => right.delta - left.delta)[0] || null;
+}
+
+async function loadAreaPeerRows(ranking = {}) {
+  const county = normalizeCounty(ranking.primary_county || ranking.county || '');
+  const market = canonicalMarketArea(ranking.market_area, ranking);
+  const attempts = [];
+  if (county) {
+    attempts.push({
+      label: county,
+      basis: 'county',
+      path: `agent_rankings?primary_county=eq.${enc(county)}&select=${AREA_COMPARE_SELECT}&order=id.asc`
+    });
+    attempts.push({
+      label: county,
+      basis: 'county',
+      path: `agent_rankings?county=eq.${enc(county)}&select=${AREA_COMPARE_SELECT}&order=id.asc`
+    });
+  }
+  if (market && market !== county) {
+    attempts.push({
+      label: market,
+      basis: 'market',
+      path: `agent_rankings?market_area=eq.${enc(market)}&select=${AREA_COMPARE_SELECT}&order=id.asc`
+    });
+  }
+
+  for (const attempt of attempts) {
+    const rows = await supabaseRestAll(attempt.path, { pageSize: 1000, maxRows: 15000 }).catch(() => []);
+    const peers = (rows || []).filter((row) => hasRankingIdentity(row));
+    if (peers.length >= 5) return { ...attempt, rows: peers };
+  }
+
+  return { label: county || market || 'Area', basis: county ? 'county' : 'market', rows: [] };
+}
+
+function areaComparisonForRanking(ranking = {}, peerContext = {}) {
+  const rows = (peerContext.rows || []).filter((row) => row.id !== ranking.id);
+  const averages = marketAverages(rows.length ? rows : peerContext.rows || []);
+  const label = peerContext.label || ranking.primary_county || ranking.county || ranking.market_area || 'Area';
+  const metrics = [
+    comparisonMetric('Active listings', ranking.active_listing_count, averages.average_active_listings, { digits: 1 }),
+    comparisonMetric('Listing side 12m', ranking.listings_active_last_12_months, averages.average_listing_side_12_months, { digits: 1 }),
+    comparisonMetric('Buyside 12m', ranking.buyside_last_12_months, averages.average_buyside_12_months, { digits: 1 }),
+    comparisonMetric('Days since last listing', ranking.listings_days_since_last, averages.average_days_since_last_listing, { digits: 0, unit: 'days', lowerIsBetter: true })
+  ];
+  const strongest = strongestComparison(metrics);
+  const strongMetric = strongest?.delta > 0.08 ? strongest.metric : null;
+  const activeListings = Number(ranking.active_listing_count || 0);
+  const matchedOpenHouses = Number(ranking.matched_open_house_count || 0);
+  const headline = strongMetric
+    ? `${ranking.agent_name || 'This agent'} is ${strongMetric.comparison} for ${strongMetric.label.toLowerCase()} in ${label}.`
+    : `${ranking.agent_name || 'This agent'} is close to the ${label} peer average, so the easiest win is improving buyer capture on the next listing.`;
+  const opportunity = activeListings > 0 || Number(ranking.listings_active_last_12_months || 0) > 0
+    ? `Rel8tion changes the outcome by turning the listing traffic they already create into identified buyers, instant follow-up, disclosures, and financing support without asking the agent to learn another system.`
+    : `Rel8tion changes the outcome by giving them a no-setup Event Pass for the next listing, so even average production can create cleaner buyer capture and stronger follow-up.`;
+  const capture = matchedOpenHouses > 0
+    ? `${matchedOpenHouses} matched Rel8tion open-house record${matchedOpenHouses === 1 ? '' : 's'} are already connected.`
+    : 'No matched Rel8tion open-house capture is connected yet, which means the first Event Pass can create new visibility immediately.';
+
+  return {
+    label,
+    basis: peerContext.basis || '',
+    peer_count: rows.length || (peerContext.rows || []).length,
+    averages: {
+      active_listing_count: roundMetric(averages.average_active_listings, 1),
+      listings_active_last_12_months: roundMetric(averages.average_listing_side_12_months, 1),
+      buyside_last_12_months: roundMetric(averages.average_buyside_12_months, 1),
+      listings_days_since_last: roundMetric(averages.average_days_since_last_listing, 0)
+    },
+    metrics,
+    headline,
+    opportunity,
+    capture
+  };
+}
+
 async function profileDetailsForRanking(ranking) {
   let ids = arrayValue(ranking.matched_open_house_ids);
   let openHouses = await loadOpenHouseDetailsByIds(ids);
   let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
   let photoCandidates = [];
+  const peerContext = await loadAreaPeerRows(ranking);
 
   if (!openHouses.length && Number(ranking.matched_open_house_count || 0) > 0) {
     const openHouseRows = await loadOpenHouseRows();
@@ -406,6 +542,7 @@ async function profileDetailsForRanking(ranking) {
     ranking,
     profile_photo_url: firstPresent(ranking.agent_photo_url, ranking.image_url, bestAgentPhoto),
     profile_url: bestAgent?.profile_url || '',
+    area_comparison: areaComparisonForRanking(ranking, peerContext),
     current_listings: rows,
     open_houses: rows,
     listing_agents: allListingAgents.map((agent) => publicListingAgent(agent, ranking)),

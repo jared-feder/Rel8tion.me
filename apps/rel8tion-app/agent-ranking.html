@@ -373,13 +373,35 @@
     .profile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
     .profile-hero {
       display: grid;
-      grid-template-columns: 92px 1fr;
+      grid-template-columns: 92px 1fr 150px;
       gap: 14px;
       align-items: center;
       padding: 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: linear-gradient(135deg, #f8fbff, #fff);
+    }
+    .grade-card {
+      min-height: 118px;
+      border-radius: 8px;
+      border: 1px solid rgba(37,99,235,.18);
+      background: #eef5ff;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+      padding: 12px;
+    }
+    .grade-card.ok { background: #ecfdf5; border-color: rgba(4,120,87,.22); }
+    .grade-card.warn { background: #fff7ed; border-color: rgba(180,83,9,.22); }
+    .grade-card.bad { background: #fff1f2; border-color: rgba(185,28,28,.22); }
+    .grade-value {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 48px;
+      line-height: .95;
+      font-weight: 800;
+      color: #17224f;
+      margin-top: 4px;
     }
     .profile-avatar {
       width: 92px;
@@ -434,6 +456,21 @@
       font-size: 12px;
       font-weight: 800;
     }
+    .comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .comparison-item {
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+    .comparison-item strong { display: block; margin-top: 4px; font-size: 18px; color: #17224f; }
+    .comparison-note {
+      margin-top: 12px;
+      border-left: 3px solid var(--blue);
+      background: #eef5ff;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+    }
     .pitch-box {
       white-space: pre-wrap;
       border-left: 3px solid var(--sky);
@@ -473,7 +510,7 @@
     @media (max-width: 760px) {
       .main { padding: 12px; }
       .topbar, .profile-grid, .profile-hero, .listing-row, .modal-grid, .mapping-grid, .info-grid { grid-template-columns: 1fr; }
-      .summary-grid, .profile-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-grid, .profile-metrics, .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .actions { justify-content: flex-start; }
     }
   </style>
@@ -787,6 +824,43 @@
               </div>
             `;
           }).join('')}
+        </div>
+      `;
+    }
+
+    function formatMetricValue(metric) {
+      const value = num(metric.value);
+      return metric.unit ? `${value} ${metric.unit}` : value;
+    }
+
+    function renderAreaComparison(row, details) {
+      const comparison = details?.area_comparison;
+      if (state.profileDetailsLoading && state.profile?.id === row.id && !comparison) {
+        return '<div class="empty" style="padding:18px;">Loading area comparison...</div>';
+      }
+      if (!comparison) {
+        return '<div class="empty" style="padding:18px;">Area comparison will appear after profile intelligence loads.</div>';
+      }
+      const metrics = comparison.metrics || [];
+      return `
+        <div class="profile-box">
+          <h3>Area Comparison</h3>
+          <p>${esc(comparison.headline || '')}</p>
+          <div class="small" style="margin-top:6px;">Compared with ${num(comparison.peer_count)} ${esc(comparison.label || 'area')} peer agents.</div>
+          <div class="comparison-grid">
+            ${metrics.map((metric) => `
+              <div class="comparison-item">
+                <div class="mini-title">${esc(metric.label)}</div>
+                <strong>${esc(formatMetricValue(metric))}</strong>
+                <div class="small">Area avg ${esc(metric.unit ? `${num(metric.average)} ${metric.unit}` : num(metric.average))}</div>
+                <div class="small">${esc(metric.comparison || '')}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="comparison-note">
+            <p>${esc(comparison.opportunity || '')}</p>
+            <p>${esc(comparison.capture || '')}</p>
+          </div>
         </div>
       `;
     }
@@ -1351,6 +1425,11 @@
                     </div>
                     ${state.profileDetailsLoading && state.profile?.id === row.id ? `<div style="margin-top:10px;">${badge('Loading live listing matches', 'info')}</div>` : ''}
                   </div>
+                  <div class="grade-card ${tierTone(row.recommended_tier)}">
+                    <div class="mini-title">Rel8tion grade</div>
+                    <div class="grade-value">${esc(row.recommended_tier || '--')}</div>
+                    <div class="small">${num(row.agent_rank_score)} opportunity score</div>
+                  </div>
                 </div>
                 <div class="profile-box">
                   <h3>ListReports Activity</h3>
@@ -1364,6 +1443,7 @@
                   </div>
                   <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
                 </div>
+                ${renderAreaComparison(row, details)}
                 <div class="profile-box">
                   <h3>Current Listings & Open Houses</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
