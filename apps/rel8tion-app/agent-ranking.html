@@ -615,6 +615,18 @@
       return (Math.max(1, Number(state.data.page || state.page || 1)) - 1) * Number(state.data.page_size || state.pageSize || 50);
     }
 
+    function phoneForRow(row) {
+      return row?.phone || row?.phone_normalized || '';
+    }
+
+    function formatPhone(value) {
+      const text = String(value || '').trim();
+      const digits = text.replace(/\D/g, '');
+      if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      if (digits.length === 11 && digits.startsWith('1')) return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+      return text;
+    }
+
     function pageCount() {
       const size = Number(state.data.page_size || state.pageSize || 50);
       return Math.max(1, Math.ceil(Number(state.data.total || 0) / size));
@@ -917,6 +929,7 @@
               <tr>
                 <th>${sortHeader('Score', 'agent_rank_score')}</th>
                 <th>${sortHeader('Agent', 'agent_name')}</th>
+                <th>${sortHeader('Phone', 'phone_normalized')}</th>
                 <th>${sortHeader('Brokerage', 'brokerage')}</th>
                 <th>${sortHeader('County', 'primary_county')}</th>
                 <th>${sortHeader('Market', 'market_area')}</th>
@@ -929,7 +942,6 @@
                 <th>${sortHeader('Weekend OH', 'matched_weekend_open_house_count')}</th>
                 <th>${sortHeader('Opportunity Gap', 'opportunity_gap_score')}</th>
                 <th>${sortHeader('Tier', 'recommended_tier')}</th>
-                <th>${sortHeader('Phone', 'phone_normalized')}</th>
                 <th>${sortHeader('Email', 'email')}</th>
                 <th>${sortHeader('Last Activity', 'last_activity_at')}</th>
                 <th>Next Best Action</th>
@@ -941,6 +953,7 @@
                 <tr>
                   <td><strong>${num(row.agent_rank_score)}</strong><div class="small">#${offset + index + 1} in current view</div></td>
                   <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
+                  <td><strong>${esc(formatPhone(phoneForRow(row)))}</strong><div class="small">${row.phone_normalized ? esc(row.phone_normalized) : ''}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
                   <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
@@ -953,7 +966,6 @@
                   <td>${num(row.matched_weekend_open_house_count)} ${row.has_open_house_this_weekend ? badge('Weekend', 'ok') : ''}</td>
                   <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.gap_summary || '')}</div></td>
                   <td>${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}</td>
-                  <td>${esc(row.phone || '')}</td>
                   <td>${esc(row.email || '')}</td>
                   <td>${esc(fmtDate(row.last_activity_at || row.last_matched_open_house_at || row.updated_at))}</td>
                   <td><div class="small">${esc(row.next_best_action || '')}</div></td>
