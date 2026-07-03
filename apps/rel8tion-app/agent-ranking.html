@@ -301,6 +301,7 @@
     .agent-link:hover strong { color: #2563eb; }
     .muted { color: var(--muted); }
     .small { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 600; }
+    .duplicate-note { margin-top: 7px; }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -722,6 +723,29 @@
       return badges.join(' ');
     }
 
+    function duplicateDisplayCount(row) {
+      return Number(row?.raw_sources?.display_duplicate_count || 1);
+    }
+
+    function duplicateRowNote(row) {
+      const count = duplicateDisplayCount(row);
+      if (count <= 1) return '';
+      return `<div class="duplicate-note">${badge(`${num(count)} stored rows preserved`, 'warn')}</div>`;
+    }
+
+    function duplicateProfileNotice(row) {
+      const count = duplicateDisplayCount(row);
+      if (count <= 1) return '';
+      const locations = row.raw_sources?.display_duplicate_locations || [];
+      const locationText = locations.length ? ` Locations seen: ${locations.slice(0, 4).join(' | ')}${locations.length > 4 ? ' | +' + num(locations.length - 4) + ' more' : ''}.` : '';
+      return `
+        <div class="comparison-note" style="margin-top:12px;">
+          <strong>${num(count)} stored ranking rows are represented here.</strong>
+          <p style="margin:6px 0 0;">No import rows were deleted. Rel8tion collapsed the duplicates for this dashboard view so campaign counts do not double-count the same agent.${esc(locationText)}</p>
+        </div>
+      `;
+    }
+
     function sortHeader(label, key) {
       const active = state.sortBy === key;
       const icon = active && state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down';
@@ -1085,20 +1109,24 @@
     function renderDataQualityNotice() {
       const q = state.data.data_quality || {};
       const hidden = Number(q.hidden_missing_identity || 0) + Number(q.hidden_untrusted_upload || 0);
-      if (!q.raw_ranking_rows && !hidden) return '';
+      const collapsed = Number(q.collapsed_display_duplicates || 0);
+      if (!q.raw_ranking_rows && !hidden && !collapsed) return '';
       return `
         <section class="panel" style="margin-top:16px;">
           <div class="panel-head">
             <div>
               <h2>Data Quality Gate</h2>
-              <div class="small">${num(q.visible_trusted_rows)} trusted ListReports rows shown. ${num(hidden)} legacy or untrusted rows hidden.</div>
+              <div class="small">${num(q.visible_trusted_rows)} trusted ListReports agents shown. ${num(collapsed)} duplicate stored rows collapsed without deleting import history. ${num(hidden)} legacy or untrusted rows hidden.</div>
             </div>
-            ${hidden ? badge('Filtered', 'warn') : badge('Clean', 'ok')}
+            ${hidden || collapsed ? badge('Filtered', 'warn') : badge('Clean', 'ok')}
           </div>
           <div class="panel-body">
             <div class="grid summary-grid">
               <div class="metric" style="box-shadow:none;"><div class="label">Raw ranking rows</div><div class="value">${num(q.raw_ranking_rows)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Trusted rows before dedupe</div><div class="value">${num(q.trusted_rows_before_display_dedupe)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Visible trusted rows</div><div class="value">${num(q.visible_trusted_rows)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Duplicates collapsed</div><div class="value">${num(q.collapsed_display_duplicates)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Duplicate groups</div><div class="value">${num(q.collapsed_display_duplicate_groups)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Missing identity hidden</div><div class="value">${num(q.hidden_missing_identity)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Bad upload hidden</div><div class="value">${num(q.hidden_untrusted_upload)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Trusted uploads</div><div class="value">${num(q.trusted_uploads)}</div></div>
@@ -1195,7 +1223,7 @@
               ${rows.map((row, index) => `
                 <tr>
                   <td><strong>${num(row.agent_rank_score)}</strong><div class="small">#${offset + index + 1} in current view</div></td>
-                  <td><button class="agent-link" data-profile="${esc(row.id)}"><strong>${esc(row.agent_name || 'Unknown agent')}</strong></button><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
+                  <td><button class="agent-link" data-profile="${esc(row.id)}"><strong>${esc(row.agent_name || 'Unknown agent')}</strong></button><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div>${duplicateRowNote(row)}</td>
                   <td><strong>${esc(formatPhone(phoneForRow(row)))}</strong><div class="small">${row.phone_normalized ? esc(row.phone_normalized) : ''}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
@@ -1431,6 +1459,7 @@
                     <div class="small">${num(row.agent_rank_score)} opportunity score</div>
                   </div>
                 </div>
+                ${duplicateProfileNotice(row)}
                 <div class="profile-box">
                   <h3>ListReports Activity</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
@@ -1704,6 +1733,31 @@
       return (state.data.rankings || []).find((row) => row.id === id) || null;
     }
 
+    function mergeProfileRanking(base, detail) {
+      if (!detail) return base;
+      const preservedRaw = {};
+      [
+        'display_dedupe_key',
+        'display_duplicate_count',
+        'display_duplicate_ranking_ids',
+        'display_duplicate_identity_keys',
+        'display_duplicate_upload_ids',
+        'display_duplicate_locations',
+        'display_duplicate_note'
+      ].forEach((key) => {
+        if (base?.raw_sources?.[key] !== undefined) preservedRaw[key] = base.raw_sources[key];
+      });
+      return {
+        ...detail,
+        ...base,
+        raw_sources: {
+          ...(detail.raw_sources || {}),
+          ...(base.raw_sources || {}),
+          ...preservedRaw
+        }
+      };
+    }
+
     function openProfile(id) {
       const row = findRanking(id);
       if (!row) return;
@@ -1724,12 +1778,13 @@
           body: JSON.stringify({ action: 'profile_details', ranking_id: id })
         });
         if (requestSeq !== state.profileDetailsSeq || state.profile?.id !== id) return;
+        const profileRanking = mergeProfileRanking(state.profile, result.ranking);
         state.profileDetails = {
           ...result,
           ranking_id: id,
-          ranking: result.ranking || state.profile
+          ranking: profileRanking
         };
-        if (result.ranking) state.profile = result.ranking;
+        state.profile = profileRanking;
         state.profileDetailsError = '';
       } catch (error) {
         if (requestSeq !== state.profileDetailsSeq || state.profile?.id !== id) return;

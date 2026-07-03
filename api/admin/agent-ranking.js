@@ -695,6 +695,14 @@ function rankingIdentity(row) {
   return row.identity_key || identityKeyForAgentRanking(row);
 }
 
+function displayDedupeKey(row) {
+  const name = normalizeName(row.agent_name || [row.first_name, row.last_name].filter(Boolean).join(' '));
+  const phone = normalizePhone(row.phone_normalized || row.phone);
+  const brokerage = normalizeName(row.brokerage || '');
+  if (!name || !phone) return '';
+  return `display:${name}|${brokerage}|${phone}`;
+}
+
 function rankingStrength(row) {
   return [
     Number(row.agent_rank_score || 0),
@@ -719,6 +727,40 @@ function strongerRanking(left, right) {
   return left;
 }
 
+function maxNumber(...values) {
+  return Math.max(0, ...values.map((value) => Number(value || 0)).filter((value) => Number.isFinite(value)));
+}
+
+function minPositiveNumber(...values) {
+  const positive = values
+    .map((value) => Number(value || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return positive.length ? Math.min(...positive) : 0;
+}
+
+function latestDateValue(...values) {
+  let latest = null;
+  for (const value of values) {
+    if (!value) continue;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) continue;
+    if (!latest || date.getTime() > latest.time) latest = { value, time: date.getTime() };
+  }
+  return latest?.value || null;
+}
+
+function uniqueStrings(values = []) {
+  return [...new Set((values || []).flat().filter(Boolean).map(String))];
+}
+
+function rowLocationLabel(row = {}) {
+  return [
+    row.primary_county || row.county || '',
+    row.market_area || '',
+    [row.city, row.state].filter(Boolean).join(', ')
+  ].filter(Boolean).join(' / ');
+}
+
 function mergeDuplicateRanking(kept, duplicate, key) {
   const keptIds = kept.raw_sources?.duplicate_import_row_ids || [];
   const duplicateIds = duplicate.raw_sources?.duplicate_import_row_ids || [];
@@ -736,6 +778,76 @@ function mergeDuplicateRanking(kept, duplicate, key) {
           duplicate.latest_import_row_id
         ].filter(Boolean))
       ]
+    }
+  };
+}
+
+function mergeDisplayDuplicateRanking(kept, duplicate, key) {
+  const keptRaw = kept.raw_sources || {};
+  const duplicateRaw = duplicate.raw_sources || {};
+  const keptCount = Number(keptRaw.display_duplicate_count || 1);
+  const duplicateCount = Number(duplicateRaw.display_duplicate_count || 1);
+  const ids = uniqueStrings([
+    keptRaw.display_duplicate_ranking_ids || [],
+    duplicateRaw.display_duplicate_ranking_ids || [],
+    kept.id,
+    duplicate.id
+  ]);
+  const identityKeys = uniqueStrings([
+    keptRaw.display_duplicate_identity_keys || [],
+    duplicateRaw.display_duplicate_identity_keys || [],
+    kept.identity_key,
+    duplicate.identity_key
+  ]);
+  const uploadIds = uniqueStrings([
+    keptRaw.display_duplicate_upload_ids || [],
+    duplicateRaw.display_duplicate_upload_ids || [],
+    uploadIdForRanking(kept),
+    uploadIdForRanking(duplicate)
+  ]);
+  const locations = uniqueStrings([
+    keptRaw.display_duplicate_locations || [],
+    duplicateRaw.display_duplicate_locations || [],
+    rowLocationLabel(kept),
+    rowLocationLabel(duplicate)
+  ]);
+  const matchedOpenHouseIds = uniqueStrings([
+    kept.matched_open_house_ids || [],
+    duplicate.matched_open_house_ids || []
+  ]);
+
+  return {
+    ...kept,
+    agent_id: kept.agent_id || duplicate.agent_id || null,
+    latest_import_row_id: kept.latest_import_row_id || duplicate.latest_import_row_id || null,
+    email: kept.email || duplicate.email || null,
+    active_listing_count: maxNumber(kept.active_listing_count, duplicate.active_listing_count),
+    sold_listing_count: maxNumber(kept.sold_listing_count, duplicate.sold_listing_count),
+    listings_days_since_last: minPositiveNumber(kept.listings_days_since_last, duplicate.listings_days_since_last),
+    listings_active_last_12_months: maxNumber(kept.listings_active_last_12_months, duplicate.listings_active_last_12_months),
+    buyside_last_90_days: maxNumber(kept.buyside_last_90_days, duplicate.buyside_last_90_days),
+    buyside_last_12_months: maxNumber(kept.buyside_last_12_months, duplicate.buyside_last_12_months),
+    open_house_count: maxNumber(kept.open_house_count, duplicate.open_house_count),
+    matched_open_house_count: maxNumber(kept.matched_open_house_count, duplicate.matched_open_house_count),
+    matched_weekend_open_house_count: maxNumber(kept.matched_weekend_open_house_count, duplicate.matched_weekend_open_house_count),
+    matched_active_listing_count: maxNumber(kept.matched_active_listing_count, duplicate.matched_active_listing_count),
+    matched_open_house_ids: matchedOpenHouseIds,
+    has_open_house_this_weekend: Boolean(kept.has_open_house_this_weekend || duplicate.has_open_house_this_weekend),
+    has_phone: Boolean(kept.has_phone || duplicate.has_phone || kept.phone_normalized || duplicate.phone_normalized),
+    has_email: Boolean(kept.has_email || duplicate.has_email || kept.email || duplicate.email),
+    location_confidence: maxNumber(kept.location_confidence, duplicate.location_confidence),
+    last_activity_at: latestDateValue(kept.last_activity_at, duplicate.last_activity_at) || kept.last_activity_at || duplicate.last_activity_at || null,
+    last_matched_open_house_at: latestDateValue(kept.last_matched_open_house_at, duplicate.last_matched_open_house_at) || kept.last_matched_open_house_at || duplicate.last_matched_open_house_at || null,
+    updated_at: latestDateValue(kept.updated_at, duplicate.updated_at) || kept.updated_at || duplicate.updated_at || null,
+    raw_sources: {
+      ...keptRaw,
+      display_dedupe_key: key,
+      display_duplicate_count: keptCount + duplicateCount,
+      display_duplicate_ranking_ids: ids,
+      display_duplicate_identity_keys: identityKeys,
+      display_duplicate_upload_ids: uploadIds,
+      display_duplicate_locations: locations,
+      display_duplicate_note: 'Duplicate stored ranking rows are collapsed for this dashboard view; raw import rows are preserved.'
     }
   };
 }
@@ -759,6 +871,29 @@ function dedupeRankings(rankings) {
   }
 
   return { rankings: [...map.values()], collapsed };
+}
+
+function dedupeRankingsForDisplay(rankings) {
+  const map = new Map();
+  let collapsed = 0;
+  let groups = 0;
+
+  for (const ranking of rankings || []) {
+    const key = displayDedupeKey(ranking);
+    if (!key) continue;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, ranking);
+      continue;
+    }
+    collapsed += 1;
+    if (Number(existing.raw_sources?.display_duplicate_count || 1) === 1) groups += 1;
+    const strongest = strongerRanking(existing, ranking);
+    const duplicate = strongest === existing ? ranking : existing;
+    map.set(key, mergeDisplayDuplicateRanking(strongest, duplicate, key));
+  }
+
+  return { rankings: [...map.values()], collapsed, groups };
 }
 
 async function upsertRankings(rankings) {
@@ -905,6 +1040,9 @@ function trustedRankingView(rankings, uploads) {
     trusted_uploads: trustedUploadIds.size,
     hidden_missing_identity: 0,
     hidden_untrusted_upload: 0,
+    trusted_rows_before_display_dedupe: 0,
+    collapsed_display_duplicates: 0,
+    collapsed_display_duplicate_groups: 0,
     visible_trusted_rows: 0
   };
 
@@ -921,8 +1059,12 @@ function trustedRankingView(rankings, uploads) {
     candidates.push(normalizeListReportsRanking(row));
   }
 
-  const averages = marketAverages(candidates);
-  const visible = candidates.map((row) => rescoreRanking(row, averages));
+  const deduped = dedupeRankingsForDisplay(candidates);
+  const averages = marketAverages(deduped.rankings);
+  const visible = deduped.rankings.map((row) => rescoreRanking(row, averages));
+  dataQuality.trusted_rows_before_display_dedupe = candidates.length;
+  dataQuality.collapsed_display_duplicates = deduped.collapsed;
+  dataQuality.collapsed_display_duplicate_groups = deduped.groups;
   dataQuality.visible_trusted_rows = visible.length;
   return { rankings: visible, data_quality: dataQuality };
 }
