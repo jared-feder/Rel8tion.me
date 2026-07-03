@@ -537,6 +537,72 @@ function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') 
   };
 }
 
+function rankPopulationForArea(ranking = {}, rows = []) {
+  const map = new Map();
+  for (const row of [...(rows || []), ranking]) {
+    const key = rankingIdentity(row) || row?.id;
+    if (!key || !hasRankingIdentity(row)) continue;
+    map.set(String(key), row?.id === ranking.id ? ranking : row);
+  }
+  const rankingKey = rankingIdentity(ranking) || ranking?.id;
+  if (rankingKey) map.set(String(rankingKey), ranking);
+  return [...map.values()];
+}
+
+function topPercentLabel(rank, total) {
+  if (!rank || !total) return '';
+  const pct = Math.max(1, Math.min(100, Math.round((Number(rank) / Number(total)) * 100)));
+  return `Top ${pct}%`;
+}
+
+function rankRecordForMetric(ranking = {}, population = [], key, label, options = {}) {
+  const current = Number(ranking[key] || 0);
+  const digits = options.digits ?? 0;
+  const lowerIsBetter = Boolean(options.lowerIsBetter);
+  const requirePositive = options.requirePositive !== false;
+  if (!Number.isFinite(current) || (requirePositive && current <= 0)) return null;
+
+  const values = (population || [])
+    .map((row) => Number(row?.[key] || 0))
+    .filter((value) => Number.isFinite(value) && (!requirePositive || value > 0));
+  if (!values.length) return null;
+
+  const better = values.filter((value) => lowerIsBetter ? value < current : value > current).length;
+  const rank = better + 1;
+  const total = values.length;
+  return {
+    key,
+    label,
+    value: roundMetric(current, digits),
+    unit: options.unit || '',
+    rank,
+    total,
+    rank_label: `#${rank} of ${total}`,
+    top_percent_label: topPercentLabel(rank, total)
+  };
+}
+
+function areaRankingsForRanking(ranking = {}, peerContext = {}, label = 'area') {
+  const population = rankPopulationForArea(ranking, peerContext.rows || []);
+  const overall = rankRecordForMetric(ranking, population, 'agent_rank_score', 'Rel8tion opportunity score', { requirePositive: false });
+  const metrics = [
+    rankRecordForMetric(ranking, population, 'active_listing_count', 'Active listings'),
+    rankRecordForMetric(ranking, population, 'listings_active_last_12_months', 'Listing side 12m'),
+    rankRecordForMetric(ranking, population, 'buyside_last_12_months', 'Buyside 12m'),
+    rankRecordForMetric(ranking, population, 'listings_days_since_last', 'Recency', { unit: 'days', lowerIsBetter: true })
+  ].filter(Boolean);
+
+  return {
+    label,
+    total_count: population.length,
+    overall,
+    metrics,
+    headline: overall
+      ? `${overall.rank_label} ${label} agents by Rel8tion opportunity fit.`
+      : `Rank context is limited for this ${label} peer set.`
+  };
+}
+
 function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   const agent = ranking.agent_name || 'This agent';
   const activeListings = Number(ranking.active_listing_count || 0);
@@ -665,6 +731,7 @@ function areaComparisonForRanking(ranking = {}, peerContext = {}) {
       listings_days_since_last: roundMetric(averages.average_days_since_last_listing, 0)
     },
     metrics,
+    rankings: areaRankingsForRanking(ranking, peerContext, label),
     status_report: story.status,
     headline: story.headline,
     opportunity: story.opportunity,

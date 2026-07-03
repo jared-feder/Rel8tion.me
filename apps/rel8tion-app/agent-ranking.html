@@ -364,6 +364,7 @@
       box-shadow: 0 30px 80px rgba(15,23,42,.28);
     }
     .modal.profile-modal { width: min(1320px, 100%); }
+    .modal.report-modal { width: min(1160px, 100%); }
     .modal.small { width: min(760px, 100%); }
     .modal-head {
       position: sticky;
@@ -547,6 +548,121 @@
       border-radius: inherit;
       background: linear-gradient(90deg, #2455d6, #0ea5c8);
     }
+    .marketing-report {
+      display: grid;
+      gap: 18px;
+      color: #17224f;
+      border: 1px solid rgba(148,163,184,.28);
+      border-radius: 8px;
+      background: #fff;
+      padding: 24px;
+    }
+    .report-cover {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 20px;
+      align-items: center;
+      padding: 22px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #eef5ff, #fff 72%);
+      border: 1px solid rgba(36,85,214,.16);
+    }
+    .report-cover h2 {
+      margin: 8px 0 0;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 34px;
+      line-height: 1.05;
+      color: #0f2b66;
+    }
+    .report-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #2455d6;
+    }
+    .report-brand img { width: 48px; height: auto; }
+    .report-agent-card {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      text-align: center;
+    }
+    .report-agent-card .profile-avatar {
+      width: 132px;
+      height: 132px;
+      font-size: 32px;
+      background: #dbeafe;
+    }
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .report-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .report-card {
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 8px;
+      background: #fbfdff;
+      padding: 14px;
+    }
+    .report-card strong {
+      display: block;
+      margin-top: 6px;
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 26px;
+      line-height: 1;
+      color: #0f2b66;
+    }
+    .report-card p { margin: 8px 0 0; color: #344256; font-weight: 700; line-height: 1.45; }
+    .report-section {
+      border-top: 1px solid rgba(148,163,184,.24);
+      padding-top: 18px;
+    }
+    .report-section h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #0f2b66;
+    }
+    .report-rank {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+    .report-rank-number {
+      min-width: 92px;
+      border-radius: 8px;
+      background: #17224f;
+      color: #fff;
+      padding: 12px;
+      text-align: center;
+      font-weight: 900;
+    }
+    .report-rank-number strong { display: block; font-size: 24px; line-height: 1; }
+    .report-copy {
+      border-left: 4px solid var(--blue);
+      background: #eef5ff;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      color: #17224f;
+      font-weight: 750;
+      line-height: 1.55;
+    }
+    .report-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      border-top: 1px solid rgba(148,163,184,.24);
+      padding-top: 14px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+    }
     .pitch-box {
       white-space: pre-wrap;
       border-left: 3px solid var(--sky);
@@ -589,9 +705,48 @@
       .summary-grid, .profile-metrics, .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .status-report { grid-template-columns: 1fr; }
       .status-badge-shell { width: 100%; }
+      .report-cover, .report-grid, .report-grid.two, .report-rank { grid-template-columns: 1fr; }
       .search-filter { grid-column: auto; }
       .search-filter-row { grid-template-columns: 1fr; }
       .actions { justify-content: flex-start; }
+    }
+    @media print {
+      body.printing-report {
+        background: #fff;
+      }
+      body.printing-report .app > .sidebar,
+      body.printing-report .app > .main > :not(.modal-backdrop),
+      body.printing-report .app > .modal-backdrop:not(.report-backdrop),
+      body.printing-report .modal-head,
+      body.printing-report .toast {
+        display: none !important;
+      }
+      body.printing-report .app {
+        display: block;
+        min-height: auto;
+      }
+      body.printing-report .modal-backdrop {
+        position: static;
+        inset: auto;
+        display: block;
+        padding: 0;
+        background: #fff;
+      }
+      body.printing-report .modal {
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        border: 0;
+        box-shadow: none;
+      }
+      body.printing-report .modal-body {
+        padding: 0;
+      }
+      body.printing-report .marketing-report {
+        border: 0;
+        border-radius: 0;
+        padding: 0;
+      }
     }
   </style>
 </head>
@@ -680,6 +835,8 @@
       profileDetailsLoading: false,
       profileDetailsError: '',
       profileDetailsSeq: 0,
+      reportModal: null,
+      reportSeq: 0,
       pitchModal: null
     };
 
@@ -1029,6 +1186,202 @@
             <p>${esc(comparison.opportunity || '')}</p>
             <p>${esc(comparison.capture || '')}</p>
           </div>
+        </div>
+      `;
+    }
+
+    function metricForLabel(comparison, label) {
+      return (comparison?.metrics || []).find((metric) => metric.label === label) || null;
+    }
+
+    function reportLocation(row, comparison) {
+      return comparison?.label || row.primary_county || row.county || row.market_area || row.city || row.state || 'your market';
+    }
+
+    function rankSummaryText(record) {
+      if (!record) return 'Rank pending';
+      return `${record.rank_label}${record.top_percent_label ? ` | ${record.top_percent_label}` : ''}`;
+    }
+
+    function reportActivityLine(row) {
+      const points = [];
+      const active = Number(row.active_listing_count || 0);
+      const listing12 = Number(row.listings_active_last_12_months || 0);
+      const buy90 = Number(row.buyside_last_90_days || 0);
+      const buy12 = Number(row.buyside_last_12_months || 0);
+      const days = Number(row.listings_days_since_last || 0);
+      if (active > 0) points.push(`${num(active)} active listing${active === 1 ? '' : 's'}`);
+      if (listing12 > 0) points.push(`${num(listing12)} listing-side 12m`);
+      if (buy90 > 0) points.push(`${num(buy90)} buyside 90d`);
+      if (buy12 > 0) points.push(`${num(buy12)} buyside 12m`);
+      if (days > 0) points.push(`last listing ${num(days)} day${days === 1 ? '' : 's'} ago`);
+      return points.length ? points.join(' | ') : 'ListReports production activity imported';
+    }
+
+    function renderReportRankCards(row, details) {
+      const comparison = details?.area_comparison || {};
+      const rankings = comparison.rankings || {};
+      const overall = rankings.overall;
+      const location = reportLocation(row, comparison);
+      return `
+        <div class="report-grid">
+          <div class="report-card report-rank">
+            <div class="report-rank-number"><strong>${esc(overall?.rank ? `#${overall.rank}` : '--')}</strong><span>${esc(overall?.total ? `of ${num(overall.total)}` : 'rank')}</span></div>
+            <div>
+              <div class="mini-title">Opportunity rank</div>
+              <p>${esc(overall ? `${rankSummaryText(overall)} in ${location}` : 'Rank loads after area intelligence runs.')}</p>
+            </div>
+          </div>
+          <div class="report-card">
+            <div class="mini-title">Production status</div>
+            <strong>${esc(comparison.status_report?.level || row.recommended_tier || 'Review')}</strong>
+            <p>${esc(comparison.status_report?.hook || row.next_best_action || 'Use the ranking context to start the conversation.')}</p>
+          </div>
+          <div class="report-card">
+            <div class="mini-title">Rel8tion score</div>
+            <strong>${num(row.agent_rank_score)}</strong>
+            <p>${esc(row.next_best_action || 'Recommended next action pending.')}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReportMetricCards(row, details) {
+      const comparison = details?.area_comparison || {};
+      const rankByLabel = new Map((comparison.rankings?.metrics || []).map((metric) => [metric.label, metric]));
+      const cards = [
+        ['Active listings', row.active_listing_count],
+        ['Listing side 12m', row.listings_active_last_12_months],
+        ['Buyside 12m', row.buyside_last_12_months],
+        ['Days since last listing', row.listings_days_since_last]
+      ];
+      return `
+        <div class="report-grid">
+          ${cards.map(([label, value]) => {
+            const metric = metricForLabel(comparison, label);
+            const rank = rankByLabel.get(label === 'Days since last listing' ? 'Recency' : label);
+            const displayValue = label === 'Days since last listing' && Number(value || 0)
+              ? `${num(value)} days`
+              : num(value || 0);
+            return `
+              <div class="report-card">
+                <div class="mini-title">${esc(label)}</div>
+                <strong>${esc(displayValue)}</strong>
+                <p>${metric ? `Area avg ${esc(metric.unit ? `${num(metric.average)} ${metric.unit}` : num(metric.average))}. ${esc(metric.comparison || '')}` : 'Area average pending.'}</p>
+                <div style="margin-top:10px;">${rank ? badge(rankSummaryText(rank), 'info') : badge('Rank pending', 'warn')}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function marketingReportText(row, details) {
+      const comparison = details?.area_comparison || {};
+      const rankings = comparison.rankings || {};
+      const status = comparison.status_report || {};
+      const location = reportLocation(row, comparison);
+      const metricLines = (comparison.metrics || []).map((metric) => {
+        const value = formatMetricValue(metric);
+        const average = metric.unit ? `${num(metric.average)} ${metric.unit}` : num(metric.average);
+        return `${metric.label}: ${value} vs ${location} average ${average} (${metric.comparison || 'comparison pending'})`;
+      });
+      return [
+        'REL8TION Production Intelligence Report',
+        `${row.agent_name || 'Agent'}${row.brokerage ? ` | ${row.brokerage}` : ''}${location ? ` | ${location}` : ''}`,
+        rankings.overall ? `Opportunity rank: ${rankSummaryText(rankings.overall)} among ${location} agents.` : '',
+        `Production status: ${status.level || row.recommended_tier || 'Review'}${status.hook ? ` - ${status.hook}` : ''}`,
+        `Profile activity: ${reportActivityLine(row)}`,
+        metricLines.join('\n'),
+        comparison.headline || '',
+        comparison.opportunity || '',
+        comparison.capture || '',
+        row.recommended_pitch || ''
+      ].filter(Boolean).join('\n\n');
+    }
+
+    function renderMarketingReportModal() {
+      const report = state.reportModal;
+      if (!report) return '';
+      const details = report.details || null;
+      const row = details?.ranking || report.row || {};
+      const comparison = details?.area_comparison || {};
+      const status = comparison.status_report || {};
+      const location = reportLocation(row, comparison);
+      return `
+        <div class="modal-backdrop report-backdrop" data-close-report>
+          <section class="modal report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" onclick="event.stopPropagation()">
+            <div class="modal-head">
+              <div>
+                <h2 id="reportTitle">Marketing Report</h2>
+                <div class="small">${esc([row.agent_name, row.brokerage, location].filter(Boolean).join(' | '))}</div>
+              </div>
+              <div class="actions">
+                <button class="btn" id="copyMarketingReport" ${report.loading ? 'disabled' : ''}><i data-lucide="copy"></i><span>Copy Text</span></button>
+                <button class="btn primary" id="printMarketingReport" ${report.loading ? 'disabled' : ''}><i data-lucide="printer"></i><span>Print / Save PDF</span></button>
+                <button class="btn" data-close-report-button><i data-lucide="x"></i><span>Close</span></button>
+              </div>
+            </div>
+            <div class="modal-body grid" style="gap:14px;">
+              ${report.loading ? '<div class="empty">Building agent marketing report...</div>' : ''}
+              ${report.error ? `<div class="empty">${esc(report.error)}</div>` : ''}
+              ${!report.loading ? `
+                <article class="marketing-report" id="marketingReport">
+                  <section class="report-cover">
+                    <div>
+                      <div class="report-brand">
+                        <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
+                        <span>Production Intelligence Report</span>
+                      </div>
+                      <h2>${esc(row.agent_name || 'Agent Production Report')}</h2>
+                      <p class="small" style="margin-top:10px;">${esc([row.brokerage, location, formatPhone(phoneForRow(row))].filter(Boolean).join(' | '))}</p>
+                      <div style="margin-top:14px;">${badge(status.level || row.recommended_tier || 'Review', tierTone(row.recommended_tier))} ${badge(`${num(row.agent_rank_score)} opportunity score`, 'info')}</div>
+                    </div>
+                    <div class="report-agent-card">
+                      ${renderProfileAvatar(row, details)}
+                      <div class="status-badge-shell" aria-label="${esc(status.level || 'Production status')} badge">
+                        <img class="status-badge-img" src="${esc(statusBadgeImage(status))}" alt="${esc(status.level || 'Production status')} badge" loading="lazy" onerror="this.closest('.status-badge-shell')?.classList.add('missing');">
+                        <div class="status-badge-fallback">${esc(status.level || 'Production Status')}</div>
+                      </div>
+                    </div>
+                  </section>
+                  <section class="report-section">
+                    <h3>Where this agent ranks</h3>
+                    <p class="small" style="margin-top:6px;">Compared with ${num(comparison.peer_count || comparison.rankings?.total_count || 0)} ${esc(location)} peer agents from trusted ListReports imports.</p>
+                    <div style="margin-top:12px;">${renderReportRankCards(row, details)}</div>
+                  </section>
+                  <section class="report-section">
+                    <h3>Production proof points</h3>
+                    <p class="small" style="margin-top:6px;">${esc(reportActivityLine(row))}</p>
+                    <div style="margin-top:12px;">${renderReportMetricCards(row, details)}</div>
+                  </section>
+                  <section class="report-section report-grid two">
+                    <div class="report-card">
+                      <div class="mini-title">What the numbers say</div>
+                      <p>${esc(comparison.headline || row.gap_summary || 'Area intelligence is still loading for this agent.')}</p>
+                      <p>${esc(status.summary || '')}</p>
+                    </div>
+                    <div class="report-card">
+                      <div class="mini-title">Open-house capture opportunity</div>
+                      <p>${esc(comparison.capture || row.rel8tion_value_summary || 'Use the next open house to make buyer traffic visible and easy to follow up with.')}</p>
+                      <p>${esc(`${num(row.matched_open_house_count || row.open_house_count || 0)} matched Rel8tion open-house records | ${num(row.matched_weekend_open_house_count || 0)} weekend matches`)}</p>
+                    </div>
+                  </section>
+                  <section class="report-section">
+                    <h3>Agent-facing Rel8tion angle</h3>
+                    <div class="report-copy">
+                      <p>${esc(row.recommended_pitch || comparison.opportunity || 'Rel8tion gives the agent a branded, no-setup buyer capture system for the next listing or open house.')}</p>
+                    </div>
+                  </section>
+                  <footer class="report-footer">
+                    <span>Prepared by Rel8tion Production Intelligence</span>
+                    <span>${esc(new Date().toLocaleDateString())}</span>
+                    <span>Event Pass | smart sign | instant buyer capture | disclosures | follow-up</span>
+                  </footer>
+                </article>
+              ` : ''}
+            </div>
+          </section>
         </div>
       `;
     }
@@ -1395,6 +1748,7 @@
                   <td>
                     <div class="row-actions">
                       <button class="btn" data-profile="${esc(row.id)}"><i data-lucide="user-round-search"></i><span>Profile</span></button>
+                      <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Report</span></button>
                       <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
                       <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
                       <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
@@ -1658,6 +2012,7 @@
                   <p>${esc(row.next_best_action || '')}</p>
                   <div class="actions" style="justify-content:flex-start;margin-top:12px;">
                     <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Open Pitch Modal</span></button>
+                    <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Marketing Report</span></button>
                     <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
                     <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
                     <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Create Rel8tion Prospect</span></button>
@@ -1823,6 +2178,7 @@
           </section>
           ${renderUploadModal()}
           ${renderProfileModal()}
+          ${renderMarketingReportModal()}
           ${renderPitchModal()}
           ${renderLocationFixModal()}
         </main>
@@ -1977,6 +2333,86 @@
           render();
         }
       }
+    }
+
+    function existingDetailsForReport(id) {
+      if (state.profileDetails?.ranking_id === id) return state.profileDetails;
+      return null;
+    }
+
+    function openMarketingReport(id) {
+      const row = findRanking(id) || (state.profile?.id === id ? state.profile : null);
+      if (!row) return;
+      const existingDetails = existingDetailsForReport(id);
+      state.reportModal = {
+        row: existingDetails?.ranking || row,
+        details: existingDetails,
+        loading: !existingDetails,
+        error: ''
+      };
+      render();
+      if (!existingDetails) loadMarketingReport(id);
+    }
+
+    async function loadMarketingReport(id) {
+      const requestSeq = ++state.reportSeq;
+      const baseRow = state.reportModal?.row || findRanking(id);
+      try {
+        const result = await api(API, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'profile_details', ranking_id: id })
+        });
+        if (requestSeq !== state.reportSeq || state.reportModal?.row?.id !== id) return;
+        const reportRanking = mergeProfileRanking(baseRow, result.ranking);
+        const details = {
+          ...result,
+          ranking_id: id,
+          ranking: reportRanking
+        };
+        state.reportModal = { row: reportRanking, details, loading: false, error: '' };
+        if (state.profile?.id === id) {
+          state.profile = reportRanking;
+          state.profileDetails = details;
+          state.profileDetailsError = '';
+          state.profileDetailsLoading = false;
+        }
+      } catch (error) {
+        if (requestSeq !== state.reportSeq || state.reportModal?.row?.id !== id) return;
+        state.reportModal = {
+          ...(state.reportModal || {}),
+          loading: false,
+          error: error.message || 'Unable to build marketing report.'
+        };
+      } finally {
+        if (requestSeq === state.reportSeq && state.reportModal?.row?.id === id) render();
+      }
+    }
+
+    async function copyMarketingReport() {
+      const report = state.reportModal;
+      if (!report || report.loading) return;
+      const text = marketingReportText(report.details?.ranking || report.row || {}, report.details || {});
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Marketing report text copied.');
+      } catch (_) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+        showToast('Marketing report text copied.');
+      }
+    }
+
+    function printMarketingReport() {
+      if (!state.reportModal || state.reportModal.loading) return;
+      document.body.classList.add('printing-report');
+      window.setTimeout(() => window.print(), 50);
     }
 
     function openLocationFix(id) {
@@ -2199,6 +2635,21 @@
           render();
         });
       });
+      document.querySelectorAll('[data-report]').forEach((button) => {
+        button.addEventListener('click', () => {
+          openMarketingReport(button.dataset.report);
+        });
+      });
+      document.querySelectorAll('[data-close-report], [data-close-report-button]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.reportModal = null;
+          state.reportSeq += 1;
+          document.body.classList.remove('printing-report');
+          render();
+        });
+      });
+      document.getElementById('copyMarketingReport')?.addEventListener('click', copyMarketingReport);
+      document.getElementById('printMarketingReport')?.addEventListener('click', printMarketingReport);
       document.querySelectorAll('[data-close-pitch], [data-close-pitch-button]').forEach((button) => {
         button.addEventListener('click', () => {
           state.pitchModal = null;
@@ -2239,6 +2690,10 @@
         button.addEventListener('click', () => markNotFit(button.dataset.notFit));
       });
     }
+
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-report');
+    });
 
     verify();
   </script>
