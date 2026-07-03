@@ -395,6 +395,87 @@ function rescoreRanking(ranking, averages) {
   };
 }
 
+function uploadMapping(upload, field) {
+  return upload?.raw_metadata?.mapping?.[field] || null;
+}
+
+function isTrustedListReportsUpload(upload) {
+  const source = String(upload?.source_name || '').trim().toLowerCase();
+  if (source && source !== 'listreports') return false;
+
+  const hasCoreListReportsFields = [
+    'agent_name',
+    'brokerage',
+    'phone',
+    'active_listing_count',
+    'listings_days_since_last',
+    'listings_active_last_12_months',
+    'buyside_last_90_days',
+    'buyside_last_12_months'
+  ].every((field) => Boolean(uploadMapping(upload, field)));
+
+  const hasLegacyBadProductionMapping = [
+    'production_volume',
+    'transaction_count',
+    'sold_listing_count',
+    'average_price'
+  ].some((field) => Boolean(uploadMapping(upload, field)));
+
+  return hasCoreListReportsFields && !hasLegacyBadProductionMapping;
+}
+
+function buildTrustedUploadSet(uploads) {
+  return new Set((uploads || []).filter(isTrustedListReportsUpload).map((upload) => upload.id).filter(Boolean));
+}
+
+function hasRankingIdentity(row) {
+  return Boolean(row?.identity_key && normalizePhone(row.phone_normalized || row.phone));
+}
+
+function normalizeListReportsRanking(row) {
+  return {
+    ...row,
+    production_volume: 0,
+    transaction_count: 0,
+    sold_listing_count: 0,
+    average_price: 0,
+    raw_sources: {
+      ...(row.raw_sources || {}),
+      trusted_listreports_display: true,
+      display_metric_note: 'ListReports import does not provide production volume, transaction count, sold listings, or average price.'
+    }
+  };
+}
+
+function trustedRankingView(rankings, uploads) {
+  const trustedUploadIds = buildTrustedUploadSet(uploads);
+  const dataQuality = {
+    raw_ranking_rows: (rankings || []).length,
+    trusted_uploads: trustedUploadIds.size,
+    hidden_missing_identity: 0,
+    hidden_untrusted_upload: 0,
+    visible_trusted_rows: 0
+  };
+
+  const candidates = [];
+  for (const row of rankings || []) {
+    if (!hasRankingIdentity(row)) {
+      dataQuality.hidden_missing_identity += 1;
+      continue;
+    }
+    if (!trustedUploadIds.has(uploadIdForRanking(row))) {
+      dataQuality.hidden_untrusted_upload += 1;
+      continue;
+    }
+    candidates.push(normalizeListReportsRanking(row));
+  }
+
+  const averages = marketAverages(candidates);
+  const visible = candidates.map((row) => rescoreRanking(row, averages));
+  dataQuality.visible_trusted_rows = visible.length;
+  return { rankings: visible, data_quality: dataQuality };
+}
+
 function applyOpenHouseMatchToRanking(ranking, openHouseRows, averages) {
   const match = matchOpenHousesForRanking(ranking, openHouseRows);
   const matched = {
@@ -631,6 +712,7 @@ const SORT_ALIASES = {
   buyer_side_count: 'buyside_last_12_months',
   transactions: 'transaction_count',
   active_listings: 'active_listing_count',
+  days_since_last: 'listings_days_since_last',
   open_houses: 'matched_open_house_count',
   weekend_open_houses: 'matched_weekend_open_house_count',
   opportunity_gap: 'opportunity_gap_score',
@@ -651,6 +733,7 @@ const SORT_FIELDS = new Set([
   'transaction_count',
   'average_price',
   'active_listing_count',
+  'listings_days_since_last',
   'listings_active_last_12_months',
   'buyside_last_90_days',
   'buyside_last_12_months',
@@ -668,7 +751,7 @@ const SORT_FIELDS = new Set([
   'created_at'
 ]);
 
-const DEFAULT_SORT_CHAIN = ['matched_weekend_open_house_count', 'opportunity_gap_score', 'production_volume', 'agent_rank_score'];
+const DEFAULT_SORT_CHAIN = ['agent_rank_score', 'active_listing_count', 'listings_active_last_12_months', 'buyside_last_12_months'];
 
 function canonicalSortBy(value) {
   const key = String(value || '').trim();
@@ -815,20 +898,23 @@ async function handleList(req) {
     supabaseRest('agent_rankings?select=*&limit=50000').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => [])
   ]);
-  const filtered = applyRankingFilters(rankings || [], filters);
+  const trustedView = trustedRankingView(rankings || [], uploads || []);
+  const visibleRankings = trustedView.rankings;
+  const filtered = applyRankingFilters(visibleRankings, filters);
   const sorted = sortRankings(filtered, sortBy, sortDirection);
   const start = (page - 1) * pageSize;
   return {
     rankings: sorted.slice(start, start + pageSize),
     uploads,
     summary: summarizeRankings(filtered),
-    options: buildFilterOptions(rankings || []),
+    options: buildFilterOptions(visibleRankings),
     total: filtered.length,
     page,
     page_size: pageSize,
     sort_by: sortBy || '',
     sort_direction: sortDirection,
     filters,
+    data_quality: trustedView.data_quality,
     loaded_at: new Date().toISOString()
   };
 }

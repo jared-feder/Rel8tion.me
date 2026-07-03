@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. Authenticated end-to-end upload testing still needs verification.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. The dashboard view now filters to trusted ListReports mappings with valid `identity_key`/phone and hides old bad-mapping rows without deleting stored history. Authenticated end-to-end upload testing still needs verification.
 
 ## Purpose
 
@@ -42,7 +42,7 @@ The parser accepts common variants for:
 - Phone, mobile, email
 - Production volume, transactions/sides/units
 - Active listings, sold listings
-- ListReports columns: `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, `buyside_last_12_months`
+- ListReports columns: `agent_name`, `agent_company`, `agent_phone`, `listings_active_total`, `listings_days_since_last`, `listings_active_last_12_months`, `buyside_last_90_days`, `buyside_sales_last_90_days`, `buyside_last_12_months`, `buyside_sales_last_12_months`
 - Average price
 - Location columns: `county`, `agent_county`, `market_county`, `primary_county`, `area`, `market`, `market_area`, `city`, `town`, `municipality`, `zip`, `zipcode`, `postal_code`, `state`, `region`, `territory`, `board_area`, `mls_area`
 
@@ -59,6 +59,17 @@ Identity format:
 Rows missing agent name or phone are skipped during final import and counted in the final import summary. Multiple agents sharing the same office/brokerage phone remain separate when their names, brokerages, or county/market values differ. Upload batches are deduped by `identity_key` before ranking upsert, and the admin API uses Supabase/PostgREST upsert with `on_conflict=identity_key`.
 
 Final import summaries include uploaded rows, valid rows, skipped missing phone/name, duplicates skipped, new rankings inserted, existing rankings updated, and failed rows.
+
+## Trusted Dashboard View
+
+The dashboard list is intentionally stricter than raw storage. It shows only rankings that:
+
+- Have a non-empty `identity_key`
+- Have a phone value
+- Come from a trusted ListReports upload mapping with the core ListReports activity fields
+- Do not come from older mappings that treated buyside or recency columns as production volume, transaction count, sold listings, or average price
+
+Hidden rows are not deleted. They are excluded from the dashboard count and surfaced through the data-quality gate summary.
 
 ## Location Intelligence
 
@@ -95,21 +106,20 @@ Ranking emphasizes opportunity, not just raw production.
 
 Signals include:
 
-- Production volume
-- Transaction count
-- Active and sold listing counts
+- Active listing count
 - ListReports active-listing total
 - Days since last listing activity
 - Listing-side activity in the last 12 months
 - Buyside activity in the last 90 days and 12 months
-- Average price
 - Known open-house activity from outreach data
 - Matched current open houses
 - Matched weekend open houses
 - Matched active listing count
 - Location confidence
 - Contactability by phone/email
-- Above-average production compared with the imported batch
+- Above-average listing-side and buyside activity compared with the imported batch
+
+For ListReports-only imports, production volume, transaction count, sold listings, and average price are not treated as imported fields unless a future source explicitly provides them with trusted mapping.
 
 The module assigns recommended tiers: `A+`, `A`, `B`, `C`, `Unknown`, and admin-reviewed `Not a Fit`.
 

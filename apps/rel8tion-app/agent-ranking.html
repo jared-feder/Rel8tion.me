@@ -680,6 +680,7 @@
           uploads: data.uploads || [],
           summary: data.summary || {},
           options: data.options || {},
+          data_quality: data.data_quality || {},
           total: data.total || 0,
           page: data.page || state.page,
           page_size: data.page_size || state.pageSize
@@ -758,12 +759,12 @@
     function renderSummaryCards() {
       const s = state.data.summary || {};
       const cards = [
-        ['Total agents analyzed', num(s.total_agents_analyzed)],
-        ['A+ agents', num(s.a_plus_agents)],
-        ['A tier agents', num(s.a_tier_agents)],
+        ['Trusted agents shown', num(s.total_agents_analyzed)],
         ['Active listings', num(s.total_active_listings)],
-        ['Matched open houses', num(s.matched_open_house_total)],
-        ['Weekend open houses', num(s.matched_weekend_open_house_total)],
+        ['Listing side 12m', num(s.total_listings_active_last_12_months)],
+        ['Buyside 90d', num(s.total_buyside_last_90_days)],
+        ['Buyside 12m', num(s.total_buyside_last_12_months)],
+        ['Matched OH', num(s.matched_open_house_total)],
         ['Needs location review', num(s.location_review_needed)]
       ];
       return cards.map(([label, value]) => `
@@ -826,6 +827,32 @@
       `;
     }
 
+    function renderDataQualityNotice() {
+      const q = state.data.data_quality || {};
+      const hidden = Number(q.hidden_missing_identity || 0) + Number(q.hidden_untrusted_upload || 0);
+      if (!q.raw_ranking_rows && !hidden) return '';
+      return `
+        <section class="panel" style="margin-top:16px;">
+          <div class="panel-head">
+            <div>
+              <h2>Data Quality Gate</h2>
+              <div class="small">${num(q.visible_trusted_rows)} trusted ListReports rows shown. ${num(hidden)} legacy or untrusted rows hidden.</div>
+            </div>
+            ${hidden ? badge('Filtered', 'warn') : badge('Clean', 'ok')}
+          </div>
+          <div class="panel-body">
+            <div class="grid summary-grid">
+              <div class="metric" style="box-shadow:none;"><div class="label">Raw ranking rows</div><div class="value">${num(q.raw_ranking_rows)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Visible trusted rows</div><div class="value">${num(q.visible_trusted_rows)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Missing identity hidden</div><div class="value">${num(q.hidden_missing_identity)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Bad upload hidden</div><div class="value">${num(q.hidden_untrusted_upload)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Trusted uploads</div><div class="value">${num(q.trusted_uploads)}</div></div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
     function renderFilters(rows) {
       const options = state.data.options || {};
       const brokerages = options.brokerages || [];
@@ -867,8 +894,6 @@
               <label>Min weekend OH <input class="field" data-filter="minWeekendOpenHouseCount" value="${esc(f.minWeekendOpenHouseCount)}" inputmode="numeric"></label>
               <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
               <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
-              <label>Min production <input class="field" data-filter="productionMin" value="${esc(f.productionMin)}" inputmode="numeric"></label>
-              <label>Max production <input class="field" data-filter="productionMax" value="${esc(f.productionMax)}" inputmode="numeric"></label>
               <label>Min active listings <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
               <label>Max active listings <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
               <label>Max days since listing <input class="field" data-filter="daysMax" value="${esc(f.daysMax)}" inputmode="numeric"></label>
@@ -887,22 +912,21 @@
       const offset = rankOffset();
       return `
         <div class="table-wrap" id="targets">
-          <table style="min-width:1980px;">
+          <table style="min-width:1760px;">
             <thead>
               <tr>
-                <th>${sortHeader('Rank', 'agent_rank_score')}</th>
+                <th>${sortHeader('Score', 'agent_rank_score')}</th>
                 <th>${sortHeader('Agent', 'agent_name')}</th>
                 <th>${sortHeader('Brokerage', 'brokerage')}</th>
                 <th>${sortHeader('County', 'primary_county')}</th>
                 <th>${sortHeader('Market', 'market_area')}</th>
-                <th>${sortHeader('Production Volume', 'production_volume')}</th>
-                <th>${sortHeader('Listing Side', 'listings_active_last_12_months')}</th>
-                <th>${sortHeader('Buyer Side', 'buyside_last_12_months')}</th>
-                <th>${sortHeader('Transactions', 'transaction_count')}</th>
-                <th>${sortHeader('Average Price', 'average_price')}</th>
                 <th>${sortHeader('Active Listings', 'active_listing_count')}</th>
-                <th>${sortHeader('Open Houses', 'matched_open_house_count')}</th>
-                <th>${sortHeader('Weekend Open Houses', 'matched_weekend_open_house_count')}</th>
+                <th>${sortHeader('Days Since Last', 'listings_days_since_last')}</th>
+                <th>${sortHeader('Listing Side 12m', 'listings_active_last_12_months')}</th>
+                <th>${sortHeader('Buyside 90d', 'buyside_last_90_days')}</th>
+                <th>${sortHeader('Buyside 12m', 'buyside_last_12_months')}</th>
+                <th>${sortHeader('Live OH Match', 'matched_open_house_count')}</th>
+                <th>${sortHeader('Weekend OH', 'matched_weekend_open_house_count')}</th>
                 <th>${sortHeader('Opportunity Gap', 'opportunity_gap_score')}</th>
                 <th>${sortHeader('Tier', 'recommended_tier')}</th>
                 <th>${sortHeader('Phone', 'phone_normalized')}</th>
@@ -915,17 +939,16 @@
             <tbody>
               ${rows.map((row, index) => `
                 <tr>
-                  <td><strong>${offset + index + 1}</strong><div class="small">${num(row.agent_rank_score)} score</div></td>
+                  <td><strong>${num(row.agent_rank_score)}</strong><div class="small">#${offset + index + 1} in current view</div></td>
                   <td><strong>${esc(row.agent_name || 'Unknown agent')}</strong><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
                   <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
-                  <td>${compactMoney(row.production_volume)}</td>
-                  <td>${num(row.listings_active_last_12_months)}<div class="small">${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days since last` : ''}</div></td>
-                  <td>${num(row.buyside_last_12_months)}<div class="small">${num(row.buyside_last_90_days)} in 90d</div></td>
-                  <td>${num(row.transaction_count)}</td>
-                  <td>${compactMoney(row.average_price)}</td>
                   <td>${num(row.active_listing_count)}</td>
+                  <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
+                  <td>${num(row.listings_active_last_12_months)}</td>
+                  <td>${num(row.buyside_last_90_days)}</td>
+                  <td>${num(row.buyside_last_12_months)}</td>
                   <td>${num(row.matched_open_house_count || row.open_house_count)}<div class="small">${num(row.matched_active_listing_count)} active linked</div></td>
                   <td>${num(row.matched_weekend_open_house_count)} ${row.has_open_house_this_weekend ? badge('Weekend', 'ok') : ''}</td>
                   <td><strong>${num(row.opportunity_gap_score)}</strong><div class="small">${esc(row.gap_summary || '')}</div></td>
@@ -1125,7 +1148,7 @@
               </div>
               <div class="actions">
                 ${badge(row.recommended_tier || 'Unknown', tierTone(row.recommended_tier))}
-                ${badge(`${num(row.agent_rank_score)} rank score`, 'info')}
+                ${badge(`${num(row.agent_rank_score)} opportunity score`, 'info')}
                 <button class="btn" data-close-profile-button><i data-lucide="x"></i><span>Close</span></button>
               </div>
             </div>
@@ -1287,6 +1310,7 @@
             <section class="grid summary-grid">${renderSummaryCards()}</section>
             <section class="grid info-grid" style="margin-top:16px;">${renderInfoCards()}</section>
             ${renderLastImportSummary()}
+            ${renderDataQualityNotice()}
             <section style="margin-top:16px;">${renderFilters(rows)}</section>
             <section class="panel" style="margin-top:16px;">
               <div class="panel-head">
