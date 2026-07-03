@@ -193,15 +193,16 @@ async function loadOpenHouseSignals() {
   return signals;
 }
 
-async function loadOpenHouseRows() {
+async function loadOpenHouseRows(options = {}) {
+  const maxRows = Math.max(1000, Math.min(Number(options.maxRows || 5000), 50000));
   const [openHouses, listingAgents] = await Promise.all([
     supabaseRestAll(
       `open_houses?select=${OPEN_HOUSE_BASE_SELECT}&order=open_start.desc.nullslast`,
-      { pageSize: 1000, maxRows: 50000 }
+      { pageSize: 1000, maxRows }
     ).catch(() => []),
     supabaseRestAll(
       `listing_agents?select=${LISTING_AGENT_BASE_SELECT}`,
-      { pageSize: 1000, maxRows: 50000 }
+      { pageSize: 1000, maxRows }
     ).catch(() => [])
   ]);
   return buildOpenHouseRows(openHouses || [], listingAgents || []);
@@ -372,8 +373,19 @@ async function profileDetailsForRanking(ranking) {
     ]);
   }
 
-  if (!listingAgents.some((agent) => listingAgentPhoto(agent))) {
+  if (!openHouses.length) {
     photoCandidates = await loadListingAgentPhotoCandidates(ranking);
+    const candidateOpenHouseIds = [...new Set(photoCandidates.map((agent) => agent.open_house_id).filter(Boolean))].slice(0, 50);
+    if (candidateOpenHouseIds.length) {
+      [openHouses, listingAgents] = await Promise.all([
+        loadOpenHouseDetailsByIds(candidateOpenHouseIds),
+        loadListingAgentDetailsByOpenHouseIds(candidateOpenHouseIds)
+      ]);
+    }
+  }
+
+  if (!listingAgents.some((agent) => listingAgentPhoto(agent))) {
+    photoCandidates = photoCandidates.length ? photoCandidates : await loadListingAgentPhotoCandidates(ranking);
   }
   const allListingAgents = dedupeListingAgents([...(listingAgents || []), ...(photoCandidates || [])]);
 
@@ -1147,14 +1159,10 @@ async function handleConfirm(body, auth) {
     200
   );
   const importRows = importInsert.inserted;
-  const [signals, openHouseRows] = await Promise.all([
-    loadOpenHouseSignals(),
-    loadOpenHouseRows()
-  ]);
+  const signals = await loadOpenHouseSignals();
   const avgs = marketAverages(importRows);
   const rankings = importRows.map((row) => {
-    const base = rankingFromImportRow(row, avgs, signals);
-    let ranking = applyOpenHouseMatchToRanking(base, openHouseRows, avgs);
+    const ranking = rankingFromImportRow(row, avgs, signals);
     ranking.identity_key = identityKeyForAgentRanking(ranking) || row.raw?.identity_key || null;
     ranking.raw_sources = {
       ...(ranking.raw_sources || {}),
@@ -1163,7 +1171,8 @@ async function handleConfirm(body, auth) {
       source_upload_id: upload.id,
       period_start: upload.period_start || null,
       period_end: upload.period_end || null,
-      original_filename: upload.original_filename || null
+      original_filename: upload.original_filename || null,
+      open_house_match_status: 'deferred_to_profile_modal'
     };
     return ranking;
   });
