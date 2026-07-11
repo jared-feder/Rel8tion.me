@@ -947,6 +947,127 @@
       flex-wrap: wrap;
     }
 
+    .finder-panel {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .finder-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .finder-field {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .finder-field.wide { grid-column: span 2; }
+    .finder-field.full { grid-column: 1 / -1; }
+
+    .finder-field label {
+      color: #49677c;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .finder-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .finder-summary {
+      min-height: 86px;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.76);
+      background: rgba(255,255,255,.62);
+      box-shadow: var(--soft-shadow);
+    }
+
+    .finder-summary .value {
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 27px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .finder-results {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .finder-card {
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.66), rgba(232,248,255,.34)),
+        rgba(255,255,255,.42);
+    }
+
+    .finder-card-media {
+      min-height: 190px;
+      background: rgba(255,255,255,.28);
+      border-right: 1px solid var(--line);
+      padding: 10px;
+      display: grid;
+    }
+
+    .finder-card-media img {
+      width: 100%;
+      height: 100%;
+      min-height: 170px;
+      object-fit: cover;
+      display: block;
+      border-radius: 8px;
+    }
+
+    .finder-card-body {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      padding: 13px;
+      min-width: 0;
+    }
+
+    .finder-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .finder-fact {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid rgba(122,148,173,.18);
+      background: rgba(255,255,255,.72);
+      padding: 5px 9px;
+      color: #31566a;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .finder-report-note {
+      border-left: 3px solid #0ea5c8;
+      border-radius: 8px;
+      background: rgba(232,248,255,.64);
+      padding: 10px 12px;
+      color: #23465c;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
     .confirmed-report-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1308,6 +1429,15 @@
       .drip-grid { grid-template-columns: 1fr; }
       .data-row { grid-template-columns: 1fr; }
       .report-grid { grid-template-columns: 1fr; }
+      .finder-grid,
+      .finder-summary-grid,
+      .finder-results,
+      .finder-card { grid-template-columns: 1fr; }
+      .finder-field.wide { grid-column: auto; }
+      .finder-card-media {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
       .assignment-grid { grid-template-columns: 1fr; }
       .assignment-actions { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 1fr; }
@@ -1335,6 +1465,7 @@
       ['outreach', 'Outreach command'],
       ['leads', 'Leads'],
       ['crm', 'Agent CRM'],
+      ['buyerFinder', 'Buyer finder'],
       ['signs', 'Signs and events'],
       ['lo', 'Loan officers'],
       ['payments', 'Payments'],
@@ -1354,6 +1485,31 @@
       outreachFilter: 'needs_reply',
       reportWindow: 'upcoming',
       reportSort: 'auto',
+      buyerFinder: {
+        loading: false,
+        error: '',
+        loaded: false,
+        loaded_at: '',
+        rows: [],
+        summary: null,
+        warnings: [],
+        filters: {
+          q: '',
+          days: '14',
+          min_price: '',
+          max_price: '',
+          min_beds: '',
+          min_baths: '',
+          city: '',
+          state: '',
+          brokerage: '',
+          agent: '',
+          photo_only: false,
+          sort: 'open_start_asc',
+          report_title: 'Buyer Home Finder Report',
+          buyer_name: ''
+        }
+      },
       coveragePickerKey: '',
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
@@ -2019,11 +2175,209 @@
       }
     }
 
+    function buyerFinderQueryString() {
+      const filters = state.buyerFinder.filters;
+      const params = new URLSearchParams();
+      [
+        'q',
+        'days',
+        'min_price',
+        'max_price',
+        'min_beds',
+        'min_baths',
+        'city',
+        'state',
+        'brokerage',
+        'agent',
+        'sort'
+      ].forEach((key) => {
+        const value = filters[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') params.set(key, String(value).trim());
+      });
+      if (filters.photo_only) params.set('photo_only', '1');
+      params.set('limit', '160');
+      return params.toString();
+    }
+
+    function syncBuyerFinderFiltersFromDom() {
+      const filters = state.buyerFinder.filters;
+      document.querySelectorAll('[data-buyer-filter]').forEach((input) => {
+        const key = input.dataset.buyerFilter;
+        if (!key) return;
+        filters[key] = input.type === 'checkbox' ? Boolean(input.checked) : input.value;
+      });
+    }
+
+    async function loadBuyerHomeFinder(options = {}) {
+      state.buyerFinder.loading = true;
+      state.buyerFinder.error = '';
+      if (options.showLoading !== false) refreshAreaContent();
+      try {
+        const result = await api(`/api/admin/buyer-home-finder?${buyerFinderQueryString()}`);
+        state.buyerFinder.loading = false;
+        state.buyerFinder.loaded = true;
+        state.buyerFinder.loaded_at = result.loaded_at || new Date().toISOString();
+        state.buyerFinder.rows = Array.isArray(result.rows) ? result.rows : [];
+        state.buyerFinder.summary = result.summary || null;
+        state.buyerFinder.warnings = Array.isArray(result.warnings) ? result.warnings : [];
+        state.buyerFinder.error = '';
+        refreshAreaContent();
+      } catch (error) {
+        state.buyerFinder.loading = false;
+        state.buyerFinder.loaded = true;
+        state.buyerFinder.error = error.message || 'Unable to load buyer home matches.';
+        refreshAreaContent();
+      }
+    }
+
+    function applyBuyerFinderFilters() {
+      syncBuyerFinderFiltersFromDom();
+      loadBuyerHomeFinder().catch(() => null);
+    }
+
+    function buyerFinderCriteriaLabel() {
+      const filters = state.buyerFinder.filters;
+      const pieces = [];
+      if (filters.q) pieces.push(`search "${filters.q}"`);
+      if (filters.days) pieces.push(`next ${filters.days} days`);
+      if (filters.min_price || filters.max_price) pieces.push(`${money(filters.min_price) || '$0'}-${money(filters.max_price) || 'any price'}`);
+      if (filters.min_beds) pieces.push(`${filters.min_beds}+ beds`);
+      if (filters.min_baths) pieces.push(`${filters.min_baths}+ baths`);
+      if (filters.city) pieces.push(filters.city);
+      if (filters.state) pieces.push(filters.state);
+      if (filters.brokerage) pieces.push(filters.brokerage);
+      if (filters.agent) pieces.push(`agent ${filters.agent}`);
+      if (filters.photo_only) pieces.push('photo required');
+      return pieces.join(' | ') || 'All upcoming buyer matches';
+    }
+
+    function buyerFinderResultAngle(row) {
+      const facts = [
+        money(row.price),
+        row.beds ? `${row.beds} bed${Number(row.beds) === 1 ? '' : 's'}` : '',
+        row.baths ? `${row.baths} bath${Number(row.baths) === 1 ? '' : 's'}` : '',
+        reportDisplayWindow(row.open_start, row.open_end) ? `open ${reportDisplayWindow(row.open_start, row.open_end)}` : ''
+      ].filter(Boolean);
+      const location = [row.city, row.state].filter(Boolean).join(', ') || row.address || 'this listing';
+      if (facts.length) return `Good buyer-match candidate in ${location}: ${facts.join(' | ')}. Add it to a tour, send it as a buyer option, or use it to open a conversation with the listing agent.`;
+      return `Good buyer-match candidate in ${location}. Use this as a quick buyer option and a reason to start a listing-agent conversation.`;
+    }
+
+    function buyerFinderAgentLine(row) {
+      return [
+        row.agent_name,
+        row.brokerage,
+        fmtPhone(row.agent_phone),
+        row.agent_email
+      ].filter(Boolean).join(' | ');
+    }
+
+    function buyerFinderReportHtml(rows) {
+      const filters = state.buyerFinder.filters;
+      const title = filters.report_title?.trim() || 'Buyer Home Finder Report';
+      const buyer = filters.buyer_name?.trim();
+      const generated = generatedStamp();
+      const rowsHtml = rows.map((row, index) => {
+        const openWindow = reportDisplayWindow(row.open_start, row.open_end);
+        const facts = [
+          money(row.price),
+          row.beds ? `${row.beds} beds` : '',
+          row.baths ? `${row.baths} baths` : '',
+          [row.city, row.state, row.zip].filter(Boolean).join(' ')
+        ].filter(Boolean).join(' | ');
+        const agents = (row.listing_agents || []).slice(0, 3).map((agent) => {
+          return [agent.name, agent.brokerage, fmtPhone(agent.phone), agent.email].filter(Boolean).join(' | ');
+        }).filter(Boolean);
+        return `
+          <tr>
+            <td class="n">${esc(index + 1)}</td>
+            <td class="pic">${row.image ? `<img src="${esc(row.image)}" alt="Listing">` : '<div class="ph">No pic</div>'}</td>
+            <td class="meta">
+              <b>${esc(row.address || 'Upcoming listing')}</b><br>
+              ${esc(facts || 'No property facts')}<br>
+              <span class="line"><b>Open house:</b> ${esc(openWindow || 'No open-house time loaded')}</span>
+              <span class="line"><b>Listing agent:</b> ${esc(buyerFinderAgentLine(row) || 'No listing agent loaded')}</span>
+              ${row.listing_url ? `<span class="line"><b>Listing URL:</b> ${esc(row.listing_url)}</span>` : ''}
+            </td>
+            <td class="why">
+              ${esc(buyerFinderResultAngle(row))}
+              ${agents.length ? `<div class="agents"><b>Additional agents:</b><br>${esc(agents.join('\n'))}</div>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+@page { size: landscape; margin: 0.3in; }
+body { font-family: Arial, sans-serif; color:#0f172a; font-size:9pt; }
+h1 { font-size:18pt; margin:0 0 3px; color:#0b2454; }
+p { margin:0 0 9px; color:#475569; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th,td { border:0.5px solid #cbd5e1; vertical-align:top; padding:7px; page-break-inside:avoid; }
+th { background:#f8fafc; text-align:left; font-weight:bold; color:#334155; }
+.n { width:24px; text-align:center; }
+.pic { width:126px; }
+.pic img,.ph { width:118px; height:86px; object-fit:cover; display:block; border-radius:6px; }
+.ph { background:#eef6fb; color:#64748b; display:flex; align-items:center; justify-content:center; }
+.meta { width:310px; line-height:1.26; }
+.why { line-height:1.32; }
+.line { display:block; margin-top:3px; }
+.agents { white-space:pre-line; margin-top:7px; padding-top:6px; border-top:0.5px solid #e2e8f0; color:#334155; }
+</style></head><body>
+<h1>${esc(title)}</h1>
+<p>${buyer ? `Buyer: ${esc(buyer)}. ` : ''}${esc(rows.length)} matching upcoming homes/open houses. Criteria: ${esc(buyerFinderCriteriaLabel())}. Generated ${esc(generated)}.</p>
+<table><thead><tr><th class="n">#</th><th class="pic">Photo</th><th class="meta">Property</th><th class="why">Buyer angle</th></tr></thead><tbody>
+${rowsHtml}
+</tbody></table></body></html>`;
+    }
+
+    function downloadBuyerFinderReportHtml(html) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const day = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `rel8tion-buyer-home-finder-${day}.html`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function generateBuyerFinderReport() {
+      syncBuyerFinderFiltersFromDom();
+      const rows = state.buyerFinder.rows || [];
+      if (!rows.length) {
+        showToast('No buyer home matches to report yet. Apply a search first.');
+        return;
+      }
+      const html = buyerFinderReportHtml(rows);
+      const report = window.open('', '_blank');
+      if (!report) {
+        downloadBuyerFinderReportHtml(html);
+        showToast('Popup blocked. Downloaded the buyer report HTML.');
+        return;
+      }
+      report.document.open();
+      report.document.write(html);
+      report.document.close();
+      report.focus();
+      window.setTimeout(() => {
+        try {
+          report.print();
+        } catch (_) {}
+      }, 700);
+      showToast(`Opened buyer report for ${rows.length} matches.`);
+    }
+
     function setArea(area) {
       state.area = area;
       window.localStorage.setItem(AREA_KEY, area);
       render();
       if (area === 'outreach' && state.query.trim().length >= 2) loadOutreachSearch().catch(() => null);
+      if (area === 'buyerFinder' && !state.buyerFinder.loaded && !state.buyerFinder.loading) {
+        loadBuyerHomeFinder({ showLoading: true }).catch(() => null);
+      }
     }
 
     function setOutreachFilter(filter) {
@@ -3075,6 +3429,7 @@
         outreach: 'message-square-reply',
         leads: 'contact-round',
         crm: 'users-round',
+        buyerFinder: 'home',
         signs: 'scan-line',
         lo: 'user-check',
         payments: 'credit-card',
@@ -3399,6 +3754,16 @@
         refreshAreaContent();
       });
       document.getElementById('generateConfirmedPdf')?.addEventListener('click', generateConfirmedPdfReport);
+      document.getElementById('buyerApply')?.addEventListener('click', applyBuyerFinderFilters);
+      document.getElementById('buyerGenerateReport')?.addEventListener('click', generateBuyerFinderReport);
+      document.querySelectorAll('[data-buyer-filter]').forEach((input) => {
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            applyBuyerFinderFilters();
+          }
+        });
+      });
     }
 
     function renderStats() {
@@ -3440,11 +3805,188 @@
     function renderArea() {
       if (state.area === 'leads') return renderLeads();
       if (state.area === 'crm') return renderCrm();
+      if (state.area === 'buyerFinder') return renderBuyerFinder();
       if (state.area === 'signs') return renderSigns();
       if (state.area === 'lo') return renderLoanOfficers();
       if (state.area === 'payments') return renderPayments();
       if (state.area === 'reports') return renderReports();
       return renderOutreach();
+    }
+
+    function buyerOption(value, label) {
+      return `<option value="${esc(value)}"${state.buyerFinder.filters.sort === value ? ' selected' : ''}>${esc(label)}</option>`;
+    }
+
+    function buyerField(key, label, attrs = '') {
+      const value = state.buyerFinder.filters[key] ?? '';
+      return `
+        <div class="finder-field">
+          <label for="buyer_${esc(key)}">${esc(label)}</label>
+          <input id="buyer_${esc(key)}" class="field" data-buyer-filter="${esc(key)}" value="${esc(value)}" ${attrs}>
+        </div>
+      `;
+    }
+
+    function renderBuyerFinderSummary() {
+      const summary = state.buyerFinder.summary || {};
+      const rows = state.buyerFinder.rows || [];
+      const cards = [
+        ['Matches', summary.total ?? rows.length],
+        ['Open houses', summary.open_house_count ?? rows.filter((row) => row.open_start).length],
+        ['With photos', summary.with_photo ?? rows.filter((row) => row.image).length],
+        ['Avg price', money(summary.avg_price) || '-'],
+        ['Price range', summary.min_price || summary.max_price ? `${money(summary.min_price) || '$0'} - ${money(summary.max_price) || 'open'}` : '-']
+      ];
+      return `
+        <div class="finder-summary-grid">
+          ${cards.map(([label, value]) => `
+            <div class="finder-summary">
+              <div class="mini-title">${esc(label)}</div>
+              <div class="value">${esc(value)}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderBuyerFinderWarnings() {
+      const warnings = state.buyerFinder.warnings || [];
+      if (!warnings.length) return '';
+      return `
+        <div class="glass-card" style="padding:12px;">
+          <div class="mini-title">Data warnings</div>
+          <div class="small">${esc(warnings.map((item) => `${item.source || 'source'}: ${item.error || 'unavailable'}`).join(' | '))}</div>
+        </div>
+      `;
+    }
+
+    function renderBuyerFinderCard(row) {
+      const openWindow = reportDisplayWindow(row.open_start, row.open_end);
+      const facts = [
+        money(row.price),
+        row.beds ? `${row.beds} beds` : '',
+        row.baths ? `${row.baths} baths` : '',
+        [row.city, row.state, row.zip].filter(Boolean).join(' ')
+      ].filter(Boolean);
+      const agents = Array.isArray(row.listing_agents) ? row.listing_agents : [];
+      return `
+        <article class="glass-card finder-card">
+          <div class="finder-card-media">
+            ${row.image ? `<img class="report-photo" src="${esc(row.image)}" alt="${esc(row.address || 'Listing photo')}">` : `<div class="image-fallback">${esc(row.address || 'No property photo')}</div>`}
+          </div>
+          <div class="finder-card-body">
+            <div>
+              <div class="address">${esc(row.address || 'Upcoming listing')}</div>
+              <div class="open-time">${esc(openWindow ? `Open house: ${openWindow}` : 'No open-house time loaded')}</div>
+            </div>
+            <div class="finder-facts">
+              ${facts.map((fact) => `<span class="finder-fact">${esc(fact)}</span>`).join('')}
+              ${row.review_status ? `<span class="finder-fact">${esc(row.review_status)}</span>` : ''}
+              ${(row.source_types || []).map((source) => `<span class="finder-fact">${esc(source)}</span>`).join('')}
+            </div>
+            <div>
+              <div class="mini-title">Listing contact</div>
+              <div class="primary">${esc(row.agent_name || 'No agent loaded')}</div>
+              <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | ') || 'No contact fields loaded')}</div>
+            </div>
+            ${agents.length ? `
+              <div>
+                <div class="mini-title">${esc(agents.length)} listing agent record${agents.length === 1 ? '' : 's'}</div>
+                <div class="secondary">${esc(agents.slice(0, 3).map((agent) => [agent.name, agent.brokerage, fmtPhone(agent.phone), agent.email].filter(Boolean).join(' | ')).filter(Boolean).join('\n'))}</div>
+              </div>
+            ` : ''}
+            <div class="finder-report-note">${esc(buyerFinderResultAngle(row))}</div>
+            <div class="row-actions">
+              ${row.listing_url ? `<a class="btn soft" href="${esc(row.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+              ${row.agent_phone ? `<a class="btn soft" href="tel:${esc(String(row.agent_phone).replace(/[^0-9+]/g, ''))}"><i data-lucide="phone"></i><span>Call agent</span></a>` : ''}
+              ${row.agent_email ? `<a class="btn soft" href="mailto:${esc(row.agent_email)}"><i data-lucide="mail"></i><span>Email agent</span></a>` : ''}
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderBuyerFinder() {
+      const finder = state.buyerFinder;
+      const filters = finder.filters;
+      const rows = finder.rows || [];
+      return `
+        <div class="section-head">
+          <div>
+            <h2>Buyer home finder</h2>
+            <div class="sub">${finder.loaded ? `${rows.length} matching homes/open houses | ${buyerFinderCriteriaLabel()}` : 'Search upcoming listings and open houses for a buyer, then generate a report.'}</div>
+          </div>
+          <div class="report-toolbar">
+            <button class="btn primary" id="buyerApply" ${finder.loading ? 'disabled' : ''}>
+              <i data-lucide="search"></i><span>${finder.loading ? 'Searching...' : 'Apply Search'}</span>
+            </button>
+            <button class="btn soft" id="buyerGenerateReport" ${rows.length ? '' : 'disabled'}>
+              <i data-lucide="file-text"></i><span>Generate Report</span>
+            </button>
+          </div>
+        </div>
+
+        <section class="glass-card finder-panel">
+          <div class="finder-grid">
+            <div class="finder-field wide">
+              <label for="buyer_q">Search</label>
+              <input id="buyer_q" class="field" data-buyer-filter="q" value="${esc(filters.q)}" placeholder="Address, city, agent, brokerage">
+            </div>
+            <div class="finder-field">
+              <label for="buyer_days">Window</label>
+              <select id="buyer_days" class="select" data-buyer-filter="days">
+                ${['7', '14', '30', '60', '90'].map((day) => `<option value="${day}"${filters.days === day ? ' selected' : ''}>Next ${day} days</option>`).join('')}
+              </select>
+            </div>
+            ${buyerField('min_price', 'Min price', 'inputmode="numeric" placeholder="$"')}
+            ${buyerField('max_price', 'Max price', 'inputmode="numeric" placeholder="$"')}
+            ${buyerField('min_beds', 'Min beds', 'inputmode="numeric" placeholder="Any"')}
+            ${buyerField('min_baths', 'Min baths', 'inputmode="numeric" placeholder="Any"')}
+            ${buyerField('city', 'City', 'placeholder="Any"')}
+            ${buyerField('state', 'State', 'placeholder="NY" maxlength="16"')}
+            ${buyerField('brokerage', 'Brokerage', 'placeholder="Any"')}
+            ${buyerField('agent', 'Agent', 'placeholder="Any"')}
+            <div class="finder-field">
+              <label for="buyer_sort">Sort</label>
+              <select id="buyer_sort" class="select" data-buyer-filter="sort">
+                ${buyerOption('open_start_asc', 'Open house soonest')}
+                ${buyerOption('open_start_desc', 'Open house latest')}
+                ${buyerOption('price_asc', 'Price low to high')}
+                ${buyerOption('price_desc', 'Price high to low')}
+                ${buyerOption('beds_desc', 'Most beds')}
+                ${buyerOption('address', 'Address A-Z')}
+                ${buyerOption('agent', 'Agent A-Z')}
+                ${buyerOption('brokerage', 'Brokerage A-Z')}
+              </select>
+            </div>
+            <div class="finder-field">
+              <label for="buyer_photo_only">Photos</label>
+              <label class="btn soft" style="justify-content:flex-start;">
+                <input id="buyer_photo_only" type="checkbox" data-buyer-filter="photo_only" ${filters.photo_only ? 'checked' : ''}>
+                <span>Require photo</span>
+              </label>
+            </div>
+            <div class="finder-field wide">
+              <label for="buyer_buyer_name">Buyer name</label>
+              <input id="buyer_buyer_name" class="field" data-buyer-filter="buyer_name" value="${esc(filters.buyer_name)}" placeholder="Optional for report">
+            </div>
+            <div class="finder-field wide">
+              <label for="buyer_report_title">Report title</label>
+              <input id="buyer_report_title" class="field" data-buyer-filter="report_title" value="${esc(filters.report_title)}" placeholder="Buyer Home Finder Report">
+            </div>
+          </div>
+          <div class="finder-report-note">Press Apply Search after changing filters. The dashboard will not hit the database on every keystroke.</div>
+        </section>
+
+        ${finder.error ? `<div class="glass-card" style="padding:18px;font-weight:900;color:#b91c1c;">${esc(finder.error)}</div>` : ''}
+        ${renderBuyerFinderWarnings()}
+        ${finder.loaded ? renderBuyerFinderSummary() : ''}
+        ${finder.loading ? '<div class="glass-card" style="padding:18px;font-weight:900;">Loading buyer matches...</div>' : ''}
+        ${!finder.loading && finder.loaded && !rows.length ? '<div class="glass-card" style="padding:18px;font-weight:900;">No upcoming listings or open houses matched those parameters.</div>' : ''}
+        <div class="finder-results">
+          ${rows.map(renderBuyerFinderCard).join('')}
+        </div>
+      `;
     }
 
     function renderOutreach() {
