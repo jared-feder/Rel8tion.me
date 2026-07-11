@@ -23,15 +23,16 @@ import {
   isGenericAgentNameValue,
   upsertAgent,
   uploadFullProfilePhoto
-} from '../../api/agents.js?v=20260511-agent-labels';
+} from '../../api/agents.js?v=20260527-agent-photo-fallback';
 import { sendActivationSMS } from '../../api/notifications.js';
-import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
+import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js?v=20260527-eventpass-uid-bind';
+import { linkChipQrToAgent, readChipQrCodeFromPage } from '../../api/chipQr.js?v=20260527-chip-qr';
 import {
   clearHostSession,
   clearPendingSignActivation,
   getPendingSignActivation,
   saveHostSession
-} from '../../core/hostSession.js?v=20260426-1108';
+} from '../../core/hostSession.js?v=20260527-eventpass-uid-bind';
 import {
   showAlreadyClaimed,
   showBetaClaimMenu,
@@ -45,7 +46,7 @@ import {
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js?v=20260517-browser-back';
+} from './renderer.js?v=20260531-eventpass-profile-qr';
 
 const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
 const BETA_AGENT_SLUG = 'main-beta';
@@ -60,8 +61,21 @@ function onboardingRoute(slug) {
   return `${url.pathname}${url.search}`;
 }
 
+function agentHomeRoute(slug, saved = false) {
+  const url = new URL(ROUTES.agentHome || '/agent-home', window.location.origin);
+  url.searchParams.set('agent', slug);
+  if (state.uid) url.searchParams.set('uid', state.uid);
+  if (saved) url.searchParams.set('profile_saved', '1');
+  return `${url.pathname}${url.search}`;
+}
+
 function isBetaKeychain() {
   return state.uid === BETA_KEYCHAIN_UID;
+}
+
+function isProfileEditRequest() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('edit') === 'profile' || params.get('mode') === 'profile';
 }
 
 function hasLockedProfileIdentity() {
@@ -148,7 +162,7 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
   });
 
   const pendingSign = getPendingSignActivation();
-  if (pendingSign?.code) {
+  if (pendingSign?.code && isPendingSignForCurrentUid(pendingSign)) {
     clearPendingSignActivation();
     const url = new URL('/sign-demo-activate.html', window.location.origin);
     url.searchParams.set('code', pendingSign.code);
@@ -167,7 +181,18 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
 
 function isEventPassClaimFlow() {
   const pendingSign = getPendingSignActivation();
-  return pendingSign?.source === 'event_pass' && !!pendingSign?.code;
+  return pendingSign?.source === 'event_pass'
+    && !!pendingSign?.code
+    && !!pendingSign?.uid
+    && pendingSign.uid === state.uid;
+}
+
+function isPendingSignForCurrentUid(pendingSign) {
+  if (!pendingSign?.code) return false;
+  if (pendingSign.source !== 'event_pass') return true;
+  if (pendingSign.uid && pendingSign.uid === state.uid) return true;
+  clearPendingSignActivation();
+  return false;
 }
 
 const CLAIM_HISTORY_FLOW = 'rel8tion-claim-activation';
@@ -691,8 +716,40 @@ function isGeneratedGenericAgent(agent) {
   return isGenericAgentName(agent?.name) && /^agent-[a-z0-9]{3,}$/i.test(String(agent?.slug || ''));
 }
 
+async function maybeLinkClaimQr(chipQrCode, slug) {
+  if (!chipQrCode || !slug || !state.uid) return null;
+  try {
+    return await linkChipQrToAgent({
+      chipCode: chipQrCode,
+      agentSlug: slug,
+      uid: state.uid
+    });
+  } catch (error) {
+    debug('CHIP QR LINK FAILED', { message: error?.message || String(error), chipQrCode, slug });
+    try {
+      window.sessionStorage.setItem('rel8tion_chip_qr_link_error', error?.message || 'QR link failed.');
+    } catch (_) {}
+    return null;
+  }
+}
+
+function normalizeNameForCompare(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function hasProfileNameConflict(existingAgent, sourceName) {
+  if (!existingAgent || !sourceName) return false;
+  if (isGeneratedGenericAgent(existingAgent)) return false;
+  if (isGenericAgentName(existingAgent.name) || isGenericAgentName(sourceName)) return false;
+  const existingName = normalizeNameForCompare(existingAgent.name);
+  const incomingName = normalizeNameForCompare(sourceName);
+  return Boolean(existingName && incomingName && existingName !== incomingName);
+}
+
 export async function autoActivate() {
   const h = state.detectedHouse;
+  const eventPassClaim = isEventPassClaimFlow();
+  const chipQrCode = eventPassClaim ? '' : readChipQrCodeFromPage();
   if (!state.uid) {
     showError('Chip Required', 'This preview can show the activation flow, but saving a live claim requires a real chip uid.');
     return;
@@ -714,6 +771,19 @@ export async function autoActivate() {
     let existingAgent = reusablePrefilledSlug ? state.prefilledAgent : null;
     if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
     if (!existingAgent && sourceEmail) existingAgent = await findAgentByEmail(sourceEmail);
+
+    if (hasProfileNameConflict(existingAgent, sourceName)) {
+      setPrefilledAgent({
+        ...(existingAgent || {}),
+        name: sourceName,
+        phone: sourcePhone || existingAgent?.phone || '',
+        email: sourceEmail || existingAgent?.email || '',
+        brokerage: state.selectedBrokerage || h?.brokerage || existingAgent?.brokerage || '',
+        image_url: state.prefilledAgent?.image_url || state.detectedAgentPhoto || existingAgent?.image_url || ''
+      });
+      routeUnknownAgentFlow(state.selectedBrokerage || h?.brokerage || existingAgent?.brokerage || '', 'We found an existing Rel8tion profile for this phone, but the name is different. Confirm the correct details below.');
+      return;
+    }
 
     const resolvedName = isGeneratedGenericAgent(existingAgent)
       ? sourceName
@@ -737,8 +807,8 @@ export async function autoActivate() {
     };
 
     await upsertAgent(agent);
-    const eventPassClaim = isEventPassClaimFlow();
     await linkKeyToAgent(slug);
+    if (!eventPassClaim) await maybeLinkClaimQr(chipQrCode, slug);
     if (!eventPassClaim) await sendActivationSMS(agent.phone, slug, agent.name);
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-auto-activate');
   } catch (e) {
@@ -759,6 +829,8 @@ export async function saveFullProfile() {
   const email = document.getElementById('full_email')?.value?.trim() || '';
   const brokerage = getFullProfileBrokerage();
   const bio = document.getElementById('full_bio')?.value?.trim() || '';
+  const eventPassClaim = isEventPassClaimFlow();
+  const chipQrCode = eventPassClaim ? '' : readChipQrCodeFromPage();
 
   if (!name || !phone) {
     alert('Name and phone are required.');
@@ -772,12 +844,19 @@ export async function saveFullProfile() {
   showLoading('Saving your profile...');
 
   try {
+    const editingProfile = isProfileEditRequest()
+      && state.keyRecord?.claimed === true
+      && state.keyRecord?.agent_slug;
     const reusablePrefilledSlug = state.prefilledAgent?.slug || '';
-    let existingAgent = reusablePrefilledSlug ? state.prefilledAgent : null;
+    let existingAgent = editingProfile
+      ? (state.prefilledAgent || await getAgentBySlug(state.keyRecord.agent_slug))
+      : (reusablePrefilledSlug ? state.prefilledAgent : null);
     if (!existingAgent && phoneNormalized) existingAgent = await findAgentByPhoneNormalized(phoneNormalized);
     if (!existingAgent && email) existingAgent = await findAgentByEmail(email);
 
-    const slug = existingAgent?.slug || reusablePrefilledSlug || `${slugify(name) || 'agent'}-${randSuffix()}`;
+    const slug = editingProfile
+      ? state.keyRecord.agent_slug
+      : existingAgent?.slug || reusablePrefilledSlug || `${slugify(name) || 'agent'}-${randSuffix()}`;
     const existingImageUrl = existingAgent?.image_url || state.prefilledAgent?.image_url || '';
     const imageUrl = await uploadFullProfilePhoto(slug);
     const agent = {
@@ -795,13 +874,19 @@ export async function saveFullProfile() {
     setManuallyEnteredProfile(true);
     setSelectedBrokerage(brokerage);
     await applyBranding(brokerage);
-    const eventPassClaim = isEventPassClaimFlow();
+    if (editingProfile) {
+      window.location.href = agentHomeRoute(slug, true);
+      return;
+    }
+
     await linkKeyToAgent(slug);
+    if (!eventPassClaim) await maybeLinkClaimQr(chipQrCode, slug);
     if (!eventPassClaim) await sendActivationSMS(phone, slug, name);
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-full-profile');
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
-    showFullProfileFormWithHistory(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
+    const message = e?.message ? `Saving failed: ${e.message}` : 'Saving failed. Please try again.';
+    showFullProfileFormWithHistory(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', message);
   }
 }
 
@@ -821,6 +906,15 @@ export async function init() {
         slug: state.keyRecord?.agent_slug || BETA_AGENT_SLUG,
         name: state.keyRecord?.agent_slug || 'Main Beta'
       }, '', 'replace');
+      return;
+    }
+    if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug && isProfileEditRequest()) {
+      const brokerage = state.prefilledAgent?.brokerage || '';
+      if (brokerage) {
+        setSelectedBrokerage(brokerage);
+        await applyBranding(brokerage);
+      }
+      showFullProfileFormWithHistory(brokerage, 'Update your Rel8tionChip profile details.');
       return;
     }
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {

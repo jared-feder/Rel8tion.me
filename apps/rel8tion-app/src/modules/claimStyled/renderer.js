@@ -1,7 +1,9 @@
 import { ASSETS, ROUTES } from '../../core/config.js';
-import { state, setCurrentBrand, setSelectedBrokerage } from '../../core/state.js';
+import { state, setCurrentBrand, setSelectedBrokerage, setSelectedProfilePhotoFile } from '../../core/state.js';
 import { esc, getStatus, money, normalizePhone } from '../../core/utils.js';
 import { applyBranding } from '../../api/brokerages.js';
+import { normalizeChipQrInput, readPendingChipQrCode } from '../../api/chipQr.js?v=20260527-chip-qr';
+import { getPendingSignActivation } from '../../core/hostSession.js?v=20260531-eventpass-profile-qr';
 
 function getBrandColors() {
   return {
@@ -35,6 +37,35 @@ function isGenericAgentName(value) {
 
 function firstRealAgentName(...values) {
   return cleanText(values.find((value) => !isGenericAgentName(value)) || '');
+}
+
+function isProfileEditRequest() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('edit') === 'profile' || params.get('mode') === 'profile';
+}
+
+function isEventPassClaimFlow() {
+  const pending = getPendingSignActivation();
+  return pending?.source === 'event_pass'
+    && !!pending?.code
+    && !!pending?.uid
+    && pending.uid === state.uid;
+}
+
+function initialChipQrCode() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeChipQrInput(params.get('chip_code') || params.get('qr_code') || '') || readPendingChipQrCode();
+}
+
+function keychainQrField() {
+  const code = initialChipQrCode();
+  return `
+    <div class="rounded-[24px] border border-blue-100 bg-white/60 px-5 py-5 text-left backdrop-blur-sm">
+      <label for="rel8tion_chip_qr_code" class="block text-slate-900 font-black text-lg mb-2">Keychain QR Code</label>
+      <input id="rel8tion_chip_qr_code" value="${esc(code)}" placeholder="Optional code or QR URL" class="w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-[15px] font-bold text-slate-700 outline-none focus:border-blue-400">
+      <div class="mt-2 text-slate-500 text-sm font-semibold">If your keychain has a printed QR, enter or paste it here so the QR opens your public profile.</div>
+    </div>
+  `;
 }
 
 function render(content) {
@@ -106,10 +137,13 @@ function attachFullProfileHandlers() {
     photo.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      setSelectedProfilePhotoFile(file);
       const preview = document.getElementById('full_preview');
       preview.src = URL.createObjectURL(file);
       preview.classList.remove('hidden');
       preview.classList.add('block');
+      const status = document.getElementById('full_photo_status');
+      if (status) status.textContent = `Selected: ${file.name || 'profile photo'}`;
     };
   }
 
@@ -304,6 +338,7 @@ export function showVerifyAgent() {
         ${displayEmail ? `<div class="text-slate-500 font-semibold">${esc(displayEmail)}</div>` : ''}
       </div>
       <div class="space-y-3">
+        ${isEventPassClaimFlow() ? '' : keychainQrField()}
         <button onclick="autoActivate()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Activate Now</button>
         <button onclick="editDetectedProfile()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Edit Profile</button>
       </div>
@@ -381,6 +416,7 @@ export function showForm(prefillBrokerage = '', notice = '') {
 }
 
 export function showFullProfileForm(prefillBrokerage = '', notice = '') {
+  const editing = isProfileEditRequest();
   const p = state.prefilledAgent || {};
   const h = state.detectedHouse || {};
   const name = p.name || h.agent || '';
@@ -393,8 +429,8 @@ export function showFullProfileForm(prefillBrokerage = '', notice = '') {
   render(`
     <div>
       ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ''}
-      <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">Complete Your Profile</h1>
-      <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Enter your details to activate your Rel8tionchip.</p>
+      <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">${editing ? 'Edit Your Profile' : 'Complete Your Profile'}</h1>
+      <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">${editing ? 'Update the details and photo shown on your Rel8tion profile.' : (isEventPassClaimFlow() ? 'Enter your details to activate this Event Pass.' : 'Enter your details to activate your Rel8tionchip.')}</p>
       ${notice ? `<div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
       <div class="space-y-4 text-left">
         <input id="full_name" value="${esc(name)}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
@@ -408,16 +444,17 @@ export function showFullProfileForm(prefillBrokerage = '', notice = '') {
           }).join('')}
         </select>
         <input id="full_brokerage_custom" value="${esc(isKnownBrokerage(brokerage) ? '' : brokerage)}" placeholder="Enter Brokerage Name" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 ${(brokerage && !isKnownBrokerage(brokerage)) ? '' : 'hidden'}">
-        <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all backdrop-blur-sm">
-          <div class="text-slate-900 font-black text-lg mb-1">Add or Update Photo</div>
-          <div class="text-slate-500 text-sm font-semibold">Tap to upload</div>
-          <input type="file" id="full_photo" accept="image/*" hidden>
-        </label>
+        <div class="rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center backdrop-blur-sm">
+          <label for="full_photo" class="block text-slate-900 font-black text-lg mb-2">Add or Update Photo</label>
+          <input type="file" id="full_photo" accept="image/*" class="block w-full rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-[14px] font-bold text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-black file:text-white">
+          <div id="full_photo_status" class="mt-2 text-slate-500 text-sm font-semibold">${storedImage ? 'Current photo loaded' : 'Choose a photo from your phone'}</div>
+        </div>
         <img id="full_preview" src="${esc(storedImage)}" class="${storedImage ? 'block' : 'hidden'} w-full rounded-[24px] max-h-[280px] object-cover shadow-sm bg-white">
         <textarea id="full_bio" placeholder="Short Bio" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
+        ${editing || isEventPassClaimFlow() ? '' : keychainQrField()}
       </div>
       <div class="mt-6 space-y-3">
-        <button onclick="saveFullProfile()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Save and Activate</button>
+        <button onclick="saveFullProfile()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">${editing ? 'Save Profile' : 'Save and Activate'}</button>
       </div>
     </div>
   `);

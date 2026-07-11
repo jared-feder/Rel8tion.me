@@ -133,6 +133,7 @@ export async function findListingAgentProfile({ openHouseId = '', name = '', pho
   }
   if (name && !isGenericAgentNameValue(name)) {
     tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&name=eq.${encodeURIComponent(name)}&limit=5`);
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=5`);
   }
 
   for (const url of tryQueries) {
@@ -191,12 +192,14 @@ export async function findListingAgentPhoto({ openHouseId = '', name = '', phone
   }
   if (openHouseId && name) {
     tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&limit=1`);
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=1`);
   }
   if (normalizedPhone) {
     tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&phone_normalized=eq.${encodeURIComponent(normalizedPhone)}&limit=1`);
   }
   if (name) {
     tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=eq.${encodeURIComponent(name)}&limit=1`);
+    tryQueries.push(`${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=1`);
   }
 
   for (const url of tryQueries) {
@@ -211,8 +214,15 @@ export async function findListingAgentPhoto({ openHouseId = '', name = '', phone
 
 export async function uploadFullProfilePhoto(slug) {
   const photo = document.getElementById('full_photo');
-  const file = photo?.files?.[0];
+  const file = photo?.files?.[0] || state.selectedProfilePhotoFile || null;
   if (!file) return state.prefilledAgent?.image_url || null;
+
+  try {
+    const uploaded = await uploadProfilePhotoViaApi(slug, file);
+    if (uploaded) return uploaded;
+  } catch (error) {
+    console.warn('Profile photo API upload failed; trying direct storage upload.', error);
+  }
 
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `${slug}.${ext}`;
@@ -230,5 +240,81 @@ export async function uploadFullProfilePhoto(slug) {
 
   const raw = await res.text().catch(() => '');
   if (!res.ok) throw new Error('Photo upload failed: ' + raw);
-  return `${SUPABASE_URL}/storage/v1/object/public/${PROFILE_BUCKET}/${path}`;
+  return `${SUPABASE_URL}/storage/v1/object/public/${PROFILE_BUCKET}/${path}?v=${Date.now()}`;
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+function imageFromObjectUrl(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+async function optimizeProfilePhoto(file) {
+  const fallbackType = file.type || 'image/jpeg';
+  let objectUrl = '';
+  try {
+    objectUrl = URL.createObjectURL(file);
+    const image = await imageFromObjectUrl(objectUrl);
+    const maxSide = 1400;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+    const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+    const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0, width, height);
+    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.86);
+    if (blob?.size) {
+      return { blob, contentType: 'image/jpeg', fileName: `${slugifyName(file.name || 'profile')}.jpg` };
+    }
+  } catch (_) {
+    return { blob: file, contentType: fallbackType, fileName: file.name || 'profile.jpg' };
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+  return { blob: file, contentType: fallbackType, fileName: file.name || 'profile.jpg' };
+}
+
+function slugifyName(value) {
+  return String(value || 'profile').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'profile';
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function uploadProfilePhotoViaApi(slug, file) {
+  const optimized = await optimizeProfilePhoto(file);
+  const dataUrl = await blobToDataUrl(optimized.blob);
+  const res = await fetch('/api/agent-profile-photo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slug,
+      uid: state.uid || '',
+      fileName: optimized.fileName || file.name || 'profile.jpg',
+      contentType: optimized.contentType || file.type || 'image/jpeg',
+      photo: dataUrl
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false || !data.publicUrl) {
+    throw new Error(data.error || `Profile photo upload failed: ${res.status}`);
+  }
+  return data.publicUrl;
 }

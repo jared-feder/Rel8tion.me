@@ -13,6 +13,7 @@ export async function sendActivationSMS(phone, slug, name) {
         agent_phone: phone,
         buyer_phone: phone,
         buyer_name: name || 'Agent',
+        category: 'event_transactional',
         message: `Your Rel8tionChip is live.\n\nhttps://rel8tion.me/a?agent=${slug}`
       })
     });
@@ -41,7 +42,8 @@ export async function sendFinancingLeadAlert({
         buyer_name: buyerName || 'Buyer',
         areas: address || 'Open House Visitor',
         price: price || '',
-        preapproved
+        preapproved,
+        category: agentPhone === JARED_FINANCING_ALERT_PHONE ? 'owner_fallback_alert' : 'loan_officer_alert'
       })
     });
 
@@ -84,6 +86,7 @@ export async function sendAgentCheckinSMS({
         agent_phone: agentPhone,
         buyer_phone: buyerPhone || agentPhone,
         buyer_name: buyerName || 'Buyer',
+        category: 'agent_checkin_alert',
         message
       })
     });
@@ -146,6 +149,7 @@ export async function sendLiveLoanOfficerFinancingAlert({
         agent_phone: loanOfficerPhone,
         buyer_phone: buyerPhone || loanOfficerPhone,
         buyer_name: buyerName || 'Buyer',
+        category: 'loan_officer_alert',
         message
       })
     });
@@ -185,6 +189,7 @@ export async function sendBuyerLoanOfficerIntroSMS({
         agent_phone: buyerPhone,
         buyer_phone: buyerPhone,
         buyer_name: buyerName || 'Buyer',
+        category: 'buyer_loan_officer_intro',
         message
       })
     });
@@ -228,6 +233,7 @@ export async function sendBuyerConfirmationSMS({
         agent_phone: buyerPhone,
         buyer_phone: buyerPhone,
         buyer_name: buyerName || 'Buyer',
+        category: 'buyer_confirmation',
         message
       })
     });

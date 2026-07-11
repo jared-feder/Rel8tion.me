@@ -8,7 +8,8 @@ export const state = {
   keyRecord: null,
   loaderInterval: null,
   detectedAgentPhoto: null,
-  selectedBrokerage: ''
+  selectedBrokerage: '',
+  selectedProfilePhotoFile: null
 };
 
 export function resetDetectionState() {
@@ -51,4 +52,8 @@ export function setDetectedAgentPhoto(photoUrl) {
 
 export function setSelectedBrokerage(brokerage) {
   state.selectedBrokerage = brokerage || '';
+}
+
+export function setSelectedProfilePhotoFile(file) {
+  state.selectedProfilePhotoFile = file || null;
 }

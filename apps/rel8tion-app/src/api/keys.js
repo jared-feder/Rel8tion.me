@@ -1,6 +1,6 @@
 import { KEY, SUPABASE_URL } from '../core/config.js';
 import { state, setKeyRecord, setPrefilledAgent } from '../core/state.js';
-import { getPendingSignActivation } from '../core/hostSession.js';
+import { clearPendingSignActivation, getPendingSignActivation } from '../core/hostSession.js?v=20260527-eventpass-uid-bind';
 import { authHeaders, jsonHeaders } from '../core/utils.js';
 import { fetchJson } from './http.js';
 import { applyBranding } from './brokerages.js';
@@ -52,7 +52,14 @@ function resolveKeychainSlot({ existingRow, agentKeys, uid }) {
 
 function isEventPassClaim() {
   const pending = getPendingSignActivation();
-  return pending?.source === 'event_pass' && !!pending?.code;
+  if (!(pending?.source === 'event_pass' && pending?.code)) return false;
+  // Event Pass claims must be tied to the exact keychain UID so stale browser state
+  // cannot convert a normal Rel8tionChip claim into an Event Pass keychain.
+  if (!pending.uid || !state.uid || pending.uid !== state.uid) {
+    clearPendingSignActivation();
+    return false;
+  }
+  return true;
 }
 
 export async function loadAgentFromUID() {

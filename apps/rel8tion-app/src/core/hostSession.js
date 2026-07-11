@@ -56,6 +56,7 @@ export function savePendingSignActivation(sign = {}) {
     code: sign.code || sign.publicCode || '',
     signId: sign.signId || '',
     inventoryId: sign.inventoryId || '',
+    uid: sign.uid || '',
     source: sign.source || 'sign-qr',
     createdAt: new Date().toISOString()
   };

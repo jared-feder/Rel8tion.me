@@ -37,7 +37,7 @@ export function clearPendingChipQrCode() {
 
 export function readChipQrCodeFromPage() {
   const params = new URLSearchParams(window.location.search);
-  const fromQuery = normalizeChipQrInput(params.get('chip_code') || params.get('qr_code') || params.get('code'));
+  const fromQuery = normalizeChipQrInput(params.get('chip_code') || params.get('qr_code') || '');
   const fromInput = normalizeChipQrInput(
     document.getElementById('rel8tion_chip_qr_code')?.value
       || document.getElementById('keychain_qr_code')?.value

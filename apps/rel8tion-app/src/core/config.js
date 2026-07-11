@@ -25,5 +25,6 @@ export const ROUTES = {
   agents: '/agents',
   sign: '/sign',
   event: '/event',
+  agentHome: '/agent-home',
   admin: '/admin'
 };
