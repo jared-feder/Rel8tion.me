@@ -100,8 +100,9 @@ Status labels used in this file:
 ## Open House Kit And Website Promo
 
 - `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, `/kit-intake`, and `/api/checkout/open-house-kit` support Open House Kit acquisition, Event Pass keychain prefill, manual intake, and Stripe Checkout handoff.
-- `[PARTIAL]` Successful Open House Kit Stripe returns can request `/api/checkout/website-promo` with a Checkout Session id to show a deterministic website-builder promo code for `https://my.rel8tion.me`.
-- `[NEEDS VERIFICATION]` Live Stripe secret/env deployment, product pricing, and webhook/fulfillment coverage still need verification before treating checkout as fully automated.
+- `[IMPLEMENTED]` `/api/checkout/stripe-webhook` verifies signed Stripe Checkout webhooks and upserts eligible Open House Kit Checkout Sessions into `open_house_kit_orders` for fulfillment review.
+- `[IMPLEMENTED]` Successful Open House Kit Stripe returns can request `/api/checkout/website-promo` with a Checkout Session id to show a deterministic website-builder promo code for `https://my.rel8tion.me`; that route also verifies the paid Stripe session and upserts `open_house_kit_orders` as a browser-return fallback before the webhook is configured.
+- `[NEEDS VERIFICATION]` Live Stripe webhook endpoint configuration, `STRIPE_WEBHOOK_SECRET` or `STRIPE_OPEN_HOUSE_KIT_WEBHOOK_SECRET`, product pricing, and fulfillment operations still need verification before treating checkout as fully automated.
 
 ## Agent Website Builder
 
