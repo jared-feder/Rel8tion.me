@@ -1,0 +1,26 @@
+<!--
+  WordPress page content for https://www.rel8tion.me/nmb-activate.
+  Paste this into a WordPress Custom HTML block on the public page with slug: nmb-activate.
+  It preserves the NFC query string and sends NMB keychain scans to the app route.
+-->
+<section style="min-height:60vh;display:grid;place-items:center;padding:28px 16px;background:linear-gradient(180deg,#cdf6ff,#f4fbff);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#18235b;text-align:center;">
+  <div style="width:min(520px,100%);border:1px solid rgba(255,255,255,.78);border-radius:28px;background:rgba(255,255,255,.72);box-shadow:0 24px 70px rgba(24,35,91,.14);padding:28px;">
+    <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" style="height:58px;width:auto;margin:0 auto 18px;display:block;">
+    <h1 style="margin:0 0 10px;font-size:clamp(30px,8vw,48px);line-height:1;font-weight:900;letter-spacing:0;color:#18235b;">Opening NMB Dashboard</h1>
+    <p style="margin:0;color:#59657d;font-size:16px;line-height:1.5;font-weight:700;">Your Rel8tion NMB keychain is being routed to the secure app.</p>
+    <a id="rel8tionNmbFallbackLink" href="https://app.rel8tion.me/nmb-activate" style="display:inline-flex;align-items:center;justify-content:center;margin-top:20px;min-height:48px;padding:12px 18px;border-radius:999px;background:#18235b;color:white;text-decoration:none;font-weight:900;">Open Dashboard</a>
+  </div>
+</section>
+<script>
+  (function () {
+    var target = new URL('https://app.rel8tion.me/nmb-activate');
+    var current = new URL(window.location.href);
+    current.searchParams.forEach(function (value, key) {
+      target.searchParams.set(key, value);
+    });
+    target.hash = current.hash || '';
+    var link = document.getElementById('rel8tionNmbFallbackLink');
+    if (link) link.href = target.toString();
+    window.location.replace(target.toString());
+  })();
+</script>
