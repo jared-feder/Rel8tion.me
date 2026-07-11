@@ -293,7 +293,7 @@
         <div class="assurance-grid" aria-label="SMS consent details">
           <div class="assurance">
             <strong>First-party consent</strong>
-            <span>This form records your direct opt-in for Rel8tion event-related messages.</span>
+            <span>This form records your SMS preference for Rel8tion event-related messages.</span>
           </div>
           <div class="assurance">
             <strong>Control</strong>
@@ -324,7 +324,6 @@
             <select id="role" name="role" required>
               <option value="">Select role</option>
               <option>Real Estate Agent</option>
-              <option>Loan Officer</option>
               <option>Buyer / Open House Visitor</option>
               <option>Broker / Manager</option>
               <option>Other</option>
@@ -332,20 +331,20 @@
           </label>
 
           <label class="consent-box">
-            <input id="consent" name="consent" type="checkbox" required>
-            <span class="consent-text">By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of purchase.</span>
+            <input id="consent" name="consent" type="checkbox">
+            <span class="consent-text">Optional SMS Opt-In: By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is optional and is not required to use Rel8tion services or submit this form.</span>
           </label>
 
           <div id="status" class="status" role="status" aria-live="polite"></div>
 
-          <button id="submitButton" type="submit">Opt In to Event-Related SMS</button>
+          <button id="submitButton" type="submit">Save SMS Preference</button>
         </form>
 
         <div class="links">
           <span>Privacy Policy: <a href="/privacy-policy">/privacy-policy</a></span>
           <span>Terms of Service: <a href="/terms">/terms</a></span>
         </div>
-        <p class="fine-print">Rel8tion SMS is used for event operations and notifications. This page does not enroll you in unrelated marketing campaigns.</p>
+        <p class="fine-print">Rel8tion SMS consent is optional. This page is used only to record your SMS preference for event-related notifications and does not enroll you in unrelated marketing campaigns.</p>
       </div>
     </section>
   </main>
@@ -391,13 +390,8 @@
         return;
       }
 
-      if (!consent) {
-        showStatus('Please check the consent box to opt in.', 'bad');
-        return;
-      }
-
       submitButton.disabled = true;
-      submitButton.textContent = 'Saving Consent...';
+      submitButton.textContent = 'Saving Preference...';
       showStatus('Saving your SMS consent...', 'ok');
 
       try {
@@ -410,18 +404,22 @@
             phone_normalized: phoneNormalized,
             email,
             role,
-            consent
+            consent,
+            consent_status: consent ? 'opted_in' : 'not_opted_in'
           })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Unable to save SMS consent.');
-        showStatus('You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.', 'ok');
+        showStatus(consent
+          ? 'You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.'
+          : 'Your preference has been saved. You are not opted in to automated Rel8tion SMS notifications.',
+          'ok');
         form.reset();
       } catch (error) {
         showStatus(error.message || 'We could not save your SMS consent right now. Please try again.', 'bad');
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = 'Opt In to Event-Related SMS';
+        submitButton.textContent = 'Save SMS Preference';
       }
     });
   </script>

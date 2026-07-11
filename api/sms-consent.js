@@ -1,11 +1,10 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
 
 const CONSENT_TEXT =
-  'By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of purchase.';
+  'Optional SMS Opt-In: By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is optional and is not required to use Rel8tion services or submit this form.';
 
 const ALLOWED_ROLES = new Set([
   'Real Estate Agent',
-  'Loan Officer',
   'Buyer / Open House Visitor',
   'Broker / Manager',
   'Other'
@@ -116,18 +115,13 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (!consent) {
-      sendJson(res, 400, { ok: false, error: 'Please check the consent box to opt in.' });
-      return;
-    }
-
     const payload = {
       full_name: fullName,
       phone,
       phone_normalized: phoneNormalized,
       email: email || null,
       role,
-      consent_status: 'opted_in',
+      consent_status: consent ? 'opted_in' : 'not_opted_in',
       consent_text: CONSENT_TEXT,
       consent_source: 'sms-consent-page',
       consent_url: 'https://rel8tion.me/sms-consent',
@@ -143,7 +137,7 @@ module.exports = async function handler(req, res) {
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify(payload)
       });
-      sendJson(res, 200, { ok: true, updated: true });
+      sendJson(res, 200, { ok: true, updated: true, consent_status: payload.consent_status });
       return;
     }
 
@@ -153,7 +147,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify(payload)
     });
 
-    sendJson(res, 200, { ok: true, inserted: true });
+    sendJson(res, 200, { ok: true, inserted: true, consent_status: payload.consent_status });
   } catch (error) {
     console.error('[sms-consent] failed', error);
     const message = /relation .*sms_consent_records/i.test(error.message || '')

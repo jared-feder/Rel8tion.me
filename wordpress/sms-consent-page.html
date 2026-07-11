@@ -280,7 +280,7 @@
         <div class="rel8tion-sms-consent__notes" aria-label="SMS consent details">
           <div class="rel8tion-sms-consent__note">
             <strong>First-party consent</strong>
-            <span>This form records your direct opt-in for Rel8tion event-related messages.</span>
+            <span>This form records your SMS preference for Rel8tion event-related messages.</span>
           </div>
           <div class="rel8tion-sms-consent__note">
             <strong>Control</strong>
@@ -311,7 +311,6 @@
             <select id="rel8tionRole" name="role" required>
               <option value="">Select role</option>
               <option>Real Estate Agent</option>
-              <option>Loan Officer</option>
               <option>Buyer / Open House Visitor</option>
               <option>Broker / Manager</option>
               <option>Other</option>
@@ -319,20 +318,20 @@
           </label>
 
           <label class="rel8tion-sms-consent__check">
-            <input id="rel8tionConsent" name="consent" type="checkbox" required>
-            <span>By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of purchase.</span>
+            <input id="rel8tionConsent" name="consent" type="checkbox">
+            <span>Optional SMS Opt-In: By checking this box, I agree to receive event-related SMS messages from Rel8tion about open house activation, buyer check-ins, disclosure confirmations, event support, and event recap notifications. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is optional and is not required to use Rel8tion services or submit this form.</span>
           </label>
 
           <div id="rel8tionConsentStatus" class="rel8tion-sms-consent__status" role="status" aria-live="polite"></div>
 
-          <button id="rel8tionConsentSubmit" type="submit">Opt In to Event-Related SMS</button>
+          <button id="rel8tionConsentSubmit" type="submit">Save SMS Preference</button>
         </form>
 
         <div class="rel8tion-sms-consent__links">
           <span>Privacy Policy: <a href="/privacy-policy">/privacy-policy</a></span>
           <span>Terms of Service: <a href="/terms">/terms</a></span>
         </div>
-        <p class="rel8tion-sms-consent__fine">Rel8tion SMS is used for event operations and notifications. This page does not enroll you in unrelated marketing campaigns.</p>
+        <p class="rel8tion-sms-consent__fine">Rel8tion SMS consent is optional. This page is used only to record your SMS preference for event-related notifications and does not enroll you in unrelated marketing campaigns.</p>
       </div>
     </div>
   </div>
@@ -367,10 +366,8 @@
         if (fullName.length < 2) return showStatus('Please enter your full name.', 'is-bad');
         if (phoneNormalized.length !== 10) return showStatus('Please enter a valid 10-digit mobile phone number.', 'is-bad');
         if (!role) return showStatus('Please select your role.', 'is-bad');
-        if (!consent) return showStatus('Please check the consent box to opt in.', 'is-bad');
-
         submitButton.disabled = true;
-        submitButton.textContent = 'Saving Consent...';
+        submitButton.textContent = 'Saving Preference...';
         showStatus('Saving your SMS consent...', 'is-ok');
 
         fetch('https://app.rel8tion.me/api/sms-consent', {
@@ -382,7 +379,8 @@
             phone_normalized: phoneNormalized,
             email: email,
             role: role,
-            consent: consent
+            consent: consent,
+            consent_status: consent ? 'opted_in' : 'not_opted_in'
           })
         })
           .then(function (response) {
@@ -392,7 +390,10 @@
             });
           })
           .then(function () {
-            showStatus('You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.', 'is-ok');
+            showStatus(consent
+              ? 'You are opted in to receive Rel8tion event-related SMS notifications. Reply STOP to opt out or HELP for help.'
+              : 'Your preference has been saved. You are not opted in to automated Rel8tion SMS notifications.',
+              'is-ok');
             form.reset();
           })
           .catch(function (error) {
@@ -400,7 +401,7 @@
           })
           .finally(function () {
             submitButton.disabled = false;
-            submitButton.textContent = 'Opt In to Event-Related SMS';
+            submitButton.textContent = 'Save SMS Preference';
           });
       });
     })();
