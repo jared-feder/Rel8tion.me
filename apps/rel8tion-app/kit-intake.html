@@ -463,6 +463,21 @@
       noticeEl.className = `notice ${type}`.trim();
     }
 
+    async function loadWebsitePromoAfterCheckout() {
+      const sessionId = params.get('session_id') || '';
+      if (!sessionId) return;
+      try {
+        const res = await fetch('/api/checkout/website-promo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const promo = await res.json().catch(() => ({}));
+        if (!res.ok || !promo?.ok || !promo.code) return;
+        setNotice(`Payment received. REL8TION will prepare your Open House Kit. Website builder promo code: ${promo.code}. Use it at ${promo.website_url || 'https://my.rel8tion.me'} for the $10/month or $100/year bundle website rate.`, 'success');
+      } catch (_) {}
+    }
+
     function setValue(id, value) {
       const el = document.getElementById(id);
       if (el && String(value || '').trim()) el.value = value;
@@ -702,6 +717,7 @@
       }
       if (params.get('success')) {
         setNotice('Payment received. REL8TION will prepare your Open House Kit and use the checkout details for shipping and service setup.', 'success');
+        loadWebsitePromoAfterCheckout();
       }
       if (params.get('canceled')) {
         setNotice('Checkout was canceled. Your details are still here so you can adjust them and try again.', 'error');

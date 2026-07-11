@@ -576,6 +576,32 @@
       statusBox.innerHTML = message;
     }
 
+    function esc(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    async function loadWebsitePromoAfterCheckout() {
+      const sessionId = params.get('session_id') || '';
+      if (!sessionId) return;
+      try {
+        const res = await fetch('/api/checkout/website-promo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const promo = await res.json().catch(() => ({}));
+        if (!res.ok || !promo?.ok || !promo.code) return;
+        const url = promo.website_url || 'https://my.rel8tion.me';
+        showStatus(`${planCopy[activePlan].success}<br><br>Website builder promo code: <strong>${esc(promo.code)}</strong>. Use it at <a href="${esc(url)}">${esc(url)}</a>.`, 'ok');
+      } catch (_) {}
+    }
+
     const agentSlug = params.get('agent') || '';
     const loPhone = cleanPhone(params.get('lo_phone') || '');
     const loName = params.get('lo_name') || 'the loan officer';
@@ -606,6 +632,7 @@
 
     if (params.get('success')) {
       showStatus(planCopy[activePlan].success, 'ok');
+      loadWebsitePromoAfterCheckout();
     } else if (params.get('canceled')) {
       showStatus('Checkout was canceled. You can restart secure payment whenever the agent is ready.', 'warn');
     }
