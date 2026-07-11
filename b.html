@@ -77,6 +77,21 @@ function buildBuyerConfirmationMessage(form){
   ].filter(Boolean).join("\\n");
 }
 
+async function syncBuyerFromLead(leadId){
+  if(!leadId) return null;
+  const res = await fetch("/api/buyer-affordability", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "sync_lead_buyer",
+      lead_id: leadId
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || data.ok === false) throw new Error(data.error || "Buyer sync failed");
+  return data;
+}
+
 function money(v){
   const n = Number(v || 0);
   return n ? "$" + n.toLocaleString() : "";
@@ -279,6 +294,9 @@ async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" 
       tryQueries.push(
         `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=eq.${encodeURIComponent(name)}&limit=1`
       );
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&open_house_id=eq.${encodeURIComponent(openHouseId)}&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=1`
+      );
     }
 
     if (normalizedPhone) {
@@ -290,6 +308,9 @@ async function fetchListingAgentPhoto({ openHouseId = "", name = "", phone = "" 
     if (name) {
       tryQueries.push(
         `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=eq.${encodeURIComponent(name)}&limit=1`
+      );
+      tryQueries.push(
+        `${SUPABASE_URL}/rest/v1/listing_agents?select=primary_photo_url,directory_photo_url&name=ilike.${encodeURIComponent(`*${name}*`)}&limit=1`
       );
     }
 
@@ -710,6 +731,11 @@ async function submitLead(){
     const savedLead = await leadRes.json().catch(() => []);
     lastLeadId = Array.isArray(savedLead) && savedLead.length ? savedLead[0].id : null;
     lastLeadForm = form;
+    try{
+      await syncBuyerFromLead(lastLeadId);
+    }catch(syncError){
+      console.log("Buyer sync warning:", syncError?.message || syncError);
+    }
 
     const smsRes = await fetch(SMS_FUNCTION_URL, {
       method: "POST",
