@@ -701,10 +701,31 @@
         setNotice(action, 'success');
       }
       if (params.get('success')) {
-        setNotice('Payment received. REL8TION will prepare your Open House Kit and use the checkout details for shipping and service setup.', 'success');
+        setNotice('Payment received. Opening your Open House Kit dashboard.', 'success');
       }
       if (params.get('canceled')) {
         setNotice('Checkout was canceled. Your details are still here so you can adjust them and try again.', 'error');
+      }
+      finishPaidReturn();
+    }
+
+    async function finishPaidReturn() {
+      const sessionId = params.get('session_id') || '';
+      if (!params.get('success') || !sessionId) return;
+      try {
+        const res = await fetch('/api/checkout/website-promo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok && payload.dashboard_url) {
+          window.location.replace(payload.dashboard_url);
+          return;
+        }
+        setNotice(payload.error || 'Payment was received. Your dashboard link will arrive by email/text shortly.', res.ok ? 'success' : 'error');
+      } catch (_) {
+        setNotice('Payment was received. Your dashboard link will arrive by email/text shortly.', 'success');
       }
     }
 

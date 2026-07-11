@@ -1,5 +1,6 @@
 const { createHash } = require('crypto');
 const { supabaseRest } = require('../../lib/admin-auth');
+const kit = require('../../lib/open-house-kit');
 
 const STRIPE_API_VERSION = '2026-02-25.clover';
 const DEFAULT_WEBSITE_BUILDER_URL = 'https://my.rel8tion.me';
@@ -230,10 +231,10 @@ module.exports = async function handler(req, res) {
     }
 
     const session = await stripeRequest(`checkout/sessions/${encodeURIComponent(sessionId)}`);
-    if (!isEligibleOpenHouseKitSession(session)) {
+    if (!kit.isEligibleOpenHouseKitSession(session)) {
       return sendJson(res, 403, { ok: false, error: 'This checkout session is not eligible for a Rel8tion website promo.' });
     }
-    if (!isPaidSession(session)) {
+    if (!kit.isPaidSession(session)) {
       return sendJson(res, 402, { ok: false, error: 'Checkout payment is not complete yet.' });
     }
 
@@ -249,9 +250,24 @@ module.exports = async function handler(req, res) {
     }
 
     let order = null;
+    let dashboard = null;
+    let welcome = null;
     let orderWarning = '';
     try {
-      order = await upsertOpenHouseKitOrder(session);
+      order = await kit.upsertOpenHouseKitOrder(kit.buildOrderPayloadFromSession(session, {
+        eventType: 'checkout_success_return'
+      }));
+      if (order?.id) {
+        const access = await kit.createDashboardAccess(order.id, 'checkout_success', {
+          checkout_session_id: session.id
+        });
+        dashboard = kit.dashboardUrl({
+          baseUrl: kit.baseUrlFromReq(req),
+          orderId: order.id,
+          token: access.token
+        });
+        welcome = await kit.sendWelcomeNotifications({ order, req });
+      }
     } catch (error) {
       orderWarning = error.message || 'Open House Kit order could not be stored.';
     }
@@ -263,6 +279,8 @@ module.exports = async function handler(req, res) {
       label: clean(process.env.REL8TION_WEBSITE_PROMO_LABEL || 'Rel8tion website builder bundle rate: $10/month or $100/year', 160),
       order_id: order?.id || null,
       order_fulfillment_status: order?.fulfillment_status || null,
+      dashboard_url: dashboard,
+      welcome,
       stripe_promotion_code_id: stripePromotion.id || null,
       stripe_promotion_configured: Boolean(stripePromotion.configured),
       stripe_promotion_reused: Boolean(stripePromotion.reused),

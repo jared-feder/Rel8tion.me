@@ -571,6 +571,16 @@ function buildPayments({ crmRows, signs, kitOrders }) {
     stripe_subscription_id: order.stripe_subscription_id || '',
     created_at: order.created_at || '',
     paid_at: order.paid_at || '',
+    logo_choice_status: order.logo_choice_status || 'not_started',
+    selected_logo_name: order.selected_logo_name || '',
+    custom_logo_url: order.custom_logo_url || '',
+    welcome_email_status: order.welcome_email_status || 'pending',
+    welcome_email_sent_at: order.welcome_email_sent_at || '',
+    welcome_email_error: order.welcome_email_error || '',
+    welcome_sms_status: order.welcome_sms_status || 'pending',
+    welcome_sms_sent_at: order.welcome_sms_sent_at || '',
+    welcome_sms_error: order.welcome_sms_error || '',
+    dashboard_secured_at: order.dashboard_secured_at || '',
     billing_note: 'Open House Kit checkout captured by Stripe webhook.'
   }));
 
@@ -649,7 +659,7 @@ module.exports = async function handler(req, res) {
       safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
       loadDashboardInbox(warnings),
-      safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders')
+      safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders')
     ]);
 
     const reportOutreach = await loadMissingReportQueueRows({
@@ -751,8 +761,16 @@ module.exports = async function handler(req, res) {
         incoming_threads: inbox.length,
         needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
         open_house_kit_orders: kitOrders.length,
-        open_house_kit_orders_needing_review: kitOrders.filter((row) => ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '')).length,
-        payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record' || ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '')).length
+        open_house_kit_orders_needing_review: kitOrders.filter((row) => ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '') || (row.logo_choice_status || 'not_started') === 'not_started').length,
+        payments_needing_setup: paymentRows.filter((row) =>
+          row.payment_status === 'needs_billing_record' ||
+          ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '') ||
+          (row.payment_kind === 'open_house_kit' && (
+            (row.logo_choice_status || 'not_started') === 'not_started' ||
+            ['failed', 'pending'].includes(row.welcome_email_status || 'pending') ||
+            ['failed', 'pending'].includes(row.welcome_sms_status || 'pending')
+          ))
+        ).length
       },
       outreach_operator: outreachOperator,
       crm: crmRows,

@@ -431,6 +431,18 @@
       return agent;
     }
 
+    async function loadKitDashboardLink(chipUid) {
+      if (!chipUid) return null;
+      try {
+        const response = await fetch(`/api/kit/resolve-chip?uid=${encodeURIComponent(chipUid)}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.dashboard_url) return null;
+        return payload;
+      } catch (_) {
+        return null;
+      }
+    }
+
     function eventAddress(event, houseMap = {}) {
       const ctx = event?.setup_context || {};
       const house = houseMap[event?.open_house_source_id] || {};
@@ -485,7 +497,7 @@
 
     window.linkKeychainQr = linkKeychainQr;
 
-    function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks }) {
+    function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard }) {
       const checkinsByEvent = checkins.reduce((map, row) => {
         const key = row.open_house_event_id || '';
         if (!map[key]) map[key] = [];
@@ -571,6 +583,13 @@
                 <p class="sub">Printed QR codes should open the share/contact profile. NFC opens this owner dashboard.</p>
                 <div class="mini-actions"><a class="mini" href="${esc(publicProfile)}">Preview Public Page</a></div>
               </div>
+              ${kitDashboard?.dashboard_url ? `
+                <div class="event-card">
+                  <p class="title">Open House Kit Setup</p>
+                  <p class="sub">This Rel8tionChip is connected to a paid Open House Kit order.</p>
+                  <div class="mini-actions"><a class="mini" href="${esc(kitDashboard.dashboard_url)}">Open Kit Dashboard</a></div>
+                </div>
+              ` : ''}
               <div class="event-card">
                 <p class="title">Link My Keychain QR</p>
                 <p class="sub">${qrLinks.length ? 'This keychain QR is connected to your public profile.' : 'Enter the printed QR code or paste the QR URL from your Rel8tionChip.'}</p>
@@ -639,15 +658,16 @@
       const agent = await hydrateAgentPhoto(agents[0] || { slug: agentSlug, name: agentSlug });
       const eventIds = events.map((event) => event.id).filter(Boolean);
       const houseIds = [...new Set(events.map((event) => event.open_house_source_id).filter(Boolean))];
-      const [checkins, houses, scenarios, guidance, qrLinks] = await Promise.all([
+      const [checkins, houses, scenarios, guidance, qrLinks, kitDashboard] = await Promise.all([
         eventIds.length ? safeRows(`event_checkins?open_house_event_id=in.(${eventIds.map((id) => encodeURIComponent(id)).join(',')})&select=*&order=created_at.desc&limit=300`) : [],
         houseIds.length ? safeRows(`open_houses?id=in.(${houseIds.map((id) => encodeURIComponent(id)).join(',')})&select=id,address,image_url,city,state,zip&limit=120`) : [],
         safeRows(`buyer_property_fit_scenarios?agent_slug=eq.${encodeURIComponent(agentSlug)}&select=id,buyer_id,result_status,created_at&order=created_at.desc&limit=200`),
         safeRows(`buyer_affordability_guidance?agent_slug=eq.${encodeURIComponent(agentSlug)}&status=eq.active&select=id,buyer_id,status,updated_at&order=updated_at.desc&limit=200`),
-        loadAgentChipQrLinks({ agentSlug, uid }).catch(() => [])
+        loadAgentChipQrLinks({ agentSlug, uid }).catch(() => []),
+        loadKitDashboardLink(uid)
       ]);
       const houseMap = Object.fromEntries(houses.map((house) => [house.id, house]));
-      renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks });
+      renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard });
     }
 
     init().catch((error) => {

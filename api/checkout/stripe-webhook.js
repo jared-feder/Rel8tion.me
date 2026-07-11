@@ -1,5 +1,6 @@
 const { createHmac, timingSafeEqual } = require('crypto');
 const { sendJson, supabaseRest } = require('../../lib/admin-auth');
+const kit = require('../../lib/open-house-kit');
 
 const SIGNATURE_TOLERANCE_SECONDS = Number(process.env.STRIPE_WEBHOOK_TOLERANCE_SECONDS || 300);
 const SUPPORTED_EVENTS = new Set([
@@ -215,7 +216,7 @@ async function upsertOrder(order) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
-async function handleStripeEvent(event) {
+async function handleStripeEvent(event, req) {
   if (!SUPPORTED_EVENTS.has(event.type)) {
     return { ignored: true, reason: 'unsupported_event_type' };
   }
@@ -225,19 +226,29 @@ async function handleStripeEvent(event) {
     return { ignored: true, reason: 'not_checkout_session' };
   }
 
-  if (!isEligibleOpenHouseKitSession(session)) {
+  if (!kit.isEligibleOpenHouseKitSession(session)) {
     return { ignored: true, reason: 'not_open_house_kit_session', session_id: session.id };
   }
 
-  const order = buildOrderPayload(event, session);
+  const order = kit.buildOrderPayloadFromSession(session, {
+    eventId: event.id,
+    eventType: event.type,
+    eventCreated: event.created
+  });
   if (!order.stripe_checkout_session_id) {
     const error = new Error('Missing Checkout Session id.');
     error.status = 400;
     throw error;
   }
 
-  const row = await upsertOrder(order);
-  return { ignored: false, order: row };
+  const row = await kit.upsertOpenHouseKitOrder(order);
+  let welcome = null;
+  try {
+    welcome = await kit.sendWelcomeNotifications({ order: row, req });
+  } catch (error) {
+    welcome = { ok: false, error: error.message || 'Welcome notifications failed.' };
+  }
+  return { ignored: false, order: row, welcome };
 }
 
 module.exports = async function handler(req, res) {
@@ -250,7 +261,7 @@ module.exports = async function handler(req, res) {
     const rawBody = await readRawBody(req);
     verifyStripeSignature(rawBody, readHeader(req, 'stripe-signature'));
     const event = parseEvent(rawBody);
-    const result = await handleStripeEvent(event);
+    const result = await handleStripeEvent(event, req);
     return sendJson(res, 200, {
       ok: true,
       event_id: clean(event.id, 160) || null,

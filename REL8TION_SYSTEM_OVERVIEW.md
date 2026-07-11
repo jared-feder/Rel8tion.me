@@ -109,7 +109,8 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 
 - `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support Open House Kit acquisition, keychain prefill, intake, and Stripe Checkout handoff.
 - `[IMPLEMENTED]` `/api/checkout/stripe-webhook` verifies Stripe signatures and records eligible Open House Kit Checkout Sessions in `open_house_kit_orders` for fulfillment review.
-- `[IMPLEMENTED]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout and also stores the paid kit order as a browser-return fallback.
+- `[IMPLEMENTED]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout, stores the paid kit order as a browser-return fallback, creates a hashed dashboard access token, attempts the welcome email/text workflow, and returns the buyer to `/kit-dashboard`.
+- `[IMPLEMENTED]` `/kit-dashboard` is the post-payment Open House Kit dashboard for logo selection/upload, fulfillment timeline, contact/shipping review, and dashboard security setup. It is backed by `/api/kit/dashboard`; chip-linked orders can mint dashboard access through `/api/kit/resolve-chip` and surface from the agent owner dashboard without changing `/k` routing priorities.
 - `[PARTIAL]` The separate agent website builder at `my.rel8tion.me` uses `agent_websites` and `agent_website_listings`; public sites show current listings from featured active/pending rows and Past Sales from featured sold rows.
 - `[INTENDED]` Public agent sites should display site-owned listings, not broader public `open_houses` inventory as MLS listing display.
 
@@ -129,7 +130,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `event_loan_officer_sessions` stores live LO coverage.
 - `[IMPLEMENTED]` `event_pass_coverage_consents` stores Sponsored Event Pass per-event consent.
 - `[PARTIAL]` `agent_outreach_queue`, `agent_outreach_replies`, and delivery-event tables support outreach.
-- `[PARTIAL]` `open_house_kit_orders` stores Stripe Checkout Sessions for Open House Kit fulfillment; the webhook/table contract exists, while live Stripe webhook dashboard configuration still requires verification.
+- `[PARTIAL]` `open_house_kit_orders` stores Stripe Checkout Sessions for Open House Kit fulfillment and onboarding, including dashboard security state, selected/custom logo fields, and welcome email/SMS status. `company_logos` stores seeded approved company-logo choices; `open_house_kit_access_tokens` stores hashed dashboard/magic-link/chip-scan tokens; `open_house_kit_notifications` logs welcome email/SMS attempts. Live Stripe webhook dashboard configuration and email provider env still require verification.
 - `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns. On 2026-06-30, location/source/confidence fields and matched open-house counts/ids/timestamps were applied to linked Supabase and column verification passed. A later 2026-06-30 migration added `agent_rankings.identity_key` and replaced the old phone-first unique index; column/index verification and backfill sampling passed. Legacy null-identity/bad-mapping rows can still exist in storage, but the trusted dashboard view filters them out. Authenticated upload-flow behavior still needs verification.
 - `[PARTIAL]` `agent_websites` and `agent_website_listings` support the website-builder app.
 
@@ -137,6 +138,7 @@ Important tables and fields:
 
 - `[PARTIAL]` `send-lead-sms` source is checked in under `supabase/functions/send-lead-sms` and uses the shared SMS provider layer.
 - `[NEEDS VERIFICATION]` Deployed function source/version, provider env, and live SMS behavior still need verification.
+- `[IMPLEMENTED]` Open House Kit post-payment welcome SMS calls `send-lead-sms` as `event_transactional`; welcome email uses Resend when `RESEND_API_KEY` and a sender address are configured in Vercel. Both channels include the `/kit-dashboard` access link and are logged through `open_house_kit_notifications`.
 - `[IMPLEMENTED]` `/event` sends buyer/agent SMS only after local check-in validation and disclosure completion.
 - `[IMPLEMENTED]` Automated outreach sends are throttled for provider safety: the Vercel send cron defaults to 7 per run, and the `send-agent-outreach` Edge Function hard-caps automatic sends with default limits of 7 per run, 20 per rolling hour, and 150 per rolling 24 hours. Automatic initial sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending initial SMS copy.
 - `[IMPLEMENTED]` Automated outreach has a global runtime pause via `rel8tion_runtime_settings.key='outreach_send_paused'` or `OUTREACH_SEND_PAUSED=true`; when enabled, `send-agent-outreach` sends nothing and reports `paused=true`.

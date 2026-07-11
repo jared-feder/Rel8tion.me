@@ -44,6 +44,8 @@
     { "source": "/get-open-house-kit.html", "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
     { "source": "/kit-confirm", "destination": "/apps/rel8tion-app/kit-confirm.html" },
     { "source": "/kit-confirm.html", "destination": "/apps/rel8tion-app/kit-confirm.html" },
+    { "source": "/kit-dashboard", "destination": "/apps/rel8tion-app/kit-dashboard.html" },
+    { "source": "/kit-dashboard.html", "destination": "/apps/rel8tion-app/kit-dashboard.html" },
     { "source": "/kit-intake", "destination": "/apps/rel8tion-app/kit-intake.html" },
     { "source": "/kit-intake.html", "destination": "/apps/rel8tion-app/kit-intake.html" },
     { "source": "/rel8tion-insider", "destination": "/apps/rel8tion-app/rel8tion-insider.html" },
