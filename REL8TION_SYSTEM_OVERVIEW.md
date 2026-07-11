@@ -109,7 +109,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 
 - `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support Open House Kit acquisition, keychain prefill, intake, and Stripe Checkout handoff.
 - `[PARTIAL]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout.
-- `[PARTIAL]` The separate agent website builder at `my.rel8tion.me` uses `agent_websites` and `agent_website_listings`.
+- `[PARTIAL]` The separate agent website builder at `my.rel8tion.me` uses `agent_websites` and `agent_website_listings`; public sites show current listings from featured active/pending rows and Past Sales from featured sold rows.
 - `[INTENDED]` Public agent sites should display site-owned listings, not broader public `open_houses` inventory as MLS listing display.
 
 ## Data Model Highlights
