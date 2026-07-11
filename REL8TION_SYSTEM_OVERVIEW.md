@@ -108,7 +108,8 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 ### Open House Kit And Website Builder
 
 - `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support Open House Kit acquisition, keychain prefill, intake, and Stripe Checkout handoff.
-- `[PARTIAL]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout.
+- `[IMPLEMENTED]` `/api/checkout/stripe-webhook` verifies Stripe signatures and records eligible Open House Kit Checkout Sessions in `open_house_kit_orders` for fulfillment review.
+- `[IMPLEMENTED]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout and also stores the paid kit order as a browser-return fallback.
 - `[PARTIAL]` The separate agent website builder at `my.rel8tion.me` uses `agent_websites` and `agent_website_listings`; public sites show current listings from featured active/pending rows and Past Sales from featured sold rows.
 - `[INTENDED]` Public agent sites should display site-owned listings, not broader public `open_houses` inventory as MLS listing display.
 
@@ -128,6 +129,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `event_loan_officer_sessions` stores live LO coverage.
 - `[IMPLEMENTED]` `event_pass_coverage_consents` stores Sponsored Event Pass per-event consent.
 - `[PARTIAL]` `agent_outreach_queue`, `agent_outreach_replies`, and delivery-event tables support outreach.
+- `[PARTIAL]` `open_house_kit_orders` stores Stripe Checkout Sessions for Open House Kit fulfillment; the webhook/table contract exists, while live Stripe webhook dashboard configuration still requires verification.
 - `[PARTIAL]` `agent_production_uploads`, `agent_production_import_rows`, and `agent_rankings` support Agent Ranking / Production Intelligence. The linked Supabase schema was applied and catalog/advisor verified for these new objects on 2026-06-28, including ListReports activity columns. On 2026-06-30, location/source/confidence fields and matched open-house counts/ids/timestamps were applied to linked Supabase and column verification passed. A later 2026-06-30 migration added `agent_rankings.identity_key` and replaced the old phone-first unique index; column/index verification and backfill sampling passed. Legacy null-identity/bad-mapping rows can still exist in storage, but the trusted dashboard view filters them out. Authenticated upload-flow behavior still needs verification.
 - `[PARTIAL]` `agent_websites` and `agent_website_listings` support the website-builder app.
 

@@ -542,20 +542,57 @@ function buildFieldVisits({ visits, participants }) {
     .slice(0, 150);
 }
 
-function buildPayments({ crmRows, signs }) {
-  const signCounts = countBy(signs.filter((row) => row.owner_agent_slug || row.assigned_agent_slug), (row) => row.owner_agent_slug || row.assigned_agent_slug);
+function paymentKey(row = {}) {
+  return firstPresent(row.agent_slug, row.slug, row.email, row.phone_normalized, phoneDigits(row.phone), row.agent_name, row.name);
+}
 
-  return crmRows.slice(0, 120).map((agent) => ({
-    agent_slug: agent.slug || '',
-    agent_name: agent.name || '',
-    brokerage: agent.brokerage || '',
-    phone: agent.phone || '',
-    sign_count: signCounts[agent.slug] || 0,
-    lead_count: agent.lead_count || 0,
-    outreach_count: agent.outreach_count || 0,
-    payment_status: 'needs_billing_record',
-    billing_note: 'No billing/subscription table is wired yet.'
+function buildPayments({ crmRows, signs, kitOrders }) {
+  const signCounts = countBy(signs.filter((row) => row.owner_agent_slug || row.assigned_agent_slug), (row) => row.owner_agent_slug || row.assigned_agent_slug);
+  const kitPaymentKeys = new Set((kitOrders || []).map(paymentKey).filter(Boolean));
+  const kitRows = (kitOrders || []).map((order) => ({
+    payment_kind: 'open_house_kit',
+    order_id: order.id || '',
+    agent_slug: order.agent_slug || '',
+    agent_name: order.agent_name || order.shipping_name || order.email || 'Open House Kit buyer',
+    brokerage: order.brokerage || '',
+    phone: order.phone || '',
+    email: order.email || '',
+    sign_count: order.sign_id ? 1 : 0,
+    lead_count: 0,
+    outreach_count: 0,
+    payment_status: order.status || order.payment_status || 'unknown',
+    fulfillment_status: order.fulfillment_status || 'needs_review',
+    plan: order.plan || '',
+    product: order.product || '',
+    address_summary: order.address_summary || '',
+    amount_total: order.amount_total || 0,
+    currency: order.currency || 'usd',
+    stripe_checkout_session_id: order.stripe_checkout_session_id || '',
+    stripe_subscription_id: order.stripe_subscription_id || '',
+    created_at: order.created_at || '',
+    paid_at: order.paid_at || '',
+    billing_note: 'Open House Kit checkout captured by Stripe webhook.'
   }));
+
+  const pendingRows = crmRows
+    .filter((agent) => !kitPaymentKeys.has(paymentKey(agent)))
+    .slice(0, 120)
+    .map((agent) => ({
+      payment_kind: 'manual_reconcile',
+      agent_slug: agent.slug || '',
+      agent_name: agent.name || '',
+      brokerage: agent.brokerage || '',
+      phone: agent.phone || '',
+      email: agent.email || '',
+      sign_count: signCounts[agent.slug] || 0,
+      lead_count: agent.lead_count || 0,
+      outreach_count: agent.outreach_count || 0,
+      payment_status: 'needs_billing_record',
+      fulfillment_status: '',
+      billing_note: 'No billing/subscription record is linked yet.'
+    }));
+
+  return [...kitRows, ...pendingRows];
 }
 
 module.exports = async function handler(req, res) {
@@ -592,7 +629,8 @@ module.exports = async function handler(req, res) {
       loanOfficerSignEvents,
       coverageConsents,
       outreach,
-      inbox
+      inbox,
+      kitOrders
     ] = await Promise.all([
       safeRest('agents?select=id,slug,name,phone,phone_normalized,email,brokerage,image_url,website&order=name.asc&limit=250', [], warnings, 'agents'),
       safeRest('keys?select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1000', [], warnings, 'keys'),
@@ -610,7 +648,8 @@ module.exports = async function handler(req, res) {
       safeRest('loan_officer_sign_events?select=*&order=created_at.desc&limit=500', [], warnings, 'loan_officer_sign_events'),
       safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
-      loadDashboardInbox(warnings)
+      loadDashboardInbox(warnings),
+      safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders')
     ]);
 
     const reportOutreach = await loadMissingReportQueueRows({
@@ -659,7 +698,7 @@ module.exports = async function handler(req, res) {
     const eventRows = buildEvents({ events, checkins, loanSessions });
     const leadRows = buildLeads({ leads, checkins, events });
     const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
-    const paymentRows = buildPayments({ crmRows, signs });
+    const paymentRows = buildPayments({ crmRows, signs, kitOrders });
     const confirmedOpenHouseRows = buildConfirmedOpenHouses({
       outreach: reportOutreach,
       visits: fieldVisits,
@@ -711,7 +750,9 @@ module.exports = async function handler(req, res) {
         confirmed_open_houses: confirmedOpenHouseRows.length,
         incoming_threads: inbox.length,
         needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
-        payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record').length
+        open_house_kit_orders: kitOrders.length,
+        open_house_kit_orders_needing_review: kitOrders.filter((row) => ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '')).length,
+        payments_needing_setup: paymentRows.filter((row) => row.payment_status === 'needs_billing_record' || ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '')).length
       },
       outreach_operator: outreachOperator,
       crm: crmRows,
@@ -731,6 +772,7 @@ module.exports = async function handler(req, res) {
       loan_officer_requests: loanOfficerRequests,
       loan_sessions: loanSessions,
       payments: paymentRows,
+      open_house_kit_orders: kitOrders,
       outreach: {
         by_review_status: countBy(outreach, (row) => row.review_status || 'pending'),
         by_initial_status: countBy(outreach, (row) => row.initial_send_status || row.send_status || 'unknown'),
@@ -738,8 +780,8 @@ module.exports = async function handler(req, res) {
         recent: recent(outreach, 'created_at', 60)
       },
       billing: {
-        configured: false,
-        note: 'No billing/subscription table is wired in the current Supabase contract.'
+        configured: true,
+        note: 'Open House Kit Stripe Checkout sessions are stored in open_house_kit_orders by the signed Stripe webhook. Other billing records may still need manual reconciliation.'
       }
     });
   } catch (error) {

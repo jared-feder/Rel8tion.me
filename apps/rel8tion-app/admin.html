@@ -4711,16 +4711,41 @@ ${rowsHtml}
 
     function renderPayments() {
       const rows = filterByQuery(state.command?.payments || []);
-      return renderRows('Payment control', `${rows.length} billing records to create or reconcile`, rows.slice(0, 100), (row) => `
-        <div>
-          <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
-          <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
-        </div>
-        <div>${badge(row.payment_status || 'unknown', 'warn')}</div>
-        <div>${badge(`${row.sign_count || 0} signs`, 'info')}</div>
-        <div>${badge(`${row.lead_count || 0} leads`, 'info')}</div>
-        <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
-      `);
+      const kitCount = rows.filter((row) => row.payment_kind === 'open_house_kit').length;
+      return renderRows('Payment control', `${kitCount} kit orders / ${rows.length} billing records`, rows.slice(0, 100), (row) => {
+        if (row.payment_kind === 'open_house_kit') {
+          const fulfillment = row.fulfillment_status || 'needs_review';
+          const paymentStatus = row.payment_status || row.status || 'paid';
+          const tone = fulfillment === 'needs_review' || fulfillment === 'payment_pending'
+            ? 'warn'
+            : fulfillment === 'payment_failed' || fulfillment === 'cancelled'
+              ? 'bad'
+              : 'ok';
+          const amount = row.amount_total ? money(Number(row.amount_total) / 100) : '';
+          const stripeId = row.stripe_checkout_session_id ? `Stripe ${row.stripe_checkout_session_id}` : '';
+          return `
+            <div>
+              <div class="primary">${esc(row.agent_name || 'Open House Kit buyer')}</div>
+              <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+              <div class="secondary">${esc([row.address_summary, stripeId].filter(Boolean).join(' | '))}</div>
+            </div>
+            <div>${badge(paymentStatus, paymentStatus === 'payment_failed' ? 'bad' : 'ok')}</div>
+            <div>${badge(fulfillment, tone)}</div>
+            <div>${badge([row.plan || 'kit', amount].filter(Boolean).join(' | '), 'info')}</div>
+            <div>${badge(fmtDate(row.paid_at || row.created_at) || 'new order', 'info')}</div>
+          `;
+        }
+        return `
+          <div>
+            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${badge(row.payment_status || 'unknown', 'warn')}</div>
+          <div>${badge(`${row.sign_count || 0} signs`, 'info')}</div>
+          <div>${badge(`${row.lead_count || 0} leads`, 'info')}</div>
+          <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
+        `;
+      });
     }
 
     function reportDateMs(value) {
