@@ -64,8 +64,8 @@
   <script type="module">
     import { ASSETS } from '/apps/rel8tion-app/src/core/config.js';
     import { esc, money } from '/apps/rel8tion-app/src/core/utils.js';
-    import { findNearestOpenHouses, searchOpenHouses } from '/apps/rel8tion-app/src/api/openHouses.js?v=20260528-sponsored-pass';
-    import { findListingAgentsByOpenHouse } from '/apps/rel8tion-app/src/api/agents.js?v=20260528-sponsored-pass';
+    import { findNearestOpenHouses, searchOpenHouses } from '/apps/rel8tion-app/src/api/openHouses.js?v=20260531-eventpass-search';
+    import { findListingAgentsByOpenHouse } from '/apps/rel8tion-app/src/api/agents.js?v=20260531-eventpass-search';
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code') || '';
@@ -110,7 +110,7 @@
     }
 
     function houseImage(house) {
-      return house?.listing_photo_url || house?.primary_photo_url || house?.photo_url || house?.image_url || '';
+      return house?.listing_photo_url || house?.primary_photo_url || house?.photo_url || house?.image_url || house?.image || '';
     }
 
     function houseFacts(house) {
@@ -127,6 +127,12 @@
       if (!start || Number.isNaN(start.getTime())) return '';
       const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       return end && !Number.isNaN(end.getTime()) ? `${fmt.format(start)} - ${fmt.format(end)}` : fmt.format(start);
+    }
+
+    function hostAgentText(house) {
+      const name = house?.agent_name || house?.agent || house?.listing_agent_name || '';
+      const phone = house?.agent_phone || '';
+      return [name, phone].filter(Boolean).join(' | ');
     }
 
     function sponsorLine() {
@@ -219,9 +225,14 @@
     }
 
     async function prefillAgentFromHouse(house) {
-      if (!house?.id) return;
-      const agents = await findListingAgentsByOpenHouse(house.id).catch(() => []);
-      const agent = agents.find((row) => row.name || row.phone || row.email) || null;
+      if (!house) return;
+      const agents = house.id ? await findListingAgentsByOpenHouse(house.id).catch(() => []) : [];
+      const agent = agents.find((row) => row.name || row.phone || row.email) || {
+        name: house.agent_name || house.agent || '',
+        phone: house.agent_phone || '',
+        email: house.agent_email || '',
+        brokerage: house.brokerage || ''
+      };
       if (!agent) return;
       state.agent = {
         name: state.agent.name || agent.name || '',
@@ -256,12 +267,14 @@
     function renderHouseCard(house, index) {
       const image = houseImage(house);
       const selected = state.selectedHouse?.id && String(state.selectedHouse.id) === String(house.id);
+      const host = hostAgentText(house);
       return `
         <button type="button" data-select-house="${esc(house.id || index)}" class="w-full text-left rounded-[24px] border ${selected ? 'border-sky-400 bg-sky-50/90' : 'border-white/80 bg-white/78'} overflow-hidden shadow-sm">
           ${image ? `<img src="${esc(image)}" alt="${esc(house.address || 'Open house')}" class="h-44 w-full object-cover bg-slate-100">` : ''}
           <div class="p-4">
             <div class="text-slate-950 font-black text-xl leading-tight">${esc(house.address || 'Open House')}</div>
             <div class="text-sky-700 font-black mt-1">${esc(houseFacts(house) || timeText(house) || 'Nearby open house')}</div>
+            ${host ? `<div class="text-emerald-700 font-black text-sm mt-2">Host: ${esc(host)}</div>` : ''}
             <div class="text-slate-500 font-bold text-sm mt-1">${esc([timeText(house), house.brokerage].filter(Boolean).join(' | '))}</div>
           </div>
         </button>
@@ -280,6 +293,7 @@
                 ${label('Selected Open House')}
                 <div class="text-slate-950 font-black text-2xl leading-tight">${esc(house.address || 'Open House')}</div>
                 <div class="text-sky-700 font-black mt-1">${esc(houseFacts(house) || timeText(house) || '')}</div>
+                ${hostAgentText(house) ? `<div class="text-emerald-700 font-black mt-2">Host: ${esc(hostAgentText(house))}</div>` : ''}
                 <button type="button" id="wrongHouse" class="btn btn-soft w-full mt-4">Wrong Open House</button>
               </div>
             </div>

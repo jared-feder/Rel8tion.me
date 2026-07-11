@@ -93,6 +93,86 @@ function sortNearbyOpenHouses(rows, lat, lng) {
     ));
 }
 
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function searchTokens(value) {
+  return normalizeSearchText(value)
+    .split(' ')
+    .filter((token) => token.length > 1);
+}
+
+function rowSearchText(row = {}) {
+  return normalizeSearchText([
+    row.address,
+    row.city,
+    row.state,
+    row.zip,
+    row.agent,
+    row.agent_name,
+    row.brokerage
+  ].filter(Boolean).join(' '));
+}
+
+function rowMatchesTokens(row, tokens) {
+  if (!tokens.length) return false;
+  const target = rowSearchText(row);
+  return tokens.every((token) => target.includes(token));
+}
+
+function sortSearchResults(rows, tokens) {
+  const query = tokens.join(' ');
+  return [...rows].sort((a, b) => {
+    const aText = rowSearchText(a);
+    const bText = rowSearchText(b);
+    const aExact = aText.includes(query) ? 0 : 1;
+    const bExact = bText.includes(query) ? 0 : 1;
+    const aTime = a.open_start ? new Date(a.open_start).getTime() : 0;
+    const bTime = b.open_start ? new Date(b.open_start).getTime() : 0;
+    return (aExact - bExact) || (bTime - aTime);
+  });
+}
+
+function mergeRows(...groups) {
+  const seen = new Set();
+  return groups.flat().filter((row) => {
+    const key = String(row?.id || row?.open_house_id || row?.address || '').toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function openHouseFromOutreach(row = {}) {
+  return {
+    id: row.open_house_id || '',
+    address: row.address || '',
+    city: row.city || '',
+    state: row.state || '',
+    zip: row.zip || '',
+    open_start: row.open_start || '',
+    open_end: row.open_end || '',
+    price: row.price || '',
+    beds: row.beds || '',
+    baths: row.baths || '',
+    brokerage: row.brokerage || '',
+    listing_photo_url: row.listing_photo_url || '',
+    image_url: row.listing_photo_url || '',
+    agent: row.agent_name || '',
+    agent_name: row.agent_name || '',
+    agent_phone: row.agent_phone || '',
+    agent_email: row.agent_email || '',
+    outreach_queue_id: row.id || '',
+    outreach_code: row.outreach_code || '',
+    source: row.source || 'agent_outreach_queue'
+  };
+}
+
 async function getLocalOpenHouseFallback(lat, lng) {
   const now = new Date();
   const from = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
@@ -108,6 +188,28 @@ async function getLocalOpenHouseFallback(lat, lng) {
     .slice(0, 20);
 }
 
+async function getFocusedOpenHouseFallback(lat, lng) {
+  const now = new Date();
+  const from = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now.getTime() + 18 * 60 * 60 * 1000).toISOString();
+  const radius = isWeekendNY(now) ? 3 : 5;
+  const latDelta = radius / 69;
+  const lngDelta = radius / Math.max(1, 69 * Math.cos(Number(lat) * Math.PI / 180));
+  const minLat = Number(lat) - latDelta;
+  const maxLat = Number(lat) + latDelta;
+  const minLng = Number(lng) - lngDelta;
+  const maxLng = Number(lng) + lngDelta;
+
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/open_houses?open_start=gte.${encodeURIComponent(from)}&open_start=lte.${encodeURIComponent(to)}&lat=gte.${encodeURIComponent(minLat)}&lat=lte.${encodeURIComponent(maxLat)}&lng=gte.${encodeURIComponent(minLng)}&lng=lte.${encodeURIComponent(maxLng)}&select=*&order=open_start.asc&limit=500`,
+    { headers: authHeaders(KEY) }
+  );
+
+  return sortNearbyOpenHouses(rows, lat, lng)
+    .filter((row) => row._distance <= radius)
+    .slice(0, 50);
+}
+
 export async function findNearestOpenHouses(lat, lng) {
   const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/rpc/find_nearest_open_house`, {
     method: 'POST',
@@ -115,9 +217,14 @@ export async function findNearestOpenHouses(lat, lng) {
     body: JSON.stringify({ user_lat: lat, user_lng: lng })
   }).catch(() => []);
 
+  const focusedRows = await getFocusedOpenHouseFallback(lat, lng).catch(() => []);
   const fallbackRows = await getLocalOpenHouseFallback(lat, lng).catch(() => []);
   const seen = new Set();
-  const merged = [...(Array.isArray(rows) ? rows : []), ...(Array.isArray(fallbackRows) ? fallbackRows : [])]
+  const merged = [
+    ...(Array.isArray(rows) ? rows : []),
+    ...(Array.isArray(focusedRows) ? focusedRows : []),
+    ...(Array.isArray(fallbackRows) ? fallbackRows : [])
+  ]
     .filter((row) => {
       if (!row?.id || seen.has(String(row.id))) return false;
       seen.add(String(row.id));
@@ -142,13 +249,35 @@ export async function searchOpenHouses(term) {
 
   const clean = query.replace(/[%*(),]/g, ' ').replace(/\s+/g, ' ').trim();
   const headers = { headers: authHeaders(KEY) };
+  const tokens = searchTokens(clean);
+  const driverToken = tokens.find((token) => /^\d/.test(token))
+    || tokens.find((token) => token.length >= 4)
+    || tokens[0]
+    || clean;
+  const matches = [];
 
   if (clean) {
-    const rows = await fetchJson(
+    const exactRows = await fetchJson(
       `${SUPABASE_URL}/rest/v1/open_houses?address=ilike.${encodeURIComponent(`*${clean}*`)}&select=*&order=open_start.desc&limit=10`,
       headers
-    );
-    if (Array.isArray(rows) && rows.length) return rows;
+    ).catch(() => []);
+    matches.push(...(Array.isArray(exactRows) ? exactRows : []));
+  }
+
+  if (driverToken) {
+    const candidateRows = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/open_houses?address=ilike.${encodeURIComponent(`*${driverToken}*`)}&select=*&order=open_start.desc&limit=50`,
+      headers
+    ).catch(() => []);
+    matches.push(...(Array.isArray(candidateRows) ? candidateRows.filter((row) => rowMatchesTokens(row, tokens)) : []));
+
+    const outreachRows = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/agent_outreach_queue?address=ilike.${encodeURIComponent(`*${driverToken}*`)}&select=id,open_house_id,address,city,state,zip,open_start,open_end,price,beds,baths,listing_photo_url,source,agent_name,agent_phone,agent_email,brokerage,outreach_code&order=open_start.desc&limit=50`,
+      headers
+    ).catch(() => []);
+    matches.push(...(Array.isArray(outreachRows)
+      ? outreachRows.map(openHouseFromOutreach).filter((row) => rowMatchesTokens(row, tokens))
+      : []));
   }
 
   if (/^[A-Za-z0-9_.:-]+$/.test(query)) {
@@ -156,8 +285,8 @@ export async function searchOpenHouses(term) {
       `${SUPABASE_URL}/rest/v1/open_houses?id=eq.${encodeURIComponent(query)}&select=*&limit=10`,
       headers
     );
-    if (Array.isArray(rows)) return rows;
+    if (Array.isArray(rows)) matches.push(...rows);
   }
 
-  return [];
+  return sortSearchResults(mergeRows(matches), tokens).slice(0, 10);
 }
