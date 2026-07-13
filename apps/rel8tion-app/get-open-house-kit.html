@@ -414,10 +414,48 @@
     }
 
     .price-card {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
       border-radius: 22px;
       background: rgba(255,255,255,0.12);
       border: 1px solid rgba(255,255,255,0.22);
       padding: 18px;
+    }
+
+    .price-card.has-image {
+      grid-template-columns: 92px minmax(0, 1fr);
+    }
+
+    .price-card-media {
+      display: none;
+      overflow: hidden;
+      width: 92px;
+      aspect-ratio: 1;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(255,255,255,0.34);
+    }
+
+    .price-card.has-image .price-card-media { display: block; }
+
+    .price-card-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .price-card-copy { min-width: 0; }
+
+    .price-card .product-name {
+      display: block;
+      margin: 0 0 7px;
+      color: var(--mint);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      line-height: 1.35;
+      text-transform: uppercase;
     }
 
     .price-card strong {
@@ -435,6 +473,36 @@
       font-size: 14px;
       font-weight: 750;
       line-height: 1.4;
+    }
+
+    .price-card .product-description {
+      color: rgba(255,255,255,0.95);
+      font-size: 15px;
+    }
+
+    .product-features {
+      display: grid;
+      gap: 6px;
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .product-description[hidden],
+    .product-features[hidden] { display: none; }
+
+    .product-features li {
+      color: rgba(255,255,255,0.86);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.4;
+    }
+
+    .product-features li::before {
+      content: "✓";
+      margin-right: 7px;
+      color: var(--mint);
+      font-weight: 900;
     }
 
     .split {
@@ -534,6 +602,8 @@
       .feature-grid, .console-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .kit-detail-grid, .steps, .pricing-strip, .hero-actions { grid-template-columns: 1fr; }
       .pricing-actions { width: 100%; }
+      .price-card.has-image { grid-template-columns: 76px minmax(0, 1fr); }
+      .price-card-media { width: 76px; }
     }
 
     @media (max-width: 560px) {
@@ -566,7 +636,7 @@
             <button class="btn plan-cta" type="button" data-plan="monthly">Get Kit + Website Bundle</button>
             <button class="btn secondary plan-cta" type="button" data-plan="annual">Lock Annual Pricing</button>
           </div>
-          <p class="micro-copy">Open House Kit checkout includes the physical kit plus platform service. Kit buyers unlock the REL8TION website-builder bundle rate.</p>
+          <p id="hero-kit-pricing" class="micro-copy">Loading the current Open House Kit and service prices...</p>
         </div>
 
         <div class="product-console" aria-label="REL8TION product stack">
@@ -686,14 +756,42 @@
           <h2 id="pricing-title">Current launch pricing</h2>
           <p>Start with the Open House Kit and required platform service, then unlock the REL8TION website builder at the bundle rate. Version 1 pricing is intended to lock in early accounts while the product keeps expanding.</p>
         </div>
-        <div class="price-stack">
-          <div class="price-card">
-            <strong>Open House Kit + Service</strong>
-            <span>Physical kit plus monthly or annual platform service through secure Stripe Checkout.</span>
+        <div class="price-stack" role="region" aria-label="Open House Kit pricing table">
+          <div id="kit-price-card" class="price-card">
+            <div class="price-card-media"><img id="kit-product-image" alt=""></div>
+            <div class="price-card-copy">
+              <span id="kit-product-name" class="product-name">Open House Kit</span>
+              <strong id="kit-price-label">Loading current price...</strong>
+              <span id="kit-product-description" class="product-description">One-time physical kit charge included with either service plan.</span>
+              <ul id="kit-product-features" class="product-features" hidden></ul>
+            </div>
+          </div>
+          <div id="monthly-price-card" class="price-card">
+            <div class="price-card-media"><img id="monthly-product-image" alt=""></div>
+            <div class="price-card-copy">
+              <span id="monthly-product-name" class="product-name">Monthly Service</span>
+              <strong id="monthly-price-label">Loading current price...</strong>
+              <span id="monthly-product-description" class="product-description" hidden></span>
+              <span id="monthly-price-detail">Physical kit plus the first month are charged today, then service renews monthly.</span>
+              <ul id="monthly-product-features" class="product-features" hidden></ul>
+            </div>
+          </div>
+          <div id="annual-price-card" class="price-card">
+            <div class="price-card-media"><img id="annual-product-image" alt=""></div>
+            <div class="price-card-copy">
+              <span id="annual-product-name" class="product-name">Annual Service</span>
+              <strong id="annual-price-label">Loading current price...</strong>
+              <span id="annual-product-description" class="product-description" hidden></span>
+              <span id="annual-price-detail">Physical kit plus one year of service are charged today, then service renews annually.</span>
+              <ul id="annual-product-features" class="product-features" hidden></ul>
+            </div>
           </div>
           <div class="price-card">
-            <strong>$10/mo or $100/yr</strong>
-            <span>Website-builder bundle rate for Open House Kit buyers. Standalone website pricing remains separate.</span>
+            <div class="price-card-copy">
+              <span class="product-name">REL8TION Website Builder</span>
+              <strong>$10/mo or $100/yr</strong>
+              <span>Website-builder bundle rate for Open House Kit buyers. Standalone website pricing remains separate.</span>
+            </div>
           </div>
           <div class="pricing-actions">
             <button class="btn light plan-cta" type="button" data-plan="monthly">Start Monthly</button>
@@ -726,8 +824,21 @@
 
   <script>
     const PENDING_KEY = 'rel8tion_open_house_kit_pending';
+    const NFC_ROUTER_ORIGIN = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+      ? window.location.origin
+      : 'https://irel8.me';
 
     function armOpenHouseKitScan() {
+      if (window.location.origin !== NFC_ROUTER_ORIGIN) {
+        const handoffUrl = new URL('/get-open-house-kit', NFC_ROUTER_ORIGIN);
+        new URLSearchParams(window.location.search).forEach((value, key) => {
+          if (key !== 'arm') handoffUrl.searchParams.set(key, value);
+        });
+        handoffUrl.searchParams.set('arm', 'event-pass');
+        window.location.href = handoffUrl.toString();
+        return;
+      }
+
       const now = Date.now();
       const payload = {
         purpose: 'open_house_kit_confirm',
@@ -737,8 +848,88 @@
         sourcePath: window.location.pathname
       };
       window.localStorage.setItem(PENDING_KEY, JSON.stringify(payload));
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('arm');
+      window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
       document.body.classList.add('is-armed');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function money(amount, currency = 'usd') {
+      if (!Number.isInteger(amount)) return '';
+      const value = amount / 100;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: String(currency || 'usd').toUpperCase(),
+        minimumFractionDigits: value % 1 ? 2 : 0,
+        maximumFractionDigits: value % 1 ? 2 : 0
+      }).format(value);
+    }
+
+    function applyProduct(prefix, product) {
+      if (!product || typeof product !== 'object') return;
+      const card = document.getElementById(`${prefix}-price-card`);
+      const name = document.getElementById(`${prefix}-product-name`);
+      const description = document.getElementById(`${prefix}-product-description`);
+      const image = document.getElementById(`${prefix}-product-image`);
+      const features = document.getElementById(`${prefix}-product-features`);
+
+      if (name && product.name) name.textContent = product.name;
+      if (description && product.description) {
+        description.textContent = product.description;
+        description.hidden = false;
+      }
+
+      const imageUrl = Array.isArray(product.images) ? product.images[0] : '';
+      if (card && image && /^https:\/\//i.test(imageUrl || '')) {
+        image.src = imageUrl;
+        image.alt = product.name ? `${product.name} product image` : 'Product image';
+        card.classList.add('has-image');
+      }
+
+      if (features && Array.isArray(product.features) && product.features.length) {
+        features.replaceChildren(...product.features.map((feature) => {
+          const item = document.createElement('li');
+          item.textContent = feature;
+          return item;
+        }));
+        features.hidden = false;
+      }
+    }
+
+    async function loadCurrentPricing() {
+      try {
+        const response = await fetch('/api/checkout/open-house-kit', { headers: { Accept: 'application/json' } });
+        const pricing = await response.json().catch(() => ({}));
+        if (!response.ok || !pricing.ok) throw new Error('pricing unavailable');
+        const currency = pricing.currency || pricing.kit?.currency || 'usd';
+        const kitPrice = money(pricing.kit?.amount, currency);
+        const monthlyService = money(pricing.monthly?.amount, currency);
+        const annualService = money(pricing.annual?.amount, currency);
+        const monthlyToday = money(pricing.monthly?.due_today, currency);
+        const annualToday = money(pricing.annual?.due_today, currency);
+
+        applyProduct('kit', pricing.kit?.product);
+        applyProduct('monthly', pricing.monthly?.product);
+        applyProduct('annual', pricing.annual?.product);
+        document.getElementById('kit-price-label').textContent = `${kitPrice} one time`;
+        document.getElementById('monthly-price-label').textContent = `${monthlyToday} due today`;
+        document.getElementById('monthly-price-detail').textContent = `${kitPrice} kit + ${monthlyService}/month service. Then ${monthlyService}/month.`;
+        document.getElementById('annual-price-label').textContent = `${annualToday} due today`;
+        document.getElementById('annual-price-detail').textContent = `${kitPrice} kit + ${annualService}/year service. Then ${annualService}/year.`;
+        document.getElementById('hero-kit-pricing').textContent = `Open House Kit ${kitPrice} one time. Choose ${monthlyService}/month or ${annualService}/year platform service. The first service period is charged with the kit today.`;
+        document.querySelectorAll('.plan-cta[data-plan="monthly"]').forEach((button) => {
+          button.textContent = `Monthly - ${monthlyToday} today`;
+        });
+        document.querySelectorAll('.plan-cta[data-plan="annual"]').forEach((button) => {
+          button.textContent = `Annual - ${annualToday} today`;
+        });
+      } catch (_) {
+        document.getElementById('kit-price-label').textContent = 'One-time kit charge';
+        document.getElementById('monthly-price-label').textContent = 'Monthly service pricing';
+        document.getElementById('annual-price-label').textContent = 'Annual service pricing';
+        document.getElementById('hero-kit-pricing').textContent = 'Current kit and service totals are shown before payment in secure Stripe Checkout.';
+      }
     }
 
     function startManualIntake(plan = '') {
@@ -758,6 +949,10 @@
     document.querySelectorAll('.plan-cta').forEach((button) => {
       button.addEventListener('click', () => startManualIntake(button.dataset.plan || 'monthly'));
     });
+    loadCurrentPricing();
+    if (new URLSearchParams(window.location.search).get('arm') === 'event-pass') {
+      armOpenHouseKitScan();
+    }
   </script>
 </body>
 </html>

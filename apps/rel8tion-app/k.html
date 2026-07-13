@@ -1023,7 +1023,7 @@
         return;
       }
 
-      // Open House Kit scans are armed by getrel8tion.com so a fresh NFC handoff can confirm the keychain before normal chip routing runs.
+      // The kit page arms this state on irel8.me, the programmed NFC origin, before normal chip routing runs.
       if (readOpenHouseKitPendingSession()) {
         setStatus('Open House Kit Keychain Found', 'Confirming your kit details.');
         window.location.href = `${window.location.origin}/kit-confirm?uid=${encodeURIComponent(uid)}`;

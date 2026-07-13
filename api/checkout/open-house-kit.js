@@ -62,6 +62,98 @@ function appendQuery(path, query) {
   return `${path}${path.includes('?') ? '&' : '?'}${query}`;
 }
 
+function configuredPriceIds() {
+  return {
+    kit: firstEnv(['STRIPE_OPEN_HOUSE_KIT_PRICE_ID', 'OPEN_HOUSE_KIT_PRICE_ID']) || DEFAULT_OPEN_HOUSE_KIT_PRICE_ID,
+    monthly: firstEnv(PLANS.monthly.priceEnv) || PLANS.monthly.defaultPriceId,
+    annual: firstEnv(PLANS.annual.priceEnv) || PLANS.annual.defaultPriceId
+  };
+}
+
+function publicProduct(product) {
+  if (!product || typeof product !== 'object') return null;
+  const text = (value, maxLength) => String(value || '').trim().slice(0, maxLength);
+  const images = Array.isArray(product.images)
+    ? product.images
+      .map((value) => text(value, 1000))
+      .filter((value) => /^https:\/\//i.test(value))
+      .slice(0, 3)
+    : [];
+  const features = Array.isArray(product.marketing_features)
+    ? product.marketing_features
+      .map((feature) => text(feature?.name, 160))
+      .filter(Boolean)
+      .slice(0, 8)
+    : [];
+
+  return {
+    name: text(product.name, 160),
+    description: text(product.description, 1200),
+    images,
+    features
+  };
+}
+
+async function fetchStripePrice(priceId, secretKey) {
+  const stripeRes = await fetch(`https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}?expand%5B%5D=product`, {
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Stripe-Version': STRIPE_API_VERSION
+    }
+  });
+  const data = await stripeRes.json().catch(() => ({}));
+  if (!stripeRes.ok || !Number.isInteger(data.unit_amount) || !data.currency) {
+    throw new Error('Stripe pricing is unavailable.');
+  }
+  return {
+    amount: data.unit_amount,
+    currency: String(data.currency).toLowerCase(),
+    type: data.type || (data.recurring ? 'recurring' : 'one_time'),
+    interval: data.recurring?.interval || null,
+    interval_count: Number(data.recurring?.interval_count || 1),
+    product: publicProduct(data.product)
+  };
+}
+
+async function sendPublicPricing(res) {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const priceIds = configuredPriceIds();
+  if (!secretKey || !priceIds.kit || !priceIds.monthly || !priceIds.annual) {
+    return sendJson(res, 503, { ok: false, error: 'Current pricing is temporarily unavailable.' });
+  }
+
+  try {
+    const [kit, monthly, annual] = await Promise.all([
+      fetchStripePrice(priceIds.kit, secretKey),
+      fetchStripePrice(priceIds.monthly, secretKey),
+      fetchStripePrice(priceIds.annual, secretKey)
+    ]);
+    const sameCurrency = kit.currency === monthly.currency && kit.currency === annual.currency;
+    const expectedCadence = !kit.interval
+      && monthly.interval === 'month'
+      && monthly.interval_count === 1
+      && annual.interval === 'year'
+      && annual.interval_count === 1;
+    if (!sameCurrency || !expectedCadence) throw new Error('Stripe pricing is inconsistent.');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    return sendJson(res, 200, {
+      ok: true,
+      currency: kit.currency,
+      kit,
+      monthly: {
+        ...monthly,
+        due_today: kit.amount + monthly.amount
+      },
+      annual: {
+        ...annual,
+        due_today: kit.amount + annual.amount
+      }
+    });
+  } catch (error) {
+    return sendJson(res, 502, { ok: false, error: 'Current pricing is temporarily unavailable.' });
+  }
+}
+
 async function readBody(req) {
   if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
   if (Buffer.isBuffer(req.body)) {
@@ -90,13 +182,17 @@ async function readBody(req) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Allow', 'POST, OPTIONS');
+    res.setHeader('Allow', 'GET, POST, OPTIONS');
     res.statusCode = 204;
     return res.end();
   }
 
+  if (req.method === 'GET') {
+    return sendPublicPricing(res);
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST, OPTIONS');
+    res.setHeader('Allow', 'GET, POST, OPTIONS');
     return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
   }
 
@@ -109,8 +205,9 @@ module.exports = async function handler(req, res) {
   }
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const servicePriceId = firstEnv(plan.priceEnv) || plan.defaultPriceId;
-  const kitPriceId = firstEnv(['STRIPE_OPEN_HOUSE_KIT_PRICE_ID', 'OPEN_HOUSE_KIT_PRICE_ID']) || DEFAULT_OPEN_HOUSE_KIT_PRICE_ID;
+  const priceIds = configuredPriceIds();
+  const servicePriceId = priceIds[plan.key];
+  const kitPriceId = priceIds.kit;
 
   if (!secretKey || !servicePriceId || !kitPriceId) {
     return sendJson(res, 501, {

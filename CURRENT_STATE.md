@@ -66,7 +66,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/c/:code` and `/chip/:code` resolve printed Rel8tionChip QR inventory.
 - `[IMPLEMENTED]` `/a` redirects legacy/public profile traffic to `/b`.
 - `[IMPLEMENTED]` `/b` is the public agent profile and lead capture path.
-- `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support the Open House Kit landing, NFC/keychain prefill, manual intake, and Stripe Checkout handoff.
+- `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support the Open House Kit landing, NFC/keychain prefill, manual intake, and Stripe Checkout handoff. Event Pass checkout arming canonicalizes to the programmed NFC origin (`irel8.me`) before setting browser state. The landing/intake pages load the configured Stripe kit and service amounts before checkout, and the landing pricing table displays the names, descriptions, images, and marketing features attached to those Stripe Products.
 - `[IMPLEMENTED]` `/loan-officer-support` stores public loan-officer open-house-support requests and surfaces them in REL8TION COMMAND.
 - `[PARTIAL]` `/key-reset` is a token-protected admin/beta reset utility, not a full admin dashboard.
 - `[PARTIAL]` `/admin` is REL8TION COMMAND. It supports important operational workflows, including a Buyer Finder area that calls `/api/admin/buyer-home-finder` with admin credentials to filter, sort, search, and generate printable buyer reports from upcoming `open_houses`, `agent_outreach_queue`, and matched `listing_agents` records. Broader CRM edits, sign inventory edits, LO calendar/availability edits, billing automation, and full project controls are not complete.

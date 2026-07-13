@@ -107,7 +107,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 
 ### Open House Kit And Website Builder
 
-- `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support Open House Kit acquisition, keychain prefill, intake, and Stripe Checkout handoff.
+- `[PARTIAL]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support Open House Kit acquisition, keychain prefill, intake, and Stripe Checkout handoff. The Event Pass handoff arms on `irel8.me` so the physical NFC tap can consume the pending intent. The public pages retrieve current kit/monthly/annual amounts from the checkout API, and the landing pricing table reads the linked Stripe Product names, descriptions, images, and marketing features.
 - `[IMPLEMENTED]` `/api/checkout/stripe-webhook` verifies Stripe signatures and records eligible Open House Kit Checkout Sessions in `open_house_kit_orders` for fulfillment review.
 - `[IMPLEMENTED]` `/api/checkout/website-promo` can show deterministic website-builder promo codes after paid kit checkout, stores the paid kit order as a browser-return fallback, creates a hashed dashboard access token, attempts the welcome email/text workflow, and returns the buyer to `/kit-dashboard`.
 - `[IMPLEMENTED]` `/kit-dashboard` is the post-payment Open House Kit dashboard for logo selection/upload, fulfillment timeline, contact/shipping review, and dashboard security setup. It is backed by `/api/kit/dashboard`; chip-linked orders can mint dashboard access through `/api/kit/resolve-chip` and surface from the agent owner dashboard without changing `/k` routing priorities.

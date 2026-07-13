@@ -227,6 +227,14 @@
       letter-spacing: 0;
     }
 
+    .product .plan-price {
+      color: var(--blue);
+      font-family: "Plus Jakarta Sans", Inter, sans-serif;
+      font-size: 19px;
+      line-height: 1.25;
+      margin-bottom: 9px;
+    }
+
     .product:has(input:checked) {
       border-color: rgba(23,44,118,0.74);
       background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(233,249,255,0.88));
@@ -393,11 +401,13 @@
             <label class="product">
               <input type="radio" name="plan" value="monthly" checked>
               <strong>Open House Kit + Monthly Service</strong>
+              <span id="monthly-plan-price" class="plan-price">Loading current price...</span>
               <span>Start with the physical kit and keep the dashboard, Event Pass, smart check-in, alerts, and records active monthly.</span>
             </label>
             <label class="product">
               <input type="radio" name="plan" value="annual">
               <strong>Open House Kit + Paid For The Year</strong>
+              <span id="annual-plan-price" class="plan-price">Loading current price...</span>
               <span>Get the same kit and platform access with the discounted annual service option paid upfront.</span>
             </label>
           </div>
@@ -461,6 +471,36 @@
     function setNotice(message, type = '') {
       noticeEl.textContent = message;
       noticeEl.className = `notice ${type}`.trim();
+    }
+
+    function money(amount, currency = 'usd') {
+      if (!Number.isInteger(amount)) return '';
+      const value = amount / 100;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: String(currency || 'usd').toUpperCase(),
+        minimumFractionDigits: value % 1 ? 2 : 0,
+        maximumFractionDigits: value % 1 ? 2 : 0
+      }).format(value);
+    }
+
+    async function loadCurrentPricing() {
+      try {
+        const response = await fetch('/api/checkout/open-house-kit', { headers: { Accept: 'application/json' } });
+        const pricing = await response.json().catch(() => ({}));
+        if (!response.ok || !pricing.ok) throw new Error('pricing unavailable');
+        const currency = pricing.currency || pricing.kit?.currency || 'usd';
+        const kitPrice = money(pricing.kit?.amount, currency);
+        const monthlyService = money(pricing.monthly?.amount, currency);
+        const annualService = money(pricing.annual?.amount, currency);
+        const monthlyToday = money(pricing.monthly?.due_today, currency);
+        const annualToday = money(pricing.annual?.due_today, currency);
+        document.getElementById('monthly-plan-price').textContent = `${monthlyToday} today (${kitPrice} kit + ${monthlyService}/month)`;
+        document.getElementById('annual-plan-price').textContent = `${annualToday} today (${kitPrice} kit + ${annualService}/year)`;
+      } catch (_) {
+        document.getElementById('monthly-plan-price').textContent = 'Exact total shown before payment in Stripe';
+        document.getElementById('annual-plan-price').textContent = 'Exact total shown before payment in Stripe';
+      }
     }
 
     function setValue(id, value) {
@@ -760,6 +800,7 @@
     });
 
     applyPrefill();
+    loadCurrentPricing();
   </script>
 </body>
 </html>
