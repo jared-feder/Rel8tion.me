@@ -335,8 +335,8 @@
 
     <section class="shell" aria-labelledby="intake-title">
       <h1 id="intake-title">Open House Kit Details</h1>
-      <p class="intro">Confirm the agent and shipping details, choose monthly or paid-for-the-year service, then continue to secure Stripe Checkout.</p>
-      <div id="notice" class="notice">Your Open House Kit order includes the kit plus the selected platform service so the Event Pass and dashboard can stay active after checkout.</div>
+      <p id="intake-intro" class="intro">Confirm the agent and shipping details, choose the summer monthly or paid-for-the-year offer, then continue to secure Stripe Checkout.</p>
+      <div id="notice" class="notice">Limited Summer Special: the kit is $199. Monthly includes the first 31 days free; annual includes the first year of service and the Website Builder for $498 total.</div>
 
       <section id="match-panel" class="match-panel" aria-live="polite">
         <h2>We may already have you in Rel8tion. Is this you?</h2>
@@ -402,13 +402,13 @@
               <input type="radio" name="plan" value="monthly" checked>
               <strong>Open House Kit + Monthly Service</strong>
               <span id="monthly-plan-price" class="plan-price">Loading current price...</span>
-              <span>Start with the physical kit and keep the dashboard, Event Pass, smart check-in, alerts, and records active monthly.</span>
+              <span id="monthly-plan-detail">Pay for the physical kit today. The first 31 days of platform service are free, then billing starts at the locked promotional monthly rate.</span>
             </label>
             <label class="product">
               <input type="radio" name="plan" value="annual">
               <strong>Open House Kit + Paid For The Year</strong>
               <span id="annual-plan-price" class="plan-price">Loading current price...</span>
-              <span>Get the same kit and platform access with the discounted annual service option paid upfront.</span>
+              <span id="annual-plan-detail">Pay once for the kit and first year of platform service, get the Website Builder included, then renew yearly at the locked promotional rate.</span>
             </label>
           </div>
         </section>
@@ -495,8 +495,21 @@
         const annualService = money(pricing.annual?.amount, currency);
         const monthlyToday = money(pricing.monthly?.due_today, currency);
         const annualToday = money(pricing.annual?.due_today, currency);
-        document.getElementById('monthly-plan-price').textContent = `${monthlyToday} today (${kitPrice} kit + ${monthlyService}/month)`;
-        document.getElementById('annual-plan-price').textContent = `${annualToday} today (${kitPrice} kit + ${annualService}/year)`;
+        const trialDays = Number(pricing.monthly?.trial_days || 0);
+        document.getElementById('monthly-plan-price').textContent = trialDays
+          ? `${monthlyToday} today · first ${trialDays} days free · then ${monthlyService}/month`
+          : `${monthlyToday} today (${kitPrice} kit + ${monthlyService}/month)`;
+        document.getElementById('annual-plan-price').textContent = pricing.annual?.website_builder_included
+          ? `${annualToday} today · kit + first year + Website Builder · renews ${annualService}/year`
+          : `${annualToday} today (${kitPrice} kit + ${annualService}/year)`;
+        if (!pricing.promotion?.active) {
+          document.getElementById('intake-intro').textContent = 'Confirm the agent and shipping details, choose monthly or paid-for-the-year service, then continue to secure Stripe Checkout.';
+          document.getElementById('monthly-plan-detail').textContent = 'Start with the physical kit and keep the dashboard, Event Pass, smart check-in, alerts, and records active monthly.';
+          document.getElementById('annual-plan-detail').textContent = 'Get the same kit and platform access with the annual service option paid upfront.';
+          if (!params.get('success') && !params.get('canceled')) {
+            setNotice('Your Open House Kit order includes the kit plus the selected platform service so the Event Pass and dashboard stay active after checkout.');
+          }
+        }
       } catch (_) {
         document.getElementById('monthly-plan-price').textContent = 'Exact total shown before payment in Stripe';
         document.getElementById('annual-plan-price').textContent = 'Exact total shown before payment in Stripe';

@@ -136,6 +136,23 @@
       font-weight: 600;
     }
 
+    .promo-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      margin-bottom: 16px;
+      padding: 8px 13px;
+      border-radius: 999px;
+      color: #7a2e0f;
+      background: linear-gradient(135deg, #fff2aa, #ffd8a8);
+      border: 1px solid rgba(122,46,15,0.14);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 10px 24px rgba(122,46,15,0.1);
+    }
+
     .hero-actions, .pricing-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -629,20 +646,21 @@
     <section class="hero" aria-labelledby="kit-title">
       <div class="hero-grid">
         <div>
+          <div class="promo-badge">Limited Summer Special · Ends September 22</div>
           <h1 id="kit-title">Smarter open houses, cleaner follow-up, and a better agent website.</h1>
           <p class="subheadline">REL8TION gives agents the Open House Kit, smart check-in, Event Pass routing, buyer records, website builder, and AI marketing tools in one connected workflow.</p>
-          <p class="body-copy">Start with the kit for your next open house. Add the REL8TION agent website builder for a polished public presence, then use AI tools for headshots, virtually staged listing images, and short-form listing reels.</p>
+          <p id="hero-promo-copy" class="body-copy">Get the kit for $199. Choose monthly and your first 31 days of service are free, or pay $498 for the kit, a full year of service, and the REL8TION Website Builder. Hurry—this summer-only offer will not last.</p>
           <div class="hero-actions" aria-label="Open House Kit checkout actions">
-            <button class="btn plan-cta" type="button" data-plan="monthly">Get Kit + Website Bundle</button>
-            <button class="btn secondary plan-cta" type="button" data-plan="annual">Lock Annual Pricing</button>
+            <button class="btn plan-cta" type="button" data-plan="monthly">Monthly · $199 Today</button>
+            <button class="btn secondary plan-cta" type="button" data-plan="annual">Annual Bundle · $498 Today</button>
           </div>
           <p id="hero-kit-pricing" class="micro-copy">Loading the current Open House Kit and service prices...</p>
         </div>
 
         <div class="product-console" aria-label="REL8TION product stack">
-          <section class="console-card featured">
-            <h2>$10/mo</h2>
-            <p>Website-builder bundle rate for Open House Kit buyers, or $100/year when paid annually.</p>
+          <section id="website-builder-feature" class="console-card featured">
+            <h2 id="website-builder-feature-price">$0 extra</h2>
+            <p id="website-builder-feature-copy">The Website Builder is included when you choose the $498 annual summer bundle.</p>
           </section>
           <div class="console-grid">
             <section class="console-card">
@@ -753,8 +771,9 @@
 
       <section class="pricing-strip" aria-labelledby="pricing-title">
         <div>
-          <h2 id="pricing-title">Current launch pricing</h2>
-          <p>Start with the Open House Kit and required platform service, then unlock the REL8TION website builder at the bundle rate. Version 1 pricing is intended to lock in early accounts while the product keeps expanding.</p>
+          <div class="promo-badge">Summer 2026 · Limited Time</div>
+          <h2 id="pricing-title">Get the complete kit for $199</h2>
+          <p id="pricing-promo-copy">Enroll by September 22, 2026. Your promotional service rate stays locked while your subscription remains active, and future REL8TION software-platform upgrades are included at no added subscription charge. Replacement hardware and third-party services are not included.</p>
         </div>
         <div class="price-stack" role="region" aria-label="Open House Kit pricing table">
           <div id="kit-price-card" class="price-card">
@@ -772,7 +791,7 @@
               <span id="monthly-product-name" class="product-name">Monthly Service</span>
               <strong id="monthly-price-label">Loading current price...</strong>
               <span id="monthly-product-description" class="product-description" hidden></span>
-              <span id="monthly-price-detail">Physical kit plus the first month are charged today, then service renews monthly.</span>
+              <span id="monthly-price-detail">Pay only for the kit today. Your first 31 days are free, then service begins at $29/month.</span>
               <ul id="monthly-product-features" class="product-features" hidden></ul>
             </div>
           </div>
@@ -782,15 +801,15 @@
               <span id="annual-product-name" class="product-name">Annual Service</span>
               <strong id="annual-price-label">Loading current price...</strong>
               <span id="annual-product-description" class="product-description" hidden></span>
-              <span id="annual-price-detail">Physical kit plus one year of service are charged today, then service renews annually.</span>
+              <span id="annual-price-detail">Pay $498 today for the kit and first year. Annual service renews at $299 on your order anniversary in 2027.</span>
               <ul id="annual-product-features" class="product-features" hidden></ul>
             </div>
           </div>
           <div class="price-card">
             <div class="price-card-copy">
               <span class="product-name">REL8TION Website Builder</span>
-              <strong>$10/mo or $100/yr</strong>
-              <span>Website-builder bundle rate for Open House Kit buyers. Standalone website pricing remains separate.</span>
+              <strong id="website-builder-price-label">Included with annual</strong>
+              <span id="website-builder-price-detail">Pay for the year and get the Website Builder at no extra charge as part of the $498 summer bundle.</span>
             </div>
           </div>
           <div class="pricing-actions">
@@ -914,15 +933,37 @@
         applyProduct('annual', pricing.annual?.product);
         document.getElementById('kit-price-label').textContent = `${kitPrice} one time`;
         document.getElementById('monthly-price-label').textContent = `${monthlyToday} due today`;
-        document.getElementById('monthly-price-detail').textContent = `${kitPrice} kit + ${monthlyService}/month service. Then ${monthlyService}/month.`;
+        const trialDays = Number(pricing.monthly?.trial_days || 0);
+        const promotionActive = Boolean(pricing.promotion?.active);
+        document.querySelectorAll('.promo-badge').forEach((badge) => {
+          badge.hidden = !promotionActive;
+        });
+        if (!promotionActive) {
+          document.getElementById('hero-promo-copy').textContent = 'Start with the Open House Kit for your next event, then choose the monthly or annual REL8TION platform service that fits your business.';
+          document.getElementById('pricing-title').textContent = 'Current Open House Kit pricing';
+          document.getElementById('pricing-promo-copy').textContent = 'Current kit and platform-service totals come directly from secure Stripe pricing.';
+          document.getElementById('website-builder-feature-price').textContent = 'Agent website';
+          document.getElementById('website-builder-feature-copy').textContent = 'Build a polished agent website with listings, contact capture, and brand styling.';
+          document.getElementById('website-builder-price-label').textContent = 'Available separately';
+          document.getElementById('website-builder-price-detail').textContent = 'Website Builder pricing is shown during website onboarding.';
+        }
+        document.getElementById('monthly-price-detail').textContent = trialDays
+          ? `${kitPrice} kit today. First ${trialDays} days of service are free; ${monthlyService}/month begins ${trialDays} days after your order.`
+          : `${kitPrice} kit + ${monthlyService}/month service, then ${monthlyService}/month.`;
         document.getElementById('annual-price-label').textContent = `${annualToday} due today`;
-        document.getElementById('annual-price-detail').textContent = `${kitPrice} kit + ${annualService}/year service. Then ${annualService}/year.`;
-        document.getElementById('hero-kit-pricing').textContent = `Open House Kit ${kitPrice} one time. Choose ${monthlyService}/month or ${annualService}/year platform service. The first service period is charged with the kit today.`;
+        document.getElementById('annual-price-detail').textContent = pricing.annual?.website_builder_included
+          ? `${kitPrice} kit + ${annualService} first year, including the Website Builder. Renews at ${annualService}/year on your order anniversary.`
+          : `${kitPrice} kit + ${annualService}/year service, then ${annualService}/year.`;
+        document.getElementById('hero-kit-pricing').textContent = promotionActive
+          ? `${monthlyToday} today with monthly—first ${trialDays} days free, then ${monthlyService}/month. Or ${annualToday} today for the kit, first year, and Website Builder; renews at ${annualService}/year.`
+          : `Open House Kit ${kitPrice} one time. Choose ${monthlyService}/month or ${annualService}/year platform service.`;
         document.querySelectorAll('.plan-cta[data-plan="monthly"]').forEach((button) => {
-          button.textContent = `Monthly - ${monthlyToday} today`;
+          button.textContent = `Monthly · ${monthlyToday} Today`;
         });
         document.querySelectorAll('.plan-cta[data-plan="annual"]').forEach((button) => {
-          button.textContent = `Annual - ${annualToday} today`;
+          button.textContent = pricing.annual?.website_builder_included
+            ? `Annual + Website · ${annualToday} Today`
+            : `Annual · ${annualToday} Today`;
         });
       } catch (_) {
         document.getElementById('kit-price-label').textContent = 'One-time kit charge';

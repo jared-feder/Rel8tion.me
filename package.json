@@ -2,6 +2,7 @@
   "private": true,
   "scripts": {
     "verify:routes": "node scripts/verify-route-map.cjs",
+    "verify:kit-pricing": "node scripts/verify-open-house-kit-pricing.cjs",
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:command-search": "node scripts/verify-command-search.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",

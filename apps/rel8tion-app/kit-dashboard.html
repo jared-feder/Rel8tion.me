@@ -301,6 +301,9 @@
     }
 
     .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       min-height: 46px;
       border: 0;
       border-radius: 999px;
@@ -310,6 +313,7 @@
       cursor: pointer;
       padding: 0 16px;
       box-shadow: 0 14px 28px rgba(23,44,118,0.18);
+      text-decoration: none;
     }
 
     .btn.secondary {
@@ -588,6 +592,16 @@
           </div>
 
           <aside class="panel">
+            ${order.website_builder_included ? `
+              <div class="notice success">
+                <h2 style="margin-bottom:10px;">Website Builder Included</h2>
+                <p>Your Summer annual bundle includes the REL8TION Website Builder at no extra charge.</p>
+                ${order.website_builder_url ? `<a class="btn" href="${esc(order.website_builder_url)}" target="_blank" rel="noopener">Start Building My Website</a>` : ''}
+              </div>
+            ` : ''}
+            ${order.future_platform_upgrades_included ? `
+              <div class="notice success">Your active Summer promotional subscription includes future REL8TION software-platform upgrades at no added subscription charge.</div>
+            ` : ''}
             <h2>Secure Access</h2>
             <p>Your welcome link opens this setup dashboard. Add a password now; on supported phones you can also bind this browser to the phone lock.</p>
             <div class="form-grid">

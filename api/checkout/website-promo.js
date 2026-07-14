@@ -1,9 +1,7 @@
-const { createHash } = require('crypto');
 const { supabaseRest } = require('../../lib/admin-auth');
 const kit = require('../../lib/open-house-kit');
 
 const STRIPE_API_VERSION = '2026-02-25.clover';
-const DEFAULT_WEBSITE_BUILDER_URL = 'https://my.rel8tion.me';
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -28,26 +26,6 @@ function normalizePhone(value) {
   const digits = clean(value, 80).replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
   return digits;
-}
-
-function promoCodeForSession(sessionId) {
-  const prefix = clean(process.env.REL8TION_WEBSITE_PROMO_PREFIX || 'R8WEB', 18)
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '') || 'R8WEB';
-  const digest = createHash('sha256')
-    .update(`${sessionId}:${process.env.REL8TION_WEBSITE_PROMO_SALT || 'rel8tion-open-house-kit'}`)
-    .digest('hex')
-    .slice(0, 8)
-    .toUpperCase();
-  return `${prefix}-${digest}`;
-}
-
-function websiteUrlWithCode(code) {
-  const base = clean(process.env.REL8TION_WEBSITE_BUILDER_URL || DEFAULT_WEBSITE_BUILDER_URL);
-  const url = new URL(base);
-  url.searchParams.set('promo', code);
-  url.searchParams.set('source', 'open_house_kit');
-  return url.toString();
 }
 
 function timestampFromSeconds(value) {
@@ -238,7 +216,8 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 402, { ok: false, error: 'Checkout payment is not complete yet.' });
     }
 
-    const code = promoCodeForSession(session.id);
+    const code = kit.websitePromoCodeForSession(session.id);
+    const websiteBuilderIncluded = clean(session.metadata?.website_builder_included).toLowerCase() === 'true';
     let stripePromotion = { configured: false };
     try {
       stripePromotion = await maybeCreateStripePromotionCode({ code, session });
@@ -275,8 +254,11 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 200, {
       ok: true,
       code,
-      website_url: websiteUrlWithCode(code),
-      label: clean(process.env.REL8TION_WEBSITE_PROMO_LABEL || 'Rel8tion website builder bundle rate: $10/month or $100/year', 160),
+      website_url: kit.websiteBuilderUrlWithCode(code),
+      website_builder_included: websiteBuilderIncluded,
+      label: websiteBuilderIncluded
+        ? 'REL8TION Website Builder included with the Summer 2026 annual bundle'
+        : clean(process.env.REL8TION_WEBSITE_PROMO_LABEL || 'Rel8tion website builder bundle rate: $10/month or $100/year', 160),
       order_id: order?.id || null,
       order_fulfillment_status: order?.fulfillment_status || null,
       dashboard_url: dashboard,

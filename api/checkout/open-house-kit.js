@@ -2,8 +2,14 @@ const STRIPE_API_VERSION = '2026-02-25.clover';
 const DEFAULT_OPEN_HOUSE_KIT_PRICE_ID = 'price_1TYtd12LIj1DZULXtTeeeYSm';
 const DEFAULT_EVENT_PASS_MONTHLY_PRICE_ID = 'price_1TYtd52LIj1DZULX8ipqLz9X';
 const DEFAULT_EVENT_PASS_ANNUAL_PRICE_ID = 'price_1TYtd62LIj1DZULXy58hBZ0I';
+const SUMMER_OPEN_HOUSE_KIT_PRICE_ID = 'price_1TtDAM2LIj1DZULXov7KGURt';
+const SUMMER_EVENT_PASS_MONTHLY_PRICE_ID = 'price_1TtDAW2LIj1DZULXxOIiYamd';
+const SUMMER_EVENT_PASS_ANNUAL_PRICE_ID = 'price_1TtDAg2LIj1DZULXNl7mnBpo';
+const SUMMER_PROMOTION_KEY = 'summer_2026';
+const SUMMER_PROMOTION_END = '2026-09-22T23:59:59-04:00';
+const SUMMER_MONTHLY_TRIAL_DAYS = 31;
 const REL8TION_LOGO_URL = 'https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png';
-const FULFILLMENT_MESSAGE = 'Open House Kit fulfillment: expected arrival within 14 days. When local scheduling allows, Moe may personally deliver it sooner and help with the handoff. This is REL8TION Version 1 pricing. More upgrades and improvements are planned, and the selected service rate is intended to lock in this account as pricing rises.';
+const FULFILLMENT_MESSAGE = 'Open House Kit fulfillment: expected arrival within 14 days. Summer promotional subscribers keep their selected service rate while the subscription remains active. Future REL8TION software-platform upgrades are included at no added subscription charge; replacement hardware and third-party services are excluded.';
 const PLANS = {
   monthly: {
     key: 'monthly',
@@ -62,7 +68,29 @@ function appendQuery(path, query) {
   return `${path}${path.includes('?') ? '&' : '?'}${query}`;
 }
 
-function configuredPriceIds() {
+function summerPromotion() {
+  const endsAt = process.env.STRIPE_SUMMER_PROMOTION_END || SUMMER_PROMOTION_END;
+  const endTime = Date.parse(endsAt);
+  return {
+    key: SUMMER_PROMOTION_KEY,
+    active: Number.isFinite(endTime) && Date.now() <= endTime,
+    ends_at: endsAt,
+    monthly_trial_days: SUMMER_MONTHLY_TRIAL_DAYS,
+    rate_lock: 'while_subscription_remains_active',
+    future_platform_upgrades_included: true,
+    website_builder_included_with_annual: true,
+    exclusions: ['replacement_hardware', 'third_party_services']
+  };
+}
+
+function configuredPriceIds(promotion = summerPromotion()) {
+  if (promotion.active) {
+    return {
+      kit: firstEnv(['STRIPE_SUMMER_OPEN_HOUSE_KIT_PRICE_ID']) || SUMMER_OPEN_HOUSE_KIT_PRICE_ID,
+      monthly: firstEnv(['STRIPE_SUMMER_EVENT_PASS_MONTHLY_PRICE_ID']) || SUMMER_EVENT_PASS_MONTHLY_PRICE_ID,
+      annual: firstEnv(['STRIPE_SUMMER_EVENT_PASS_ANNUAL_PRICE_ID']) || SUMMER_EVENT_PASS_ANNUAL_PRICE_ID
+    };
+  }
   return {
     kit: firstEnv(['STRIPE_OPEN_HOUSE_KIT_PRICE_ID', 'OPEN_HOUSE_KIT_PRICE_ID']) || DEFAULT_OPEN_HOUSE_KIT_PRICE_ID,
     monthly: firstEnv(PLANS.monthly.priceEnv) || PLANS.monthly.defaultPriceId,
@@ -117,7 +145,8 @@ async function fetchStripePrice(priceId, secretKey) {
 
 async function sendPublicPricing(res) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const priceIds = configuredPriceIds();
+  const promotion = summerPromotion();
+  const priceIds = configuredPriceIds(promotion);
   if (!secretKey || !priceIds.kit || !priceIds.monthly || !priceIds.annual) {
     return sendJson(res, 503, { ok: false, error: 'Current pricing is temporarily unavailable.' });
   }
@@ -139,14 +168,18 @@ async function sendPublicPricing(res) {
     return sendJson(res, 200, {
       ok: true,
       currency: kit.currency,
+      promotion,
       kit,
       monthly: {
         ...monthly,
-        due_today: kit.amount + monthly.amount
+        due_today: promotion.active ? kit.amount : kit.amount + monthly.amount,
+        trial_days: promotion.active ? promotion.monthly_trial_days : 0,
+        first_recurring_charge_days: promotion.active ? promotion.monthly_trial_days : 0
       },
       annual: {
         ...annual,
-        due_today: kit.amount + annual.amount
+        due_today: kit.amount + annual.amount,
+        website_builder_included: promotion.active
       }
     });
   } catch (error) {
@@ -198,14 +231,15 @@ module.exports = async function handler(req, res) {
 
   const body = await readBody(req);
   const plan = getPlan(body.plan);
+  const promotion = summerPromotion();
   const requiresDynamicMetadata = body.source === 'getrel8tion_open_house_kit' || body.uid || body.agent_id || body.agent_slug;
-  const paymentLink = requiresDynamicMetadata ? '' : firstEnv(plan.paymentLinkEnv);
+  const paymentLink = promotion.active || requiresDynamicMetadata ? '' : firstEnv(plan.paymentLinkEnv);
   if (paymentLink) {
     return sendJson(res, 200, { ok: true, plan: plan.key, mode: 'payment_link', url: paymentLink });
   }
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const priceIds = configuredPriceIds();
+  const priceIds = configuredPriceIds(promotion);
   const servicePriceId = priceIds[plan.key];
   const kitPriceId = priceIds.kit;
 
@@ -214,9 +248,7 @@ module.exports = async function handler(req, res) {
       ok: false,
       plan: plan.key,
       error: `${plan.label} checkout is not configured yet.`,
-      setup: plan.key === 'monthly'
-        ? 'Set STRIPE_SECRET_KEY. Monthly service defaults to price_1TYtd52LIj1DZULX8ipqLz9X unless STRIPE_EVENT_PASS_MONTHLY_PRICE_ID is set.'
-        : 'Set STRIPE_SECRET_KEY. Annual service defaults to price_1TYtd62LIj1DZULXy58hBZ0I unless STRIPE_EVENT_PASS_ANNUAL_PRICE_ID is set.'
+      setup: 'Set STRIPE_SECRET_KEY and verify the active Open House Kit Price configuration.'
     });
   }
 
@@ -267,7 +299,14 @@ module.exports = async function handler(req, res) {
   checkoutParams.set('metadata[address]', cleanMetadataValue(body.address));
   checkoutParams.set('metadata[email]', cleanMetadataValue(body.email, 120));
   checkoutParams.set('metadata[phone]', cleanMetadataValue(body.phone, 80));
+  checkoutParams.set('metadata[promotion]', promotion.active ? promotion.key : 'standard');
+  checkoutParams.set('metadata[rate_lock]', promotion.active ? promotion.rate_lock : '');
+  checkoutParams.set('metadata[future_platform_upgrades_included]', promotion.active ? 'true' : 'false');
+  checkoutParams.set('metadata[website_builder_included]', promotion.active && plan.key === 'annual' ? 'true' : 'false');
   if (plan.mode === 'subscription') {
+    if (promotion.active && plan.key === 'monthly') {
+      checkoutParams.set('subscription_data[trial_period_days]', String(promotion.monthly_trial_days));
+    }
     checkoutParams.set('subscription_data[metadata][plan]', plan.key);
     checkoutParams.set('subscription_data[metadata][source]', cleanMetadataValue(body.source || 'open_house_kit'));
     checkoutParams.set('subscription_data[metadata][flow]', cleanMetadataValue(body.flow, 80));
@@ -280,6 +319,10 @@ module.exports = async function handler(req, res) {
     checkoutParams.set('subscription_data[metadata][event]', cleanMetadataValue(body.event, 120));
     checkoutParams.set('subscription_data[metadata][sign_id]', cleanMetadataValue(body.sign_id, 120));
     checkoutParams.set('subscription_data[metadata][address]', cleanMetadataValue(body.address));
+    checkoutParams.set('subscription_data[metadata][promotion]', promotion.active ? promotion.key : 'standard');
+    checkoutParams.set('subscription_data[metadata][rate_lock]', promotion.active ? promotion.rate_lock : '');
+    checkoutParams.set('subscription_data[metadata][future_platform_upgrades_included]', promotion.active ? 'true' : 'false');
+    checkoutParams.set('subscription_data[metadata][website_builder_included]', promotion.active && plan.key === 'annual' ? 'true' : 'false');
   }
   if (referenceParts.length) checkoutParams.set('client_reference_id', referenceParts.join(':'));
   if (body.email) checkoutParams.set('customer_email', cleanMetadataValue(body.email, 120));
