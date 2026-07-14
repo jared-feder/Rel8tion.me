@@ -20,6 +20,11 @@ const criticalProductionFiles = [
   ['supabase/functions/android-inbox-replay/index.ts', 'Supabase Android inbox replay function source']
 ];
 
+const criticalCleanUrlMirrors = [
+  ['get-open-house-kit.html', 'apps/rel8tion-app/get-open-house-kit.html'],
+  ['kit-intake.html', 'apps/rel8tion-app/kit-intake.html']
+];
+
 function normalize(relPath) {
   return String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
 }
@@ -161,6 +166,20 @@ function main() {
         route: reason,
         file,
         problem: `${state} critical production file`
+      });
+    }
+  }
+
+  for (const [wrapper, destination] of criticalCleanUrlMirrors) {
+    const wrapperPath = path.join(ROOT, wrapper);
+    const destinationPath = path.join(ROOT, destination);
+    if (!fs.existsSync(wrapperPath) || !fs.existsSync(destinationPath)) continue;
+    if (!fs.readFileSync(wrapperPath).equals(fs.readFileSync(destinationPath))) {
+      failures.push({
+        type: 'clean-url-mirror',
+        route: `/${wrapper.replace(/\.html$/, '')}`,
+        file: wrapper,
+        problem: `root clean-URL file differs from ${destination}`
       });
     }
   }
