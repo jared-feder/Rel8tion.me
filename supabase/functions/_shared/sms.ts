@@ -178,23 +178,24 @@ async function logSmsAttempt(supabase: any, entry: SmsLogEntry) {
   }
 }
 
-async function isSuppressed(supabase: any, phone: string, provider: string): Promise<boolean> {
+async function isSuppressed(supabase: any, phone: string): Promise<boolean> {
   if (!supabase || !phone) return false;
   try {
     const { data, error } = await supabase
       .from("sms_suppression_list")
       .select("id, provider")
       .eq("phone", phone)
-      .or(`provider.is.null,provider.eq.${provider}`)
       .limit(1);
     if (error) {
-      console.error("[sms] suppression lookup failed", error);
-      return false;
+      throw error;
     }
     return Boolean(data?.length);
   } catch (error) {
     console.error("[sms] suppression lookup failed", error);
-    return false;
+    throw new SmsSendError("sms_suppression_check_failed: Unable to verify recipient opt-out status", {
+      code: "sms_suppression_check_failed",
+      status: "blocked",
+    });
   }
 }
 
@@ -281,6 +282,7 @@ async function sendViaAndroidGateway(opts: {
 }
 
 async function sendViaTwilio(opts: {
+  route: SmsRoute;
   to: string;
   body: string;
   mediaUrls?: string[];
@@ -288,18 +290,36 @@ async function sendViaTwilio(opts: {
 }) {
   const accountSid = clean(Deno.env.get("TWILIO_ACCOUNT_SID"));
   const authToken = clean(Deno.env.get("TWILIO_AUTH_TOKEN"));
-  const from = clean(Deno.env.get("TWILIO_FROM_NUMBER") || Deno.env.get("TWILIO_PHONE"));
+  const routePrefix = opts.route === "outreach" ? "TWILIO_OUTREACH" : "TWILIO_EVENTS";
+  const routeMessagingServiceSid = clean(Deno.env.get(`${routePrefix}_MESSAGING_SERVICE_SID`));
+  const routeFrom = clean(Deno.env.get(`${routePrefix}_FROM_NUMBER`));
+  const dedicatedOutreachSenderRequired = opts.route === "outreach" &&
+    clean(Deno.env.get("SMS_OUTREACH_PROVIDER")).toLowerCase() === "twilio";
+  const messagingServiceSid = clean(
+    routeMessagingServiceSid ||
+      (!dedicatedOutreachSenderRequired ? Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") : ""),
+  );
+  const configuredFrom = clean(
+    routeFrom ||
+      (!dedicatedOutreachSenderRequired
+        ? Deno.env.get("TWILIO_FROM_NUMBER") || Deno.env.get("TWILIO_PHONE")
+        : ""),
+  );
 
-  if (!accountSid || !authToken || !from) {
-    throw new SmsSendError("Missing Twilio credentials", {
+  if (!accountSid || !authToken || (!messagingServiceSid && !configuredFrom)) {
+    throw new SmsSendError(`Missing Twilio credentials or ${opts.route} sender`, {
       code: "sms_twilio_config_missing",
       provider: "twilio",
-      route: "twilio",
+      route: opts.route,
     });
   }
 
   const form = new URLSearchParams();
-  form.set("From", from);
+  if (messagingServiceSid) {
+    form.set("MessagingServiceSid", messagingServiceSid);
+  } else {
+    form.set("From", configuredFrom);
+  }
   form.set("To", opts.to);
   form.set("Body", opts.body);
   if (opts.statusCallback) form.set("StatusCallback", opts.statusCallback);
@@ -321,16 +341,19 @@ async function sendViaTwilio(opts: {
     throw new SmsSendError(clean(data?.message) || `Twilio error ${response.status}`, {
       code: "sms_twilio_failed",
       provider: "twilio",
-      route: "twilio",
+      route: opts.route,
     });
   }
 
+  const from = clean(data.from || configuredFrom);
+
   return {
     provider: "twilio",
-    route: "twilio",
+    route: opts.route,
     status: clean(data.status || "queued").toLowerCase() || "queued",
     externalId: clean(data.sid) || null,
-    from,
+    from: from || null,
+    messagingServiceSid: messagingServiceSid || null,
     raw: data,
   };
 }
@@ -342,7 +365,7 @@ export async function sendSMS(options: SendSmsOptions) {
   const provider = providerForRoute(route, options.providerOverride);
   const supabase = options.supabase || smsClient();
   const to = toE164(options.to);
-  const routeLabel = provider === "twilio" ? "twilio" : route;
+  const routeLabel = route;
   let body = clean(options.body);
 
   if (!to) {
@@ -386,29 +409,48 @@ export async function sendSMS(options: SendSmsOptions) {
     body = ensureOutreachStopText(body);
   }
 
-  if (!isSuppressionBypassed(category, metadata) && await isSuppressed(supabase, to, provider)) {
-    await logSmsAttempt(supabase, {
-      provider,
-      route: routeLabel,
-      category,
-      to_phone: to,
-      body,
-      status: "blocked",
-      error: "sms_suppressed: Recipient is on the SMS suppression list",
-      metadata,
-    });
-    throw new SmsSendError("sms_suppressed: Recipient is on the SMS suppression list", {
-      code: "sms_suppressed",
-      status: "blocked",
-      provider,
-      route: routeLabel,
-    });
+  if (!isSuppressionBypassed(category, metadata)) {
+    try {
+      if (await isSuppressed(supabase, to)) {
+        await logSmsAttempt(supabase, {
+          provider,
+          route: routeLabel,
+          category,
+          to_phone: to,
+          body,
+          status: "blocked",
+          error: "sms_suppressed: Recipient is on the global SMS suppression list",
+          metadata,
+        });
+        throw new SmsSendError("sms_suppressed: Recipient is on the global SMS suppression list", {
+          code: "sms_suppressed",
+          status: "blocked",
+          provider,
+          route: routeLabel,
+        });
+      }
+    } catch (error) {
+      if (error instanceof SmsSendError && error.code === "sms_suppressed") throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      await logSmsAttempt(supabase, {
+        provider,
+        route: routeLabel,
+        category,
+        to_phone: to,
+        body,
+        status: "blocked",
+        error: message,
+        metadata,
+      });
+      throw error;
+    }
   }
 
   try {
     const result = provider === "android_gateway"
       ? await sendViaAndroidGateway({ route, to, body })
       : await sendViaTwilio({
+        route,
         to,
         body,
         mediaUrls: options.mediaUrls,

@@ -2,6 +2,8 @@
 
 Android Gateway is the general non-Douglas Elliman outreach route when REL8TION COMMAND is in Away mode. Twilio remains active for buyer/event/system messages and for Douglas Elliman outreach.
 
+The current Android provider automates text SMS only. It does not support outbound MMS/media. For images, use a verified MMS-capable Twilio sender or keep the Android text preview link.
+
 ## Environment
 
 Current split outreach route:
@@ -56,9 +58,11 @@ Emergency all-Twilio route, not current production:
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=twilio
 SMS_EVENTS_PROVIDER=twilio
+TWILIO_EVENTS_FROM_NUMBER=+15168885461
+TWILIO_OUTREACH_MESSAGING_SERVICE_SID=<verified toll-free Messaging Service SID>
 ```
 
-Do not use that route for non-Douglas Elliman automated outreach until the toll-free outreach lane is intentionally added and verified.
+Do not use that route for non-Douglas Elliman automated outreach until the route-specific toll-free sender is intentionally added and verified. The code refuses to fall back to the regular Twilio number when `SMS_OUTREACH_PROVIDER=twilio` and no dedicated outreach sender is configured.
 
 When Twilio is active for any route, use `docs/twilio-outreach-sms-runbook.md` for the current number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
 
@@ -109,7 +113,7 @@ Invoke-RestMethod `
   } | ConvertTo-Json)
 ```
 
-The webhook logs inbound messages to `sms_inbound_messages`, stores STOP/UNSUBSCRIBE/CANCEL/END/QUIT in `sms_suppression_list`, and links outreach replies back to `agent_outreach_replies` when the phone matches an outreach queue row.
+The webhook logs inbound messages to `sms_inbound_messages`, stores STOP/UNSUBSCRIBE/CANCEL/END/QUIT in `sms_suppression_list`, removes application suppression for an exact START/UNSTOP, and links outreach replies back to `agent_outreach_replies` when the phone matches an outreach queue row. Suppression is enforced globally across Android and Twilio.
 
 ## Inbox Reconciliation
 

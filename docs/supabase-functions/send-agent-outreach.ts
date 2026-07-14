@@ -14,10 +14,17 @@ const BUSINESS_CARD_URL =
 const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
-const DEFAULT_SEND_MAX_PER_RUN = 7;
-const SEND_MAX_PER_RUN_HARD_CAP = 7;
-const DEFAULT_SEND_MAX_PER_HOUR = 20;
-const DEFAULT_SEND_MAX_PER_DAY = 150;
+const DEFAULT_SEND_MAX_PER_RUN = 5;
+const SEND_MAX_PER_RUN_HARD_CAP = 5;
+const DEFAULT_SEND_MAX_PER_HOUR = 5;
+const SEND_MAX_PER_HOUR_HARD_CAP = 5;
+const DEFAULT_SEND_MAX_PER_DAY = 5;
+const SEND_MAX_PER_DAY_HARD_CAP = 5;
+const DEFAULT_DUPLICATE_PHONE_COOLDOWN_DAYS = 30;
+const DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS = 7;
+const DEFAULT_HEALTH_WINDOW_DAYS = 7;
+const DEFAULT_HEALTH_MIN_SENDS = 20;
+const DEFAULT_MAX_OPT_OUT_RATE = 0.01;
 const FOLLOWUPS_DISABLED = true;
 
 type OutreachRow = {
@@ -44,7 +51,8 @@ type OutreachOperatorMode = "live" | "away";
 
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
 function toE164(phone: string | null): string {
@@ -97,9 +105,16 @@ function buildSmsLink(phone: string | null, body: string): string {
 }
 
 function usesAndroidGateway(): boolean {
+  return configuredOutreachProvider() === "android_gateway";
+}
+
+function configuredOutreachProvider(): "twilio" | "android_gateway" {
   const outreachProvider = String(Deno.env.get("SMS_OUTREACH_PROVIDER") || "").trim().toLowerCase();
-  if (outreachProvider) return outreachProvider === "android_gateway";
-  return String(Deno.env.get("SMS_PROVIDER") || "").trim().toLowerCase() === "android_gateway";
+  if (outreachProvider === "android_gateway") return "android_gateway";
+  if (outreachProvider === "twilio") return "twilio";
+  return String(Deno.env.get("SMS_PROVIDER") || "").trim().toLowerCase() === "android_gateway"
+    ? "android_gateway"
+    : "twilio";
 }
 
 function twilioOutreachBrokeragePatterns(): string[] {
@@ -178,6 +193,12 @@ function positiveIntEnv(name: string, fallback: number, max: number): number {
   return Math.max(1, Math.min(Math.floor(parsed), max));
 }
 
+function positiveFloatEnv(name: string, fallback: number, max: number): number {
+  const parsed = Number(Deno.env.get(name) || "");
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
 async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise<number> {
   const { count, error } = await supabase
     .from("sms_message_log")
@@ -188,6 +209,37 @@ async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise
 
   if (error) throw error;
   return count || 0;
+}
+
+async function recentOutreachOptOutCount(supabase: any, sinceIso: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("agent_outreach_replies")
+    .select("id", { count: "exact", head: true })
+    .eq("direction", "inbound")
+    .eq("opt_out", true)
+    .gte("received_at", sinceIso);
+
+  if (error) throw error;
+  return count || 0;
+}
+
+async function findRecentOutreachForPhone(
+  supabase: any,
+  phoneNormalized: string,
+  rowId: string,
+  cooldownCutoff: string,
+) {
+  const { data, error } = await supabase
+    .from("agent_outreach_queue")
+    .select("id, agent_name, last_outreach_at")
+    .eq("agent_phone_normalized", phoneNormalized)
+    .gte("last_outreach_at", cooldownCutoff)
+    .neq("id", rowId)
+    .order("last_outreach_at", { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  return data?.[0] || null;
 }
 
 function buildOutreachPreviewUrl(
@@ -235,16 +287,15 @@ function buildInitialOutreachBody(row: OutreachRow): string {
 
   if (row.template_key === "missed_open_house") {
     return (
-      `Hey ${firstName} 👋 Sorry I missed your open house at ${addr}. ` +
-      `I’d still love to support your next one with quick pre-approval help and sponsor a Rel8tion Event Pass — paperless check-in, e-sign disclosures, and lead capture with no app needed. Reply STOP to opt out.`
+      `Hi ${firstName} — Jared with NMB. I missed your open house at ${addr}. ` +
+      `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`
     );
   }
 
   const when = formatOpenHouse(row.open_start || null);
   return (
-    `Hey ${firstName} 👋 I’d love to stop by your open house at ${addr} ${when} to provide quick pre-approval support.\n\n` +
-    `I’m also sponsoring a Rel8tion Event Pass for you — paperless check-in, e-sign disclosures, and lead capture with no app needed.\n\n` +
-    `Looking forward to meeting you. Reply STOP to opt out.`
+    `Hi ${firstName} — Jared with NMB. I saw your open house at ${addr} ${when}. ` +
+    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`
   );
 }
 
@@ -397,10 +448,33 @@ serve(async (req) => {
     }
 
     const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, SEND_MAX_PER_RUN_HARD_CAP);
-    const maxPerHour = positiveIntEnv("OUTREACH_SEND_MAX_PER_HOUR", DEFAULT_SEND_MAX_PER_HOUR, 200);
-    const maxPerDay = positiveIntEnv("OUTREACH_SEND_MAX_PER_DAY", DEFAULT_SEND_MAX_PER_DAY, 150);
+    const maxPerHour = positiveIntEnv(
+      "OUTREACH_SEND_MAX_PER_HOUR",
+      DEFAULT_SEND_MAX_PER_HOUR,
+      SEND_MAX_PER_HOUR_HARD_CAP,
+    );
+    const maxPerDay = positiveIntEnv(
+      "OUTREACH_SEND_MAX_PER_DAY",
+      DEFAULT_SEND_MAX_PER_DAY,
+      SEND_MAX_PER_DAY_HARD_CAP,
+    );
+    const duplicatePhoneCooldownDays = positiveIntEnv(
+      "OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS",
+      DEFAULT_DUPLICATE_PHONE_COOLDOWN_DAYS,
+      365,
+    );
+    const missedOpenHouseMaxAgeDays = positiveIntEnv(
+      "OUTREACH_MISSED_OPEN_HOUSE_MAX_AGE_DAYS",
+      DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS,
+      30,
+    );
+    const healthWindowDays = positiveIntEnv("OUTREACH_HEALTH_WINDOW_DAYS", DEFAULT_HEALTH_WINDOW_DAYS, 30);
+    const healthMinSends = positiveIntEnv("OUTREACH_HEALTH_MIN_SENDS", DEFAULT_HEALTH_MIN_SENDS, 1000);
+    const maxOptOutRate = positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1);
+    const body = await req.json().catch(() => ({}));
+    const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
 
-    if (!isWithinAllowedSendWindow()) {
+    if (!isWithinAllowedSendWindow() && !dryRun) {
       return new Response(
         JSON.stringify(
           {
@@ -425,8 +499,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const outreachSendPaused = await loadOutreachSendPaused(supabase);
     const outreachOperatorMode = await loadOutreachOperatorMode(supabase);
-    const body = await req.json().catch(() => ({}));
-    const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
     const requestedLimit = Number(body.limit ?? maxPerRun);
     const normalizedRequestedLimit = Math.max(
       0,
@@ -434,8 +506,15 @@ serve(async (req) => {
     );
     const hourlyWindowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const dailyWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const healthWindowStart = new Date(Date.now() - healthWindowDays * 24 * 60 * 60 * 1000).toISOString();
     const recentHourlySendCount = await recentOutreachSendCount(supabase, hourlyWindowStart);
     const recentDailySendCount = await recentOutreachSendCount(supabase, dailyWindowStart);
+    const recentHealthSendCount = await recentOutreachSendCount(supabase, healthWindowStart);
+    const recentHealthOptOutCount = await recentOutreachOptOutCount(supabase, healthWindowStart);
+    const recentOptOutRate = recentHealthSendCount > 0
+      ? recentHealthOptOutCount / recentHealthSendCount
+      : 0;
+    const healthBlocked = recentHealthSendCount >= healthMinSends && recentOptOutRate >= maxOptOutRate;
     const hourlyRemaining = Math.max(0, maxPerHour - recentHourlySendCount);
     const dailyRemaining = Math.max(0, maxPerDay - recentDailySendCount);
     const limit = dryRun
@@ -445,8 +524,14 @@ serve(async (req) => {
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
+    const cooldownCutoff = new Date(
+      now.getTime() - duplicatePhoneCooldownDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const missedOpenHouseCutoff = new Date(
+      now.getTime() - missedOpenHouseMaxAgeDays * 24 * 60 * 60 * 1000,
+    );
 
-    if (outreachSendPaused) {
+    if ((outreachSendPaused || healthBlocked) && !dryRun) {
       return new Response(
         JSON.stringify(
           {
@@ -459,8 +544,17 @@ serve(async (req) => {
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
+            health_blocked: healthBlocked,
+            health_window_days: healthWindowDays,
+            health_min_sends: healthMinSends,
+            health_outreach_sends: recentHealthSendCount,
+            health_opt_outs: recentHealthOptOutCount,
+            health_opt_out_rate: recentOptOutRate,
+            max_opt_out_rate: maxOptOutRate,
             outreach_operator_mode: outreachOperatorMode,
-            message: "Outbound outreach sending is paused. No messages sent this run.",
+            message: outreachSendPaused
+              ? "Outbound outreach sending is paused. No messages sent this run."
+              : "Outreach health gate is active because the rolling opt-out rate reached the configured limit. No messages sent this run.",
             results: [],
           },
           null,
@@ -589,8 +683,14 @@ serve(async (req) => {
 
         const isMissedOpenHouseCampaign = row.template_key === "missed_open_house";
         const isAdminScheduledDrip = row.review_status === "drip_scheduled";
-        const initialStale = !isMissedOpenHouseCampaign && !!openEnd && openEnd <= now;
+        const missedOpenHouseStale = isMissedOpenHouseCampaign &&
+          (!openEnd || openEnd < missedOpenHouseCutoff);
+        const initialStale = missedOpenHouseStale ||
+          (!isMissedOpenHouseCampaign && !!openEnd && openEnd <= now);
         const followupStale = !FOLLOWUPS_DISABLED && !isAdminScheduledDrip && !!openStart && openStart <= now;
+        const initialStaleReason = missedOpenHouseStale
+          ? `Missed open house is older than ${missedOpenHouseMaxAgeDays} days`
+          : "Open house already ended";
 
         if (dryRun && (initialStale || followupStale)) {
           results.push({
@@ -600,7 +700,7 @@ serve(async (req) => {
             ok: true,
             dry_run: true,
             would_skip: true,
-            reason: initialStale ? "Open house already ended" : "Open house already started",
+            reason: initialStale ? initialStaleReason : "Open house already started",
           });
           continue;
         }
@@ -610,7 +710,7 @@ serve(async (req) => {
             .from("agent_outreach_queue")
             .update({
               initial_send_status: "skipped_expired",
-              initial_block_reason: "open_house_ended",
+              initial_block_reason: missedOpenHouseStale ? "missed_open_house_too_old" : "open_house_ended",
               send_error: null,
             })
             .eq("id", row.id);
@@ -621,7 +721,7 @@ serve(async (req) => {
             step: "initial",
             ok: true,
             skipped: true,
-            reason: "Open house already ended",
+            reason: initialStaleReason,
           });
           continue;
         }
@@ -672,7 +772,7 @@ serve(async (req) => {
         const selectedProvider = twilioBrokerageOverride
           ? "twilio"
           : outreachOperatorMode === "away"
-            ? "android_gateway"
+            ? configuredOutreachProvider()
             : "manual";
         const providerOverride = selectedProvider === "manual"
           ? null
@@ -688,6 +788,10 @@ serve(async (req) => {
         const storedFollowupBody = FOLLOWUPS_DISABLED
           ? null
           : addPreviewLinkBeforeStop(buildFollowupOutreachBody(row) || "", previewUrl) || null;
+        const recentOutreach = initialDue && selectedProvider !== "manual"
+          ? await findRecentOutreachForPhone(supabase, phoneNormalized, row.id, cooldownCutoff)
+          : null;
+        const contactBlocked = isBlockedReviewStatus(row.review_status);
 
         if (dryRun) {
           results.push({
@@ -696,7 +800,16 @@ serve(async (req) => {
             step: initialDue ? "initial" : followupDue ? "followup" : null,
             ok: true,
             dry_run: true,
-            would_send: initialDue || followupDue,
+            would_send: Boolean(
+              (initialDue || followupDue) && !recentOutreach && !contactBlocked && selectedProvider !== "manual",
+            ),
+            would_skip: Boolean(recentOutreach || contactBlocked),
+            skip_reason: contactBlocked
+              ? "Contact opted out"
+              : recentOutreach
+                ? "Recent outreach already sent to this phone"
+                : null,
+            blocked_by: recentOutreach?.id || null,
             initial_send_status: row.initial_send_status,
             followup_send_status: row.followup_send_status,
             initial_send_at: row.initial_send_at,
@@ -709,6 +822,7 @@ serve(async (req) => {
             provider_override: providerOverride,
             outreach_operator_mode: outreachOperatorMode,
             manual_ready: selectedProvider === "manual",
+            initial_mms_enabled: selectedProvider === "twilio" && truthySetting(Deno.env.get("OUTREACH_INITIAL_MMS_ENABLED")),
             preview_url: previewUrl || null,
             message_preview: (initialDue ? initialBody : followupBody || "").slice(0, 360),
           });
@@ -762,6 +876,28 @@ serve(async (req) => {
           continue;
         }
 
+        if (initialDue && recentOutreach) {
+          await supabase
+            .from("agent_outreach_queue")
+            .update({
+              initial_send_status: "blocked_duplicate",
+              initial_block_reason: `recent_outreach_sent_to_phone:${recentOutreach.id}`,
+              send_error: null,
+            })
+            .eq("id", row.id);
+
+          results.push({
+            id: row.id,
+            agent_name: row.agent_name,
+            step: "initial",
+            ok: true,
+            skipped: true,
+            reason: `Outreach was already sent to this phone within ${duplicatePhoneCooldownDays} days`,
+            blocked_by: recentOutreach.id,
+          });
+          continue;
+        }
+
         if (initialDue) {
           sendAttempts += 1;
           attemptedStep = "initial";
@@ -771,7 +907,9 @@ serve(async (req) => {
             body: initialBody,
             category: row.template_key === "missed_open_house" ? "outreach_followup" : "outreach",
             providerOverride: providerOverride || undefined,
-            mediaUrls: [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean),
+            mediaUrls: truthySetting(Deno.env.get("OUTREACH_INITIAL_MMS_ENABLED"))
+              ? [row.mockup_image_url, BUSINESS_CARD_URL].filter(Boolean)
+              : [],
             statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id, "initial"),
             metadata: {
               queue_row_id: row.id,
@@ -955,7 +1093,15 @@ serve(async (req) => {
           daily_remaining: dailyRemaining,
           outreach_operator_mode: outreachOperatorMode,
           paused: outreachSendPaused,
-          duplicate_phone_cooldown: "disabled",
+          health_blocked: healthBlocked,
+          health_window_days: healthWindowDays,
+          health_min_sends: healthMinSends,
+          health_outreach_sends: recentHealthSendCount,
+          health_opt_outs: recentHealthOptOutCount,
+          health_opt_out_rate: recentOptOutRate,
+          max_opt_out_rate: maxOptOutRate,
+          duplicate_phone_cooldown_days: duplicatePhoneCooldownDays,
+          missed_open_house_max_age_days: missedOpenHouseMaxAgeDays,
           results,
         },
         null,

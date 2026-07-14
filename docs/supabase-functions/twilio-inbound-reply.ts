@@ -26,6 +26,11 @@ function isOptOut(text: string): boolean {
   return ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(normalized);
 }
 
+function isOptIn(text: string): boolean {
+  const normalized = text.trim().toUpperCase();
+  return ["START", "UNSTOP"].includes(normalized);
+}
+
 function toE164(phone: string | null): string {
   const digits = normalizePhone(phone);
   if (!digits) return "";
@@ -95,6 +100,7 @@ serve(async (req) => {
     const toPhone = String(payload.To || payload.to || "").trim();
     const body = String(payload.Body || payload.body || "").trim();
     const accountSid = String(payload.AccountSid || payload.account_sid || "").trim();
+    const optOutType = String(payload.OptOutType || payload.opt_out_type || "").trim().toUpperCase();
 
     if (!messageSid || !fromPhone) {
       return new Response(
@@ -104,7 +110,8 @@ serve(async (req) => {
     }
 
     const fromPhoneNormalized = normalizePhone(fromPhone);
-    const optOut = isOptOut(body);
+    const optOut = optOutType === "STOP" || isOptOut(body);
+    const optIn = optOutType === "START" || isOptIn(body);
 
     const { data: queueRow, error: queueLookupError } = await supabase
       .from("agent_outreach_queue")
@@ -144,7 +151,8 @@ serve(async (req) => {
         .from("sms_suppression_list")
         .select("id")
         .eq("phone", suppressedPhone)
-        .eq("provider", "twilio")
+        .order("created_at", { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (suppressLookupError) {
@@ -173,15 +181,38 @@ serve(async (req) => {
       if (suppressError) {
         console.error("SMS suppression upsert failed", suppressError);
       }
+    } else if (optIn) {
+      const { error: optInError } = await supabase
+        .from("sms_suppression_list")
+        .delete()
+        .eq("phone", toE164(fromPhone));
+
+      if (optInError) {
+        console.error("SMS suppression opt-in removal failed", optInError);
+      }
     }
 
-    if (queueRow?.id) {
+    if (optOut) {
+      const { error: updateAllQueueError } = await supabase
+        .from("agent_outreach_queue")
+        .update({
+          approved_for_send: false,
+          review_status: "opted_out",
+          send_mode: "manual",
+          followup_block_reason: "opted_out",
+          followup_send_status: "blocked_opt_out",
+          updated_at: new Date().toISOString(),
+        })
+        .in("agent_phone_normalized", phoneLookupVariants(fromPhone));
+
+      if (updateAllQueueError) throw updateAllQueueError;
+    } else if (queueRow?.id) {
       const queueUpdate: Record<string, unknown> = {
         approved_for_send: false,
-        review_status: optOut ? "opted_out" : "replied",
-        send_mode: optOut ? "manual" : queueRow.send_mode,
-        followup_block_reason: optOut ? "opted_out" : null,
-        followup_send_status: optOut ? "blocked_opt_out" : "pending",
+        review_status: "replied",
+        send_mode: queueRow.send_mode,
+        followup_block_reason: null,
+        followup_send_status: "pending",
         updated_at: new Date().toISOString(),
       };
 
@@ -217,9 +248,9 @@ serve(async (req) => {
       }
     }
 
-    const twiml = optOut
-      ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>You have been opted out. No further automated texts will be sent.</Message></Response>`
-      : `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
+    // Twilio/carriers provide the required toll-free STOP/START confirmation.
+    // Returning an empty response avoids sending a duplicate application reply.
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
 
     return new Response(twiml, {
       status: 200,

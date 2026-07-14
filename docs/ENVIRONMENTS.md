@@ -35,6 +35,7 @@ This repo uses branch separation to reduce production risk.
 - Use Vercel environment variables, Supabase dashboard secrets, or local untracked `.env` files for sensitive values.
 - Do not commit production tokens, private service keys, Twilio credentials, webhook secrets, signing secrets, or provider API keys.
 - The public Supabase anon key can exist in browser code when intentionally used as a public client key, but private service credentials must never be exposed in frontend code.
-- Twilio sender number belongs in Supabase secret `TWILIO_PHONE`; delivery callback token belongs in `TWILIO_STATUS_CALLBACK_TOKEN`. Store the secret names and URL shapes in docs, not the actual token values.
+- The legacy/default Twilio sender belongs in `TWILIO_PHONE`; route-specific senders use `TWILIO_EVENTS_FROM_NUMBER`, `TWILIO_OUTREACH_FROM_NUMBER`, or preferably `TWILIO_OUTREACH_MESSAGING_SERVICE_SID`. Delivery callback token belongs in `TWILIO_STATUS_CALLBACK_TOKEN`. Store secret names and URL shapes in docs, not private values.
 - SMS provider routing should use `SMS_PROVIDER=twilio` as the default, `SMS_EVENTS_PROVIDER=twilio` for buyer/event/owner operational texts, `SMS_OUTREACH_PROVIDER=android_gateway` for general outreach, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` for the Twilio/MMS outreach override.
 - Runtime manual/away behavior is stored in `rel8tion_runtime_settings` under `outreach_operator_mode`.
+- When `SMS_OUTREACH_PROVIDER=twilio`, a route-specific outreach sender is required; the code does not fall back to the regular event number. Keep `OUTREACH_INITIAL_MMS_ENABLED` unset/false for initial cold outreach.

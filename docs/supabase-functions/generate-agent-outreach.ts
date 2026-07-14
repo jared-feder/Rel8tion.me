@@ -24,7 +24,8 @@ type QueueRow = {
 
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
 function firstNameSafe(name: string | null): string {
@@ -106,9 +107,8 @@ function buildVariants(row: QueueRow) {
   const addr = shortAddress(row.address);
 
   const main =
-    `Hey ${firstName} 👋 I’d love to stop by your open house at ${addr} ${when} to provide quick pre-approval support.\n\n` +
-    `I’m also sponsoring a Rel8tion Event Pass for you — paperless check-in, e-sign disclosures, and lead capture with no app needed.\n\n` +
-    `Looking forward to meeting you. Reply STOP to opt out.`;
+    `Hi ${firstName} — Jared with NMB. I saw your open house at ${addr} ${when}. ` +
+    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`;
 
   const followup = FOLLOWUPS_DISABLED
     ? null
@@ -123,8 +123,8 @@ function buildMissedOpenHouseVariants(row: QueueRow) {
   const addr = shortAddress(row.address);
 
   const main =
-    `Hey ${firstName} 👋 Sorry I missed your open house at ${addr}. ` +
-    `I’d still love to support your next one with quick pre-approval help and sponsor a Rel8tion Event Pass — paperless check-in, e-sign disclosures, and lead capture with no app needed. Reply STOP to opt out.`;
+    `Hi ${firstName} — Jared with NMB. I missed your open house at ${addr}. ` +
+    `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`;
 
   return { v1: main, v2: null, v3: null, selected: main, followup: null };
 }
@@ -202,7 +202,7 @@ serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("send_status", "not_sent")
         .gt("open_end", new Date().toISOString())
-        .or("generation_status.eq.pending,and(generation_status.eq.generated,mockup_image_url.is.null)");
+        .or("generation_status.eq.pending,and(generation_status.eq.generated,mockup_status.eq.pending,mockup_image_url.is.null)");
 
       if (blockingFuture.error) throw blockingFuture.error;
 

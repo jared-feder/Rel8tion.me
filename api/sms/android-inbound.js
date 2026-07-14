@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { sendJson, supabaseRest } = require('../../lib/admin-auth');
 
 const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT']);
+const START_WORDS = new Set(['START', 'UNSTOP']);
 const PRESERVED_REVIEW_STATUSES = new Set(['interested', 'confirmed_open_house', 'accepted_open_house']);
 
 function clean(value) {
@@ -51,6 +52,10 @@ function isStop(body) {
   const text = clean(body).toUpperCase();
   if (STOP_WORDS.has(text)) return true;
   return text.split(/\r?\n+/).some((line) => STOP_WORDS.has(line.trim().replace(/[.!?]+$/g, '')));
+}
+
+function isStart(body) {
+  return START_WORDS.has(clean(body).toUpperCase());
 }
 
 function safeIsoTimestamp(value) {
@@ -158,7 +163,7 @@ async function findRecentOutreachRow(fromPhone) {
 
 async function insertSuppression(phone, payload) {
   const existing = await supabaseRest(
-    `sms_suppression_list?phone=eq.${encodeURIComponent(phone)}&provider=eq.android_gateway&select=id&limit=1`
+    `sms_suppression_list?phone=eq.${encodeURIComponent(phone)}&select=id&order=created_at.asc&limit=1`
   ).catch(() => []);
   const body = {
     phone,
@@ -179,6 +184,13 @@ async function insertSuppression(phone, payload) {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify(body)
+  });
+}
+
+async function removeSuppression(phone) {
+  await supabaseRest(`sms_suppression_list?phone=eq.${encodeURIComponent(phone)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' }
   });
 }
 
@@ -259,8 +271,8 @@ async function markPhoneAndroidOptedOut(fromPhone) {
   const updatedAt = new Date().toISOString();
   await Promise.all(rows.map((row) => {
     const patch = {
-      review_status: 'android_opted_out',
-      followup_block_reason: 'android_opted_out',
+      review_status: 'opted_out',
+      followup_block_reason: 'opted_out',
       updated_at: updatedAt
     };
 
@@ -314,6 +326,7 @@ module.exports = async function handler(req, res) {
     const receivedAt = safeIsoTimestamp(receivedAtRaw);
     const fromPhone = toE164(fromRaw);
     const stop = isStop(body);
+    const start = isStart(body);
     const externalId = firstPresent(
       nested.messageId,
       nested.message_id,
@@ -356,13 +369,17 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (stop) await insertSuppression(fromPhone, payload);
+    if (stop) {
+      await insertSuppression(fromPhone, payload);
+    } else if (start) {
+      await removeSuppression(fromPhone);
+    }
 
     const queueRow = await findRecentOutreachRow(fromPhone);
     await insertOutreachReply({ queueRow, fromPhone, toPhone: toE164(toPhone), body, externalId, payload, stop, receivedAt });
     if (stop) {
       await markPhoneAndroidOptedOut(fromPhone);
-    } else {
+    } else if (!start) {
       await updateOutreachQueue(queueRow, stop);
     }
 
@@ -372,6 +389,7 @@ module.exports = async function handler(req, res) {
       auth: auth.method,
       from_phone: fromPhone,
       is_stop: stop,
+      is_start: start,
       queue_row_id: queueRow?.id || null
     });
   } catch (error) {

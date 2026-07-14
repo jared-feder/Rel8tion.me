@@ -1,6 +1,6 @@
 const { callSupabaseFunction, cronAuthorized, readJsonBody, send } = require('../../lib/outreach-cron-shared');
 
-const OUTREACH_SEND_MAX_PER_RUN_HARD_CAP = 7;
+const OUTREACH_SEND_MAX_PER_RUN_HARD_CAP = 5;
 
 module.exports = async function handler(req, res) {
   try {

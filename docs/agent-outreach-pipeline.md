@@ -91,13 +91,13 @@ The send function should assume:
 
 It should not require a hidden `approved_for_send` gate. Normal cron sends are eligible when the row is automatic, generated, rendered, due, has a listing photo, and has pending initial SMS copy. As of 2026-06-28, follow-up/drip sends are disabled while opt-out health is recovered; generator and sender code should keep follow-up rows unscheduled with `followup_block_reason = "followups_disabled"`.
 
-Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production routing should use `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, `SMS_OUTREACH_PROVIDER=android_gateway`, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`.
+Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md` and `docs/android-sms-gateway.md`. The shared SMS layer supports `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic, both falling back to `SMS_PROVIDER`. Current production remains paused with `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, `SMS_OUTREACH_PROVIDER=android_gateway`, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman`. The intended restart uses a dedicated verified toll-free Messaging Service for outreach and keeps the regular Twilio number for event/operational traffic.
 
 Douglas Elliman outreach is the Twilio/MMS auto-send lane. Non-Douglas Elliman outreach waits for manual send when `rel8tion_runtime_settings.outreach_operator_mode` is `live`, and uses Android Gateway when that mode is `away`.
 
-Automatic outreach is capped at 7 sends per run. The rolling hourly and daily caps still apply on top of that.
+During opt-out recovery, automatic outreach is hard-capped at 5 sends per run, 5 per rolling hour, and 5 per rolling 24 hours. A 30-day same-phone cooldown and rolling 7-day opt-out health gate apply before delivery; missed-open-house outreach older than 7 days is skipped, and the initial MMS flag is off by default.
 
-Automatic outreach can be globally paused with `rel8tion_runtime_settings.key = "outreach_send_paused"` and a truthy JSON value such as `{ "paused": true }`, or with `OUTREACH_SEND_PAUSED=true`. When paused, `send-agent-outreach` exits before selecting queue rows and sends no messages.
+Automatic outreach can be globally paused with `rel8tion_runtime_settings.key = "outreach_send_paused"` and a truthy JSON value such as `{ "paused": true }`, or with `OUTREACH_SEND_PAUSED=true`. When paused, live runs send nothing; authenticated dry runs can still inspect candidate routing, cooldowns, and message previews.
 
 For Twilio-routed replies, the current sender secret is `TWILIO_PHONE`, inbound replies must enter through `twilio-inbound-router`, and Twilio Messaging Service inbound handling must be `Send a webhook`. For Android-routed outreach, inbound replies must arrive through the Android inbound webhook/replay path.
 
