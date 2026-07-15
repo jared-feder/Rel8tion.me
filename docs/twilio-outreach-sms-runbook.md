@@ -33,7 +33,7 @@ TWILIO_OUTREACH_FROM_NUMBER=+18448211802
 
 `TWILIO_OUTREACH_FROM_NUMBER` can be used instead of a Messaging Service SID, but the Messaging Service is preferred. When `SMS_OUTREACH_PROVIDER=twilio`, the shared SMS layer requires a route-specific outreach sender and will not silently fall back to the regular event number. Twilio Console shows the toll-free registration complete, and live tests confirm sender-pool membership, MMS delivery, inbound webhook behavior, queue linking, and the owner-alert route.
 
-Do not enable `OUTREACH_INITIAL_MMS_ENABLED` for cold initial outreach. The default is plain SMS; send images only after a positive reply or for contacts with a documented permission basis. Android Gateway can automate text SMS and a preview link, but it cannot automate outbound MMS with the current provider.
+`OUTREACH_INITIAL_MMS_ENABLED` is disabled by code default but is explicitly `true` in current production after owner approval and verified toll-free MMS delivery. Initial outreach sends two public JPEG attachments in order: the row's generated outreach mockup, then `NMB_BUSINESS_CARD_URL` (falling back to the verified `mynmb.jpg` business card). Keep the permission-oriented copy, STOP language, suppression checks, freshness checks, and recovery caps intact. Android Gateway remains text-only.
 
 ## Twilio Console Settings
 
@@ -113,6 +113,7 @@ Inbound reply test:
 - Post-cutover inbound SID `SM5bd0275785326ce95cfd9c4970070647` was stored in `agent_outreach_replies` and linked to queue row `b674dd8f-99f1-40f7-9ec2-403634b3571c`.
 - The inbound handler queued event-route owner alert SID `SMc284b6659cb7b25c8c61e724b31231d8`.
 - Runtime pause was removed with reason `toll_free_outreach_verified`. The recovery caps were increased with owner approval to 5/run, 10/hour, and 25/day; the rolling health gate, suppression, cooldown, freshness, and quiet-hour checks remain active.
+- Production `OUTREACH_INITIAL_MMS_ENABLED=true` was owner-approved after both the generated mockup and business-card JPEG URLs returned HTTP 200. A live dry run reported `initial_mms_enabled=true` for the 25 staged future-open-house candidates.
 
 ## Common Failure Modes
 
