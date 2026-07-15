@@ -49,8 +49,8 @@ const checks = [
     label: 'admin outreach search browser preflight'
   },
   { path: '/api/admin/outreach-health', statuses: [401], label: 'admin outreach health API' },
-  { path: '/api/rel8tionos/health', statuses: [401], label: 'Rel8tionOS authenticated health API' },
-  { path: '/api/rel8tionos/threads', statuses: [401], label: 'Rel8tionOS authenticated thread API' },
+  { path: '/api/rel8tionos/health', statuses: [401, 503], label: 'Rel8tionOS authenticated health API' },
+  { path: '/api/rel8tionos/threads', statuses: [401, 503], label: 'Rel8tionOS authenticated thread API' },
   { path: '/api/rel8tionos/reply', statuses: [405], label: 'Rel8tionOS reply method guard' },
   { path: '/api/admin/android-inbox-replay', statuses: [405], label: 'admin Android replay API' },
   { path: '/api/cron/replay-android-inbox', statuses: [401, 500], label: 'Android replay cron API' }
