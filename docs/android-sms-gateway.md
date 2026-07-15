@@ -1,12 +1,12 @@
 # Android SMS Gateway Fallback
 
-Android Gateway is the general non-Douglas Elliman outreach route when REL8TION COMMAND is in Away mode. Twilio remains active for buyer/event/system messages and for Douglas Elliman outreach.
+Android Gateway is the fallback outreach route. As of 2026-07-14, Away/automatic mode uses the dedicated Twilio toll-free Messaging Service; Android should be selected only during an intentional provider fallback.
 
 The current Android provider automates text SMS only. It does not support outbound MMS/media. For images, use a verified MMS-capable Twilio sender or keep the Android text preview link.
 
 ## Environment
 
-Current split outreach route:
+Android fallback route:
 
 ```text
 SMS_PROVIDER=twilio
@@ -18,7 +18,7 @@ SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
 Runtime mode is stored in `rel8tion_runtime_settings` as `outreach_operator_mode`:
 
 - `live`: non-Douglas Elliman waits for manual send in COMMAND.
-- `away`: non-Douglas Elliman sends through Android Gateway on cron.
+- `away`: ready rows use whichever provider is configured by `SMS_OUTREACH_PROVIDER`.
 
 Android route settings:
 
@@ -50,19 +50,19 @@ TWILIO_AUTH_TOKEN=
 TWILIO_PHONE=
 ```
 
-Use the outreach device only for non-Douglas Elliman outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. Brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES` bypass the Android outreach route and send through Twilio/MMS. If Android is ever used for events too, use the events device and do not share one device across both routes.
+When Android fallback is enabled, use the outreach device only for outreach traffic. Keep event/buyer/owner operational traffic on Twilio unless there is a provider outage. If Android is ever used for events too, use the events device and do not share one device across both routes.
 
-Emergency all-Twilio route, not current production:
+Current all-Twilio split route:
 
 ```text
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=twilio
 SMS_EVENTS_PROVIDER=twilio
 TWILIO_EVENTS_FROM_NUMBER=+15168885461
-TWILIO_OUTREACH_MESSAGING_SERVICE_SID=<verified toll-free Messaging Service SID>
+TWILIO_OUTREACH_MESSAGING_SERVICE_SID=MG8d7ec49cf1d6d231080b7f870a10eb0b
 ```
 
-Do not use that route for non-Douglas Elliman automated outreach until the route-specific toll-free sender is intentionally added and verified. The code refuses to fall back to the regular Twilio number when `SMS_OUTREACH_PROVIDER=twilio` and no dedicated outreach sender is configured.
+The route-specific toll-free sender is configured and outbound MMS is verified. Automatic outreach remains globally paused pending inbound reply verification. The code refuses to fall back to the regular Twilio number when `SMS_OUTREACH_PROVIDER=twilio` and no dedicated outreach sender is configured.
 
 When Twilio is active for any route, use `docs/twilio-outreach-sms-runbook.md` for the current number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
 

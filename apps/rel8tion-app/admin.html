@@ -1891,7 +1891,7 @@
       if (row?.send_mode && row.send_mode !== 'automatic' && isOutreachCronReady(row)) return badge('Manual ready', 'warn');
       if (isOutreachSendCandidate(row) && isDouglasEllimanOutreach(row)) return badge('Twilio ready', 'ok');
       if (isOutreachSendCandidate(row) && outreachOperatorMode() === 'live') return badge('Manual ready', 'warn');
-      if (isOutreachSendCandidate(row)) return badge('Android ready', 'ok');
+      if (isOutreachSendCandidate(row)) return badge('Auto ready', 'ok');
       if (row?.send_mode && row.send_mode !== 'automatic') return badge('Paused', 'info');
       if (row?.generation_status === 'generated' && row?.mockup_status === 'rendered') return badge('Not due', 'info');
       return '';
@@ -2473,7 +2473,7 @@ ${rowsHtml}
       const normalized = mode === 'away' ? 'away' : 'live';
       if (normalized === outreachOperatorMode()) return;
       const prompt = normalized === 'away'
-        ? 'Switch outreach to Away mode? Non-Douglas Elliman ready rows can send through the Android Gateway on the next cron run.'
+        ? 'Switch outreach to Away mode? Ready rows can send through the configured automatic provider on the next cron run.'
         : 'Switch outreach to Live mode? Non-Douglas Elliman ready rows will wait for manual SMS instead of auto-sending.';
       if (!window.confirm(prompt)) return;
 
@@ -3996,13 +3996,13 @@ ${rowsHtml}
       const paused = state.command?.overview?.outreach_queue_paused || 0;
       const twilioReady = state.command?.overview?.outreach_queue_twilio_ready || 0;
       const manualReady = state.command?.overview?.outreach_queue_manual_ready || 0;
-      const androidReady = state.command?.overview?.outreach_queue_android_ready || 0;
+      const autoReady = state.command?.overview?.outreach_queue_auto_ready ?? state.command?.overview?.outreach_queue_android_ready ?? 0;
       const operatorMode = outreachOperatorMode();
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(androidReady)} Android | ${esc(paused)} paused</div>
+            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(autoReady)} auto | ${esc(paused)} paused</div>
           </div>
           <div class="header-actions">
             ${renderOutreachModeControls()}
@@ -4143,7 +4143,7 @@ ${rowsHtml}
             <i data-lucide="hand"></i><span>${busy && state.actionKey === 'outreach_mode:live' ? 'Switching...' : 'Live: manual'}</span>
           </button>
           <button class="btn ${mode === 'away' ? 'primary' : 'soft'}" data-outreach-mode="away" ${busy || mode === 'away' ? 'disabled' : ''}>
-            <i data-lucide="send"></i><span>${busy && state.actionKey === 'outreach_mode:away' ? 'Switching...' : 'Away: Android'}</span>
+            <i data-lucide="send"></i><span>${busy && state.actionKey === 'outreach_mode:away' ? 'Switching...' : 'Away: auto'}</span>
           </button>
         </div>
       `;
@@ -4188,11 +4188,11 @@ ${rowsHtml}
       const cronReady = countValue(state.command?.overview?.outreach_queue_cron_ready, state.command?.overview?.outreach_queue_approved_ready || 0);
       const twilioReady = state.command?.overview?.outreach_queue_twilio_ready || 0;
       const manualReady = state.command?.overview?.outreach_queue_manual_ready || 0;
-      const androidReady = state.command?.overview?.outreach_queue_android_ready || 0;
+      const autoReady = state.command?.overview?.outreach_queue_auto_ready ?? state.command?.overview?.outreach_queue_android_ready ?? 0;
       const paused = state.command?.overview?.outreach_queue_paused || 0;
       const totalCount = state.command?.overview?.outreach_queue || rows.length;
       const shownCount = Math.min(rows.length, 80);
-      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${cronReady} auto ready | ${twilioReady} Twilio | ${manualReady} manual | ${androidReady} Android | ${paused} paused | ${totalCount} total`, rows.slice(0, 80), (row) => {
+      return renderRows('Outreach queue reference', `${shownCount} recent records shown | ${pendingCount} pending initial send | ${cronReady} auto ready | ${twilioReady} Twilio | ${manualReady} manual | ${autoReady} automatic | ${paused} paused | ${totalCount} total`, rows.slice(0, 80), (row) => {
         const thread = queueRowToThread(row);
         const key = thread.thread_key;
         return `

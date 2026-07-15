@@ -79,6 +79,7 @@ serve(async (req) => {
       message,
       category,
       metadata,
+      media_urls,
     } = body;
 
     const buyerName = clean(buyer_name) || "Buyer";
@@ -88,10 +89,15 @@ serve(async (req) => {
     const results: Array<Record<string, unknown>> = [];
 
     if (message) {
+      const mediaUrls = (Array.isArray(media_urls) ? media_urls : [])
+        .map((value) => clean(value))
+        .filter((value) => /^https:\/\//i.test(value))
+        .slice(0, 10);
       const sms = await sendSMS({
         to: agentPhone,
         body: clean(message),
         category: clean(category) || "event_transactional",
+        mediaUrls,
         metadata: {
           mode: "direct_message",
           ...(metadata && typeof metadata === "object" ? metadata : {}),

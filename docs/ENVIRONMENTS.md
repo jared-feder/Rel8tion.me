@@ -6,7 +6,7 @@ This repo uses branch separation to reduce production risk.
 
 - Production branch: `main`.
 - Vercel production branch should be set to `main`.
-- Production uses live Supabase and live Twilio settings. Outreach default should be Android Gateway with Douglas Elliman as the Twilio override; event/owner/system SMS stays on Twilio.
+- Production uses live Supabase and live Twilio settings. Outreach uses the dedicated toll-free Twilio Messaging Service; event/owner/system SMS stays on the regular Twilio number. Android Gateway is a fallback only.
 - Production secrets must never be committed to the repo.
 - Production is not the place to test risky Supabase, Twilio, NFC, sign, key, claim, buyer, or agent-dashboard changes.
 - Current Twilio outreach recovery settings are documented in `docs/twilio-outreach-sms-runbook.md`; keep the runbook updated when changing Twilio numbers, Messaging Service webhooks, or status callback tokens.
@@ -36,6 +36,6 @@ This repo uses branch separation to reduce production risk.
 - Do not commit production tokens, private service keys, Twilio credentials, webhook secrets, signing secrets, or provider API keys.
 - The public Supabase anon key can exist in browser code when intentionally used as a public client key, but private service credentials must never be exposed in frontend code.
 - The legacy/default Twilio sender belongs in `TWILIO_PHONE`; route-specific senders use `TWILIO_EVENTS_FROM_NUMBER`, `TWILIO_OUTREACH_FROM_NUMBER`, or preferably `TWILIO_OUTREACH_MESSAGING_SERVICE_SID`. Delivery callback token belongs in `TWILIO_STATUS_CALLBACK_TOKEN`. Store secret names and URL shapes in docs, not private values.
-- SMS provider routing should use `SMS_PROVIDER=twilio` as the default, `SMS_EVENTS_PROVIDER=twilio` for buyer/event/owner operational texts, `SMS_OUTREACH_PROVIDER=android_gateway` for general outreach, and `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` for the Twilio/MMS outreach override.
+- SMS provider routing uses `SMS_PROVIDER=twilio`, `SMS_EVENTS_PROVIDER=twilio`, `TWILIO_EVENTS_FROM_NUMBER=+15168885461`, `SMS_OUTREACH_PROVIDER=twilio`, and `TWILIO_OUTREACH_MESSAGING_SERVICE_SID=MG8d7ec49cf1d6d231080b7f870a10eb0b` with toll-free sender `+18448211802`. Android Gateway remains configured for fallback.
 - Runtime manual/away behavior is stored in `rel8tion_runtime_settings` under `outreach_operator_mode`.
 - When `SMS_OUTREACH_PROVIDER=twilio`, a route-specific outreach sender is required; the code does not fall back to the regular event number. Keep `OUTREACH_INITIAL_MMS_ENABLED` unset/false for initial cold outreach.
