@@ -95,7 +95,7 @@ Provider-specific recovery details live in `docs/twilio-outreach-sms-runbook.md`
 
 When `rel8tion_runtime_settings.outreach_operator_mode` is `away`, ready outreach uses the configured automatic provider, currently the toll-free Twilio Messaging Service. `live` holds non-override rows for manual send. Android is now a deliberate fallback rather than the default Away provider.
 
-During opt-out recovery, automatic outreach is hard-capped at 5 sends per run, 5 per rolling hour, and 5 per rolling 24 hours. A 30-day same-phone cooldown and rolling 7-day opt-out health gate apply before delivery; missed-open-house outreach older than 7 days is skipped, and the initial MMS flag is off by default.
+During opt-out recovery, automatic outreach is hard-capped at 5 sends per run, 10 per rolling hour, and 25 per rolling 24 hours. A 30-day same-phone cooldown and rolling 7-day opt-out health gate apply before delivery; missed-open-house outreach older than 7 days is skipped, and the initial MMS flag is off by default.
 
 Automatic outreach can be globally paused with `rel8tion_runtime_settings.key = "outreach_send_paused"` and a truthy JSON value such as `{ "paused": true }`, or with `OUTREACH_SEND_PAUSED=true`. When paused, live runs send nothing; authenticated dry runs can still inspect candidate routing, cooldowns, and message previews.
 

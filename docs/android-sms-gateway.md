@@ -62,7 +62,7 @@ TWILIO_EVENTS_FROM_NUMBER=+15168885461
 TWILIO_OUTREACH_MESSAGING_SERVICE_SID=MG8d7ec49cf1d6d231080b7f870a10eb0b
 ```
 
-The route-specific toll-free sender, outbound MMS, inbound Rel8tion webhook, queue linking, and owner-alert route are verified. Automatic outreach is live under the 5/run, 5/hour, and 5/day recovery caps; Android remains fallback-only. The code refuses to fall back to the regular Twilio number when `SMS_OUTREACH_PROVIDER=twilio` and no dedicated outreach sender is configured.
+The route-specific toll-free sender, outbound MMS, inbound Rel8tion webhook, queue linking, and owner-alert route are verified. Automatic outreach is live under the 5/run, 10/hour, and 25/day recovery caps; Android remains fallback-only. The code refuses to fall back to the regular Twilio number when `SMS_OUTREACH_PROVIDER=twilio` and no dedicated outreach sender is configured.
 
 When Twilio is active for any route, use `docs/twilio-outreach-sms-runbook.md` for the current number, inbound webhook, delivery-status callback, and verification steps. The sender number secret for this repo is `TWILIO_PHONE`; `TWILIO_FROM_NUMBER` is only an optional code fallback.
 

@@ -16,7 +16,7 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
-- Automatic outreach is live with `rel8tion_runtime_settings.outreach_send_paused.paused=false` and reason `toll_free_outreach_verified`. Recovery remains hard-capped at 5/run, 5/hour, and 5/day; old manual backlog rows must remain held.
+- Automatic outreach is live with `rel8tion_runtime_settings.outreach_send_paused.paused=false` and reason `toll_free_outreach_verified`. Recovery remains hard-capped at 5/run, 10/hour, and 25/day; old manual backlog rows must remain held.
 
 ## Dedicated Toll-Free Outreach Target
 
@@ -112,7 +112,7 @@ Inbound reply test:
 - Messaging Service inbound handling was corrected from `Defer to sender's webhook`/ElevenLabs to `Send a webhook` with the Rel8tion `twilio-inbound-router` primary and fallback POST URLs.
 - Post-cutover inbound SID `SM5bd0275785326ce95cfd9c4970070647` was stored in `agent_outreach_replies` and linked to queue row `b674dd8f-99f1-40f7-9ec2-403634b3571c`.
 - The inbound handler queued event-route owner alert SID `SMc284b6659cb7b25c8c61e724b31231d8`.
-- Runtime pause was removed with reason `toll_free_outreach_verified`. The authenticated dry run returned `paused=false`, `outreach_operator_mode=away`, 0 automatic candidates, no health block, and hard caps of 5/run, 5/hour, 5/day.
+- Runtime pause was removed with reason `toll_free_outreach_verified`. The recovery caps were increased with owner approval to 5/run, 10/hour, and 25/day; the rolling health gate, suppression, cooldown, freshness, and quiet-hour checks remain active.
 
 ## Common Failure Modes
 
@@ -128,7 +128,7 @@ Inbound reply test:
 
 ## 2026-07-14 Recovery Audit
 
-- The audit started with runtime paused for `opt_out_rate_recovery`; after the verified toll-free cutover, runtime was released with reason `toll_free_outreach_verified` under the 5/day recovery cap.
+- The audit started with runtime paused for `opt_out_rate_recovery`; after the verified toll-free cutover, runtime was released with reason `toll_free_outreach_verified` under the 25/day recovery cap.
 - Last 30 days contained 222 logged outreach/manual-outreach sends and 8 recorded opt-outs, about 3.6%. This is above the healthy target and is why the backlog must not be released at once.
 - The live queue contained 523 pending initial rows during the audit. A restart must select a small fresh pilot; never unpause the entire backlog without rechecking freshness, suppression, cooldown, and consent/relationship basis.
 - Existing suppression rows were provider-scoped (7 Android, 8 Twilio). The shared send check is now provider-agnostic so all 15 block both delivery paths.
