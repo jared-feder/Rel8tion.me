@@ -139,6 +139,10 @@ function isSuppressionBypassed(category: string, metadata: Record<string, unknow
   return category === "owner_fallback_alert" || metadata.internal_operational_alert === true;
 }
 
+function isQuietHoursBypassed(category: string, metadata: Record<string, unknown> = {}): boolean {
+  return category === "manual_outreach" && metadata.reply_to_recent_inbound === true;
+}
+
 export function isQuietHoursNY(date = new Date()): boolean {
   const hour = Number(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -388,7 +392,7 @@ export async function sendSMS(options: SendSmsOptions) {
   }
 
   if (route === "outreach") {
-    if (isQuietHoursNY()) {
+    if (isQuietHoursNY() && !isQuietHoursBypassed(category, metadata)) {
       await logSmsAttempt(supabase, {
         provider,
         route: routeLabel,

@@ -66,6 +66,13 @@ function buildStatusCallbackUrl(supabaseUrl: string, queueId: string): string {
   return url.toString();
 }
 
+function isRecentInbound(receivedAt: string | null | undefined): boolean {
+  const receivedAtMs = new Date(receivedAt || "").getTime();
+  if (!Number.isFinite(receivedAtMs)) return false;
+  const ageMs = Date.now() - receivedAtMs;
+  return ageMs >= 0 && ageMs <= 24 * 60 * 60 * 1000;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -146,6 +153,20 @@ serve(async (req) => {
       );
     }
 
+    const { data: latestInbound, error: latestInboundError } = await supabase
+      .from("agent_outreach_replies")
+      .select("received_at")
+      .eq("queue_row_id", row.id)
+      .neq("direction", "outbound")
+      .order("received_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestInboundError) throw latestInboundError;
+
+    const lastInboundAt = latestInbound?.received_at || null;
+    const replyToRecentInbound = isRecentInbound(lastInboundAt);
+
     const normalizedPhone = normalizePhone(row.agent_phone_normalized || row.agent_phone || "");
     const to = toE164(normalizedPhone);
 
@@ -171,6 +192,8 @@ serve(async (req) => {
         provider_override: providerOverride,
         campaign: typeof body.campaign === "string" ? body.campaign : null,
         step: "manual_reply",
+        reply_to_recent_inbound: replyToRecentInbound,
+        last_inbound_at: lastInboundAt,
       },
     });
 
