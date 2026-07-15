@@ -51,6 +51,7 @@ REL8TION is deliberately lightweight:
 - `[IMPLEMENTED]` Static Vercel pages in `apps/rel8tion-app`.
 - `[IMPLEMENTED]` Root static wrappers and public pages such as `index.html`, `a.html`, and `b.html`.
 - `[IMPLEMENTED]` Root Vercel serverless API routes under `api/`.
+- `[IMPLEMENTED]` A private server-to-server Rel8tionOS API under `api/rel8tionos/` exposes scoped outreach conversation, reply, Open House acceptance, and loan-officer assignment operations. It authenticates with a dedicated server-only shared key and returns no-store, versioned JSON responses.
 - `[IMPLEMENTED]` Supabase REST/RPC calls from browser code where allowed by anon policies.
 - `[IMPLEMENTED]` Supabase Edge Functions under `supabase/functions`.
 - `[PARTIAL]` Android SMS Gateway as a temporary outreach-volume provider fallback while Twilio paths remain intact.
@@ -152,6 +153,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` REL8TION COMMAND shows Twilio ready, Manual ready, and Auto ready rows. Live: manual / Away: auto changes `rel8tion_runtime_settings.outreach_operator_mode`, while Pause cron / Resume cron intentionally changes row `send_mode`.
 - `[IMPLEMENTED]` `/manual-sms-outreach` is the protected cell-send backup. It uses `/api/manual-sms-outreach`, opens the local SMS composer, marks rows sent/skipped only after operator action, and does not exclude Douglas Elliman manual-ready rows.
 - `[IMPLEMENTED]` REL8TION COMMAND outreach health treats an empty inbound window as quiet/normal instead of a broken inbox; actual warnings remain for raw/unlinked inbound rows and linked replies missing from the inbox view.
+- `[IMPLEMENTED]` Rel8tionOS uses the same manual reply and assignment workflows as REL8TION COMMAND. Its API requires an idempotency key for outbound SMS and preserves centralized suppression, opt-out, routing, and quiet-hour enforcement.
 - `[PARTIAL]` Agent Ranking / Production Intelligence stages ranked agents into `agent_outreach_queue` with manual send mode and follow-ups disabled. It should not be used to send automatic SMS or to game opt-out-rate metrics.
 - `[IMPLEMENTED]` Durable Twilio outreach recovery settings live in `docs/twilio-outreach-sms-runbook.md`; keep that runbook and the source-of-truth docs aligned.
 - `[IMPLEMENTED]` As of 2026-07-14, Twilio route separation is live and verified: operational SMS uses `+15168885461`, and outreach uses registered toll-free `+18448211802` through Messaging Service `MG8d7ec49cf1d6d231080b7f870a10eb0b`. Outbound MMS delivered, the service-level inbound webhook was corrected from ElevenLabs to Rel8tion, an inbound test linked to the outreach queue, and the operational owner alert queued. The global pause is off; recovery remains limited to fresh eligible rows and hard caps of 5/run, 10/hour, and 25/day.

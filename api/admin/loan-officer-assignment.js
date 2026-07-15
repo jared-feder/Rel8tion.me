@@ -321,7 +321,7 @@ async function autoAssignLiveCoverage() {
   return { assignments, available_loan_officers: activeProfiles.length, considered_events: activeEvents.length };
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
@@ -379,4 +379,7 @@ module.exports = async function handler(req, res) {
       details: error.payload || null
     });
   }
-};
+}
+
+module.exports = handler;
+module.exports.assignLiveCoverage = assignLiveCoverage;

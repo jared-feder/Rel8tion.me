@@ -442,7 +442,7 @@ async function holdSend(body) {
   return { queue: updated || queue };
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
@@ -514,4 +514,7 @@ module.exports = async function handler(req, res) {
       details: error.payload || null
     });
   }
-};
+}
+
+module.exports = handler;
+module.exports.acceptOpenHouse = acceptOpenHouse;

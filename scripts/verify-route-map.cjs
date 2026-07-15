@@ -14,9 +14,17 @@ const criticalProductionFiles = [
   ['api/admin/key-action.js', 'protected admin key maintenance'],
   ['api/admin/outreach-health.js', 'admin outreach health panel'],
   ['api/admin/outreach-search.js', 'admin outreach full-table search'],
+  ['api/rel8tionos/health.js', 'Rel8tionOS authenticated health API'],
+  ['api/rel8tionos/threads.js', 'Rel8tionOS outreach thread API'],
+  ['api/rel8tionos/messages.js', 'Rel8tionOS outreach message API'],
+  ['api/rel8tionos/reply.js', 'Rel8tionOS manual reply API'],
+  ['api/rel8tionos/open-house.js', 'Rel8tionOS open-house acceptance API'],
+  ['api/rel8tionos/loan-officers.js', 'Rel8tionOS loan-officer API'],
   ['api/cron/replay-android-inbox.js', 'scheduled Android inbox replay'],
   ['apps/rel8tion-app/src/api/chipQr.js', 'agent QR linking browser helper'],
   ['lib/android-inbox-export.js', 'Android inbox export helper'],
+  ['lib/rel8tionos-auth.js', 'Rel8tionOS server authentication helper'],
+  ['lib/rel8tionos-outreach.js', 'Rel8tionOS outreach service helper'],
   ['supabase/functions/android-inbox-replay/index.ts', 'Supabase Android inbox replay function source']
 ];
 
