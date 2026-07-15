@@ -16,7 +16,7 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
-- Automatic outreach is currently paused in `rel8tion_runtime_settings` for `opt_out_rate_recovery`. Outbound toll-free MMS and dry-run routing are verified; keep the pause until an inbound reply to the toll-free number reaches `twilio-inbound-router` and `agent_outreach_replies`.
+- Automatic outreach is live with `rel8tion_runtime_settings.outreach_send_paused.paused=false` and reason `toll_free_outreach_verified`. Recovery remains hard-capped at 5/run, 5/hour, and 5/day; old manual backlog rows must remain held.
 
 ## Dedicated Toll-Free Outreach Target
 
@@ -31,7 +31,7 @@ TWILIO_OUTREACH_MESSAGING_SERVICE_SID=MG8d7ec49cf1d6d231080b7f870a10eb0b
 TWILIO_OUTREACH_FROM_NUMBER=+18448211802
 ```
 
-`TWILIO_OUTREACH_FROM_NUMBER` can be used instead of a Messaging Service SID, but the Messaging Service is preferred. When `SMS_OUTREACH_PROVIDER=twilio`, the shared SMS layer requires a route-specific outreach sender and will not silently fall back to the regular event number. The owner-only test confirms the toll-free sender is in the service pool and accepts MMS; Twilio Console verification/use-case approval and inbound webhook behavior must still be confirmed.
+`TWILIO_OUTREACH_FROM_NUMBER` can be used instead of a Messaging Service SID, but the Messaging Service is preferred. When `SMS_OUTREACH_PROVIDER=twilio`, the shared SMS layer requires a route-specific outreach sender and will not silently fall back to the regular event number. Twilio Console shows the toll-free registration complete, and live tests confirm sender-pool membership, MMS delivery, inbound webhook behavior, queue linking, and the owner-alert route.
 
 Do not enable `OUTREACH_INITIAL_MMS_ENABLED` for cold initial outreach. The default is plain SMS; send images only after a positive reply or for contacts with a documented permission basis. Android Gateway can automate text SMS and a preview link, but it cannot automate outbound MMS with the current provider.
 
@@ -108,8 +108,11 @@ Inbound reply test:
 - Owner-only outreach-route MMS was accepted by Twilio with SID `MM395033030537bb1de5b4b0b6489d7cdd`.
 - Twilio selected `+18448211802` as the sender from Messaging Service `MG8d7ec49cf1d6d231080b7f870a10eb0b`.
 - The request contained one public image, proving outbound MMS submission through the service.
-- The sender dry run remained `paused=true`, `outreach_operator_mode=away`, 0 automatic candidates, and hard caps of 5/run, 5/hour, 5/day.
-- Inbound reply verification is still pending; do not unpause until a reply to `+18448211802` appears in `agent_outreach_replies`.
+- Twilio Console showed the toll-free registration complete and the MMS test delivered.
+- Messaging Service inbound handling was corrected from `Defer to sender's webhook`/ElevenLabs to `Send a webhook` with the Rel8tion `twilio-inbound-router` primary and fallback POST URLs.
+- Post-cutover inbound SID `SM5bd0275785326ce95cfd9c4970070647` was stored in `agent_outreach_replies` and linked to queue row `b674dd8f-99f1-40f7-9ec2-403634b3571c`.
+- The inbound handler queued event-route owner alert SID `SMc284b6659cb7b25c8c61e724b31231d8`.
+- Runtime pause was removed with reason `toll_free_outreach_verified`. The authenticated dry run returned `paused=false`, `outreach_operator_mode=away`, 0 automatic candidates, no health block, and hard caps of 5/run, 5/hour, 5/day.
 
 ## Common Failure Modes
 
@@ -125,7 +128,7 @@ Inbound reply test:
 
 ## 2026-07-14 Recovery Audit
 
-- Live runtime remains paused with reason `opt_out_rate_recovery`.
+- The audit started with runtime paused for `opt_out_rate_recovery`; after the verified toll-free cutover, runtime was released with reason `toll_free_outreach_verified` under the 5/day recovery cap.
 - Last 30 days contained 222 logged outreach/manual-outreach sends and 8 recorded opt-outs, about 3.6%. This is above the healthy target and is why the backlog must not be released at once.
 - The live queue contained 523 pending initial rows during the audit. A restart must select a small fresh pilot; never unpause the entire backlog without rechecking freshness, suppression, cooldown, and consent/relationship basis.
 - Existing suppression rows were provider-scoped (7 Android, 8 Twilio). The shared send check is now provider-agnostic so all 15 block both delivery paths.
