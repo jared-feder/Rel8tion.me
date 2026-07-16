@@ -186,3 +186,6 @@ Important tables and fields:
 - `[RISK]` `smart_signs.public_code` is not a print source for new QR codes. Use `smart_sign_inventory.public_code`.
 - `[RISK]` Older references to `open_house_events.agent_slug` are stale. Use `host_agent_slug`.
 - `[RISK]` WordPress files are local tracking only and do not automatically sync to the live WordPress page.
+# New York agent-website compliance
+
+Agent website records carry separate fields for marketing title and exact license type, plus brokerage identity/contact information and broker-controlled compliance links. Public generated sites surface the NY Housing and Anti-Discrimination Disclosure, the employing broker's Standardized Operating Procedures when supplied, brokerage website when supplied, and the listing brokerage on property advertising. A missing SOP URL is a publish-readiness issue; broker policy content is never inferred by REL8TION.

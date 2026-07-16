@@ -12,7 +12,12 @@ const EDITABLE_FIELDS = new Set([
   'about_image_url',
   'facebook_url',
   'instagram_url',
-  'linkedin_url'
+  'linkedin_url',
+  'license_type',
+  'brokerage_address',
+  'brokerage_phone',
+  'brokerage_website_url',
+  'standardized_operating_procedure_url'
 ]);
 
 function parseBody(req) {
@@ -63,7 +68,7 @@ function buildUpdates(fields) {
   const updates = {};
   for (const [key, value] of Object.entries(fields || {})) {
     if (!EDITABLE_FIELDS.has(key)) continue;
-    if (key === 'phone') updates[key] = cleanPhone(value);
+    if (key === 'phone' || key === 'brokerage_phone') updates[key] = cleanPhone(value);
     else if (key.endsWith('_url')) updates[key] = cleanUrl(value);
     else updates[key] = cleanText(value, key === 'bio' ? 6000 : 500);
   }
