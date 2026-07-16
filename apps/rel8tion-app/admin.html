@@ -3744,6 +3744,9 @@ ${rowsHtml}
       document.querySelectorAll('[data-lo-sign-reset]').forEach((button) => {
         button.addEventListener('click', () => resetLoanOfficerCoverageSign(button.dataset.loSignReset));
       });
+      document.querySelectorAll('[data-website-form]').forEach((form) => {
+        form.addEventListener('submit', saveAgentWebsite);
+      });
       document.getElementById('autoAssignLo')?.addEventListener('click', autoAssignLoanOfficers);
       document.getElementById('reportWindow')?.addEventListener('change', (event) => {
         state.reportWindow = event.target.value;
@@ -4446,7 +4449,10 @@ ${rowsHtml}
 
     function renderCrm() {
       const rows = filterByQuery(state.command?.crm || []);
-      return renderRows('Agent CRM', `${rows.length} agent records and outreach contacts`, rows.slice(0, 80), (row) => `
+      const websites = filterByQuery(state.command?.agent_websites || []);
+      return `
+        ${renderAgentWebsiteEditor(websites)}
+        ${renderRows('Agent CRM', `${rows.length} agent records and outreach contacts`, rows.slice(0, 80), (row) => `
         <div>
           <div class="primary">${esc(row.name || 'Unknown agent')}</div>
           <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
@@ -4455,7 +4461,84 @@ ${rowsHtml}
         <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
         <div>${badge(`${row.reply_count || 0} replies`, row.reply_count ? 'warn' : 'info')}</div>
         <div>${badge(`${row.lead_count || 0} leads`, row.lead_count ? 'ok' : 'info')}</div>
-      `);
+        `)}
+      `;
+    }
+
+    function websiteField(id, field, label, value, type = 'text') {
+      const tag = type === 'textarea'
+        ? `<textarea class="field" rows="4" data-website-field="${esc(field)}">${esc(value || '')}</textarea>`
+        : `<input class="field" type="${esc(type)}" value="${esc(value || '')}" data-website-field="${esc(field)}">`;
+      return `<label class="small" style="display:grid;gap:6px;"><strong>${esc(label)}</strong>${tag}</label>`;
+    }
+
+    function renderAgentWebsiteEditor(websites) {
+      return `
+        <div class="section-head">
+          <div>
+            <h2>Agent websites</h2>
+            <div class="sub">Edit published website content. Changes save directly to the live site record.</div>
+          </div>
+        </div>
+        <div class="rows" style="margin-bottom:24px;">
+          ${websites.length ? websites.map((site) => `
+            <form class="glass-card" data-website-form="${esc(site.id)}" style="padding:18px;display:grid;gap:14px;">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                  <div class="primary">${esc(site.name || site.slug || 'Agent website')}</div>
+                  <div class="secondary">${esc(site.custom_domain || `${site.slug}.my.rel8tion.me`)} | ${esc(site.status || 'unknown')}</div>
+                </div>
+                ${site.custom_domain ? `<a class="btn soft" href="https://${esc(site.custom_domain)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open site</span></a>` : ''}
+              </div>
+              <div class="coverage-form-grid">
+                ${websiteField(site.id, 'name', 'Name', site.name)}
+                ${websiteField(site.id, 'title', 'Title', site.title)}
+                ${websiteField(site.id, 'phone', 'Phone', site.phone, 'tel')}
+                ${websiteField(site.id, 'email', 'Email', site.email, 'email')}
+                ${websiteField(site.id, 'brokerage', 'Brokerage', site.brokerage)}
+                ${websiteField(site.id, 'photo_url', 'Profile photo URL', site.photo_url, 'url')}
+                ${websiteField(site.id, 'hero_image_url', 'Hero image URL', site.hero_image_url, 'url')}
+                ${websiteField(site.id, 'about_image_url', 'About image URL', site.about_image_url, 'url')}
+                ${websiteField(site.id, 'facebook_url', 'Facebook URL', site.facebook_url, 'url')}
+                ${websiteField(site.id, 'instagram_url', 'Instagram URL', site.instagram_url, 'url')}
+                ${websiteField(site.id, 'linkedin_url', 'LinkedIn URL', site.linkedin_url, 'url')}
+              </div>
+              ${websiteField(site.id, 'bio', 'Biography', site.bio, 'textarea')}
+              <div class="row-actions">
+                <button class="btn primary" type="submit" ${state.actionKey === `website:${site.id}` ? 'disabled' : ''}>
+                  <i data-lucide="save"></i><span>${state.actionKey === `website:${site.id}` ? 'Saving...' : 'Save website'}</span>
+                </button>
+                ${badge(site.listing_sync_enabled ? (site.listing_sync_status || 'sync enabled') : 'sync off', site.listing_sync_last_error ? 'bad' : 'info')}
+              </div>
+            </form>
+          `).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No website records loaded.</div>'}
+        </div>
+      `;
+    }
+
+    async function saveAgentWebsite(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const websiteId = form.dataset.websiteForm;
+      const fields = {};
+      form.querySelectorAll('[data-website-field]').forEach((input) => {
+        fields[input.dataset.websiteField] = input.value;
+      });
+      state.actionKey = `website:${websiteId}`;
+      render();
+      try {
+        await api('/api/admin/website-action', {
+          method: 'POST',
+          body: JSON.stringify({ website_id: websiteId, fields })
+        });
+        state.actionKey = '';
+        showToast('Agent website updated.');
+        await loadAll({ showLoading: false });
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to update website.');
+        render();
+      }
     }
 
     function signAssignmentLabel(row) {

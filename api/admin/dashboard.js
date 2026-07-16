@@ -640,7 +640,8 @@ module.exports = async function handler(req, res) {
       coverageConsents,
       outreach,
       inbox,
-      kitOrders
+      kitOrders,
+      agentWebsites
     ] = await Promise.all([
       safeRest('agents?select=id,slug,name,phone,phone_normalized,email,brokerage,image_url,website&order=name.asc&limit=250', [], warnings, 'agents'),
       safeRest('keys?select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1000', [], warnings, 'keys'),
@@ -659,7 +660,8 @@ module.exports = async function handler(req, res) {
       safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
       loadDashboardInbox(warnings),
-      safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders')
+      safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders'),
+      safeRest('agent_websites?select=id,name,slug,title,brokerage,email,phone,bio,photo_url,hero_image_url,about_image_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,listing_sync_enabled,listing_sync_status,listing_sync_last_run_at,listing_sync_last_error,updated_at&order=updated_at.desc&limit=250', [], warnings, 'agent_websites')
     ]);
 
     const reportOutreach = await loadMissingReportQueueRows({
@@ -775,6 +777,7 @@ module.exports = async function handler(req, res) {
       },
       outreach_operator: outreachOperator,
       crm: crmRows,
+      agent_websites: agentWebsites,
       leads: leadRows,
       signs: signRows,
       event_passes: eventPassRows,
