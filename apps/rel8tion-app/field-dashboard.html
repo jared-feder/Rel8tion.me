@@ -53,6 +53,7 @@
       slug: params.get('slug') || '',
       role: params.get('role') || '',
       profile: null,
+      profileUids: [],
       availability: [],
       visits: [],
       relationshipVisits: [],
@@ -246,13 +247,23 @@
       return null;
     }
 
+    async function loadSignedInIdentity() {
+      if (!state.authSession?.access_token || !isLoanOfficerDashboard()) return null;
+      const response = await fetch('/api/loan-officer-account', { headers:{ Authorization:`Bearer ${state.authSession.access_token}` } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) return null;
+      state.profileUids = [...new Set([...(payload.profile_uids || []), payload.profile?.uid].filter(Boolean))];
+      return payload.profile || null;
+    }
+
     async function loadParticipantRows(range = dashboardRange()) {
       const { start, end } = range;
       const queries = [];
-      if (state.profile?.uid) {
-        queries.push(`participant_profile_id=eq.${encodeURIComponent(state.profile.uid)}`);
-        queries.push(`participant_uid=eq.${encodeURIComponent(state.profile.uid)}`);
-      }
+      const profileUids = [...new Set([...(state.profileUids || []), state.profile?.uid].filter(Boolean))];
+      profileUids.forEach((uid) => {
+        queries.push(`participant_profile_id=eq.${encodeURIComponent(uid)}`);
+        queries.push(`participant_uid=eq.${encodeURIComponent(uid)}`);
+      });
       if (state.uid && state.uid !== state.profile?.uid) queries.push(`participant_uid=eq.${encodeURIComponent(state.uid)}`);
       if (!queries.length) return [];
 
@@ -1416,6 +1427,7 @@
       state.message = message;
       state.error = '';
       state.profile = await loadProfile();
+      state.profile = await loadSignedInIdentity() || state.profile;
       state.availability = await loadAvailability();
       state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows(dashboardRange());

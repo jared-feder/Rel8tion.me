@@ -39,20 +39,22 @@ async function uploadHeadshot(dataUrl, profileUid, url, key) {
 }
 
 async function profileForEmail(email) {
-  const rows = await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=*&limit=1`);
+  const rows = await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=*&order=updated_at.desc&limit=20`);
   const profile = Array.isArray(rows) ? rows[0] || null : null;
   if (!profile?.uid || !/loan|mortgage/i.test(`${profile.industry || ''} ${profile.title || ''}`)) {
     const error = new Error('No approved loan officer profile matches this email.');
     error.status = 403;
     throw error;
   }
-  return profile;
+  return { profile, profiles:rows };
 }
 
-async function visitContexts(profile, rawIds) {
+async function visitContexts(profiles, rawIds) {
   const ids = [...new Set(clean(rawIds, 4000).split(',').map((id) => id.trim()).filter(Boolean))].slice(0, 50);
   if (!ids.length) return [];
-  const participants = await supabaseRest(`field_demo_visit_participants?participant_profile_id=eq.${enc(profile.uid)}&field_demo_visit_id=in.(${ids.map(enc).join(',')})&select=field_demo_visit_id`);
+  const profileUids = [...new Set((profiles || []).map((row) => row?.uid).filter(Boolean))];
+  if (!profileUids.length) return [];
+  const participants = await supabaseRest(`field_demo_visit_participants?participant_profile_id=in.(${profileUids.map(enc).join(',')})&field_demo_visit_id=in.(${ids.map(enc).join(',')})&select=field_demo_visit_id`);
   const allowed = new Set((Array.isArray(participants) ? participants : []).map((row) => row.field_demo_visit_id));
   if (!allowed.size) return [];
   const visits = await supabaseRest(`field_demo_visits?id=in.(${[...allowed].map(enc).join(',')})&select=id,outreach_queue_id,open_house_id,agent_name,agent_phone,agent_email,brokerage,notes`);
@@ -78,11 +80,12 @@ module.exports = async function handler(req, res) {
     const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
     if (!url || !key) throw new Error('Supabase Auth is not configured.');
     const user = await authUser(token, url, key);
-    let profile = await profileForEmail(user.email);
+    const identity = await profileForEmail(user.email);
+    let profile = identity.profile;
     if (req.method === 'GET') {
       const visitIds = clean(req.query?.visit_ids || new URL(req.url, 'https://rel8tion.local').searchParams.get('visit_ids'), 4000);
-      const contexts = visitIds ? await visitContexts(profile, visitIds) : [];
-      sendJson(res, 200, { ok:true, profile, visit_contexts:contexts });
+      const contexts = visitIds ? await visitContexts(identity.profiles, visitIds) : [];
+      sendJson(res, 200, { ok:true, profile, profile_uids:identity.profiles.map((row) => row.uid).filter(Boolean), visit_contexts:contexts });
       return;
     }
     const body = bodyOf(req);

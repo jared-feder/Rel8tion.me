@@ -275,3 +275,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` The account page verifies invite/recovery token hashes directly with Supabase Auth, removes the token from browser history, and opens password creation.
 - `[IMPLEMENTED]` A recent erroneous localhost account link does not trigger the normal five-minute duplicate suppression, allowing an immediate corrected replacement.
 - `[IMPLEMENTED]` Loan officer password/setup links and registration approval notices are transactional account messages and do not append outreach opt-out copy. Initial cold agent outreach retains its required Y/N/STOP disclosure.
+### 2026-07-17 loan-officer duplicate identity dashboard hotfix
+
+- The signed-in loan-officer dashboard now treats active verified profiles sharing the authenticated email as one account identity for assigned open-house history. This preserves older assignments when an existing loan officer registers again and a second profile row is created.
+- The canonical field-dashboard wrapper now preserves query parameters and hashes without a competing zero-second meta refresh, so mobile Open Houses, Buyers, Profile, Availability, and My Agents navigation opens the selected section.
+- Existing listing-photo URLs continue to resolve from the assigned outreach queue; the identity fix makes those assigned cards visible to the correct signed-in account.
+- Password-link resend throttling now runs before Supabase generates a replacement token. A suppressed retry can no longer invalidate the usable link that was already texted; after 30 seconds, an explicit retry generates and sends a fresh link.

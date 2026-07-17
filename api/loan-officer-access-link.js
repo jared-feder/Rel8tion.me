@@ -46,8 +46,6 @@ async function generateAccountLink(profile, url, key, redirectTo) {
 async function textAccountLink(profile, link, url, key) {
   const phone = normalizePhone(profile.phone);
   if (!phone) throw Object.assign(new Error('This approved profile does not have a valid mobile number.'), { status:409 });
-  const recent = await supabaseRest(`sms_message_log?to_phone=eq.${enc(phone)}&category=eq.event_transactional&metadata->>mode=eq.loan_officer_account_access&created_at=gte.${enc(new Date(Date.now() - 5 * 60 * 1000).toISOString())}&select=id,body&order=created_at.desc&limit=1`).catch(() => []);
-  if (Array.isArray(recent) && recent.length && !/localhost/i.test(recent[0]?.body || '')) return { status:'recently_sent' };
   const message = `REL8TION: ${profile.full_name || 'Loan officer'}, use this secure one-time link to create or reset your dashboard password: ${link}`;
   const response = await fetch(`${url}/functions/v1/send-lead-sms`, {
     method:'POST',
@@ -83,10 +81,17 @@ module.exports = async function handler(req, res) {
     const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
     const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
     if (!url || !key) throw new Error('Account access is not configured.');
+    const phone = normalizePhone(profile.phone);
+    if (!phone) throw Object.assign(new Error('This approved profile does not have a valid mobile number.'), { status:409 });
+    const recent = await supabaseRest(`sms_message_log?to_phone=eq.${enc(phone)}&category=eq.event_transactional&metadata->>mode=eq.loan_officer_account_access&created_at=gte.${enc(new Date(Date.now() - 30 * 1000).toISOString())}&select=id,body&order=created_at.desc&limit=1`).catch(() => []);
+    if (Array.isArray(recent) && recent.length && !/localhost/i.test(recent[0]?.body || '')) {
+      sendJson(res, 200, { ok:true, delivery:'A secure link was just sent. Wait 30 seconds before requesting another so the current link remains valid.' });
+      return;
+    }
     const redirectTo = `${clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '')}/loan-officer?mode=setup`;
     const generated = await generateAccountLink(profile, url, key, redirectTo);
     const delivery = await textAccountLink(profile, generated.actionLink, url, key);
-    sendJson(res, 200, { ok:true, delivery:delivery.status === 'recently_sent' ? 'A secure link was already sent recently. Check your text messages.' : 'Secure account link sent by text.', mode:generated.mode });
+    sendJson(res, 200, { ok:true, delivery:'Secure account link sent by text.', mode:generated.mode });
   } catch (error) {
     sendJson(res, error.status || 500, { ok:false, error:error.message || 'Unable to send the secure account link.' });
   }
