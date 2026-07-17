@@ -96,6 +96,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 - `[IMPLEMENTED]` `/lo-sign-activate` activates coverage for an open house and can issue Sponsored Event Pass context.
 - `[PARTIAL]` `/loan-officer-dashboard` and `/lo-field-dashboard` expose loan-officer operations.
 - `[PARTIAL]` `/nmb-activate` and `/nmb-verified` are loan officer tag/profile pages.
+- `[IMPLEMENTED]` Agent and buyer event views do not substitute a default loan officer when an event lacks a live assignment. Financing-help consent remains event data until a real loan officer is assigned.
 - `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management.
 
 ### Buyer Check-In And Dashboards

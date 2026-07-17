@@ -1,8 +1,6 @@
 import { KEY, SUPABASE_URL } from '../core/config.js';
 import { debug, jsonHeaders } from '../core/utils.js';
 
-const JARED_FINANCING_ALERT_PHONE = '13477758059';
-
 export async function sendActivationSMS(phone, slug, name) {
   if (!phone) return;
   try {
@@ -95,23 +93,6 @@ export async function sendAgentCheckinSMS({
   } catch (e) {
     debug('AGENT CHECKIN SMS FAILED', { message: e?.message || String(e) });
   }
-}
-
-export async function sendJaredFinancingAlert({
-  buyerPhone,
-  buyerName,
-  address,
-  price,
-  preapproved = 'no'
-}) {
-  return sendFinancingLeadAlert({
-    agentPhone: JARED_FINANCING_ALERT_PHONE,
-    buyerPhone,
-    buyerName,
-    address,
-    price,
-    preapproved
-  });
 }
 
 export async function sendLiveLoanOfficerFinancingAlert({

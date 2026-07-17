@@ -2,12 +2,10 @@ import { ASSETS, NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL, PROFILE_BUC
 import { findListingAgentPhoto, getAgentBySlug } from '../../api/agents.js?v=20260527-agent-photo-fallback';
 import { applyBranding } from '../../api/brokerages.js';
 import { createCheckin, generateSignedDisclosurePdf, getDisclosurePreviewUrl, getEventById, getLiveLoanOfficerSession, touchEvent, updateCheckinMetadata } from '../../api/events.js?v=20260519-listing-link-health';
-import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendJaredFinancingAlert, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260519-listing-link-sms';
+import { sendAgentCheckinSMS, sendBuyerConfirmationSMS, sendBuyerLoanOfficerIntroSMS, sendLiveLoanOfficerFinancingAlert } from '../../api/notifications.js?v=20260717-assigned-lo-only';
 import { getOpenHouseById } from '../../api/openHouses.js?v=20260427-3props';
 import { state as appState } from '../../core/state.js';
 import { esc, money } from '../../core/utils.js';
-
-const TEMP_FINANCING_SUPPORT_PHONE = '3477758059';
 
 const CHECKIN_PATHS = Object.freeze({
   BUYER: 'buyer',
@@ -1181,12 +1179,12 @@ function nextStepCards() {
   const contactHref = vcardHref(agent);
   const neighborhoodBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress}. Can you tell me more about the neighborhood and nearby open houses?`;
   const liveLoanOfficer = pageState.loanOfficer;
-  const financingPhone = liveLoanOfficer?.loan_officer_phone || TEMP_FINANCING_SUPPORT_PHONE;
-  const financingName = liveLoanOfficer?.loan_officer_name || 'the sponsoring loan officer';
+  const financingPhone = liveLoanOfficer?.loan_officer_phone || '';
+  const financingName = liveLoanOfficer?.loan_officer_name || '';
   const financingBody = liveLoanOfficer
     ? `Hi ${financingName}, I just checked in through Rel8tion for ${subjectAddress} and would like financing or pre-approval help.`
-    : `Hi, I just checked in through Rel8tion for ${subjectAddress} and would like to talk about financing.`;
-  const financingLabel = liveLoanOfficer ? 'Request Financing Help' : 'Start Financing Chat';
+    : '';
+  const financingLabel = liveLoanOfficer ? 'Request Financing Help' : 'No Loan Officer Assigned';
 
   return `
     <section class="grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
@@ -1242,7 +1240,7 @@ function nextStepCards() {
           <a href="${esc(telHref(agent?.phone || ''))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Call</a>
           <a href="${esc(smsHref(agent?.phone || '', `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in for ${subjectAddress}.`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">Text</a>
           <a href="${esc(mailtoHref(agent?.email || '', `Question about ${subjectAddress}`))}" class="inline-flex items-center justify-center px-4 py-4 rounded-full font-bold text-sm bg-white/80 border border-slate-200 text-slate-700 ${agent?.email ? '' : 'pointer-events-none opacity-60'}">Email</a>
-          <a href="${esc(smsHref(financingPhone, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)]" style="background:var(--event-gradient);">${esc(financingLabel)}</a>
+          <a href="${esc(smsHref(financingPhone, financingBody))}" class="sm:col-span-2 inline-flex items-center justify-center px-4 py-4 rounded-full font-black text-sm text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)] ${financingPhone ? '' : 'pointer-events-none opacity-60'}" style="background:var(--event-gradient);">${esc(financingLabel)}</a>
         </div>
       </article>
     </section>
@@ -1651,14 +1649,6 @@ function attachEventHandlers() {
             buyerName: payload.visitor_name || 'Buyer',
             loanOfficer: liveLoanOfficer,
             propertyAddress: address
-          });
-        } else {
-          await sendJaredFinancingAlert({
-            buyerPhone: payload.visitor_phone || '',
-            buyerName: payload.visitor_name || 'Buyer',
-            address,
-            price,
-            preapproved: payload.pre_approved === true ? 'yes' : 'no'
           });
         }
       }

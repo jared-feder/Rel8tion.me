@@ -69,22 +69,7 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
-    const DEFAULT_LOAN_OFFICER = {
-      loan_officer_uid: 'default-nmb-jared',
-      verified_profile_uid: '',
-      loan_officer_slug: 'default-nmb-jared',
-      loan_officer_name: 'Jared Feder',
-      loan_officer_title: 'Loan Officer',
-      loan_officer_company: 'Nationwide Mortgage Bankers',
-      loan_officer_phone: '3477758059',
-      loan_officer_email: 'jfeder@nmbnow.com',
-      loan_officer_photo_url: 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png',
-      loan_officer_calendar_url: '',
-      status: 'default',
-      is_default_fallback: true
-    };
     const FIT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
-    const defaultLoanOfficer = () => ({ ...DEFAULT_LOAN_OFFICER });
     function openHouseKitHref(address = '') {
       const kitParams = new URLSearchParams();
       const agentSlug = state.event?.host_agent_slug || state.agent || '';
@@ -274,10 +259,10 @@
         state.house?.address ? `Property: ${state.house.address}` : '',
         `Event: ${state.event?.id || ''}`
       ].filter(Boolean).join('\n');
-      return {
-        href: smsHref(state.loanOfficer?.loan_officer_phone || '3477758059', message),
-        label: 'Request LO Guidance'
-      };
+      const assignedPhone = state.loanOfficer?.loan_officer_phone || '';
+      return assignedPhone
+        ? { href: smsHref(assignedPhone, message), label: 'Request LO Guidance' }
+        : { href: '#loan-officer-support', label: 'Assign LO To Request Guidance', disabled: true };
     }
 
     function resultTone(status) {
@@ -312,7 +297,7 @@
           <div class="text-xs font-black uppercase tracking-[.14em] text-sky-700">Property Fit Checker</div>
           <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance needed</h3>
           <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">A licensed loan officer can add guidance after completing their own preapproval workflow outside Rel8tion.</p>
-          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white">${esc(request.label)}</a>
+          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white ${request.disabled ? 'pointer-events-none opacity-60' : ''}" ${request.disabled ? 'aria-disabled="true"' : ''}>${esc(request.label)}</a>
           <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(FIT_DISCLAIMER)}</p>
         </div>`;
       }
@@ -359,7 +344,7 @@
 
     function eventSummaryStats() {
       const disclosureCount = state.checkins.filter((row) => disclosureSummary(row).signed).length;
-      const financingCount = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      const financingCount = state.checkins.filter((row) => row.metadata?.financing_requested === true).length;
       return {
         checkins: state.checkins.length,
         disclosures: disclosureCount,
@@ -386,7 +371,7 @@
         ``,
         `${stats.checkins} buyers checked in`,
         `${stats.disclosures} disclosure packets completed`,
-        `${stats.financing} buyers requested or may need financing help`,
+        `${stats.financing} buyers explicitly requested financing help`,
         ``,
         `Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.`
       ].join('\n');
@@ -397,8 +382,12 @@
       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
       const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
       const email = checkin.visitor_email || checkin.email || meta.email || '';
-      const financingStatus = checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
-      const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
+      const financingStatus = meta.financing_requested === true
+        ? 'Financing help requested'
+        : checkin.pre_approved === true
+          ? 'Financing already arranged'
+          : 'No financing request';
+      const needsFinancing = meta.financing_requested === true;
       const disclosure = disclosureSummary(checkin);
       const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
@@ -444,11 +433,8 @@
       const company = lo.loan_officer_company || 'NMB';
       const phone = lo.loan_officer_phone || '';
       const photo = lo.loan_officer_photo_url || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png';
-      const isDefault = lo.is_default_fallback === true;
-      const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
-      const note = isDefault
-        ? 'Default Rel8tion coverage contact. Assign a specific loan officer or have them scan their verified keychain to replace this.'
-        : 'This loan officer is assigned live to this open house.';
+      const badge = 'Loan Officer Coverage Live';
+      const note = 'This loan officer is assigned live to this open house.';
       return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
         <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
         <div class="mt-4 flex items-center gap-4">
@@ -464,7 +450,7 @@
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
           <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
         </div>
-        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</button>
+        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">Replace Loan Officer</button>
       </div>`;
     }
 
@@ -719,7 +705,7 @@
       state.house = await loadHouse(state.event.open_house_source_id);
       state.checkins = await loadCheckins(state.event.id).catch(() => []);
       state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
-      state.loanOfficer = (await loadLoanOfficer(state.event.id).catch(() => null)) || defaultLoanOfficer();
+      state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
       state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
         console.log('affordability fit data skipped', error);
         return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };

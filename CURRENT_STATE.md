@@ -20,6 +20,13 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Twilio inbound outreach replies recognize exact `Y`/`YES` and `N`/`NO` responses. Y marks the thread interested and confirms a follow-up call; N marks it `not_now` and sends the NMB Hard Loans contact positioning. Both automatic responses preserve STOP language and are mirrored into the outreach thread.
 - `[IMPLEMENTED]` Outreach sender hard ceilings now permit a future configuration of 20/hour and 100/day. Effective production values remain unchanged until the scheduled 2026-07-18 activation.
 
+## 2026-07-17: Loan officer assignment truth cleanup
+
+- `[IMPLEMENTED]` The Agent Dashboard no longer creates a synthetic Jared Feder loan-officer fallback. It shows a loan officer only when a live `event_loan_officer_sessions` assignment exists; otherwise it clearly shows that no loan officer is assigned.
+- `[IMPLEMENTED]` Buyer financing alerts no longer fall back to Jared Feder when an event has no assigned live loan officer. Explicit financing consent remains stored on the check-in for the upcoming unassigned-request inbox workflow.
+- `[IMPLEMENTED]` Agent Dashboard financing counts and action buttons now use `metadata.financing_requested = true`; `pre_approved = false` by itself is not treated as a financing-help request.
+- `[IMPLEMENTED]` Jared Feder's malformed production `verified_profiles.cta_url` was corrected to `https://www.nmbnow.com/jared-feder`, and the stale live LO session attached to an already-ended event was closed on 2026-07-17. The separate LO session attached to an event still marked active was intentionally left unchanged pending normal event closeout.
+
 This file tracks what is currently implemented, partial, intended, risky, or still needs verification. It should be updated after production-flow changes. `AGENTS.md` is the Codex operating guide; `REL8TION_SYSTEM_OVERVIEW.md` is the human architecture/product overview.
 
 Status labels used in this file:
