@@ -7,6 +7,18 @@
   <title>REL8TION Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html,body{max-width:100%;overflow-x:hidden}
+    button,a,input,select,textarea{touch-action:manipulation}
+    @media(max-width:639px){
+      body{padding-bottom:78px}
+      #app{padding:14px!important;border-radius:24px!important}
+      #profileLabel{max-width:62vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem}
+      .lo-mobile-nav{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+      article,section{scroll-margin-top:16px}
+      input,select,textarea{font-size:16px!important}
+    }
+  </style>
 </head>
 <body class="bg-[#eef8ff] text-slate-900">
   <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 42%,#f8fbff 100%);">
@@ -459,18 +471,22 @@
     function renderLoanOfficerNav() {
       if (!isLoanOfficerDashboard()) return '';
       const active = normalizeLoanOfficerSection(state.activeSection);
+      const items = [
+        ['lo-overview', 'Home'],
+        ['lo-availability', 'Times'],
+        ['lo-agents', 'Agents'],
+        ['lo-open-houses', 'Houses']
+      ];
       return `
-        <aside class="rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
+        <aside class="hidden rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-sm lg:sticky lg:top-4 lg:block lg:self-start">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Dashboard Sections</div>
           <nav class="mt-3 grid gap-2">
-            ${[
-              ['lo-overview', 'Overview'],
-              ['lo-availability', 'Availability'],
-              ['lo-agents', 'Worked Agents'],
-              ['lo-open-houses', 'Open Houses + Buyers']
-            ].map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label)}</a>`).join('')}
+            ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : 'Open Houses + Buyers')}</a>`).join('')}
           </nav>
         </aside>
+        <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-4 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
+          ${items.map(([id,label])=>`<a href="${esc(dashboardSectionHref(id))}" class="flex min-h-12 items-center justify-center rounded-2xl px-1 text-center text-[11px] font-black ${id===active?'bg-sky-600 text-white':'text-slate-600'}">${esc(label)}</a>`).join('')}
+        </nav>
       `;
     }
 
@@ -835,14 +851,14 @@
       const address = visit.open_house_id || visit.open_house_event_id || 'Field visit';
       const agentMessage = `Hi${visit.agent_name ? ` ${visit.agent_name}` : ''}, this is ${state.profile?.full_name || participantName(primary)}. I am assigned to your REL8TION field demo.`;
       return `
-        <article class="rounded-[30px] border border-white/80 bg-white/78 p-5 shadow-[0_18px_50px_rgba(15,23,42,.10)]">
+        <article class="rounded-[24px] border border-white/80 bg-white/78 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] sm:rounded-[30px] sm:p-5">
           <div class="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
             <div>
               <div class="flex flex-wrap items-center gap-2">
                 ${visitStatusPill(visit.status)}
                 <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500 ring-1 ring-slate-200">${esc(titleize(visit.coverage_mode))}</span>
               </div>
-              <h2 class="mt-3 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold leading-tight">${esc(agentLine || visit.agent_slug || 'Assigned Field Visit')}</h2>
+              <h2 class="mt-3 break-words font-['Plus_Jakarta_Sans'] text-2xl font-extrabold leading-tight sm:text-3xl">${esc(agentLine || visit.agent_slug || 'Assigned Field Visit')}</h2>
               <p class="mt-2 text-sm font-bold text-slate-500">${esc(address)}</p>
               <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
               <div class="mt-4 flex flex-wrap gap-2">
@@ -1149,7 +1165,7 @@
         ${showOverview ? `
         <section id="lo-overview" class="mb-6 scroll-mt-5">
           <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">${esc(dashboardKicker())}</div>
-          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(dashboardTitle())}</h1>
+          <h1 class="mt-2 break-words font-['Plus_Jakarta_Sans'] text-3xl font-extrabold leading-tight sm:text-4xl md:text-6xl">${esc(dashboardTitle())}</h1>
           <p class="mt-3 max-w-3xl text-base font-semibold leading-relaxed text-slate-600">
             ${esc(dashboardIntro())}
           </p>
