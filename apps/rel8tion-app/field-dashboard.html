@@ -317,6 +317,10 @@
       return responsibilities(visit).some((item) => ['product_demo', 'sign_setup', 'agent_onboarding'].includes(item));
     }
 
+    function financingHelpRequested(row) {
+      return row?.metadata?.financing_requested === true;
+    }
+
     async function loadBuyerRequestsForVisits(visits = []) {
       const next = {};
       for (const visit of visits) {
@@ -391,7 +395,7 @@
         tomorrow: state.visits.filter((visit) => new Date(visit.scheduled_start || '').toDateString() === tomorrow).length,
         live: state.visits.filter((visit) => visit.status === 'live').length,
         buyers: allRequests.length,
-        financing: allRequests.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length
+        financing: allRequests.filter(financingHelpRequested).length
       };
     }
 
@@ -540,9 +544,9 @@
       const phone = row.visitor_phone || meta.phone || '';
       const email = row.visitor_email || meta.email || '';
       const preApproved = row.pre_approved === true ? 'Pre-approved'
-        : row.pre_approved === false ? 'Needs financing'
+        : row.pre_approved === false ? 'Not pre-approved'
           : 'Not shared';
-      const financingRequested = row.pre_approved === false || meta.financing_requested === true;
+      const financingRequested = financingHelpRequested(row);
       const textBody = `Hi ${name}, this is ${state.profile?.full_name || 'your NMB loan officer'} with REL8TION. I am live for this open house and can help with financing questions.`;
       return `
         <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
@@ -568,7 +572,7 @@
         return `<div class="mt-4 rounded-2xl bg-white/75 p-4 text-sm font-bold text-slate-500 ring-1 ring-emerald-100">Attach this visit to an open house event before buyer requests can appear here.</div>`;
       }
       const rows = state.buyerRequests[visit.open_house_event_id] || [];
-      const needsHelp = rows.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true);
+      const needsHelp = rows.filter(financingHelpRequested);
       return `
         <div class="mt-4 rounded-[22px] bg-white/80 p-4 ring-1 ring-emerald-100">
           <div class="flex items-center justify-between gap-3">
@@ -715,7 +719,7 @@
       state.visits.forEach((visit) => {
         const rows = state.buyerRequests[visit.open_house_event_id] || [];
         rows.forEach((row) => {
-          if (row.pre_approved === false || row.metadata?.financing_requested === true) {
+          if (financingHelpRequested(row)) {
             financingRows.push({ visit, row });
           }
         });
@@ -1431,7 +1435,7 @@
       return `<section class="mb-6 flex flex-col gap-4 rounded-[28px] border border-white/80 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center sm:p-5">
         ${photo ? `<img src="${esc(photo)}" alt="${esc(state.profile.full_name)}" class="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-4 ring-white sm:h-28 sm:w-28">` : `<div class="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-sky-100 text-3xl font-black text-sky-700 sm:h-28 sm:w-28">${esc((state.profile.full_name || 'LO').split(/\s+/).map((part)=>part[0]).join('').slice(0,2))}</div>`}
         <div class="min-w-0 flex-1"><div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Verified Loan Officer</div><h1 class="mt-1 break-words font-['Plus_Jakarta_Sans'] text-3xl font-extrabold sm:text-4xl">${esc(state.profile.full_name || 'Loan Officer')}</h1><p class="mt-1 font-bold text-slate-500">${esc([state.profile.title,state.profile.company_name].filter(Boolean).join(' · '))}</p><p class="mt-1 break-all text-sm font-bold text-slate-400">${esc([state.profile.phone,state.profile.email].filter(Boolean).join(' · '))}</p></div>
-        <div class="grid shrink-0 gap-2"><a href="${esc(dashboardSectionHref('lo-account'))}" class="rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-black text-white">Edit Account</a><a href="${esc(publicProfileHref())}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">View / Share Profile</a></div>
+        <div class="grid shrink-0 gap-2"><a href="/loan-officer-event-pass-guide" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white">Event Pass Instructions</a><a href="${esc(dashboardSectionHref('lo-account'))}" class="rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-black text-white">Edit Account</a><a href="${esc(publicProfileHref())}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">View / Share Profile</a></div>
       </section>`;
     }
 
