@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { notifyAssignment } = require('../../lib/loan-officer-assignment-notifications');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -48,6 +49,24 @@ async function loadLoanOfficerProfile(uid) {
     `verified_profiles?uid=eq.${enc(uid)}&select=*`,
     'Loan officer profile'
   );
+}
+
+async function loadAssignmentContacts(event) {
+  const [agentRows, houseRows] = await Promise.all([
+    event.host_agent_slug
+      ? supabaseRest(`agents?slug=eq.${enc(event.host_agent_slug)}&select=*&limit=1`).catch(() => [])
+      : Promise.resolve([]),
+    event.open_house_source_id
+      ? supabaseRest(`open_houses?id=eq.${enc(event.open_house_source_id)}&select=*&limit=1`).catch(() => [])
+      : Promise.resolve([])
+  ]);
+  const context = eventContext(event);
+  return {
+    agent: (Array.isArray(agentRows) ? agentRows[0] : null) || {
+      name: context.agent_name || '', phone: context.agent_phone || '', email: context.agent_email || ''
+    },
+    house: (Array.isArray(houseRows) ? houseRows[0] : null) || {}
+  };
 }
 
 function sessionPayload(event, profile) {
@@ -371,7 +390,11 @@ async function handler(req, res) {
     }
 
     const result = await assignLiveCoverage(body.event_id, body.loan_officer_uid);
-    sendJson(res, 200, { ok: true, action: 'assign', ...result });
+    const contacts = await loadAssignmentContacts(result.event);
+    const notifications = body.notify === false
+      ? { skipped: true, reason: 'Notifications disabled for this assignment.' }
+      : await notifyAssignment({ req, event: result.event, house: contacts.house, loanOfficer: result.loan_officer, agent: contacts.agent });
+    sendJson(res, 200, { ok: true, action: 'assign', ...result, notifications });
   } catch (error) {
     sendJson(res, error.status || 500, {
       ok: false,

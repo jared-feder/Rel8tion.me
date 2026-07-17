@@ -192,3 +192,7 @@ Important tables and fields:
 Agent website records carry separate fields for marketing title and exact license type, plus brokerage identity/contact information and broker-controlled compliance links. Public generated sites surface the NY Housing and Anti-Discrimination Disclosure, the employing broker's Standardized Operating Procedures when supplied, brokerage website when supplied, and the listing brokerage on property advertising. A missing SOP URL is a publish-readiness issue; broker policy content is never inferred by REL8TION.
 
 Automatic agent outreach is restricted to future open houses. When the operator is away, future eligible rows from any brokerage may use the configured automatic outreach provider. Provider health, opt-out, duplicate-phone, hourly, daily, and per-run gates are enforced independently.
+
+### Loan officer assignment confirmation
+
+An admin manual assignment is one transaction from the product's point of view: it creates the live `event_loan_officer_sessions` coverage record, upserts the scheduled `field_demo_visits` appointment and primary loan-officer participant, then attempts confirmations to the loan officer and host agent. SMS is operational event traffic. Email is optional until Resend is configured and includes a provider-neutral iCalendar attachment plus a Google Calendar add link. Notification failure is returned to the admin UI but does not roll back a valid coverage assignment.

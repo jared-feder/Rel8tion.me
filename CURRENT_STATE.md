@@ -247,3 +247,10 @@ npm run refresh:onekey:dry-run -- --id=M00000489-971018
 ```
 
 There is no confirmed full automated suite for the main static app. NFC/sign/Event Pass checks usually need manual route/state testing plus targeted Supabase row inspection.
+
+## Loan officer assignment confirmations (branch preview, 2026-07-17)
+
+- `[IMPLEMENTED]` Manual loan-officer assignment from REL8TION COMMAND now keeps the existing live event session and field visit assignment, then attempts transactional confirmations to both the assigned loan officer and host agent.
+- `[IMPLEMENTED]` SMS confirmations introduce the agent and loan officer, identify the open house and appointment time, and link each recipient to the appropriate dashboard.
+- `[IMPLEMENTED]` When `RESEND_API_KEY` and a verified sender are configured, both parties also receive an email with an attached `.ics` appointment and a Google Calendar link. Missing email configuration is reported as a non-fatal warning and does not undo coverage.
+- `[NEEDS VERIFICATION]` Preview validation must not submit a real assignment casually because it uses production Supabase and the event SMS provider. Resend sender-domain setup and live email delivery remain to be configured and verified.

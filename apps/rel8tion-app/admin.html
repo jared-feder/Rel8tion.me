@@ -2709,7 +2709,7 @@ ${rowsHtml}
             ? 'Loan officer removed from active use.'
           : action === 'end'
             ? 'Loan officer coverage ended.'
-            : 'Loan officer assigned live.'
+            : `Loan officer assigned live. ${result.notifications?.results?.filter((item) => item.status === 'sent').length || 0} confirmations sent.`
         );
         await loadAll();
       } catch (error) {
