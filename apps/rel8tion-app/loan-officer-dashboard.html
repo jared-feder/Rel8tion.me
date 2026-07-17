@@ -15,7 +15,8 @@
     .grid{display:grid;grid-template-columns:1.3fr .9fr;gap:18px;margin-top:18px}.panel{padding:24px}.panel h2{font-size:26px;color:var(--navy);margin-bottom:16px}.cards{display:grid;gap:12px}.card{padding:17px;border-radius:22px;background:rgba(255,255,255,.78);border:1px solid rgba(23,44,118,.07)}.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.card h3{font-size:17px}.meta{margin:7px 0 0;color:var(--muted);font-size:12px;font-weight:700;line-height:1.5}.card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}.mini{display:inline-flex;align-items:center;justify-content:center;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:white;color:var(--navy);font-size:11px;font-weight:900;text-decoration:none;cursor:pointer}.empty{padding:24px;border-radius:22px;background:rgba(255,255,255,.52);border:1px dashed rgba(23,44,118,.18);color:var(--muted);font-weight:700;line-height:1.55}.tool-grid{display:grid;gap:11px}.tool{padding:17px;border-radius:22px;background:rgba(255,255,255,.78);border:1px solid rgba(23,44,118,.07)}.tool h3{font-size:16px}.tool p{margin:7px 0 12px;color:var(--muted);font-size:12px;font-weight:700;line-height:1.5}.inbox{margin-top:18px}.request{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}.request-name{font-weight:900}.loading{text-align:center;padding:70px 20px;font-weight:900;color:var(--navy)}.notice{margin-bottom:18px;padding:14px 17px;border-radius:18px;background:#fff3d7;color:#855a00;font-weight:800;font-size:13px}.footer-note{margin:16px 4px 0;color:var(--muted);font-size:11px;font-weight:700;text-align:center}
     .chat{display:none;margin-top:16px;border-radius:26px;background:rgba(238,249,255,.9);border:1px solid rgba(56,189,248,.3);padding:18px}.chat.active{display:block}.chat-head{display:flex;justify-content:space-between;gap:14px;align-items:start}.chat-log{display:grid;gap:9px;max-height:390px;overflow-y:auto;margin-top:16px;padding:4px}.bubble{max-width:82%;padding:12px 14px;border-radius:18px;background:white;border:1px solid var(--line);color:#344054}.bubble.own{justify-self:end;background:var(--navy);color:white;border-color:transparent}.bubble small{display:block;margin-bottom:5px;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;opacity:.7}.bubble div{font-size:13px;font-weight:700;line-height:1.5}.composer{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:14px}.composer textarea{width:100%;resize:vertical;min-height:78px;border:1px solid rgba(23,44,118,.16);border-radius:18px;padding:13px 15px;font:700 13px Inter;color:var(--ink);outline:none}.send{border:0;border-radius:18px;background:var(--navy);color:white;padding:13px 20px;font-weight:900;cursor:pointer}.send:disabled{opacity:.55;cursor:wait}.chat-status{min-height:18px;margin-top:9px;color:var(--muted);font-size:11px;font-weight:800}
     .schedule{margin-top:18px}.availability-form{display:grid;grid-template-columns:1.1fr 1.1fr .6fr .55fr auto;gap:10px;align-items:end}.field label{display:block;margin:0 0 6px 3px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.field input{width:100%;min-height:46px;border:1px solid rgba(23,44,118,.15);border-radius:15px;background:white;padding:10px 12px;color:var(--ink);font:700 12px Inter;outline:none}.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:15px}.slot{padding:15px;border-radius:19px;background:rgba(255,255,255,.78);border:1px solid var(--line)}.slot strong{display:block;color:var(--navy);font-size:14px}.slot .mini{margin-top:10px}.availability-status{min-height:20px;margin-top:10px;color:var(--muted);font-size:12px;font-weight:800}
-    @media(max-width:900px){.hero-grid,.grid{grid-template-columns:1fr}.actions{grid-template-columns:repeat(2,1fr);min-width:0}.stats{grid-template-columns:repeat(2,1fr)}.availability-form{grid-template-columns:1fr 1fr}.slot-grid{grid-template-columns:1fr 1fr}}
+    .outreach-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.field select,.field textarea{width:100%;border:1px solid rgba(23,44,118,.15);border-radius:15px;background:white;padding:11px 12px;color:var(--ink);font:700 12px Inter;outline:none}.field select{min-height:46px}.field textarea{min-height:105px;resize:vertical}.outreach-message{grid-column:1/-1}.outreach-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:9px}.outreach-actions .button{cursor:pointer}.relationship-list{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}.agent-chip{border:1px solid var(--line);border-radius:999px;background:white;color:var(--navy);padding:8px 11px;font:900 11px Inter;cursor:pointer}
+    @media(max-width:900px){.hero-grid,.grid{grid-template-columns:1fr}.actions{grid-template-columns:repeat(2,1fr);min-width:0}.stats{grid-template-columns:repeat(2,1fr)}.availability-form,.outreach-form{grid-template-columns:1fr 1fr}.slot-grid{grid-template-columns:1fr 1fr}}
     @media(max-width:600px){.shell{padding:10px}.hero,.panel{padding:18px}.hero-grid{gap:18px}.identity{align-items:flex-start}.avatar{width:72px;height:72px;border-radius:21px}h1{font-size:38px}.actions{grid-template-columns:1fr}.request{grid-template-columns:1fr}.brand img{width:82px}}
   </style>
 </head>
@@ -84,6 +85,9 @@
           { sender_role:'system', sender_name:'REL8TION', body:'The buyer explicitly requested financing help and was routed to the assigned loan officer.', created_at:new Date(Date.now()-170000).toISOString() }
         ];
       }
+      if (demoMode && !participantRows.length) {
+        participantRows.push({ id:'demo-participant', field_demo_visits:{ id:'demo-visit', agent_slug:'demo-host-agent', agent_name:'Demo Host Agent', agent_phone:'(555) 010-1144', agent_email:'agent@example.com', brokerage:'Demo Realty', scheduled_start:new Date(Date.now()+86400000).toISOString(), scheduled_end:new Date(Date.now()+93600000).toISOString(), status:'scheduled' } });
+      }
       return { sessions, availability:availabilityPayload.availability || [], participantRows, conversations, messagesByConversation, events, houses };
     }
 
@@ -123,6 +127,45 @@
           <button id="availability-save" class="send" type="submit">Add Time</button>
         </form><div id="availability-status" class="availability-status"></div>
         <div class="slot-grid">${future.length ? future.map((slot) => `<article class="slot"><strong>${esc(fmt(slot.available_start))}</strong><p class="meta">Until ${esc(fmt(slot.available_end))}<br>ZIP ${esc(slot.service_zip)} · ${esc(slot.service_radius_miles)} miles · ${esc(titleize(slot.status))}</p>${slot.status === 'open' ? `<button class="mini" type="button" onclick="window.cancelLoanOfficerAvailability('${esc(slot.id)}')">Remove</button>` : ''}</article>`).join('') : '<div class="empty">No future availability has been added yet.</div>'}</div>
+      </section>`;
+    }
+
+    function workedAgents(participantRows) {
+      const agents = new Map();
+      participantRows.forEach((row) => {
+        const visit = row.field_demo_visits || {};
+        const key = visit.agent_slug || visit.agent_email || visit.agent_phone || visit.agent_name;
+        if (!key) return;
+        const existing = agents.get(key) || { slug:visit.agent_slug || '', name:visit.agent_name || visit.agent_slug || 'Agent', phone:visit.agent_phone || '', email:visit.agent_email || '', brokerage:visit.brokerage || '', events:0 };
+        existing.events += 1;
+        existing.phone ||= visit.agent_phone || '';
+        existing.email ||= visit.agent_email || '';
+        agents.set(key, existing);
+      });
+      return [...agents.values()].sort((a,b) => a.name.localeCompare(b.name));
+    }
+
+    function outreachCopy(profile, agentName, offer) {
+      const first = String(agentName || 'there').trim().split(/\s+/)[0] || 'there';
+      const loName = profile.full_name || 'your loan officer';
+      if (offer === 'event_pass') return `Hi ${first}, it’s ${loName}. I’d like to offer you a REL8TION Event Pass for an upcoming open house—paperless check-in, disclosures and event follow-up, with no setup burden on you. Want me to create one for your next event?`;
+      if (offer === 'in_person') return `Hi ${first}, it’s ${loName}. I’d like to provide live financing coverage at one of your upcoming open houses and be there in person to help buyers who request financing support. What date would be most useful?`;
+      return `Hi ${first}, it’s ${loName}. I’d like to provide live financing coverage for one of your upcoming open houses. I can support opted-in buyers remotely, so I do not need to be physically present. Want to try it at your next event?`;
+    }
+
+    function renderOutreach(profile, participantRows) {
+      const agents = workedAgents(participantRows);
+      return `<section id="agent-outreach" class="glass panel schedule"><h2>My Agents & Outreach</h2>
+        <p class="meta">Offer an Event Pass or loan-officer coverage to an agent you already work with. Creating copy here does not send anything automatically.</p>
+        ${agents.length ? `<div class="relationship-list">${agents.map((agent, index) => `<button class="agent-chip" type="button" onclick="window.chooseOutreachAgent(${index})">${esc(agent.name)} · ${agent.events} event${agent.events === 1 ? '' : 's'}</button>`).join('')}</div>` : '<div class="notice">No worked-agent history yet. You can still enter an agent manually.</div>'}
+        <form id="outreach-form" class="outreach-form">
+          <div class="field"><label for="outreach-agent-name">Agent name</label><input id="outreach-agent-name" placeholder="Agent name" required></div>
+          <div class="field"><label for="outreach-agent-phone">Agent phone</label><input id="outreach-agent-phone" inputmode="tel" placeholder="(516) 555-0100"></div>
+          <div class="field"><label for="outreach-agent-email">Agent email</label><input id="outreach-agent-email" type="email" placeholder="agent@example.com"></div>
+          <div class="field"><label for="outreach-offer">Offer</label><select id="outreach-offer"><option value="event_pass">Event Pass</option><option value="remote_coverage">Live coverage — remote</option><option value="in_person">Live coverage — in person</option></select></div>
+          <div class="field outreach-message"><label for="outreach-copy">Outreach message</label><textarea id="outreach-copy"></textarea></div>
+          <div class="outreach-actions"><button class="button primary" type="submit">Create Outreach</button><button id="copy-outreach" class="button" type="button">Copy Message</button><a id="text-outreach" class="button disabled" href="#">Open Text</a><a id="email-outreach" class="button disabled" href="#">Open Email</a></div>
+        </form><div id="outreach-status" class="availability-status"></div>
       </section>`;
     }
 
@@ -172,7 +215,7 @@
               <a class="button primary" href="${esc(publicUrl)}">Open Public Profile</a>
               <a class="button" href="${esc(editUrl)}">Edit Profile</a>
               <a class="button" href="#availability">Set Availability</a>
-              <a class="button" href="${esc(dashboardHref(profile, 'lo-agents'))}">Agent Outreach</a>
+              <a class="button" href="#agent-outreach">Agent Outreach</a>
             </div>
           </div>
           <div class="stats">
@@ -198,7 +241,7 @@
             <h2>Loan Officer Tools</h2>
             <div class="tool-grid">
               <div class="tool"><h3>Availability</h3><p>${openAvailability.length} open future slots. Set working days, unavailable periods, ZIP and coverage radius.</p><a class="mini" href="#availability">Manage Schedule</a></div>
-              <div class="tool"><h3>My Agents & Outreach</h3><p>Create Event Pass or live-coverage outreach for agents you work with. Relationship ownership is the next workflow being connected.</p><a class="mini" href="${esc(dashboardHref(profile, 'lo-agents'))}">Open Agent Workspace</a></div>
+              <div class="tool"><h3>My Agents & Outreach</h3><p>Create Event Pass or live-coverage outreach for agents you work with.</p><a class="mini" href="#agent-outreach">Create Outreach</a></div>
               <div class="tool"><h3>Event Pass & Coverage Sign</h3><p>Activate sponsored Event Pass support or configure loan-officer-owned Coverage Sign hardware.</p><div class="card-actions"><a class="mini" href="/lo-sign-setup?uid=${encodeURIComponent(profile.uid)}">Coverage Sign</a><a class="mini" href="/sponsored-pass-activate">Event Pass</a></div></div>
               <div class="tool"><h3>Affordability Guidance</h3><p>Add property-fit guidance only after completing your own preapproval workflow outside REL8TION.</p><a class="mini" href="/lo-affordability-guidance?uid=${encodeURIComponent(profile.uid)}">Open Guidance</a></div>
             </div>
@@ -206,6 +249,7 @@
         </div>
 
         ${renderAvailability(profile, data.availability)}
+        ${renderOutreach(profile, data.participantRows)}
 
         <section class="glass panel inbox">
           <h2>Financing Help Inbox</h2>
@@ -216,6 +260,41 @@
         </section>
         <p class="footer-note">Preview owner dashboard. Authenticated account ownership and recurring weekly templates are the next security/build step.</p>`;
       document.getElementById('availability-form')?.addEventListener('submit', saveLoanOfficerAvailability);
+      document.getElementById('outreach-form')?.addEventListener('submit', createLoanOfficerOutreach);
+      document.getElementById('outreach-offer')?.addEventListener('change', refreshOutreachCopy);
+      document.getElementById('outreach-agent-name')?.addEventListener('input', refreshOutreachCopy);
+      document.getElementById('copy-outreach')?.addEventListener('click', copyLoanOfficerOutreach);
+      refreshOutreachCopy();
+    }
+
+    function refreshOutreachCopy() {
+      const field = document.getElementById('outreach-copy');
+      if (!field || !currentProfile) return;
+      field.value = outreachCopy(currentProfile, document.getElementById('outreach-agent-name')?.value, document.getElementById('outreach-offer')?.value);
+    }
+
+    function createLoanOfficerOutreach(event) {
+      event.preventDefault();
+      const name = document.getElementById('outreach-agent-name').value.trim();
+      const phone = document.getElementById('outreach-agent-phone').value.trim();
+      const email = document.getElementById('outreach-agent-email').value.trim();
+      const message = document.getElementById('outreach-copy').value.trim();
+      const subject = `Open house support from ${currentProfile.full_name || 'your loan officer'}`;
+      const textLink = document.getElementById('text-outreach');
+      const emailLink = document.getElementById('email-outreach');
+      textLink.href = phone ? `sms:${phone.replace(/[^\d+]/g,'')}?body=${encodeURIComponent(message)}` : '#';
+      textLink.classList.toggle('disabled', !phone);
+      emailLink.href = email ? `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}` : '#';
+      emailLink.classList.toggle('disabled', !email);
+      document.getElementById('outreach-status').textContent = `Outreach created for ${name}. Review it, then copy, text or email it.`;
+    }
+
+    async function copyLoanOfficerOutreach() {
+      const message = document.getElementById('outreach-copy')?.value?.trim() || '';
+      const status = document.getElementById('outreach-status');
+      if (!message) { status.textContent = 'Create an outreach message first.'; return; }
+      try { await navigator.clipboard.writeText(message); status.textContent = 'Outreach copied.'; }
+      catch (_) { status.textContent = 'Copy was blocked by the browser. Select the message and copy it manually.'; }
     }
 
     async function saveLoanOfficerAvailability(event) {
@@ -274,6 +353,15 @@
         document.getElementById('availability-status').textContent = 'Availability removed.';
         document.getElementById('availability')?.scrollIntoView({ behavior:'smooth', block:'start' });
       } catch (error) { if (status) status.textContent = error.message || 'Availability could not be removed.'; }
+    };
+    window.chooseOutreachAgent = (index) => {
+      const agent = workedAgents(currentData?.participantRows || [])[index];
+      if (!agent) return;
+      document.getElementById('outreach-agent-name').value = agent.name || '';
+      document.getElementById('outreach-agent-phone').value = agent.phone || '';
+      document.getElementById('outreach-agent-email').value = agent.email || '';
+      refreshOutreachCopy();
+      document.getElementById('agent-outreach')?.scrollIntoView({ behavior:'smooth', block:'start' });
     };
     window.sendLoanOfficerChat = async (conversationId) => {
       const conversation = currentData?.conversations?.find((row) => row.id === conversationId);
