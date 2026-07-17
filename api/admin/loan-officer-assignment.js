@@ -119,6 +119,29 @@ async function notifyConfirmedAssignment(visit, profile) {
   return results.map((result) => result.status === 'fulfilled' ? result.value : { status:'warning', warning:result.reason?.message || String(result.reason) });
 }
 
+async function blockConfirmedAvailability(visit, profile) {
+  const start = new Date(visit?.scheduled_start || visit?.start_time || '');
+  const end = new Date(visit?.scheduled_end || visit?.end_time || '');
+  if (!visit?.id || !profile?.uid || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
+    return { status:'skipped', warning:'Assignment window was not valid for an availability block.' };
+  }
+  await supabaseRest(`field_coverage_availability?linked_visit_id=eq.${enc(visit.id)}&notes=eq.${enc('Automatic assignment block')}&status=neq.cancelled`, {
+    method:'PATCH', body:JSON.stringify({ status:'cancelled', updated_at:new Date().toISOString() })
+  }).catch(() => null);
+  const zip = clean(visit.property_zip || assignmentAddress(visit).match(/\b\d{5}\b/)?.[0] || '00000', 5);
+  const rows = await supabaseRest('field_coverage_availability', {
+    method:'POST', headers:{ Prefer:'return=representation' }, body:JSON.stringify({
+      participant_profile_id:profile.uid, participant_uid:profile.uid, participant_slug:profile.slug || null,
+      participant_name:profile.full_name || profile.slug || null, participant_phone:profile.phone || null,
+      participant_email:profile.email || null, participant_company:profile.company_name || null,
+      role:'loan_officer', responsibility:'financing_support', available_start:start.toISOString(),
+      available_end:end.toISOString(), service_zip:zip, service_radius_miles:1, status:'unavailable',
+      linked_visit_id:visit.id, notes:'Automatic assignment block', updated_at:new Date().toISOString()
+    })
+  });
+  return { status:'unavailable', row:Array.isArray(rows) ? rows[0] || null : null };
+}
+
 async function updateAuthEmail(oldEmail, newEmail) {
   if (!oldEmail || !newEmail || oldEmail.toLowerCase() === newEmail.toLowerCase()) return { changed:false };
   const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
@@ -333,7 +356,8 @@ async function upsertFieldVisitAssignment(event, profile, source = 'manual_admin
           body: JSON.stringify(participantPayload)
         }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
 
-    return { visit, participant };
+    const availability_block = await blockConfirmedAvailability(visit, profile);
+    return { visit, participant, availability_block };
   } catch (error) {
     return { visit: null, participant: null, warning: error.message || String(error) };
   }
@@ -369,8 +393,9 @@ async function assignConfirmedVisit(visitId, loanOfficerUid) {
   const participant = existing?.id
     ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existing.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null)
     : await supabaseRest('field_demo_visit_participants', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null);
+  const availability_block = await blockConfirmedAvailability(visit, profile);
   const notifications = await notifyConfirmedAssignment(visit, profile);
-  return { visit, loan_officer: profile, participant, notifications, calendar_url:assignmentLinks(visit).calendar };
+  return { visit, loan_officer: profile, participant, availability_block, notifications, calendar_url:assignmentLinks(visit).calendar };
 }
 
 async function assignLiveCoverage(eventId, loanOfficerUid) {
@@ -550,3 +575,4 @@ async function handler(req, res) {
 module.exports = handler;
 module.exports.assignLiveCoverage = assignLiveCoverage;
 module.exports.notifyConfirmedAssignment = notifyConfirmedAssignment;
+module.exports.blockConfirmedAvailability = blockConfirmedAvailability;
