@@ -211,3 +211,4 @@ Authenticated loan-officer dashboards resolve all active `verified_profiles` row
 Loan-officer account-link throttling is checked before generating a Supabase invite/recovery token. This ordering is required because generating a replacement token invalidates the prior one; REL8TION never generates and then withholds a newer token.
 
 The loan-officer dashboard overview and full Open Houses + Buyers section both render listing photos and street addresses from the assigned outreach queue context. The dashboard header renders the active verified profile's public headshot.
+The authenticated loan-officer Profile section contains the Event Pass field activation guide. It reinforces the physical activation sequence: scan the printed Event Pass QR, tap the same NFC keychain, choose open-house mode, confirm the listing and agent, and activate the pass for buyer QR check-in and agent alerts.
