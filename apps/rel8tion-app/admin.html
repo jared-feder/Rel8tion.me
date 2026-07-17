@@ -2694,7 +2694,7 @@ ${rowsHtml}
     }
 
     async function updateLoanOfficerAssignment(action, body = {}) {
-      const actionKey = body.event_id ? `${action}:${body.event_id}` : body.loan_officer_uid ? `${action}:${body.loan_officer_uid}` : action;
+      const actionKey = body.event_id ? `${action}:${body.event_id}` : body.visit_id ? `${action}:${body.visit_id}` : body.loan_officer_uid ? `${action}:${body.loan_officer_uid}` : action;
       state.actionKey = actionKey;
       render();
       try {
@@ -2709,6 +2709,8 @@ ${rowsHtml}
             ? 'Loan officer removed from active use.'
           : action === 'end'
             ? 'Loan officer coverage ended.'
+          : action === 'assign_visit'
+            ? 'Loan officer assigned to confirmed open house.'
             : 'Loan officer assigned live.'
         );
         await loadAll();
@@ -2733,6 +2735,16 @@ ${rowsHtml}
         event_id: eventId,
         loan_officer_uid: loanOfficerUid
       });
+    }
+
+    function assignLoanOfficerToVisit(visitId) {
+      const select = document.getElementById(`visit_lo_${domId(visitId)}`);
+      const loanOfficerUid = select?.value || '';
+      if (!loanOfficerUid) {
+        showToast('Choose a loan officer first.');
+        return;
+      }
+      updateLoanOfficerAssignment('assign_visit', { visit_id: visitId, loan_officer_uid: loanOfficerUid });
     }
 
     function endLoanOfficer(eventId) {
@@ -3707,6 +3719,9 @@ ${rowsHtml}
       });
       document.querySelectorAll('[data-assign-lo]').forEach((button) => {
         button.addEventListener('click', () => assignLoanOfficer(button.dataset.assignLo));
+      });
+      document.querySelectorAll('[data-assign-visit-lo]').forEach((button) => {
+        button.addEventListener('click', () => assignLoanOfficerToVisit(button.dataset.assignVisitLo));
       });
       document.querySelectorAll('[data-end-lo]').forEach((button) => {
         button.addEventListener('click', () => endLoanOfficer(button.dataset.endLo));
@@ -4726,7 +4741,13 @@ ${rowsHtml}
             <div>${badge(row.status || 'scheduled', row.status === 'cancelled' ? 'bad' : row.status === 'confirmed' ? 'ok' : 'info')}</div>
             <div>${badge(fmtDate(row.scheduled_start) || 'No time', 'info')}</div>
             <div>${badge(participantNames || 'No LO assigned', participantNames ? 'ok' : 'warn')}</div>
-            <div>${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>LO view</span></a>` : badge(row.coverage_mode || 'coverage', 'info')}</div>
+            <div class="row-actions">
+              <select id="visit_lo_${domId(row.id)}" class="select" ${activeProfiles.length ? '' : 'disabled'}>
+                ${activeProfiles.length ? activeProfiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === (primary?.participant_uid || row.loan_officer_uid) ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
+              </select>
+              <button class="btn primary" data-assign-visit-lo="${esc(row.id)}" ${activeProfiles.length && state.actionKey !== `assign_visit:${row.id}` ? '' : 'disabled'}><i data-lucide="user-check"></i><span>${state.actionKey === `assign_visit:${row.id}` ? 'Assigning...' : primary?.participant_uid ? 'Reassign LO' : 'Assign LO'}</span></button>
+              ${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>LO view</span></a>` : ''}
+            </div>
           `;
         })}
         ${renderRows('Loan officers', `${activeProfiles.length} active verified profiles${profiles.length > activeProfiles.length ? `, ${profiles.length - activeProfiles.length} removed` : ''}`, activeProfiles.slice(0, 80), (row) => {

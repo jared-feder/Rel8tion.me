@@ -97,6 +97,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 - `[PARTIAL]` `/loan-officer-dashboard` and `/lo-field-dashboard` expose loan-officer operations.
 - `[PARTIAL]` `/nmb-activate` and `/nmb-verified` are loan officer tag/profile pages.
 - `[INTENDED]` Formal remote LO coverage management is not built: no invite/request/accept workflow, no remote availability queue, no scheduled coverage assignment, and no persistent agent-LO relationship management.
+- `[IMPLEMENTED]` REL8TION COMMAND can assign an active loan officer to a confirmed scheduled field visit before the live event shell exists; this creates the primary financing-support participant without falsely creating a live coverage session.
 
 ### Buyer Check-In And Dashboards
 

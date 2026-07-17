@@ -50,6 +50,10 @@ async function loadLoanOfficerProfile(uid) {
   );
 }
 
+async function loadFieldVisit(id) {
+  return loadOne(`field_demo_visits?id=eq.${enc(id)}&select=*`, 'Confirmed open house');
+}
+
 function sessionPayload(event, profile) {
   const now = new Date().toISOString();
   return {
@@ -227,6 +231,39 @@ async function upsertFieldVisitAssignment(event, profile, source = 'manual_admin
   }
 }
 
+async function assignConfirmedVisit(visitId, loanOfficerUid) {
+  const [visit, profile] = await Promise.all([loadFieldVisit(visitId), loadLoanOfficer(loanOfficerUid)]);
+  if (visit.status === 'cancelled') {
+    const error = new Error('This confirmed open house is cancelled.');
+    error.status = 409;
+    throw error;
+  }
+  await supabaseRest(`field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&responsibility=eq.financing_support&is_primary=eq.true`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_primary: false })
+  }).catch(() => null);
+  const existing = await supabaseRest(`field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&participant_profile_id=eq.${enc(profile.uid)}&responsibility=eq.financing_support&select=*&limit=1`)
+    .then((rows) => Array.isArray(rows) ? rows[0] || null : null).catch(() => null);
+  const payload = {
+    field_demo_visit_id: visit.id,
+    participant_profile_id: profile.uid,
+    participant_uid: profile.uid,
+    participant_name: profile.full_name || profile.slug || null,
+    participant_phone: profile.phone || null,
+    participant_email: profile.email || null,
+    participant_company: profile.company_name || null,
+    role: 'loan_officer',
+    responsibility: 'financing_support',
+    status: 'assigned',
+    is_primary: true,
+    assignment_reason: 'Admin assigned confirmed open house appointment'
+  };
+  const participant = existing?.id
+    ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existing.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null)
+    : await supabaseRest('field_demo_visit_participants', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null);
+  return { visit, loan_officer: profile, participant };
+}
+
 async function assignLiveCoverage(eventId, loanOfficerUid) {
   const [event, profile] = await Promise.all([
     loadEvent(eventId),
@@ -351,6 +388,16 @@ async function handler(req, res) {
 
     if (action === 'auto_assign') {
       const result = await autoAssignLiveCoverage();
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'assign_visit') {
+      if (!body.visit_id || !body.loan_officer_uid) {
+        sendJson(res, 400, { ok: false, error: 'Missing visit_id or loan_officer_uid.' });
+        return;
+      }
+      const result = await assignConfirmedVisit(body.visit_id, body.loan_officer_uid);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }
