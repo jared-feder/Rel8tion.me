@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Loan Officer Dashboard | REL8TION</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root{--navy:#172c76;--ink:#10213f;--muted:#5d6c84;--sky:#48c9f2;--line:rgba(23,44,118,.1);--glass:rgba(255,255,255,.76)}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:radial-gradient(circle at 77% -8%,rgba(40,200,238,.62),transparent 34%),linear-gradient(180deg,#e8f8ff 0%,#f4fbff 48%,#edf3fa 100%)}
@@ -32,6 +33,8 @@
     const slug = params.get('slug') || '';
     const demoMode = params.get('demo') === '1';
     const app = document.getElementById('app');
+    const authClient = window.supabase.createClient(SUPABASE_URL, KEY);
+    let authSession = null;
     let currentProfile = null;
     let currentData = null;
     let activeConversationId = '';
@@ -48,7 +51,9 @@
       return raw ? JSON.parse(raw) : [];
     }
     async function api(path, body) {
-      const response = await fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+      const apiHeaders = { 'Content-Type':'application/json' };
+      if (authSession?.access_token) apiHeaders.Authorization = `Bearer ${authSession.access_token}`;
+      const response = await fetch(path, { method:'POST', headers:apiHeaders, body:JSON.stringify(body) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) throw new Error(data.error || 'Request failed.');
       return data;
@@ -200,6 +205,7 @@
               <a class="button" href="${esc(editUrl)}">Edit Profile</a>
               <a class="button" href="#availability">Set Availability</a>
               <a class="button" href="#my-agents">My Agents</a>
+              ${demoMode ? '' : '<button class="button" type="button" onclick="window.signOutLoanOfficer()">Sign Out</button>'}
             </div>
           </div>
           <div class="stats">
@@ -275,11 +281,43 @@
         app.innerHTML = '<h2>Loan Officer Account Required</h2><p class="empty">Register or open this dashboard from your verified Rel8tionChip so REL8TION can identify your loan officer profile.</p><div class="card-actions"><a class="button primary" href="/loan-officer-support">Register as a Loan Officer</a><a class="button" href="/nmb-activate">Activate Existing Chip</a></div>';
         return;
       }
+      if (!demoMode) {
+        const sessionPayload = await authClient.auth.getSession();
+        authSession = sessionPayload.data?.session || null;
+        if (!authSession?.user?.email) {
+          renderLoanOfficerSignIn();
+          return;
+        }
+      }
       const profile = await loadProfile();
       if (!profile) throw new Error('An active verified loan officer profile was not found.');
+      if (!demoMode && String(profile.email || '').toLowerCase() !== String(authSession.user.email || '').toLowerCase()) {
+        throw new Error('The signed-in email does not match this loan officer profile. Sign out and use the approved email address.');
+      }
       currentProfile = profile;
       currentData = await loadData(profile);
       render(profile, currentData);
+    }
+    function renderLoanOfficerSignIn() {
+      app.className = 'glass panel';
+      app.innerHTML = `<h2>Sign in to your Loan Officer Dashboard</h2><p class="empty">Enter the approved email address on your verified loan officer profile. We will send a secure passwordless sign-in link.</p><form id="lo-signin-form" class="availability-form" style="grid-template-columns:1fr auto"><div class="field"><label for="lo-signin-email">Approved email</label><input id="lo-signin-email" type="email" autocomplete="email" required placeholder="you@company.com"></div><button id="lo-signin-send" class="send" type="submit">Email Sign-In Link</button></form><div id="lo-signin-status" class="availability-status"></div>`;
+      document.getElementById('lo-signin-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const email = document.getElementById('lo-signin-email').value.trim();
+        const button = document.getElementById('lo-signin-send');
+        const status = document.getElementById('lo-signin-status');
+        try {
+          button.disabled = true;
+          status.textContent = 'Sending secure sign-in link...';
+          const redirect = new URL('/loan-officer-dashboard', window.location.origin);
+          if (uid) redirect.searchParams.set('uid', uid);
+          if (slug) redirect.searchParams.set('slug', slug);
+          const result = await authClient.auth.signInWithOtp({ email, options:{ emailRedirectTo:redirect.toString(), shouldCreateUser:true } });
+          if (result.error) throw result.error;
+          status.textContent = 'Check your email and open the secure sign-in link.';
+        } catch (error) { status.textContent = error.message || 'Unable to send the sign-in link.'; }
+        finally { button.disabled = false; }
+      });
     }
     window.openLoanOfficerChat = (conversationId) => {
       activeConversationId = conversationId;
@@ -290,6 +328,11 @@
     window.closeLoanOfficerChat = () => {
       activeConversationId = '';
       document.querySelectorAll('.chat').forEach((node) => node.classList.remove('active'));
+    };
+    window.signOutLoanOfficer = async () => {
+      await authClient.auth.signOut();
+      authSession = null;
+      renderLoanOfficerSignIn();
     };
     window.cancelLoanOfficerAvailability = async (availabilityId) => {
       if (!availabilityId || !window.confirm('Remove this availability time?')) return;

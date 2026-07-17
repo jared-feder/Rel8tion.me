@@ -97,6 +97,22 @@ function tokenMatches(conversation, token) {
   return Boolean(clean(token) && clean(token) === clean(safeMetadata(conversation?.metadata).buyer_access_token));
 }
 
+async function authenticatedLoanOfficer(req, input) {
+  const bearer = clean(req.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!bearer) return null;
+  const url = clean(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+  const response = await fetch(`${url}/auth/v1/user`, { headers:{ apikey:key, Authorization:`Bearer ${bearer}` } });
+  if (!response.ok) return null;
+  const user = await response.json().catch(() => null);
+  if (!user?.email) return null;
+  const filter = input.sender_uid
+    ? `uid=eq.${enc(input.sender_uid)}`
+    : `slug=eq.${enc(input.sender_slug || input.loan_officer_slug)}`;
+  const profile = one(await supabaseRest(`verified_profiles?${filter}&is_active=eq.true&select=uid,slug,email&limit=1`).catch(() => []));
+  return profile && clean(profile.email).toLowerCase() === clean(user.email).toLowerCase() ? profile : null;
+}
+
 async function findConversation(input) {
   if (input.conversation_id) {
     return one(await supabaseRest(`event_conversations?id=eq.${enc(input.conversation_id)}&select=*&limit=1`).catch(() => []));
@@ -164,6 +180,10 @@ module.exports = async function handler(req, res) {
       access_token: clean(body.access_token || body.token || '')
     };
     const senderRole = clean(body.sender_role || 'system') || 'system';
+
+    if (senderRole === 'loan_officer' && !(await authenticatedLoanOfficer(req, input))) {
+      throw httpError(401, 'Loan officer sign-in is required to send this message.');
+    }
 
     if (!input.open_house_event_id && !body.conversation_id) throw new Error('Missing open house event id.');
     if (!input.body) throw new Error('Message body is required.');

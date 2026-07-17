@@ -10,6 +10,18 @@ function bodyOf(req) {
   try { return JSON.parse(req.body || '{}'); } catch (_) { return {}; }
 }
 
+async function authenticatedUser(req) {
+  const bearer = clean(req.headers?.authorization, 3000).replace(/^Bearer\s+/i, '');
+  if (!bearer) return null;
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers:{ apikey:key, Authorization:`Bearer ${bearer}` }
+  });
+  if (!response.ok) return null;
+  return response.json().catch(() => null);
+}
+
 async function loadRelationship(uid, agentKey) {
   const participants = await supabaseRest(
     `field_demo_visit_participants?or=(participant_profile_id.eq.${enc(uid)},participant_uid.eq.${enc(uid)})&select=id,field_demo_visits(*)&limit=250`
@@ -75,9 +87,18 @@ module.exports = async function handler(req, res) {
       return;
     }
     const body = bodyOf(req);
+    const user = await authenticatedUser(req);
+    if (!user?.email) {
+      sendJson(res, 401, { ok:false, error:'Loan officer sign-in required.' });
+      return;
+    }
     const profile = one(await supabaseRest(`verified_profiles?uid=eq.${enc(body.loan_officer_uid)}&is_active=eq.true&select=*&limit=1`));
     if (!profile) {
       sendJson(res, 403, { ok:false, error:'Active loan officer profile required.' });
+      return;
+    }
+    if (clean(profile.email, 320).toLowerCase() !== clean(user.email, 320).toLowerCase()) {
+      sendJson(res, 403, { ok:false, error:'This signed-in account does not own that loan officer profile.' });
       return;
     }
     const agent = await loadRelationship(profile.uid, body.agent_key);
