@@ -189,3 +189,5 @@ Important tables and fields:
 # New York agent-website compliance
 
 Agent website records carry separate fields for marketing title and exact license type, plus brokerage identity/contact information and broker-controlled compliance links. Public generated sites surface the NY Housing and Anti-Discrimination Disclosure, the employing broker's Standardized Operating Procedures when supplied, brokerage website when supplied, and the listing brokerage on property advertising. A missing SOP URL is a publish-readiness issue; broker policy content is never inferred by REL8TION.
+
+Automatic agent outreach is restricted to future open houses. When the operator is away, future eligible rows from any brokerage may use the configured automatic outreach provider. Provider health, opt-out, duplicate-phone, hourly, daily, and per-run gates are enforced independently.

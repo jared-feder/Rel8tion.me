@@ -630,6 +630,7 @@ serve(async (req) => {
       .eq("generation_status", "generated")
       .eq("mockup_status", "rendered")
       .not("listing_photo_url", "is", null)
+      .gt("open_start", nowIso)
       .or(FOLLOWUPS_DISABLED
         ? `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso})`
         : `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
@@ -768,12 +769,10 @@ serve(async (req) => {
           continue;
         }
 
-        const twilioBrokerageOverride = outreachProviderOverrideForRow(row) === "twilio";
-        const selectedProvider = twilioBrokerageOverride
-          ? "twilio"
-          : outreachOperatorMode === "away"
-            ? configuredOutreachProvider()
-            : "manual";
+        const configuredProvider = configuredOutreachProvider();
+        const selectedProvider = outreachOperatorMode === "away"
+          ? configuredProvider
+          : outreachProviderOverrideForRow(row) || "manual";
         const providerOverride = selectedProvider === "manual"
           ? null
           : selectedProvider as "twilio" | "android_gateway";
@@ -847,7 +846,7 @@ serve(async (req) => {
             ok: true,
             skipped: true,
             manual_ready: true,
-            reason: "Operator is live; non-Douglas Elliman outreach is waiting for manual send.",
+            reason: "Operator is live; outreach is waiting for manual send.",
             outreach_operator_mode: outreachOperatorMode,
             provider: "manual",
           });
