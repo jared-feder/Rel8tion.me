@@ -2707,6 +2707,8 @@ ${rowsHtml}
           ? `Auto assigned ${result.assignments?.length || 0} open houses.`
           : action === 'remove_profile'
             ? 'Loan officer removed from active use.'
+          : action === 'update_profile'
+            ? 'Loan officer account and login updated.'
           : action === 'end'
             ? 'Loan officer coverage ended.'
           : action === 'assign_visit'
@@ -2788,6 +2790,23 @@ ${rowsHtml}
       updateLoanOfficerAssignment('remove_profile', {
         loan_officer_uid: loanOfficerUid
       });
+    }
+
+    function editLoanOfficerProfile(loanOfficerUid) {
+      const profile = (state.command?.loan_officers || []).find((item) => item.uid === loanOfficerUid);
+      if (!profile) return showToast('Loan officer profile not found.');
+      const fullName = window.prompt('Loan officer name:', profile.full_name || '');
+      if (fullName === null) return;
+      const email = window.prompt('Login and profile email:', profile.email || '');
+      if (email === null) return;
+      const phone = window.prompt('Mobile phone:', profile.phone || '');
+      if (phone === null) return;
+      const companyName = window.prompt('Company:', profile.company_name || '');
+      if (companyName === null) return;
+      const title = window.prompt('Title:', profile.title || 'Loan Officer');
+      if (title === null) return;
+      if (!window.confirm(`Save these changes for ${fullName.trim() || profile.full_name}?\n\nIf the email changed, their login email changes too.`)) return;
+      updateLoanOfficerAssignment('update_profile', { loan_officer_uid:loanOfficerUid, full_name:fullName.trim(), email:email.trim(), phone:phone.trim(), company_name:companyName.trim(), title:title.trim() });
     }
 
     async function runOutreachAction(key, action, body = {}, message = 'Updated.') {
@@ -3762,6 +3781,9 @@ ${rowsHtml}
       });
       document.querySelectorAll('[data-remove-lo-profile]').forEach((button) => {
         button.addEventListener('click', () => removeLoanOfficerProfile(button.dataset.removeLoProfile));
+      });
+      document.querySelectorAll('[data-edit-lo-profile]').forEach((button) => {
+        button.addEventListener('click', () => editLoanOfficerProfile(button.dataset.editLoProfile));
       });
       document.querySelectorAll('[data-approve-lo-request]').forEach((button) => {
         button.addEventListener('click', () => approveLoanOfficerRequest(button.dataset.approveLoRequest));
@@ -4794,14 +4816,16 @@ ${rowsHtml}
           const removeKey = `remove_profile:${row.uid}`;
           return `
           <div>
-            <div class="primary">${esc(row.full_name || row.slug || 'Unknown LO')}</div>
+            <div style="display:flex;align-items:center;gap:10px;">${row.photo_url ? `<img src="${esc(row.photo_url)}" alt="" style="width:48px;height:48px;border-radius:14px;object-fit:cover;">` : ''}<div><div class="primary">${esc(row.full_name || row.slug || 'Unknown LO')}</div>
             <div class="secondary">${esc([row.company_name, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+            </div></div>
           </div>
           <div>${badge(row.is_active ? 'active' : 'inactive', row.is_active ? 'ok' : 'bad')}</div>
           <div>${badge(row.industry || 'profile', 'info')}</div>
           <div>${badge(row.calendar_url ? 'calendar' : 'no calendar', row.calendar_url ? 'ok' : 'warn')}</div>
           <div class="row-actions">
             <a class="btn soft" href="/lo-field-dashboard?uid=${esc(row.uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open dashboard</span></a>
+            <button class="btn soft" data-edit-lo-profile="${esc(row.uid)}" ${state.actionKey === `update_profile:${row.uid}` ? 'disabled' : ''}><i data-lucide="pencil"></i><span>${state.actionKey === `update_profile:${row.uid}` ? 'Saving...' : 'Edit LO'}</span></button>
             <button class="btn bad" data-remove-lo-profile="${esc(row.uid)}" ${state.actionKey === removeKey ? 'disabled' : ''}>
               <i data-lucide="user-x"></i><span>${state.actionKey === removeKey ? 'Removing...' : 'Remove'}</span>
             </button>

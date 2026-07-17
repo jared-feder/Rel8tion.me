@@ -7,6 +7,7 @@
   <title>REL8TION Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     html,body{max-width:100%;overflow-x:hidden}
     button,a,input,select,textarea{touch-action:manipulation}
@@ -62,6 +63,7 @@
       activeConversationByVisit: {},
       scheduleOpen: false,
       activeSection: params.get('section') || window.location.hash.replace(/^#/, '') || 'lo-overview',
+      authSession: null,
       busy: false,
       message: '',
       error: ''
@@ -71,6 +73,7 @@
     const app = document.getElementById('app');
     const profileLabel = document.getElementById('profileLabel');
     const dashboardRoleLabel = document.getElementById('dashboardRoleLabel');
+    const authClient = window.supabase.createClient(SUPABASE_URL, KEY);
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -180,9 +183,11 @@
     }
 
     async function api(path, body) {
+      const apiHeaders = { 'Content-Type': 'application/json' };
+      if (state.authSession?.access_token) apiHeaders.Authorization = `Bearer ${state.authSession.access_token}`;
       const res = await fetch(path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders,
         body: JSON.stringify(body || {})
       });
       const raw = await res.text().catch(() => '');
@@ -197,6 +202,26 @@
       const end = new Date(start);
       end.setDate(end.getDate() + 8);
       return { start, end };
+    }
+
+    async function loadVisitContexts(visits = []) {
+      if (!visits.length) return visits;
+      let contextRows = [];
+      if (state.authSession?.access_token) {
+        const ids = visits.map((visit) => visit.id).filter(Boolean).join(',');
+        const res = await fetch(`/api/loan-officer-account?visit_ids=${encodeURIComponent(ids)}`, { headers:{ Authorization:`Bearer ${state.authSession.access_token}` } });
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok) contextRows = payload.visit_contexts || [];
+      }
+      const contexts = new Map(contextRows.map((row) => [row.visit_id, row]));
+      const queueIds = [...new Set(visits.map((visit) => visit.outreach_queue_id).filter(Boolean))];
+      for (const queueId of queueIds) {
+        if (contextRows.some((row) => row.id === queueId)) continue;
+        const rows = await request(`agent_outreach_queue?id=eq.${encodeURIComponent(queueId)}&select=id,address,listing_photo_url,agent_name,agent_phone,agent_email,brokerage,open_house_id&limit=1`).catch(() => []);
+        const queue = Array.isArray(rows) ? rows[0] : null;
+        visits.filter((visit) => visit.outreach_queue_id === queueId).forEach((visit) => { if (queue) contexts.set(visit.id, { visit_id:visit.id, ...queue }); });
+      }
+      return visits.map((visit) => ({ ...contexts.get(visit.id), ...visit, listing_photo_url:contexts.get(visit.id)?.listing_photo_url || visit.listing_photo_url || '', address:contexts.get(visit.id)?.address || visit.address || '' }));
     }
 
     function relationshipRange() {
@@ -420,7 +445,7 @@
     }
 
     function normalizeLoanOfficerSection(value) {
-      return ['lo-overview', 'lo-availability', 'lo-agents', 'lo-open-houses'].includes(value) ? value : 'lo-overview';
+      return ['lo-overview', 'lo-account', 'lo-availability', 'lo-agents', 'lo-open-houses'].includes(value) ? value : 'lo-overview';
     }
 
     function dashboardSectionHref(section) {
@@ -433,8 +458,7 @@
     }
 
     function editProfileHref() {
-      const uid = loanOfficerUid();
-      return uid ? `/nmb-activate?uid=${encodeURIComponent(uid)}&edit=profile` : '/nmb-activate';
+      return dashboardSectionHref('lo-account');
     }
 
     function coverageSignSetupHref() {
@@ -473,6 +497,7 @@
       const active = normalizeLoanOfficerSection(state.activeSection);
       const items = [
         ['lo-overview', 'Home'],
+        ['lo-account', 'Profile'],
         ['lo-availability', 'Times'],
         ['lo-agents', 'Agents'],
         ['lo-open-houses', 'Houses']
@@ -484,7 +509,7 @@
             ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : 'Open Houses + Buyers')}</a>`).join('')}
           </nav>
         </aside>
-        <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-4 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
+        <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
           ${items.map(([id,label])=>`<a href="${esc(dashboardSectionHref(id))}" class="flex min-h-12 items-center justify-center rounded-2xl px-1 text-center text-[11px] font-black ${id===active?'bg-sky-600 text-white':'text-slate-600'}">${esc(label)}</a>`).join('')}
         </nav>
       `;
@@ -848,10 +873,11 @@
       const financeParticipant = primaryParticipant(visit, 'financing_support');
       const demoParticipant = primaryParticipant(visit, 'product_demo');
       const agentLine = [visit.agent_name, visit.brokerage].filter(Boolean).join(' - ');
-      const address = visit.open_house_id || visit.open_house_event_id || 'Field visit';
+      const address = visit.address || visit.open_house_id || visit.open_house_event_id || 'Field visit';
       const agentMessage = `Hi${visit.agent_name ? ` ${visit.agent_name}` : ''}, this is ${state.profile?.full_name || participantName(primary)}. I am assigned to your REL8TION field demo.`;
       return `
         <article class="rounded-[24px] border border-white/80 bg-white/78 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] sm:rounded-[30px] sm:p-5">
+          ${visit.listing_photo_url ? `<img src="${esc(visit.listing_photo_url)}" alt="${esc(address)}" class="mb-4 h-48 w-full rounded-[22px] object-cover sm:h-64">` : ''}
           <div class="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
             <div>
               <div class="flex flex-wrap items-center gap-2">
@@ -866,12 +892,13 @@
               </div>
             </div>
             <div class="rounded-[24px] bg-white/75 p-4 ring-1 ring-slate-100">
-              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Primary Contact</div>
-              <div class="mt-2 text-xl font-black">${esc(participantName(primary))}</div>
-              <div class="mt-1 text-sm font-bold text-slate-500">${esc(primary.participant_company || state.profile?.company_name || 'REL8TION Field Team')}</div>
-              <div class="mt-3 grid grid-cols-2 gap-2">
-                <a href="${esc(telHref(primary.participant_phone || state.profile?.phone))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200">Call</a>
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Hosting Agent</div>
+              <div class="mt-2 text-xl font-black">${esc(visit.agent_name || 'Agent')}</div>
+              <div class="mt-1 text-sm font-bold text-slate-500">${esc(visit.brokerage || 'Brokerage not listed')}</div>
+              <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <a href="${esc(telHref(visit.agent_phone))}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call Agent</a>
                 <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text Agent</a>
+                <a href="${visit.agent_email ? `mailto:${esc(visit.agent_email)}` : '#'}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_email ? '' : 'pointer-events-none opacity-40'}">Email Agent</a>
               </div>
             </div>
           </div>
@@ -1155,6 +1182,7 @@
       dashboardRoleLabel.textContent = isLoanOfficerDashboard() ? 'Loan Officer' : 'Field Operations';
       document.title = isLoanOfficerDashboard() ? `REL8TION ${dashboardTitle()}` : 'REL8TION Field Dashboard';
       const dashboardBody = `
+        ${renderProfileHeader()}
         ${!showOverview && (state.message || state.error) ? `
           <section class="mb-6 rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm">
             ${state.message ? `<div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">${esc(state.message)}</div>` : ''}
@@ -1199,6 +1227,8 @@
 
         ${isLoanOfficerDashboard() ? '' : renderSchedulePanel()}
 
+        ${isLoanOfficerDashboard() && activeSection === 'lo-account' ? renderAccountPanel() : ''}
+
         ${!isLoanOfficerDashboard() || activeSection === 'lo-availability' ? `<div id="lo-availability" class="scroll-mt-5">${renderAvailabilityPanel()}</div>` : ''}
 
         ${!isLoanOfficerDashboard() || activeSection === 'lo-agents' ? renderWorkedAgentsPanel(agents) : ''}
@@ -1219,6 +1249,34 @@
         : dashboardBody;
       document.getElementById('schedule-form')?.addEventListener('submit', handleScheduleSubmit);
       document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
+      document.getElementById('lo-account-form')?.addEventListener('submit', handleAccountSubmit);
+    }
+
+    async function photoDataUrl(file) {
+      if (!file || !file.size) return '';
+      if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || file.size > 12 * 1024 * 1024) throw new Error('Choose a JPG, PNG, or WebP image smaller than 12 MB.');
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+      return canvas.toDataURL('image/jpeg', .82);
+    }
+
+    async function handleAccountSubmit(event) {
+      event.preventDefault();
+      if (!state.authSession?.access_token) { state.error = 'Sign in through the Loan Officer Account page before editing your profile.'; render(); return; }
+      const data = new FormData(event.currentTarget);
+      try {
+        state.message = 'Saving account...'; state.error = ''; render();
+        const image = await photoDataUrl(data.get('photo'));
+        const response = await fetch('/api/loan-officer-account', { method:'PATCH', headers:{ Authorization:`Bearer ${state.authSession.access_token}`, 'Content-Type':'application/json' }, body:JSON.stringify({ full_name:data.get('full_name'), email:data.get('email'), phone:data.get('phone'), company_name:data.get('company_name'), title:data.get('title'), photo_data_url:image }) });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Unable to save account.');
+        state.profile = payload.profile;
+        if (payload.email_changed) { await authClient.auth.signOut(); window.location.href='/loan-officer-account'; return; }
+        await refresh('Account and public profile updated.');
+      } catch (error) { state.error = error.message || 'Unable to save account.'; state.message = ''; render(); }
     }
 
     function selectedVisit(visitId) {
@@ -1334,6 +1392,26 @@
       }
     }
 
+    function publicProfileHref() {
+      return state.profile?.slug ? `/nmb-verified?slug=${encodeURIComponent(state.profile.slug)}` : '#';
+    }
+
+    function renderProfileHeader() {
+      if (!isLoanOfficerDashboard() || !state.profile) return '';
+      const photo = state.profile.photo_url || '';
+      return `<section class="mb-6 flex flex-col gap-4 rounded-[28px] border border-white/80 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center sm:p-5">
+        ${photo ? `<img src="${esc(photo)}" alt="${esc(state.profile.full_name)}" class="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-4 ring-white sm:h-28 sm:w-28">` : `<div class="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-sky-100 text-3xl font-black text-sky-700 sm:h-28 sm:w-28">${esc((state.profile.full_name || 'LO').split(/\s+/).map((part)=>part[0]).join('').slice(0,2))}</div>`}
+        <div class="min-w-0 flex-1"><div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Verified Loan Officer</div><h1 class="mt-1 break-words font-['Plus_Jakarta_Sans'] text-3xl font-extrabold sm:text-4xl">${esc(state.profile.full_name || 'Loan Officer')}</h1><p class="mt-1 font-bold text-slate-500">${esc([state.profile.title,state.profile.company_name].filter(Boolean).join(' · '))}</p><p class="mt-1 break-all text-sm font-bold text-slate-400">${esc([state.profile.phone,state.profile.email].filter(Boolean).join(' · '))}</p></div>
+        <div class="grid shrink-0 gap-2"><a href="${esc(dashboardSectionHref('lo-account'))}" class="rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-black text-white">Edit Account</a><a href="${esc(publicProfileHref())}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">View / Share Profile</a></div>
+      </section>`;
+    }
+
+    function renderAccountPanel() {
+      if (!isLoanOfficerDashboard()) return '';
+      const p = state.profile || {};
+      return `<section id="lo-account" class="mb-6 rounded-[30px] border border-white/80 bg-white/80 p-5 shadow-sm"><div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Account + Shared Profile</div><h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-3xl font-extrabold">Edit Your Profile</h2><p class="mt-2 text-sm font-semibold text-slate-500">These details and your photo also appear on the public profile you share with potential clients.</p><form id="lo-account-form" class="mt-5 grid gap-3 sm:grid-cols-2"><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Headshot<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base"></label><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Name<input name="full_name" required value="${esc(p.full_name)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal"></label><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Email<input name="email" type="email" required value="${esc(p.email)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal"></label><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Mobile Phone<input name="phone" required value="${esc(p.phone)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal"></label><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Company<input name="company_name" required value="${esc(p.company_name)}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal"></label><label class="grid gap-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">Title<input name="title" required value="${esc(p.title || 'Loan Officer')}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold normal-case tracking-normal"></label><button type="submit" class="rounded-full bg-sky-600 px-5 py-4 text-base font-black text-white sm:col-span-2">Save Account + Public Profile</button></form></section>`;
+    }
+
     async function refresh(message = '') {
       state.message = message;
       state.error = '';
@@ -1341,7 +1419,7 @@
       state.availability = await loadAvailability();
       state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows(dashboardRange());
-      state.visits = groupVisits(rows);
+      state.visits = await loadVisitContexts(groupVisits(rows));
       if (isLoanOfficerDashboard()) {
         const relationshipRows = await loadParticipantRows(relationshipRange());
         state.relationshipVisits = groupVisits(relationshipRows);
@@ -1580,10 +1658,7 @@
       }
     };
 
-    refresh().catch((error) => {
-      state.error = error.message || 'Could not load field dashboard.';
-      render();
-    });
+    authClient.auth.getSession().then(({data}) => { state.authSession=data.session || null; return refresh(); }).catch((error) => { state.error=error.message || 'Could not load field dashboard.'; render(); });
   </script>
 </body>
 </html>

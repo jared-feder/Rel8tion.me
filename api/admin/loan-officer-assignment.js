@@ -50,6 +50,49 @@ async function loadLoanOfficerProfile(uid) {
   );
 }
 
+function clean(value, max = 2000) {
+  return String(value || '').trim().slice(0, max);
+}
+
+async function updateAuthEmail(oldEmail, newEmail) {
+  if (!oldEmail || !newEmail || oldEmail.toLowerCase() === newEmail.toLowerCase()) return { changed:false };
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  const listResponse = await fetch(`${url}/auth/v1/admin/users?page=1&per_page=1000`, { headers:{ apikey:key, Authorization:`Bearer ${key}` } });
+  const listPayload = await listResponse.json().catch(() => ({}));
+  if (!listResponse.ok) throw new Error(listPayload?.message || 'Unable to find the loan officer login account.');
+  const users = Array.isArray(listPayload?.users) ? listPayload.users : Array.isArray(listPayload) ? listPayload : [];
+  const user = users.find((item) => clean(item.email, 320).toLowerCase() === clean(oldEmail, 320).toLowerCase());
+  if (!user?.id) return { changed:false, warning:'No Auth login existed for the old email; the verified profile was updated.' };
+  const response = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(user.id)}`, {
+    method:'PUT', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
+    body:JSON.stringify({ email:newEmail, email_confirm:true })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || payload?.msg || 'Unable to update the login email.');
+  const redirectTo = `${clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '')}/loan-officer-account?mode=setup`;
+  const recovery = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method:'POST', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({ email:newEmail })
+  });
+  return { changed:true, user_id:user.id, recovery_sent:recovery.ok };
+}
+
+async function updateLoanOfficerProfile(body) {
+  const profile = await loadLoanOfficerProfile(body.loan_officer_uid);
+  const email = clean(body.email || profile.email, 320).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid email address.'), { status:400 });
+  const auth = await updateAuthEmail(profile.email, email);
+  const rows = await supabaseRest(`verified_profiles?uid=eq.${enc(profile.uid)}`, {
+    method:'PATCH', headers:{ Prefer:'return=representation' },
+    body:JSON.stringify({
+      full_name:clean(body.full_name || profile.full_name, 160), email,
+      phone:clean(body.phone || profile.phone, 80), company_name:clean(body.company_name || profile.company_name, 180),
+      title:clean(body.title || profile.title || 'Loan Officer', 160), updated_at:new Date().toISOString()
+    })
+  });
+  return { loan_officer:Array.isArray(rows) ? rows[0] || profile : profile, auth };
+}
+
 async function loadFieldVisit(id) {
   return loadOne(`field_demo_visits?id=eq.${enc(id)}&select=*`, 'Confirmed open house');
 }
@@ -409,6 +452,16 @@ async function handler(req, res) {
       }
       const result = await removeLoanOfficerProfile(body.loan_officer_uid);
       sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
+    if (action === 'update_profile') {
+      if (!body.loan_officer_uid) {
+        sendJson(res, 400, { ok:false, error:'Missing loan_officer_uid.' });
+        return;
+      }
+      const result = await updateLoanOfficerProfile(body);
+      sendJson(res, 200, { ok:true, action, ...result });
       return;
     }
 

@@ -199,3 +199,6 @@ Public loan officers apply through `/loan-officer-support`; an application alone
 ### Loan officer password account
 
 Approved loan officers receive a Supabase Auth email invitation and create a password at `/loan-officer-account`. Password login is matched server-side to the active `verified_profiles.email` row before the loan officer dashboard opens. The service-role key remains server-only; the browser uses the public anon key and the signed-in user's access token.
+### Loan officer identity editing and public sharing
+
+Loan officer identity data remains sourced from `verified_profiles`. Authenticated officers and REL8TION COMMAND admins can update profile/contact/company information, while email changes are synchronized to Supabase Auth server-side. The private dashboard displays the same photo/name/company identity but shares `/nmb-verified?slug=...` publicly; private open-house assignments, buyer requests, and messages are never part of the shared profile.
