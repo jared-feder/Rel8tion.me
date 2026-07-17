@@ -82,6 +82,14 @@
     const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
     const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    function visitCalendarHref(visit) {
+      const start = new Date(visit?.scheduled_start || Date.now());
+      const end = new Date(visit?.scheduled_end || start.getTime() + 2 * 60 * 60 * 1000);
+      const stamp = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      const address = visit?.address || visit?.open_house_id || 'Open house';
+      const query = new URLSearchParams({ action:'TEMPLATE', text:`REL8TION Open House Coverage - ${address}`, dates:`${stamp(start)}/${stamp(end)}`, location:address, details:`Hosting agent: ${visit?.agent_name || 'Agent'}` });
+      return `https://calendar.google.com/calendar/render?${query.toString()}`;
+    }
     const WEEKDAY_OPTIONS = [
       [0, 'Sun'],
       [1, 'Mon'],
@@ -913,6 +921,7 @@
                 <a href="${esc(telHref(visit.agent_phone))}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call Agent</a>
                 <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text Agent</a>
                 <a href="${visit.agent_email ? `mailto:${esc(visit.agent_email)}` : '#'}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_email ? '' : 'pointer-events-none opacity-40'}">Email Agent</a>
+                <a href="${esc(visitCalendarHref(visit))}" target="_blank" rel="noopener" class="rounded-full bg-sky-600 px-3 py-3 text-center text-xs font-black text-white sm:col-span-3">Add Coverage to Calendar</a>
               </div>
             </div>
           </div>

@@ -54,6 +54,71 @@ function clean(value, max = 2000) {
   return String(value || '').trim().slice(0, max);
 }
 
+function htmlEscape(value) {
+  return clean(value, 4000).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+}
+
+function normalizePhone(value) {
+  const digits = clean(value, 80).replace(/\D/g, '');
+  const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  return ten.length === 10 ? `+1${ten}` : '';
+}
+
+function assignmentAddress(visit) {
+  const direct = clean(visit?.address || visit?.setup_context?.address, 300);
+  if (direct) return direct;
+  const match = clean(visit?.notes, 2000).match(/Open house:\s*([^\n]+?)(?:\.\s*Agent phone:|$)/i);
+  return clean(match?.[1] || visit?.open_house_id || 'the open house', 300);
+}
+
+function assignmentLinks(visit) {
+  const start = new Date(visit?.scheduled_start || visit?.start_time || Date.now());
+  const end = new Date(visit?.scheduled_end || visit?.end_time || start.getTime() + 2 * 60 * 60 * 1000);
+  const stamp = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const address = assignmentAddress(visit);
+  const calendar = new URL('https://calendar.google.com/calendar/render');
+  calendar.searchParams.set('action', 'TEMPLATE');
+  calendar.searchParams.set('text', `REL8TION Open House Coverage - ${address}`);
+  calendar.searchParams.set('dates', `${stamp(start)}/${stamp(end)}`);
+  calendar.searchParams.set('location', address);
+  calendar.searchParams.set('details', 'Loan officer coverage assigned through REL8TION.');
+  return { address, calendar:calendar.toString(), dashboard:'https://app.rel8tion.me/loan-officer' };
+}
+
+async function sendAssignmentSms(to, name, message, metadata) {
+  const phone = normalizePhone(to);
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  if (!phone || !url || !key) return { status:'skipped' };
+  const response = await fetch(`${url}/functions/v1/send-lead-sms`, { method:'POST', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({ agent_phone:phone, buyer_phone:phone, buyer_name:name || 'Open house contact', category:'event_transactional', message, metadata }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.error) throw new Error(payload?.error || `Assignment SMS failed: ${response.status}`);
+  return { status:'sent', id:payload.sid || payload.id || null };
+}
+
+async function sendAssignmentEmail(to, subject, html) {
+  const apiKey = clean(process.env.RESEND_API_KEY, 1000);
+  if (!to || !apiKey) return { status:'skipped', warning:'Email provider is not configured.' };
+  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:clean(process.env.REL8TION_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'REL8TION <onboarding@resend.dev>', 320), to:[to], subject, html }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || `Assignment email failed: ${response.status}`);
+  return { status:'sent', id:payload.id || null };
+}
+
+async function notifyConfirmedAssignment(visit, profile) {
+  const links = assignmentLinks(visit);
+  const when = new Date(visit.scheduled_start).toLocaleString('en-US', { timeZone:'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short' });
+  const loMessage = `REL8TION assignment confirmed: ${links.address}, ${when}. Hosting agent: ${visit.agent_name || 'Agent'}${visit.agent_phone ? `, ${visit.agent_phone}` : ''}. Dashboard: ${links.dashboard} Add to calendar: ${links.calendar}`;
+  const agentMessage = `REL8TION coverage confirmed for ${links.address}, ${when}. Your assigned loan officer is ${profile.full_name || 'your REL8TION loan officer'}${profile.phone ? `, ${profile.phone}` : ''}.`;
+  const results = await Promise.allSettled([
+    sendAssignmentSms(profile.phone, profile.full_name, loMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'loan_officer' }),
+    sendAssignmentSms(visit.agent_phone, visit.agent_name, agentMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'agent' }),
+    sendAssignmentEmail(profile.email, `REL8TION open house assignment - ${links.address}`, `<p>${htmlEscape(loMessage)}</p>`),
+    sendAssignmentEmail(visit.agent_email, 'Your REL8TION loan officer coverage is confirmed', `<p>${htmlEscape(agentMessage)}</p>`)
+  ]);
+  return results.map((result) => result.status === 'fulfilled' ? result.value : { status:'warning', warning:result.reason?.message || String(result.reason) });
+}
+
 async function updateAuthEmail(oldEmail, newEmail) {
   if (!oldEmail || !newEmail || oldEmail.toLowerCase() === newEmail.toLowerCase()) return { changed:false };
   const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
@@ -304,7 +369,8 @@ async function assignConfirmedVisit(visitId, loanOfficerUid) {
   const participant = existing?.id
     ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existing.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null)
     : await supabaseRest('field_demo_visit_participants', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null);
-  return { visit, loan_officer: profile, participant };
+  const notifications = await notifyConfirmedAssignment(visit, profile);
+  return { visit, loan_officer: profile, participant, notifications, calendar_url:assignmentLinks(visit).calendar };
 }
 
 async function assignLiveCoverage(eventId, loanOfficerUid) {
