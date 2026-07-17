@@ -158,7 +158,7 @@ export function isQuietHoursNY(date = new Date()): boolean {
 }
 
 function ensureOutreachStopText(body: string): string {
-  if (/reply\s+STOP\s+to\s+opt\s+out\.?/i.test(body)) return body;
+  if (/reply[^.\n]*\bSTOP\b[^.\n]*(?:opt\s+out|unsubscribe)\.?/i.test(body)) return body;
   return `${body.trim()}\n\nReply STOP to opt out.`;
 }
 

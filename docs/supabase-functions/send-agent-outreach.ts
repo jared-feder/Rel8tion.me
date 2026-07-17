@@ -259,9 +259,13 @@ function addPreviewLinkBeforeStop(message: string, previewUrl: string): string {
   const cleanPreviewUrl = String(previewUrl || "").trim();
   if (!cleanMessage || !cleanPreviewUrl || cleanMessage.includes(cleanPreviewUrl)) return cleanMessage;
 
-  const stopPattern = /(?:\s*\n*)?Reply STOP to opt out\.?\s*$/i;
+  const ctaPattern = /(?:\s*\n*)?Reply Y to book me, N for another time, or STOP to unsubscribe\.?\s*$/i;
+  const stopPattern = /(?:\s*\n*)?Reply STOP to (?:opt out|unsubscribe)\.?\s*$/i;
+  if (ctaPattern.test(cleanMessage)) {
+    return `${cleanMessage.replace(ctaPattern, "").trim()}\n\n${cleanPreviewUrl}\n\nReply Y to book me, N for another time, or STOP to unsubscribe.`;
+  }
   if (stopPattern.test(cleanMessage)) {
-    return `${cleanMessage.replace(stopPattern, "").trim()}\n\n${cleanPreviewUrl}\n\nReply STOP to opt out.`;
+    return `${cleanMessage.replace(stopPattern, "").trim()}\n\n${cleanPreviewUrl}\n\nReply STOP to unsubscribe.`;
   }
 
   return `${cleanMessage}\n\n${cleanPreviewUrl}`;
@@ -288,14 +292,14 @@ function buildInitialOutreachBody(row: OutreachRow): string {
   if (row.template_key === "missed_open_house") {
     return (
       `Hi ${firstName} — Jared with NMB. I missed your open house at ${addr}. ` +
-      `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`
+      `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply Y to book me, N for another time, or STOP to unsubscribe.`
     );
   }
 
   const when = formatOpenHouse(row.open_start || null);
   return (
     `Hi ${firstName} — Jared with NMB. I saw your open house at ${addr} ${when}. ` +
-    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`
+    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply Y to book me, N for another time, or STOP to unsubscribe.`
   );
 }
 

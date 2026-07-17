@@ -108,7 +108,7 @@ function buildVariants(row: QueueRow) {
 
   const main =
     `Hi ${firstName} — Jared with NMB. I saw your open house at ${addr} ${when}. ` +
-    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`;
+    `Would it help if I stopped by with quick pre-approval support and a complimentary Rel8tion digital check-in pass? Reply Y to book me, N for another time, or STOP to unsubscribe.`;
 
   const followup = FOLLOWUPS_DISABLED
     ? null
@@ -124,7 +124,7 @@ function buildMissedOpenHouseVariants(row: QueueRow) {
 
   const main =
     `Hi ${firstName} — Jared with NMB. I missed your open house at ${addr}. ` +
-    `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply YES if useful. Reply STOP to opt out.`;
+    `Would it help if I supported your next one with quick pre-approval help and a complimentary Rel8tion digital check-in pass? Reply Y to book me, N for another time, or STOP to unsubscribe.`;
 
   return { v1: main, v2: null, v3: null, selected: main, followup: null };
 }
