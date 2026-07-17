@@ -3,7 +3,7 @@ const { sendJson, supabaseRest } = require('../../lib/admin-auth');
 
 const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT']);
 const START_WORDS = new Set(['START', 'UNSTOP']);
-const PRESERVED_REVIEW_STATUSES = new Set(['interested', 'confirmed_open_house', 'accepted_open_house']);
+const PRESERVED_REVIEW_STATUSES = new Set(['interested', 'not_now', 'confirmed_open_house', 'accepted_open_house']);
 
 function clean(value) {
   return String(value ?? '').trim();

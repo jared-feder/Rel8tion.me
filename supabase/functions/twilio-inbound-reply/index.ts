@@ -31,6 +31,20 @@ function isOptIn(text: string): boolean {
   return ["START", "UNSTOP"].includes(normalized);
 }
 
+function replyIntent(text: string): "yes" | "no" | null {
+  const normalized = text.trim().toUpperCase().replace(/[^A-Z]/g, "");
+  if (["Y", "YES"].includes(normalized)) return "yes";
+  if (["N", "NO"].includes(normalized)) return "no";
+  return null;
+}
+
+function automaticReply(intent: "yes" | "no"): string {
+  if (intent === "yes") {
+    return "Great—I’m excited to support your open house. I’ll call shortly to confirm timing and how the complimentary Rel8tion Event Pass and buyer pre-approval support will work. —Jared, NMB. Reply STOP to unsubscribe.";
+  }
+  return "No problem—another time works. Save me as Jared | NMB Hard Loans. I help find financing solutions for difficult or nontraditional loans that other lenders may not be able to approve. If a buyer needs a second look, call or text me here. Reply STOP to unsubscribe.";
+}
+
 function toE164(phone: string | null): string {
   const digits = normalizePhone(phone);
   if (!digits) return "";
@@ -112,6 +126,7 @@ serve(async (req) => {
     const fromPhoneNormalized = normalizePhone(fromPhone);
     const optOut = optOutType === "STOP" || isOptOut(body);
     const optIn = optOutType === "START" || isOptIn(body);
+    const intent = !optOut && !optIn ? replyIntent(body) : null;
 
     const { data: queueRow, error: queueLookupError } = await supabase
       .from("agent_outreach_queue")
@@ -209,7 +224,7 @@ serve(async (req) => {
     } else if (queueRow?.id) {
       const queueUpdate: Record<string, unknown> = {
         approved_for_send: false,
-        review_status: "replied",
+        review_status: intent === "yes" ? "interested" : intent === "no" ? "not_now" : "replied",
         send_mode: queueRow.send_mode,
         followup_block_reason: null,
         followup_send_status: "pending",
@@ -222,6 +237,44 @@ serve(async (req) => {
         .eq("id", queueRow.id);
 
       if (updateQueueError) throw updateQueueError;
+    }
+
+    let automaticReplyStatus = "skipped";
+    if (intent && queueRow?.id) {
+      try {
+        const replyBody = automaticReply(intent);
+        const sentReply = await sendSMS({
+          supabase,
+          to: toE164(fromPhone),
+          body: replyBody,
+          category: "manual_outreach",
+          metadata: {
+            source: "twilio-inbound-reply",
+            queue_row_id: queueRow.id,
+            inbound_reply_id: savedReply?.id || null,
+            automatic_y_n_reply: true,
+            reply_intent: intent,
+            reply_to_recent_inbound: true,
+          },
+        });
+        await supabase.from("agent_outreach_replies").insert({
+          queue_row_id: queueRow.id,
+          open_house_id: queueRow.open_house_id || null,
+          from_phone: toPhone || null,
+          from_phone_normalized: normalizePhone(toPhone),
+          to_phone: fromPhone,
+          body: replyBody,
+          message_sid: sentReply.externalId || sentReply.sid || null,
+          direction: "outbound",
+          opt_out: false,
+          raw_payload: { source: "automatic_y_n_reply", intent },
+          received_at: new Date().toISOString(),
+        });
+        automaticReplyStatus = String(sentReply.externalId || sentReply.sid || "sent");
+      } catch (autoReplyError) {
+        automaticReplyStatus = "failed";
+        console.error("Automatic Y/N reply failed", autoReplyError);
+      }
     }
 
     let ownerAlertStatus = "skipped";
@@ -258,6 +311,7 @@ serve(async (req) => {
         ...corsHeaders,
         "Content-Type": "text/xml",
         "X-Rel8tion-Owner-Alert": ownerAlertStatus,
+        "X-Rel8tion-Automatic-Reply": automaticReplyStatus,
       },
     });
   } catch (err) {

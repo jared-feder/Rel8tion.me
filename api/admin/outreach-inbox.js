@@ -12,7 +12,7 @@ function readQuery(req, name) {
   return value || '';
 }
 
-const HANDLED_STATUSES = new Set(['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled']);
+const HANDLED_STATUSES = new Set(['interested', 'not_now', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled']);
 const OPT_OUT_STATUSES = new Set(['opted_out', 'android_opted_out']);
 
 function phoneDigits(value) {

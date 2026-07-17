@@ -762,7 +762,7 @@ module.exports = async function handler(req, res) {
         new_loan_officer_support_requests: loanOfficerRequests.filter((row) => (row.status || 'new') === 'new').length,
         confirmed_open_houses: confirmedOpenHouseRows.length,
         incoming_threads: inbox.length,
-        needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
+        needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'not_now', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
         open_house_kit_orders: kitOrders.length,
         open_house_kit_orders_needing_review: kitOrders.filter((row) => ['needs_review', 'payment_pending'].includes(row.fulfillment_status || '') || (row.logo_choice_status || 'not_started') === 'not_started').length,
         payments_needing_setup: paymentRows.filter((row) =>
