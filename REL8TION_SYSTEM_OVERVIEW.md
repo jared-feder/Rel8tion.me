@@ -209,3 +209,5 @@ Loan officer setup texts use a REL8TION-owned verification URL. The server conve
 Authenticated loan-officer dashboards resolve all active `verified_profiles` rows that share the authenticated email when loading assigned field visits. The most recently updated profile remains the editable/display profile, while legacy profile UIDs remain assignment aliases. This prevents prior open-house coverage from disappearing if an established loan officer later completes the newer registration flow.
 
 Loan-officer account-link throttling is checked before generating a Supabase invite/recovery token. This ordering is required because generating a replacement token invalidates the prior one; REL8TION never generates and then withholds a newer token.
+
+The loan-officer dashboard overview and full Open Houses + Buyers section both render listing photos and street addresses from the assigned outreach queue context. The dashboard header renders the active verified profile's public headshot.

@@ -811,12 +811,15 @@
               const agentLine = [visit.agent_name || visit.agent_slug, visit.brokerage].filter(Boolean).join(' - ');
               const buyers = (state.buyerRequests[visit.open_house_event_id] || []).length;
               return `
-                <article class="rounded-[24px] bg-white/85 p-4 ring-1 ring-slate-100">
+                <article class="overflow-hidden rounded-[24px] bg-white/85 ring-1 ring-slate-100">
+                  ${visit.listing_photo_url ? `<img src="${esc(visit.listing_photo_url)}" alt="${esc(visit.address || 'Open house listing')}" class="h-40 w-full object-cover" loading="lazy">` : ''}
+                  <div class="p-4">
                   <div class="flex flex-wrap items-center gap-2">${visitStatusPill(visit.status)}</div>
                   <h3 class="mt-3 text-lg font-black leading-tight">${esc(agentLine || 'Assigned coverage')}</h3>
-                  <p class="mt-1 text-sm font-bold text-slate-500">${esc(visit.open_house_id || visit.open_house_event_id || 'Open house')}</p>
+                  <p class="mt-1 text-sm font-bold text-slate-600">${esc(visit.address || visit.open_house_id || visit.open_house_event_id || 'Open house')}</p>
                   <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
                   <p class="mt-2 text-xs font-black uppercase tracking-[.12em] text-slate-400">${buyers} buyer check-in${buyers === 1 ? '' : 's'}</p>
+                  </div>
                 </article>
               `;
             }).join('') : `<div class="rounded-[24px] bg-white/70 p-5 text-sm font-bold text-slate-500 ring-1 ring-slate-100 lg:col-span-3">No upcoming open houses yet. At the open house, scan your Coverage Sign QR to start live coverage and link a Sponsored Event Pass.</div>`}
