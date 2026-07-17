@@ -84,7 +84,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/event` is the buyer smart sign check-in page with guided disclosures, optional financing-help routing, and SMS after local validation.
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
 - `[IMPLEMENTED]` `/agent-dashboard` is the live event dashboard for the host agent.
-- `[PARTIAL]` `/loan-officer-dashboard` now renders a permanent LO owner-dashboard preview modeled on `/agent-home`, with verified profile identity, live/upcoming coverage, availability totals, financing-conversation totals, and links into the existing field operations. `/lo-field-dashboard` remains a backward-compatible detailed-operations alias. Authenticated ownership and recurring schedule management remain to be built.
+- `[PARTIAL]` `/loan-officer-dashboard` now renders a permanent LO owner-dashboard preview modeled on `/agent-home`, with verified profile identity, live/upcoming coverage, availability totals, an inline financing-help inbox with thread history and buyer reply sending, and links into the existing field operations. Preview-host sends require an explicit warning confirmation because they use production conversation/SMS infrastructure. `/lo-field-dashboard` remains a backward-compatible detailed-operations alias. Authenticated ownership, automatic financing-request conversation creation, and recurring schedule management remain to be built.
 - `[PARTIAL]` `/nmb-activate` and `/nmb-verified` are loan officer tag/profile pages. Formal remote LO coverage management is not built.
 - `[IMPLEMENTED]` `/c/:code` and `/chip/:code` resolve printed Rel8tionChip QR inventory.
 - `[IMPLEMENTED]` `/a` redirects legacy/public profile traffic to `/b`.
