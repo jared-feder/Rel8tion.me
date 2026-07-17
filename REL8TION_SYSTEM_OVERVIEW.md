@@ -199,4 +199,4 @@ An admin manual assignment is one transaction from the product's point of view: 
 
 ### Loan officer registration approval
 
-Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, and opens the activation page so profile details can be completed before dashboard use.
+Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, sends an activation SMS, attempts an activation email, and opens the activation page so profile details can be completed before dashboard use. Email remains dependent on Resend sender configuration.

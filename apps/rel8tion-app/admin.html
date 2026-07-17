@@ -2730,7 +2730,9 @@ ${rowsHtml}
           body: JSON.stringify({ action:'approve', request_id:requestId })
         });
         state.actionKey = '';
-        showToast('Loan officer approved. Opening activation page.');
+        const sent = result.notifications?.filter((item) => item.status === 'sent').length || 0;
+        const emailPending = result.notifications?.some((item) => item.channel === 'email' && item.status === 'not_configured');
+        showToast(`Loan officer approved. ${sent} notification${sent === 1 ? '' : 's'} sent.${emailPending ? ' Email setup is still required.' : ''}`);
         await loadAll();
         window.open(result.activation_url, '_blank', 'noopener');
       } catch (error) {

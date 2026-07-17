@@ -4,6 +4,7 @@ const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('
 const clean = (value, max = 2000) => String(value || '').trim().slice(0, max);
 const enc = (value) => encodeURIComponent(clean(value));
 const one = (rows) => Array.isArray(rows) ? rows[0] || null : null;
+const htmlEscape = (value) => clean(value, 2000).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
 
 function bodyOf(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -54,6 +55,57 @@ async function approve(request) {
   return { request:one(rows), profile };
 }
 
+function appBaseUrl() {
+  return clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '');
+}
+
+async function sendApprovalSms(request, activationUrl) {
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  if (!url || !key) return { channel:'sms', status:'not_configured', warning:'Supabase SMS is not configured.' };
+  const message = `REL8TION: ${clean(request.full_name, 80)}, your loan officer registration was approved. Complete your verified profile and open your dashboard here: ${activationUrl} Reply STOP to opt out.`;
+  const response = await fetch(`${url}/functions/v1/send-lead-sms`, {
+    method:'POST',
+    headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
+    body:JSON.stringify({
+      agent_phone:request.phone, buyer_phone:request.phone, buyer_name:request.full_name,
+      message, category:'event_transactional',
+      metadata:{ mode:'loan_officer_registration_approved', request_id:request.id }
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.error) throw new Error(data?.error || `Approval SMS failed: ${response.status}`);
+  return { channel:'sms', status:'sent', provider_id:data.sid || data.id || null };
+}
+
+async function sendApprovalEmail(request, activationUrl) {
+  const apiKey = clean(process.env.RESEND_API_KEY, 500);
+  if (!apiKey) return { channel:'email', status:'not_configured', warning:'RESEND_API_KEY is not configured.' };
+  const from = clean(process.env.REL8TION_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'REL8TION <onboarding@resend.dev>', 320);
+  const subject = 'Your REL8TION loan officer registration is approved';
+  const text = `${request.full_name}, your loan officer registration was approved. Complete your verified profile and open your dashboard: ${activationUrl}`;
+  const html = `<h2>Your loan officer registration is approved</h2><p>${htmlEscape(clean(request.full_name, 160))}, complete your verified profile to open your REL8TION loan officer dashboard.</p><p><a href="${htmlEscape(activationUrl)}">Complete profile and open dashboard</a></p>`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json', 'Idempotency-Key':`lo-registration-approved-${request.id}` },
+    body:JSON.stringify({ from, to:request.email, subject, text, html })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.message || data?.error?.message || `Approval email failed: ${response.status}`);
+  return { channel:'email', status:'sent', provider_id:data.id || null };
+}
+
+async function notifyApproval(request, activationUrl) {
+  const settle = async (channel, task) => {
+    try { return await task(); }
+    catch (error) { return { channel, status:'failed', error:error.message || String(error) }; }
+  };
+  return Promise.all([
+    request.phone ? settle('sms', () => sendApprovalSms(request, activationUrl)) : Promise.resolve({ channel:'sms', status:'skipped', warning:'Applicant phone is missing.' }),
+    request.email ? settle('email', () => sendApprovalEmail(request, activationUrl)) : Promise.resolve({ channel:'email', status:'skipped', warning:'Applicant email is missing.' })
+  ]);
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -72,8 +124,15 @@ module.exports = async function handler(req, res) {
       sendJson(res, 400, { ok:false, error:'Unsupported loan officer request action.' });
       return;
     }
-    const result = await approve(await loadRequest(body.request_id));
-    sendJson(res, 200, { ok:true, ...result, activation_url:`/nmb-activate?uid=${encodeURIComponent(result.profile.uid)}`, dashboard_url:`/loan-officer-dashboard?uid=${encodeURIComponent(result.profile.uid)}` });
+    const sourceRequest = await loadRequest(body.request_id);
+    const result = await approve(sourceRequest);
+    const activationUrl = `${appBaseUrl()}/nmb-activate?uid=${encodeURIComponent(result.profile.uid)}`;
+    const notifications = body.notify === false ? [] : await notifyApproval(sourceRequest, activationUrl);
+    sendJson(res, 200, {
+      ok:true, ...result, notifications,
+      activation_url:activationUrl,
+      dashboard_url:`${appBaseUrl()}/loan-officer-dashboard?uid=${encodeURIComponent(result.profile.uid)}`
+    });
   } catch (error) {
     sendJson(res, error.status || 500, { ok:false, error:error.message || 'Unable to approve loan officer application.', details:error.payload || null });
   }
