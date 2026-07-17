@@ -20,9 +20,8 @@
     <section id="pinUnlock" class="hide"><h1>Unlock your dashboard</h1><p>Enter the four-digit PIN saved on this phone.</p><form id="pinUnlockForm"><div class="field"><label for="unlockPin">Phone PIN</label><input id="unlockPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" required></div><button type="submit">Unlock</button></form><button id="usePassword" type="button" class="secondary">Use Password Instead</button></section>
     <div id="status" class="status" aria-live="polite"></div>
   </main>
-  <script>
-    const SUPABASE_URL='https://nicanqrfqlbnlmnoernb.supabase.co';
-    const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaWNhbnFyZnFsYm5sbW5vZXJuYiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzYxMTYxMDc3LCJleHAiOjIwNzY3MzcwNzd9.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg';
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js';
     const client=window.supabase.createClient(SUPABASE_URL,KEY);
     const mode=new URLSearchParams(location.search).get('mode')||'';
     const sections=['loading','setup','login','pinSetup','pinUnlock'];

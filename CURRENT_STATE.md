@@ -256,3 +256,6 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` REL8TION COMMAND shows loan officer photos and provides an Edit LO action for identity/contact/company changes. Admin email changes also send a fresh password setup/recovery email when an Auth user exists.
 - `[IMPLEMENTED]` Loan officer dashboard headers show the profile image immediately left of the name and link to the separate public NMB verified profile so private assignments and buyer messages are not exposed.
 - `[IMPLEMENTED]` Assigned open-house cards hydrate the stored outreach listing photo/address and display hosting-agent call, text, and email actions.
+### 2026-07-17 - Loan officer password-reset API-key fix
+
+- `[IMPLEMENTED]` `/loan-officer` now imports the shared public Supabase configuration instead of maintaining a shortened duplicate anon key that caused `Invalid API key` during password-reset requests.
