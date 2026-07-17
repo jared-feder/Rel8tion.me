@@ -157,3 +157,7 @@ where created_at >= now() - interval '30 minutes'
 order by created_at desc
 limit 20;
 ```
+
+### Automatic Y/N confirmations
+
+Initial outreach must retain its Y/N/STOP disclosure. When an agent directly replies Y or N, the automatic confirmation may omit a second STOP sentence by setting `omit_repeated_stop_disclosure: true` together with the recent-inbound reply metadata. This does not bypass suppression: a STOP keyword is still recorded and blocks subsequent outreach.

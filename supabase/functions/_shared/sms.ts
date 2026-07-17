@@ -410,7 +410,9 @@ export async function sendSMS(options: SendSmsOptions) {
         route: routeLabel,
       });
     }
-    body = ensureOutreachStopText(body);
+    if (metadata.omit_repeated_stop_disclosure !== true) {
+      body = ensureOutreachStopText(body);
+    }
   }
 
   if (!isSuppressionBypassed(category, metadata)) {

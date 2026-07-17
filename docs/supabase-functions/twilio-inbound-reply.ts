@@ -40,9 +40,9 @@ function replyIntent(text: string): "yes" | "no" | null {
 
 function automaticReply(intent: "yes" | "no"): string {
   if (intent === "yes") {
-    return "Great—I’m excited to support your open house. I’ll call shortly to confirm timing and how the complimentary Rel8tion Event Pass and buyer pre-approval support will work. —Jared, NMB. Reply STOP to unsubscribe.";
+    return "Great—I’m excited to support your open house. I’ll call shortly to confirm timing and how the complimentary Rel8tion Event Pass and buyer pre-approval support will work. —Jared, NMB.";
   }
-  return "No problem—another time works. Save me as Jared | NMB Hard Loans. I help find financing solutions for difficult or nontraditional loans that other lenders may not be able to approve. If a buyer needs a second look, call or text me here. Reply STOP to unsubscribe.";
+  return "No problem—another time works. Save me as Jared | NMB Hard Loans. I help find financing solutions for difficult or nontraditional loans that other lenders may not be able to approve. If a buyer needs a second look, call or text me here.";
 }
 
 function toE164(phone: string | null): string {
@@ -255,6 +255,7 @@ serve(async (req) => {
             automatic_y_n_reply: true,
             reply_intent: intent,
             reply_to_recent_inbound: true,
+            omit_repeated_stop_disclosure: true,
           },
         });
         await supabase.from("agent_outreach_replies").insert({
