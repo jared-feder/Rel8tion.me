@@ -196,3 +196,7 @@ Automatic agent outreach is restricted to future open houses. When the operator 
 ### Loan officer assignment confirmation
 
 An admin manual assignment is one transaction from the product's point of view: it creates the live `event_loan_officer_sessions` coverage record, upserts the scheduled `field_demo_visits` appointment and primary loan-officer participant, then attempts confirmations to the loan officer and host agent. SMS is operational event traffic. Email is optional until Resend is configured and includes a provider-neutral iCalendar attachment plus a Google Calendar add link. Notification failure is returned to the admin UI but does not roll back a valid coverage assignment.
+
+### Loan officer registration approval
+
+Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, and opens the activation page so profile details can be completed before dashboard use.

@@ -2719,6 +2719,27 @@ ${rowsHtml}
       }
     }
 
+    async function approveLoanOfficerRequest(requestId) {
+      const request = (state.command?.loan_officer_requests || []).find((row) => row.id === requestId);
+      if (!request || !window.confirm(`Approve ${request.full_name || 'this applicant'} as a verified loan officer?`)) return;
+      state.actionKey = `approve_request:${requestId}`;
+      render();
+      try {
+        const result = await api('/api/admin/loan-officer-request-action', {
+          method: 'POST',
+          body: JSON.stringify({ action:'approve', request_id:requestId })
+        });
+        state.actionKey = '';
+        showToast('Loan officer approved. Opening activation page.');
+        await loadAll();
+        window.open(result.activation_url, '_blank', 'noopener');
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to approve loan officer.');
+        render();
+      }
+    }
+
     function assignLoanOfficer(eventId) {
       const select = document.getElementById(`lo_${domId(eventId)}`);
       const loanOfficerUid = select?.value || '';
@@ -3713,6 +3734,9 @@ ${rowsHtml}
       });
       document.querySelectorAll('[data-remove-lo-profile]').forEach((button) => {
         button.addEventListener('click', () => removeLoanOfficerProfile(button.dataset.removeLoProfile));
+      });
+      document.querySelectorAll('[data-approve-lo-request]').forEach((button) => {
+        button.addEventListener('click', () => approveLoanOfficerRequest(button.dataset.approveLoRequest));
       });
       document.querySelectorAll('[data-end-event]').forEach((button) => {
         button.addEventListener('click', () => endEvent(button.dataset.endEvent));
@@ -4709,7 +4733,10 @@ ${rowsHtml}
             <div class="secondary">${esc(row.coverage_areas || 'No area listed')}</div>
             <div class="secondary">${esc(row.availability || 'No availability listed')}</div>
           </div>
-          <div>${contactActions(row.phone, row.email)}</div>
+          <div class="row-actions">
+            ${contactActions(row.phone, row.email)}
+            ${(row.status || 'new') === 'new' ? `<button class="btn primary" data-approve-lo-request="${esc(row.id)}" ${state.actionKey === `approve_request:${row.id}` ? 'disabled' : ''}><i data-lucide="user-check"></i><span>${state.actionKey === `approve_request:${row.id}` ? 'Approving...' : 'Approve LO'}</span></button>` : ''}
+          </div>
         `)}
         <div class="assignment-grid">
           ${events.length ? events.map((event) => renderLoanOfficerAssignment(event, activeProfiles)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No active open house events are ready for LO assignment.</div>'}

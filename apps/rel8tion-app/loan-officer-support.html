@@ -278,8 +278,8 @@
     <section class="shell">
       <div class="hero">
         <div>
-          <div class="eyebrow">Loan Officer Support</div>
-          <h1>Available to assist agents at open houses?</h1>
+          <div class="eyebrow">Loan Officer Registration</div>
+          <h1>Register for your Rel8tion loan officer dashboard.</h1>
           <p class="intro">
             Rel8tion connects active open-house technology with qualified local support. If you can help agents with live
             open house coverage, buyer questions, and follow-up coordination, send your details below.
@@ -354,7 +354,7 @@
 
           <div id="status" class="status" role="status" aria-live="polite"></div>
 
-          <button id="submitButton" type="submit">Request Open House Support Review</button>
+          <button id="submitButton" type="submit">Submit Loan Officer Registration</button>
         </form>
         <p class="fine-print">
           Submitting this request does not create a Rel8tion verified profile or guarantee event assignments. Rel8tion
@@ -419,7 +419,7 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save request.');
         form.reset();
-        showStatus('Your request was sent to Rel8tion. Jared or the team can follow up from the admin dashboard.', 'ok');
+        showStatus('Registration submitted. Rel8tion will review your information before activating your verified profile and dashboard.', 'ok');
       } catch (error) {
         showStatus(error.message || 'We could not send your request right now. Please try again.', 'bad');
       } finally {
