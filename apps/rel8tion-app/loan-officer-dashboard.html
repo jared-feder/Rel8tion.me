@@ -3,18 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=/field-dashboard?role=loan_officer">
-  <title>Opening Loan Officer Dashboard</title>
+  <title>Loan Officer Dashboard | REL8TION</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--navy:#172c76;--ink:#10213f;--muted:#5d6c84;--sky:#48c9f2;--line:rgba(23,44,118,.1);--glass:rgba(255,255,255,.76)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:radial-gradient(circle at 77% -8%,rgba(40,200,238,.62),transparent 34%),linear-gradient(180deg,#e8f8ff 0%,#f4fbff 48%,#edf3fa 100%)}
+    a{color:inherit}.shell{width:min(1460px,100%);margin:auto;padding:22px}.glass{border:1px solid rgba(255,255,255,.78);background:var(--glass);box-shadow:0 26px 70px rgba(23,44,118,.1);backdrop-filter:blur(17px);border-radius:34px}
+    .hero{padding:30px}.brand{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.brand img{width:108px;height:auto}.owner-pill,.status{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.owner-pill{background:#eef4ff;color:var(--navy);border:1px solid rgba(23,44,118,.1)}.status.live{background:#dff9ee;color:#087554}.status.ended{background:#eef1f5;color:#667085}.status.pending{background:#fff2cf;color:#9b6400}
+    .hero-grid{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start}.identity{display:flex;gap:20px;align-items:center}.avatar{width:96px;height:96px;border-radius:26px;object-fit:cover;background:white;border:4px solid rgba(255,255,255,.85);box-shadow:0 14px 34px rgba(23,44,118,.15)}h1,h2,h3{font-family:"Plus Jakarta Sans",Inter,sans-serif;margin:0}h1{font-size:clamp(38px,5vw,68px);line-height:.96;color:var(--navy);letter-spacing:-.045em}.subtitle{margin:10px 0 0;color:var(--muted);font-weight:800}.actions{display:grid;gap:10px;min-width:230px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;border-radius:999px;padding:11px 18px;text-decoration:none;font-size:13px;font-weight:900;border:1px solid var(--line);background:rgba(255,255,255,.82);color:var(--navy)}.button.primary{background:var(--navy);color:white;border-color:transparent}.button.disabled{pointer-events:none;opacity:.55}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}.stat{padding:18px;border-radius:22px;background:rgba(255,255,255,.67);border:1px solid rgba(255,255,255,.9)}.stat span{display:block;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.stat strong{display:block;margin-top:8px;font-size:30px;color:var(--navy)}
+    .grid{display:grid;grid-template-columns:1.3fr .9fr;gap:18px;margin-top:18px}.panel{padding:24px}.panel h2{font-size:26px;color:var(--navy);margin-bottom:16px}.cards{display:grid;gap:12px}.card{padding:17px;border-radius:22px;background:rgba(255,255,255,.78);border:1px solid rgba(23,44,118,.07)}.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.card h3{font-size:17px}.meta{margin:7px 0 0;color:var(--muted);font-size:12px;font-weight:700;line-height:1.5}.card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}.mini{display:inline-flex;align-items:center;justify-content:center;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:white;color:var(--navy);font-size:11px;font-weight:900;text-decoration:none}.empty{padding:24px;border-radius:22px;background:rgba(255,255,255,.52);border:1px dashed rgba(23,44,118,.18);color:var(--muted);font-weight:700;line-height:1.55}.tool-grid{display:grid;gap:11px}.tool{padding:17px;border-radius:22px;background:rgba(255,255,255,.78);border:1px solid rgba(23,44,118,.07)}.tool h3{font-size:16px}.tool p{margin:7px 0 12px;color:var(--muted);font-size:12px;font-weight:700;line-height:1.5}.inbox{margin-top:18px}.request{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}.request-name{font-weight:900}.loading{text-align:center;padding:70px 20px;font-weight:900;color:var(--navy)}.notice{margin-bottom:18px;padding:14px 17px;border-radius:18px;background:#fff3d7;color:#855a00;font-weight:800;font-size:13px}.footer-note{margin:16px 4px 0;color:var(--muted);font-size:11px;font-weight:700;text-align:center}
+    @media(max-width:900px){.hero-grid,.grid{grid-template-columns:1fr}.actions{grid-template-columns:repeat(2,1fr);min-width:0}.stats{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){.shell{padding:10px}.hero,.panel{padding:18px}.hero-grid{gap:18px}.identity{align-items:flex-start}.avatar{width:72px;height:72px;border-radius:21px}h1{font-size:38px}.actions{grid-template-columns:1fr}.request{grid-template-columns:1fr}.brand img{width:82px}}
+  </style>
 </head>
 <body>
-  <script>
-    const target = new URL('/field-dashboard', window.location.origin);
-    target.searchParams.set('role', 'loan_officer');
-    for (const [key, value] of new URLSearchParams(window.location.search).entries()) {
-      if (key !== 'role') target.searchParams.set(key, value);
+  <main class="shell">
+    <div id="app" class="glass loading">Opening your Loan Officer Dashboard...</div>
+  </main>
+  <script type="module">
+    import { KEY, SUPABASE_URL } from '/apps/rel8tion-app/src/core/config.js?v=20260717-lo-owner-dashboard';
+
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('uid') || '';
+    const slug = params.get('slug') || '';
+    const app = document.getElementById('app');
+    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[char]));
+    const fmt = (value) => { const date = new Date(value || ''); return Number.isNaN(date.getTime()) ? 'Not scheduled' : date.toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); };
+    const titleize = (value) => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+
+    async function request(path) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
+      const raw = await response.text();
+      if (!response.ok) throw new Error(raw || `Request failed: ${response.status}`);
+      return raw ? JSON.parse(raw) : [];
     }
-    window.location.replace(`${target.pathname}${target.search}${window.location.hash}`);
+    async function api(path, body) {
+      const response = await fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Request failed.');
+      return data;
+    }
+    const safe = (promise, fallback = []) => promise.catch((error) => { console.log('dashboard load skipped', error); return fallback; });
+
+    async function loadProfile() {
+      if (uid) return (await request(`verified_profiles?uid=eq.${encodeURIComponent(uid)}&is_active=eq.true&select=*&limit=1`))[0] || null;
+      if (slug) return (await request(`verified_profiles?slug=eq.${encodeURIComponent(slug)}&is_active=eq.true&select=*&limit=1`))[0] || null;
+      return null;
+    }
+
+    async function loadData(profile) {
+      const profileUid = profile.uid;
+      const [sessions, availabilityPayload, participantRows, conversations] = await Promise.all([
+        safe(request(`event_loan_officer_sessions?or=(verified_profile_uid.eq.${encodeURIComponent(profileUid)},loan_officer_uid.eq.${encodeURIComponent(profileUid)})&select=*&order=signed_in_at.desc&limit=100`)),
+        safe(api('/api/field-demo/availability', { action:'list', uid:profileUid, days:90 }), { availability:[] }),
+        safe(request(`field_demo_visit_participants?or=(participant_profile_id.eq.${encodeURIComponent(profileUid)},participant_uid.eq.${encodeURIComponent(profileUid)})&select=*,field_demo_visits(*)&order=created_at.desc&limit=100`)),
+        profile.slug ? safe(request(`event_conversations?loan_officer_slug=eq.${encodeURIComponent(profile.slug)}&select=*&order=updated_at.desc&limit=100`)) : []
+      ]);
+      const eventIds = [...new Set(sessions.map((row) => row.open_house_event_id).filter(Boolean))];
+      const events = eventIds.length ? await safe(request(`open_house_events?id=in.(${eventIds.map(encodeURIComponent).join(',')})&select=*&order=created_at.desc&limit=100`)) : [];
+      const houseIds = [...new Set(events.map((row) => row.open_house_source_id).filter(Boolean))];
+      const houses = houseIds.length ? await safe(request(`open_houses?id=in.(${houseIds.map(encodeURIComponent).join(',')})&select=id,address,city,state,zip,open_start,open_end&limit=100`)) : [];
+      return { sessions, availability:availabilityPayload.availability || [], participantRows, conversations, events, houses };
+    }
+
+    function dashboardHref(profile, section = 'lo-overview') {
+      const query = new URLSearchParams({ role:'loan_officer', section });
+      if (profile.uid) query.set('uid', profile.uid);
+      if (profile.slug) query.set('slug', profile.slug);
+      return `/field-dashboard?${query.toString()}`;
+    }
+
+    function eventAddress(event, houseMap) {
+      const house = houseMap[event?.open_house_source_id] || {};
+      const context = event?.setup_context || {};
+      return house.address || context.address || context.property_address || 'Open house';
+    }
+
+    function render(profile, data) {
+      const now = Date.now();
+      const houseMap = Object.fromEntries(data.houses.map((row) => [row.id, row]));
+      const eventMap = Object.fromEntries(data.events.map((row) => [row.id, row]));
+      const liveSessions = data.sessions.filter((row) => row.status === 'live' && !eventMap[row.open_house_event_id]?.ended_at);
+      const openAvailability = data.availability.filter((row) => row.status === 'open' && new Date(row.available_end).getTime() > now);
+      const upcomingVisits = data.participantRows.map((row) => ({ ...row.field_demo_visits, participant:row })).filter((row) => row.id && new Date(row.scheduled_end || row.scheduled_start || 0).getTime() >= now).sort((a,b) => new Date(a.scheduled_start)-new Date(b.scheduled_start));
+      const openConversations = data.conversations.filter((row) => row.status !== 'closed');
+      const unread = openConversations.filter((row) => row.status === 'waiting' || row.metadata?.needs_reply === true);
+      const photo = profile.photo_url || profile.image_url || 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png';
+      const publicUrl = profile.slug ? `/nmb-verified?slug=${encodeURIComponent(profile.slug)}` : '#';
+      const editUrl = `/nmb-activate?uid=${encodeURIComponent(profile.uid)}&edit=profile`;
+
+      app.className = '';
+      app.innerHTML = `
+        <section class="glass hero">
+          <div class="brand"><img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="REL8TION"><span class="owner-pill">Personal Loan Officer Dashboard</span></div>
+          <div class="hero-grid">
+            <div class="identity"><img class="avatar" src="${esc(photo)}" alt="${esc(profile.full_name)}"><div><h1>${esc(profile.full_name || 'Loan Officer')}</h1><p class="subtitle">${esc([profile.title, profile.company_name].filter(Boolean).join(' · '))}</p></div></div>
+            <div class="actions">
+              <a class="button primary" href="${esc(publicUrl)}">Open Public Profile</a>
+              <a class="button" href="${esc(editUrl)}">Edit Profile</a>
+              <a class="button" href="${esc(dashboardHref(profile, 'lo-availability'))}">Set Availability</a>
+              <a class="button" href="${esc(dashboardHref(profile, 'lo-agents'))}">Agent Outreach</a>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><span>Live coverage</span><strong>${liveSessions.length}</strong></div>
+            <div class="stat"><span>Upcoming assignments</span><strong>${upcomingVisits.length}</strong></div>
+            <div class="stat"><span>Available slots</span><strong>${openAvailability.length}</strong></div>
+            <div class="stat"><span>Needs reply</span><strong>${unread.length}</strong></div>
+          </div>
+        </section>
+
+        <div class="grid">
+          <section class="glass panel">
+            <h2>Coverage & Open Houses</h2>
+            <div class="cards">
+              ${liveSessions.length ? liveSessions.map((session) => { const event = eventMap[session.open_house_event_id] || {}; return `
+                <article class="card"><div class="card-top"><div><h3>${esc(eventAddress(event, houseMap))}</h3><p class="meta">${esc(event.host_agent_slug ? `Host: ${titleize(event.host_agent_slug)}` : 'Host agent')} · Live since ${esc(fmt(session.signed_in_at))}</p></div><span class="status live">Live</span></div>
+                <div class="card-actions"><a class="mini" href="${esc(dashboardHref(profile, 'lo-open-houses'))}">Open Coverage Workspace</a>${event.id ? `<a class="mini" href="/event?event=${encodeURIComponent(event.id)}">View Event</a>` : ''}</div></article>`; }).join('') : '<div class="empty">No live open-house coverage is assigned. Accepted remote or in-person coverage will appear here.</div>'}
+              ${upcomingVisits.slice(0,6).map((visit) => `<article class="card"><div class="card-top"><div><h3>${esc(visit.property_address || visit.address || visit.agent_name || 'Upcoming agent support')}</h3><p class="meta">${esc(fmt(visit.scheduled_start))} · ${esc(titleize(visit.status || visit.participant?.status || 'scheduled'))}</p></div><span class="status pending">Upcoming</span></div><div class="card-actions"><a class="mini" href="${esc(dashboardHref(profile, 'lo-open-houses'))}">Open Assignment</a></div></article>`).join('')}
+            </div>
+          </section>
+
+          <aside class="glass panel">
+            <h2>Loan Officer Tools</h2>
+            <div class="tool-grid">
+              <div class="tool"><h3>Availability</h3><p>${openAvailability.length} open future slots. Set working days, unavailable periods, ZIP and coverage radius.</p><a class="mini" href="${esc(dashboardHref(profile, 'lo-availability'))}">Manage Schedule</a></div>
+              <div class="tool"><h3>My Agents & Outreach</h3><p>Create Event Pass or live-coverage outreach for agents you work with. Relationship ownership is the next workflow being connected.</p><a class="mini" href="${esc(dashboardHref(profile, 'lo-agents'))}">Open Agent Workspace</a></div>
+              <div class="tool"><h3>Event Pass & Coverage Sign</h3><p>Activate sponsored Event Pass support or configure loan-officer-owned Coverage Sign hardware.</p><div class="card-actions"><a class="mini" href="/lo-sign-setup?uid=${encodeURIComponent(profile.uid)}">Coverage Sign</a><a class="mini" href="/sponsored-pass-activate">Event Pass</a></div></div>
+              <div class="tool"><h3>Affordability Guidance</h3><p>Add property-fit guidance only after completing your own preapproval workflow outside REL8TION.</p><a class="mini" href="/lo-affordability-guidance?uid=${encodeURIComponent(profile.uid)}">Open Guidance</a></div>
+            </div>
+          </aside>
+        </div>
+
+        <section class="glass panel inbox">
+          <h2>Financing Help Inbox</h2>
+          <div class="cards">
+            ${openConversations.length ? openConversations.slice(0,12).map((conversation) => `<article class="card request"><div><div class="request-name">${esc(conversation.buyer_name || 'Buyer financing request')}</div><p class="meta">${esc([conversation.agent_name, conversation.status ? titleize(conversation.status) : '', fmt(conversation.updated_at)].filter(Boolean).join(' · '))}</p></div><a class="mini" href="${esc(dashboardHref(profile, 'lo-open-houses'))}">Open Message</a></article>`).join('') : '<div class="empty">No buyer financing conversations are assigned to this profile yet. Explicit buyer requests will appear here when the event is assigned to this loan officer.</div>'}
+          </div>
+        </section>
+        <p class="footer-note">Preview owner dashboard. Authenticated account ownership and recurring availability are the next security/build step.</p>`;
+    }
+
+    async function init() {
+      if (!uid && !slug) {
+        app.className = 'glass panel';
+        app.innerHTML = '<h2>Loan Officer Account Required</h2><p class="empty">Register or open this dashboard from your verified Rel8tionChip so REL8TION can identify your loan officer profile.</p><div class="card-actions"><a class="button primary" href="/loan-officer-support">Register as a Loan Officer</a><a class="button" href="/nmb-activate">Activate Existing Chip</a></div>';
+        return;
+      }
+      const profile = await loadProfile();
+      if (!profile) throw new Error('An active verified loan officer profile was not found.');
+      render(profile, await loadData(profile));
+    }
+    init().catch((error) => { app.className = 'glass panel'; app.innerHTML = `<h2>Dashboard could not load</h2><p class="empty">${esc(error.message || error)}</p>`; });
   </script>
-  <p>Opening loan officer dashboard...</p>
 </body>
 </html>
