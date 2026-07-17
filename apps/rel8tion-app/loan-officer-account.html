@@ -40,6 +40,18 @@
       location.replace(`/field-dashboard?role=loan_officer&uid=${encodeURIComponent(data.profile.uid)}`);
     }
     async function boot(){
+      const linkParams=new URLSearchParams(location.search);
+      const tokenHash=linkParams.get('token_hash');
+      const verifyType=linkParams.get('type');
+      if(tokenHash&&['invite','recovery'].includes(verifyType)){
+        message('Verifying your secure account link...');
+        const verified=await client.auth.verifyOtp({token_hash:tokenHash,type:verifyType});
+        if(verified.error)throw verified.error;
+        history.replaceState({},'',`${location.pathname}?mode=setup`);
+        window.currentLoanOfficerSession=verified.data.session;
+        show('setup');
+        return;
+      }
       const {data}=await client.auth.getSession();
       if(data.session){
         if(mode==='setup'||location.hash.includes('type=invite')||location.hash.includes('type=recovery'))show('setup');

@@ -99,7 +99,7 @@ async function sendApprovalSms(request, activationUrl) {
   const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
   const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
   if (!url || !key) return { channel:'sms', status:'not_configured', warning:'Supabase SMS is not configured.' };
-  const message = `REL8TION: ${clean(request.full_name, 80)}, your loan officer registration was approved. Complete your verified profile and open your dashboard here: ${activationUrl} Reply STOP to opt out.`;
+  const message = `REL8TION: ${clean(request.full_name, 80)}, your loan officer registration was approved. Complete your verified profile and open your dashboard here: ${activationUrl}`;
   const response = await fetch(`${url}/functions/v1/send-lead-sms`, {
     method:'POST',
     headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },

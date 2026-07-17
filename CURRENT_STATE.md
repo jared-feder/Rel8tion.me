@@ -269,3 +269,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 
 - `[IMPLEMENTED]` Initial automated outreach still requires the Y/N/STOP disclosure. Automatic confirmation messages sent in direct response to an inbound Y or N no longer repeat the STOP sentence.
 - `[IMPLEMENTED]` The shared SMS provider only allows this omission when the caller explicitly marks a recent-inbound reply with `omit_repeated_stop_disclosure`; suppression checks and STOP keyword handling remain unchanged.
+### 2026-07-17 - Production-safe loan officer verification links
+
+- `[IMPLEMENTED]` Account-access SMS no longer forwards Supabase's generated action URL or depends on the project's current Auth Site URL. The server extracts the one-time token hash and creates an `https://app.rel8tion.me/loan-officer` link.
+- `[IMPLEMENTED]` The account page verifies invite/recovery token hashes directly with Supabase Auth, removes the token from browser history, and opens password creation.
+- `[IMPLEMENTED]` A recent erroneous localhost account link does not trigger the normal five-minute duplicate suppression, allowing an immediate corrected replacement.
+- `[IMPLEMENTED]` Loan officer password/setup links and registration approval notices are transactional account messages and do not append outreach opt-out copy. Initial cold agent outreach retains its required Y/N/STOP disclosure.

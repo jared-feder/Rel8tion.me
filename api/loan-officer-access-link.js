@@ -32,15 +32,23 @@ async function generateAccountLink(profile, url, key, redirectTo) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload?.action_link) throw new Error(payload?.message || payload?.msg || 'Unable to create the secure account link.');
-  return { actionLink:payload.action_link, mode:exists ? 'recovery' : 'invite' };
+  const generated = new URL(payload.action_link);
+  const tokenHash = clean(generated.searchParams.get('token'), 500);
+  const verifyType = clean(generated.searchParams.get('type'), 40) || (exists ? 'recovery' : 'invite');
+  if (!tokenHash || !['invite', 'recovery'].includes(verifyType)) throw new Error('Supabase did not return a usable one-time token.');
+  const safeLink = new URL(redirectTo);
+  safeLink.searchParams.set('mode', 'setup');
+  safeLink.searchParams.set('token_hash', tokenHash);
+  safeLink.searchParams.set('type', verifyType);
+  return { actionLink:safeLink.toString(), mode:exists ? 'recovery' : 'invite' };
 }
 
 async function textAccountLink(profile, link, url, key) {
   const phone = normalizePhone(profile.phone);
   if (!phone) throw Object.assign(new Error('This approved profile does not have a valid mobile number.'), { status:409 });
-  const recent = await supabaseRest(`sms_message_log?to_phone=eq.${enc(phone)}&category=eq.event_transactional&metadata->>mode=eq.loan_officer_account_access&created_at=gte.${enc(new Date(Date.now() - 5 * 60 * 1000).toISOString())}&select=id&limit=1`).catch(() => []);
-  if (Array.isArray(recent) && recent.length) return { status:'recently_sent' };
-  const message = `REL8TION: ${profile.full_name || 'Loan officer'}, use this secure one-time link to create or reset your dashboard password: ${link} Reply STOP to opt out.`;
+  const recent = await supabaseRest(`sms_message_log?to_phone=eq.${enc(phone)}&category=eq.event_transactional&metadata->>mode=eq.loan_officer_account_access&created_at=gte.${enc(new Date(Date.now() - 5 * 60 * 1000).toISOString())}&select=id,body&order=created_at.desc&limit=1`).catch(() => []);
+  if (Array.isArray(recent) && recent.length && !/localhost/i.test(recent[0]?.body || '')) return { status:'recently_sent' };
+  const message = `REL8TION: ${profile.full_name || 'Loan officer'}, use this secure one-time link to create or reset your dashboard password: ${link}`;
   const response = await fetch(`${url}/functions/v1/send-lead-sms`, {
     method:'POST',
     headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
