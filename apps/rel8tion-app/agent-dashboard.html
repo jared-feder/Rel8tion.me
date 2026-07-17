@@ -69,22 +69,7 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
-    const DEFAULT_LOAN_OFFICER = {
-      loan_officer_uid: 'default-nmb-jared',
-      verified_profile_uid: '',
-      loan_officer_slug: 'default-nmb-jared',
-      loan_officer_name: 'Jared Feder',
-      loan_officer_title: 'Loan Officer',
-      loan_officer_company: 'Nationwide Mortgage Bankers',
-      loan_officer_phone: '3477758059',
-      loan_officer_email: 'jfeder@nmbnow.com',
-      loan_officer_photo_url: 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png',
-      loan_officer_calendar_url: '',
-      status: 'default',
-      is_default_fallback: true
-    };
     const FIT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
-    const defaultLoanOfficer = () => ({ ...DEFAULT_LOAN_OFFICER });
     function openHouseKitHref(address = '') {
       const kitParams = new URLSearchParams();
       const agentSlug = state.event?.host_agent_slug || state.agent || '';
@@ -275,7 +260,7 @@
         `Event: ${state.event?.id || ''}`
       ].filter(Boolean).join('\n');
       return {
-        href: smsHref(state.loanOfficer?.loan_officer_phone || '3477758059', message),
+        href: smsHref(state.loanOfficer?.loan_officer_phone || '', message),
         label: 'Request LO Guidance'
       };
     }
@@ -719,7 +704,7 @@
       state.house = await loadHouse(state.event.open_house_source_id);
       state.checkins = await loadCheckins(state.event.id).catch(() => []);
       state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
-      state.loanOfficer = (await loadLoanOfficer(state.event.id).catch(() => null)) || defaultLoanOfficer();
+      state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
       state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
         console.log('affordability fit data skipped', error);
         return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
