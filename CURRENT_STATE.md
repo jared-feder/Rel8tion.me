@@ -259,3 +259,8 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 ### 2026-07-17 - Loan officer password-reset API-key fix
 
 - `[IMPLEMENTED]` `/loan-officer` now imports the shared public Supabase configuration instead of maintaining a shortened duplicate anon key that caused `Invalid API key` during password-reset requests.
+### 2026-07-17 - Existing loan officer Auth bootstrap
+
+- `[IMPLEMENTED]` `/loan-officer` no longer claims a password-reset email was sent for profiles that have no Supabase Auth user. The secure setup action matches an approved verified profile, creates the missing Auth identity or recovery link, and sends the one-time link through the saved mobile number.
+- `[IMPLEMENTED]` Public account-access requests return generic results for unknown emails and suppress repeat SMS sends for five minutes.
+- `[NEEDS VERIFICATION]` Custom SMTP/Resend is not configured in production, so account setup currently uses the verified mobile number instead of email delivery.
