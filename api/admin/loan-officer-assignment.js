@@ -149,6 +149,23 @@ async function insertLiveCoverage(event, profile) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+async function assignOpenConversations(eventId, profile) {
+  const rows = await supabaseRest(
+    `event_conversations?open_house_event_id=eq.${enc(eventId)}&status=neq.closed`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        loan_officer_slug: profile.slug || null,
+        loan_officer_name: profile.full_name || profile.name || null,
+        loan_officer_phone: profile.phone || null,
+        updated_at: new Date().toISOString()
+      })
+    }
+  ).catch((error) => ({ warning:error.message || String(error) }));
+  return Array.isArray(rows) ? rows : rows;
+}
+
 function eventContext(event) {
   return event?.setup_context && typeof event.setup_context === 'object' ? event.setup_context : {};
 }
@@ -261,8 +278,9 @@ async function assignLiveCoverage(eventId, loanOfficerUid) {
   const ended = await endLiveCoverage(event.id);
   const assigned = await insertLiveCoverage(event, profile);
   const field_assignment = await upsertFieldVisitAssignment(event, profile, 'manual_admin');
+  const conversations = await assignOpenConversations(event.id, profile);
 
-  return { event, loan_officer: profile, ended, assigned, field_assignment };
+  return { event, loan_officer: profile, ended, assigned, field_assignment, conversations };
 }
 
 async function removeLoanOfficerProfile(loanOfficerUid) {
@@ -332,7 +350,8 @@ async function autoAssignLiveCoverage() {
 
     const assigned = await insertLiveCoverage(event, profile);
     const field_assignment = await upsertFieldVisitAssignment(event, profile, 'auto_admin');
-    assignments.push({ event, loan_officer: profile, assigned, field_assignment });
+    const conversations = await assignOpenConversations(event.id, profile);
+    assignments.push({ event, loan_officer: profile, assigned, field_assignment, conversations });
     coveredEvents.add(event.id);
     loadByUid[profile.uid] = (loadByUid[profile.uid] || 0) + 1;
   }

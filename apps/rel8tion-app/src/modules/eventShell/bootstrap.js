@@ -1166,6 +1166,34 @@ function buildCheckinPayload(formData) {
   };
 }
 
+async function createFinancingHelpConversation({ checkin, payload, loanOfficer }) {
+  const address = pageState.house?.address || pageState.eventRow?.setup_context?.address || 'this open house';
+  const response = await fetch('/api/event-chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      open_house_event_id: pageState.eventRow.id,
+      buyer_checkin_id: checkin?.id || '',
+      buyer_name: payload.visitor_name || 'Buyer',
+      buyer_phone: payload.visitor_phone || '',
+      agent_slug: pageState.eventRow.host_agent_slug || '',
+      agent_name: pageState.agent?.name || pageState.eventRow.host_agent_slug || '',
+      agent_phone: pageState.agent?.phone || '',
+      loan_officer_slug: loanOfficer?.loan_officer_slug || '',
+      loan_officer_name: loanOfficer?.loan_officer_name || '',
+      loan_officer_phone: loanOfficer?.loan_officer_phone || '',
+      sender_role: 'system',
+      sender_name: 'REL8TION',
+      source: 'buyer_financing_request',
+      body: `${payload.visitor_name || 'A buyer'} explicitly requested financing help while checking in at ${address}.`,
+      metadata: { financing_requested:true, needs_reply:true, created_from_checkin:true }
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'Unable to create financing conversation.');
+  return data;
+}
+
 function nextStepCards() {
   const house = pageState.house || {
     address: pageState.eventRow?.setup_context?.address || '',
@@ -1650,6 +1678,11 @@ function attachEventHandlers() {
             loanOfficer: liveLoanOfficer,
             propertyAddress: address
           });
+        }
+        try {
+          await createFinancingHelpConversation({ checkin:createdCheckin, payload, loanOfficer:liveLoanOfficer });
+        } catch (error) {
+          console.log('financing conversation creation skipped', error);
         }
       }
 

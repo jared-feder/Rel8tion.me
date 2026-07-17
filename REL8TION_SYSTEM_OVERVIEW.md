@@ -195,7 +195,7 @@ Automatic agent outreach is restricted to future open houses. When the operator 
 
 ### Loan officer assignment confirmation
 
-An admin manual assignment is one transaction from the product's point of view: it creates the live `event_loan_officer_sessions` coverage record, upserts the scheduled `field_demo_visits` appointment and primary loan-officer participant, then attempts confirmations to the loan officer and host agent. SMS is operational event traffic. Email is optional until Resend is configured and includes a provider-neutral iCalendar attachment plus a Google Calendar add link. Notification failure is returned to the admin UI but does not roll back a valid coverage assignment.
+An admin manual assignment is one transaction from the product's point of view: it creates the live `event_loan_officer_sessions` coverage record, upserts the scheduled `field_demo_visits` appointment and primary loan-officer participant, assigns the event's open financing conversations to that LO, then attempts confirmations to the loan officer and host agent. Explicit financing consent during buyer check-in creates the inbox thread even when coverage has not yet been assigned, allowing later assignment to route it correctly. SMS is operational event traffic. Email is optional until Resend is configured and includes a provider-neutral iCalendar attachment plus a Google Calendar add link. Notification failure is returned to the admin UI but does not roll back a valid coverage assignment.
 
 ### Loan officer registration approval
 
