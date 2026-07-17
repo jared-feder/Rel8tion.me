@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { notifyConfirmedAssignment } = require('./loan-officer-assignment');
 
 const OUTREACH_FOLLOWUPS_DISABLED = true;
 
@@ -307,9 +308,10 @@ async function acceptOpenHouse(body) {
   const visit = await upsertFieldVisit(queue);
   const participant = profile ? await upsertVisitParticipant(visit, profile) : null;
   const live_coverage = profile ? await upsertLiveCoverageIfEventLinked(visit, profile) : null;
+  const notifications = profile ? await notifyConfirmedAssignment(visit, profile) : [];
   const updated_queue = await markInterested(queue.id, 'accepted_open_house');
 
-  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile };
+  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, notifications };
 }
 
 async function confirmOpenHouse(body) {
@@ -330,10 +332,11 @@ async function confirmOpenHouse(body) {
     coverage_label: body.coverage_label
   });
   const participant = profile ? await upsertVisitParticipant(visit, profile) : null;
+  const notifications = profile ? await notifyConfirmedAssignment(visit, profile) : [];
   const nextStatus = queue.review_status === 'accepted_open_house' ? 'accepted_open_house' : 'confirmed_open_house';
   const updated_queue = await markInterested(queue.id, nextStatus);
 
-  return { queue: updated_queue || queue, visit, participant, loan_officer: profile };
+  return { queue: updated_queue || queue, visit, participant, loan_officer: profile, notifications };
 }
 
 async function scheduleDrip(body) {

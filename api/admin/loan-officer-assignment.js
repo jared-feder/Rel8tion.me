@@ -549,3 +549,4 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.assignLiveCoverage = assignLiveCoverage;
+module.exports.notifyConfirmedAssignment = notifyConfirmedAssignment;
