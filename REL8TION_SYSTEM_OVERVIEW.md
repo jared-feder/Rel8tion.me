@@ -197,6 +197,8 @@ Automatic agent outreach is restricted to future open houses. When the operator 
 
 An admin manual assignment is one transaction from the product's point of view: it creates the live `event_loan_officer_sessions` coverage record, upserts the scheduled `field_demo_visits` appointment and primary loan-officer participant, assigns the event's open financing conversations to that LO, then attempts confirmations to the loan officer and host agent. Explicit financing consent during buyer check-in creates the inbox thread even when coverage has not yet been assigned, allowing later assignment to route it correctly. SMS is operational event traffic. Email is optional until Resend is configured and includes a provider-neutral iCalendar attachment plus a Google Calendar add link. Notification failure is returned to the admin UI but does not roll back a valid coverage assignment.
 
+A confirmed future open house may exist first as `field_demo_visits` without a live event shell. REL8TION COMMAND assigns the LO directly to that scheduled visit and sends appointment confirmations; it does not create a false live session. Once an event shell is active, live assignment and conversation routing use `event_loan_officer_sessions`.
+
 ### Loan officer registration approval
 
 Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, sends an activation SMS, attempts an activation email, and opens the activation page so profile details can be completed before dashboard use. Email remains dependent on Resend sender configuration.
