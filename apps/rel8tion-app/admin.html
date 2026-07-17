@@ -2848,12 +2848,14 @@ ${rowsHtml}
       const target = thread.address || thread.open_house_id || thread.agent_name || 'this open house';
       const assignment = outreachAssignment(thread);
       const alreadyConfirmed = Boolean(assignment.visit || assignment.report || thread.review_status === 'confirmed_open_house' || thread.review_status === 'accepted_open_house');
+      const loanOfficerUid = document.getElementById('coverageLoanOfficer')?.value || '';
+      const profile = activeLoanOfficers().find((row) => row.uid === loanOfficerUid);
       const prompt = alreadyConfirmed
-        ? `Update ${target} to ${coverage.coverage_label} in Reports?`
-        : `Confirm ${target} for ${coverage.coverage_label} and add it to Reports?`;
+        ? `Update ${target} to ${coverage.coverage_label}${profile ? ` and assign ${loanOfficerLabel(profile)}` : ''}?`
+        : `Confirm ${target} for ${coverage.coverage_label}${profile ? ` and assign ${loanOfficerLabel(profile)}` : ''}?`;
       if (!window.confirm(prompt)) return;
       state.coveragePickerKey = '';
-      runOutreachAction(key, 'confirm_open_house', coverage, alreadyConfirmed ? 'Open house date updated.' : 'Open house confirmed for Reports.');
+      runOutreachAction(key, 'confirm_open_house', { ...coverage, loan_officer_uid:loanOfficerUid }, alreadyConfirmed ? 'Open house date and LO updated.' : 'Open house confirmed and LO assignment saved.');
     }
 
     function confirmCoverageChoice(index) {
@@ -3476,6 +3478,8 @@ ${rowsHtml}
       const endFallback = thread.open_start ? timeInputValue(fallbackCoverageEnd(thread.open_start), '15:00') : '15:00';
       const startTime = timeInputValue(thread.open_start, '13:00');
       const endTime = timeInputValue(thread.open_end, endFallback);
+      const profiles = activeLoanOfficers();
+      const assignedUid = assignment.participant?.participant_uid || assignment.report?.loan_officer_uid || '';
       return `
         <div class="modal-backdrop" data-coverage-backdrop>
           <section class="coverage-modal" role="dialog" aria-modal="true" aria-labelledby="coverageTitle">
@@ -3507,6 +3511,13 @@ ${rowsHtml}
             `}
 
             <div class="coverage-form">
+              <div class="coverage-field">
+                <label for="coverageLoanOfficer">Loan officer</label>
+                <select id="coverageLoanOfficer" class="select" ${profiles.length ? '' : 'disabled'}>
+                  <option value="">Assign later</option>
+                  ${profiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === assignedUid ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('')}
+                </select>
+              </div>
               <div>
                 <div class="mini-title">Calendar override</div>
                 <div class="small">${alreadyConfirmed ? 'Use this to move an old confirmed open house back into upcoming reports with the new date/time.' : 'Use this when the agent confirmed only one day, changed the time, or the listing dates are missing.'}</div>
@@ -5163,6 +5174,12 @@ ${rowsHtml}
                 <div class="mini-title">Loan officer</div>
                 <div class="primary">${esc(row.loan_officer_name || 'Not assigned')}</div>
                 <div class="secondary">${esc([row.loan_officer_company, fmtPhone(row.loan_officer_phone), row.loan_officer_email].filter(Boolean).join(' | ') || 'No LO coverage recorded')}</div>
+                ${row.field_visit_id ? `<div class="row-actions" style="margin-top:10px;">
+                  <select id="visit_lo_${domId(row.field_visit_id)}" class="select" ${activeLoanOfficers().length ? '' : 'disabled'}>
+                    ${activeLoanOfficers().length ? activeLoanOfficers().map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === row.loan_officer_uid ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
+                  </select>
+                  <button class="btn primary" data-assign-visit-lo="${esc(row.field_visit_id)}" ${activeLoanOfficers().length && state.actionKey !== `assign_visit:${row.field_visit_id}` ? '' : 'disabled'}><i data-lucide="user-check"></i><span>${state.actionKey === `assign_visit:${row.field_visit_id}` ? 'Assigning...' : row.loan_officer_uid ? 'Change LO' : 'Assign LO'}</span></button>
+                </div>` : ''}
               </div>
               <div class="report-detail">
                 <div class="mini-title">Confirmed coverage</div>

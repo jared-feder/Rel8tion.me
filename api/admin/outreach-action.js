@@ -320,6 +320,7 @@ async function confirmOpenHouse(body) {
     throw error;
   }
 
+  const profile = body.loan_officer_uid ? await loadLoanOfficer(body.loan_officer_uid) : null;
   const visit = await upsertFieldVisit(queue, {
     source: 'admin_confirmed_open_house',
     assignment_source: 'confirmed_outreach',
@@ -328,10 +329,11 @@ async function confirmOpenHouse(body) {
     coverage_end: body.coverage_end,
     coverage_label: body.coverage_label
   });
+  const participant = profile ? await upsertVisitParticipant(visit, profile) : null;
   const nextStatus = queue.review_status === 'accepted_open_house' ? 'accepted_open_house' : 'confirmed_open_house';
   const updated_queue = await markInterested(queue.id, nextStatus);
 
-  return { queue: updated_queue || queue, visit };
+  return { queue: updated_queue || queue, visit, participant, loan_officer: profile };
 }
 
 async function scheduleDrip(body) {
