@@ -105,6 +105,8 @@
     { "source": "/loan-officer-account.html", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
     { "source": "/loan-officer", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
     { "source": "/loan-officer.html", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
+    { "source": "/loan-officer-event-pass-guide", "destination": "/apps/rel8tion-app/loan-officer-event-pass-guide.html" },
+    { "source": "/loan-officer-event-pass-guide.html", "destination": "/apps/rel8tion-app/loan-officer-event-pass-guide.html" },
     { "source": "/lo-field-dashboard", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/lo-field-dashboard.html", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/admin/agent-ranking", "destination": "/apps/rel8tion-app/agent-ranking.html" },

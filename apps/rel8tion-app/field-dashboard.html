@@ -1261,6 +1261,12 @@
       app.innerHTML = isLoanOfficerDashboard()
         ? `<div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">${renderLoanOfficerNav()}<div class="min-w-0">${dashboardBody}</div></div>`
         : dashboardBody;
+      document.querySelectorAll('a[href="/apps/rel8tion-app/assets/loan-officer-event-pass-activation-guide.jpeg"]').forEach((link) => {
+        link.href = '/loan-officer-event-pass-guide';
+        const preview = link.querySelector('img');
+        if (preview) link.innerHTML = '<span class="p-5 text-center"><span class="block text-xs font-black uppercase tracking-[.18em] text-sky-700">Updated Field Guide</span><span class="mt-2 block font-[\'Plus_Jakarta_Sans\'] text-3xl font-extrabold text-slate-900">Scan.<br>Tap.<br>Activate.</span><span class="mt-3 block text-sm font-bold text-slate-500">Open the verified live instructions</span></span>';
+        else link.textContent = 'Open Updated Activation Guide';
+      });
       document.getElementById('schedule-form')?.addEventListener('submit', handleScheduleSubmit);
       document.getElementById('availability-form')?.addEventListener('submit', handleAvailabilitySubmit);
       document.getElementById('lo-account-form')?.addEventListener('submit', handleAccountSubmit);
