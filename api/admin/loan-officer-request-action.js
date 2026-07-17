@@ -69,7 +69,7 @@ async function sendPasswordSetupInvite(request, profile) {
   const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
   const email = clean(request.email, 320).toLowerCase();
   if (!url || !key || !email) return { channel:'auth_email', status:'not_configured', warning:'Supabase Auth invitation is not configured.' };
-  const redirectTo = `${appBaseUrl()}/loan-officer-account?mode=setup`;
+  const redirectTo = `${appBaseUrl()}/loan-officer?mode=setup`;
   const inviteResponse = await fetch(`${url}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method:'POST',
     headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
     }
     const sourceRequest = await loadRequest(body.request_id);
     const result = await approve(sourceRequest);
-    const activationUrl = `${appBaseUrl()}/loan-officer-account?mode=setup`;
+    const activationUrl = `${appBaseUrl()}/loan-officer?mode=setup`;
     const notifications = body.notify === false ? [] : await notifyApproval(sourceRequest, result.profile, activationUrl);
     sendJson(res, 200, {
       ok:true, ...result, notifications,

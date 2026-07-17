@@ -1274,7 +1274,7 @@
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || 'Unable to save account.');
         state.profile = payload.profile;
-        if (payload.email_changed) { await authClient.auth.signOut(); window.location.href='/loan-officer-account'; return; }
+        if (payload.email_changed) { await authClient.auth.signOut(); window.location.href='/loan-officer'; return; }
         await refresh('Account and public profile updated.');
       } catch (error) { state.error = error.message || 'Unable to save account.'; state.message = ''; render(); }
     }

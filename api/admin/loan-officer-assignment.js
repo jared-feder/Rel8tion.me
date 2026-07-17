@@ -70,7 +70,7 @@ async function updateAuthEmail(oldEmail, newEmail) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || payload?.msg || 'Unable to update the login email.');
-  const redirectTo = `${clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '')}/loan-officer-account?mode=setup`;
+  const redirectTo = `${clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '')}/loan-officer?mode=setup`;
   const recovery = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method:'POST', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({ email:newEmail })
   });

@@ -103,6 +103,8 @@
     { "source": "/loan-officer-dashboard.html", "destination": "/apps/rel8tion-app/loan-officer-dashboard.html" },
     { "source": "/loan-officer-account", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
     { "source": "/loan-officer-account.html", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
+    { "source": "/loan-officer", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
+    { "source": "/loan-officer.html", "destination": "/apps/rel8tion-app/loan-officer-account.html" },
     { "source": "/lo-field-dashboard", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/lo-field-dashboard.html", "destination": "/apps/rel8tion-app/lo-field-dashboard.html" },
     { "source": "/admin/agent-ranking", "destination": "/apps/rel8tion-app/agent-ranking.html" },
