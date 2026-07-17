@@ -15,7 +15,7 @@ const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
 const DEFAULT_SEND_MAX_PER_RUN = 5;
-const SEND_MAX_PER_RUN_HARD_CAP = 5;
+const SEND_MAX_PER_RUN_HARD_CAP = 15;
 const DEFAULT_SEND_MAX_PER_HOUR = 10;
 const SEND_MAX_PER_HOUR_HARD_CAP = 20;
 const DEFAULT_SEND_MAX_PER_DAY = 25;
@@ -343,6 +343,40 @@ function isWithinAllowedSendWindow(): boolean {
   return minutes >= start && minutes < endExclusive;
 }
 
+function newYorkDateKey(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+  return `${pick("year")}-${pick("month")}-${pick("day")}`;
+}
+
+function outreachTimingPriority(openStart: string | null | undefined): number {
+  const date = new Date(openStart || "");
+  if (!Number.isFinite(date.getTime())) return 9;
+
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+  }).format(date);
+  const hour = Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    hourCycle: "h23",
+  }).format(date));
+
+  if (weekday === "Sat" && hour >= 13) return 0;
+  if (weekday === "Sun") return 1;
+  if (weekday === "Sat") return 2;
+  return 3;
+}
+
 function isBlockedReviewStatus(reviewStatus: string | null): boolean {
   return reviewStatus === "opted_out" || reviewStatus === "android_opted_out";
 }
@@ -650,10 +684,20 @@ serve(async (req) => {
 
     if (error) throw error;
 
+    // Keep same-day open houses out of automatic outreach and favor late Saturday/Sunday events.
+    const todayNy = newYorkDateKey(now);
+    const candidateRows = (rows || [])
+      .filter((row) => newYorkDateKey(row.open_start || "") > todayNy)
+      .sort((left, right) => {
+        const timing = outreachTimingPriority(left.open_start) - outreachTimingPriority(right.open_start);
+        if (timing) return timing;
+        return new Date(left.open_start || 0).getTime() - new Date(right.open_start || 0).getTime();
+      });
+
     const results: Array<Record<string, unknown>> = [];
     let sendAttempts = 0;
 
-    for (const row of rows || []) {
+    for (const row of candidateRows) {
       if (!dryRun && sendAttempts >= limit) break;
       if (dryRun && results.length >= inspectionLimit) break;
 
@@ -1083,7 +1127,7 @@ serve(async (req) => {
           ok: true,
           processed: results.length,
           dry_run: dryRun,
-          candidate_rows: rows?.length || 0,
+          candidate_rows: candidateRows.length,
           fetch_limit: fetchLimit,
           requested_limit: normalizedRequestedLimit,
           effective_limit: limit,
