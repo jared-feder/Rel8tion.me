@@ -242,3 +242,10 @@ npm run refresh:onekey:dry-run -- --id=M00000489-971018
 ```
 
 There is no confirmed full automated suite for the main static app. NFC/sign/Event Pass checks usually need manual route/state testing plus targeted Supabase row inspection.
+### 2026-07-17 - Loan officer password accounts
+
+- `[IMPLEMENTED]` Admin approval now sends a Supabase Auth invitation (or recovery email for an existing Auth user) to the approved loan officer email.
+- `[IMPLEMENTED]` `/loan-officer-account` handles password creation, password login, password reset, and matches the authenticated email to an active verified loan officer profile before opening the dashboard.
+- `[NEEDS VERIFICATION]` Supabase Auth must allow `https://app.rel8tion.me/loan-officer-account` as an email redirect URL and its production email provider must deliver Auth invitations.
+- `[IMPLEMENTED]` Loan officer registration requires a headshot, compresses it in the browser, stores it in the existing public `verified-assets` bucket through a server route, and carries the image into the approved verified profile.
+- `[IMPLEMENTED]` After the first secure password setup, a loan officer can create a four-digit quick-unlock PIN stored as a salted hash on that phone. It is a device convenience lock, while the Supabase password remains the actual account credential and recovery path.

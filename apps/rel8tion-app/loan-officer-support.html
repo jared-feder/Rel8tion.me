@@ -201,6 +201,8 @@
     }
 
     input { min-height: 52px; }
+    input[type="file"] { min-height: 0; padding: 13px; }
+    .photo-preview { display:none; width:96px; height:96px; border-radius:22px; object-fit:cover; border:3px solid white; box-shadow:0 12px 30px rgba(24,35,91,.18); }
     textarea {
       min-height: 118px;
       padding-top: 13px;
@@ -320,6 +322,12 @@
             </label>
           </div>
 
+          <label>
+            Profile Headshot
+            <input id="profilePhoto" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <img id="photoPreview" class="photo-preview" alt="Headshot preview">
+          </label>
+
           <div class="grid">
             <label>
               Email
@@ -368,6 +376,9 @@
     const form = document.getElementById('supportForm');
     const statusEl = document.getElementById('status');
     const submitButton = document.getElementById('submitButton');
+    const profilePhoto = document.getElementById('profilePhoto');
+    const photoPreview = document.getElementById('photoPreview');
+    let compressedPhoto = '';
 
     function clean(value) {
       return String(value || '').trim();
@@ -384,6 +395,34 @@
       statusEl.className = `status show ${type}`;
     }
 
+    async function compressHeadshot(file) {
+      if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type)) throw new Error('Choose a JPG, PNG, or WebP headshot.');
+      if (file.size > 12 * 1024 * 1024) throw new Error('Choose an image smaller than 12 MB.');
+      const bitmap = await createImageBitmap(file);
+      const size = Math.min(640, Math.max(bitmap.width, bitmap.height));
+      const scale = Math.min(1, size / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      return canvas.toDataURL('image/jpeg', .82);
+    }
+
+    profilePhoto.addEventListener('change', async () => {
+      try {
+        compressedPhoto = await compressHeadshot(profilePhoto.files?.[0]);
+        photoPreview.src = compressedPhoto;
+        photoPreview.style.display = 'block';
+        showStatus('Headshot ready.', 'ok');
+      } catch (error) {
+        compressedPhoto = '';
+        profilePhoto.value = '';
+        photoPreview.style.display = 'none';
+        showStatus(error.message || 'Unable to prepare that image.', 'bad');
+      }
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(form);
@@ -396,6 +435,7 @@
         availability: clean(formData.get('availability')),
         experience: clean(formData.get('experience')),
         notes: clean(formData.get('notes')),
+        photo_data_url: compressedPhoto,
         source_host: window.location.host,
         source_path: window.location.pathname
       };
@@ -405,6 +445,7 @@
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return showStatus('Please enter a valid email address.', 'bad');
       if (normalizePhone(payload.phone).length !== 10) return showStatus('Please enter a valid 10-digit mobile phone number.', 'bad');
       if (payload.experience.length < 10) return showStatus('Please add a short note about your experience.', 'bad');
+      if (!payload.photo_data_url) return showStatus('Please add a profile headshot.', 'bad');
 
       submitButton.disabled = true;
       submitButton.textContent = 'Sending Request...';
@@ -419,6 +460,8 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save request.');
         form.reset();
+        compressedPhoto = '';
+        photoPreview.style.display = 'none';
         showStatus('Registration submitted. Rel8tion will review your information before activating your verified profile and dashboard.', 'ok');
       } catch (error) {
         showStatus(error.message || 'We could not send your request right now. Please try again.', 'bad');

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Loan Officer Account | REL8TION</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,Arial,sans-serif;color:#10213f;background:radial-gradient(circle at 75% 0,#52d0ef 0,transparent 38%),linear-gradient(180deg,#e9f8ff,#f8fbff);display:grid;place-items:center;padding:22px}.card{width:min(560px,100%);padding:34px;border:1px solid rgba(255,255,255,.9);border-radius:32px;background:rgba(255,255,255,.78);box-shadow:0 25px 80px rgba(16,33,63,.14);backdrop-filter:blur(16px)}.brand{width:120px}h1{font-size:clamp(34px,7vw,54px);line-height:1;margin:24px 0 12px}p{color:#5d6c84;font-weight:600;line-height:1.55}.field{margin-top:18px}label{display:block;margin-bottom:7px;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}input{width:100%;padding:15px 16px;border:1px solid #cad8e8;border-radius:16px;background:white;font-size:16px}button{width:100%;margin-top:18px;padding:15px;border:0;border-radius:16px;background:#155eef;color:white;font-size:16px;font-weight:900;cursor:pointer}button.secondary{background:white;color:#172c76;border:1px solid #cad8e8}button:disabled{opacity:.55}.status{min-height:24px;margin-top:16px;font-weight:800;color:#155eef}.error{color:#b42318}.hide{display:none}.small{text-align:center;font-size:13px}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="brand" src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="REL8TION">
+    <section id="loading"><h1>Opening your account</h1><p>Checking your secure invitation...</p></section>
+    <section id="setup" class="hide"><h1>Create your password</h1><p>Use at least eight characters. This password replaces the keychain for dashboard access.</p><form id="setupForm"><div class="field"><label for="newPassword">New password</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label for="confirmPassword">Confirm password</label><input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></div><button type="submit">Save Password & Open Dashboard</button></form></section>
+    <section id="login" class="hide"><h1>Loan officer sign in</h1><p>Sign in with the approved email address on your REL8TION profile.</p><form id="loginForm"><div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div><div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div><button type="submit">Sign In</button></form><button id="forgot" type="button" class="secondary">Email Me a Password Reset</button></section>
+    <section id="pinSetup" class="hide"><h1>Set a quick phone PIN</h1><p>Your secure account is ready. Choose a four-digit PIN to unlock this dashboard quickly on this phone.</p><form id="pinSetupForm"><div class="field"><label for="newPin">4-digit PIN</label><input id="newPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" required></div><div class="field"><label for="confirmPin">Confirm PIN</label><input id="confirmPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" required></div><button type="submit">Save Phone PIN</button></form><p class="small">This PIN only unlocks this device. Your password remains the secure account recovery method.</p></section>
+    <section id="pinUnlock" class="hide"><h1>Unlock your dashboard</h1><p>Enter the four-digit PIN saved on this phone.</p><form id="pinUnlockForm"><div class="field"><label for="unlockPin">Phone PIN</label><input id="unlockPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" required></div><button type="submit">Unlock</button></form><button id="usePassword" type="button" class="secondary">Use Password Instead</button></section>
+    <div id="status" class="status" aria-live="polite"></div>
+  </main>
+  <script>
+    const SUPABASE_URL='https://nicanqrfqlbnlmnoernb.supabase.co';
+    const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaWNhbnFyZnFsYm5sbW5vZXJuYiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzYxMTYxMDc3LCJleHAiOjIwNzY3MzcwNzd9.FNE_8qVT4BZBrgdhYqvdwEzeCdbtUzBXndq_Us-WUjg';
+    const client=window.supabase.createClient(SUPABASE_URL,KEY);
+    const mode=new URLSearchParams(location.search).get('mode')||'';
+    const sections=['loading','setup','login','pinSetup','pinUnlock'];
+    const status=document.getElementById('status');
+    function show(id){sections.forEach((name)=>document.getElementById(name).classList.toggle('hide',name!==id));status.textContent='';status.className='status'}
+    function message(text,error=false){status.textContent=text;status.className=`status${error?' error':''}`}
+    function lockKey(userId){return `rel8tion_lo_quick_lock:${userId}`}
+    async function pinDigest(pin,salt){const bytes=new TextEncoder().encode(`${salt}:${pin}`);const digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}
+    function loadLock(session){try{return JSON.parse(localStorage.getItem(lockKey(session.user.id))||'null')}catch{return null}}
+    async function continueWithQuickLock(session){window.currentLoanOfficerSession=session;show(loadLock(session)?'pinUnlock':'pinSetup')}
+    async function openDashboard(session){
+      message('Opening your dashboard...');
+      const response=await fetch('/api/loan-officer-account',{headers:{Authorization:`Bearer ${session.access_token}`}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.profile?.uid)throw new Error(data.error||'Approved loan officer profile not found.');
+      location.replace(`/field-dashboard?role=loan_officer&uid=${encodeURIComponent(data.profile.uid)}`);
+    }
+    async function boot(){
+      const {data}=await client.auth.getSession();
+      if(data.session){
+        if(mode==='setup'||location.hash.includes('type=invite')||location.hash.includes('type=recovery'))show('setup');
+        else await continueWithQuickLock(data.session);
+      }else show('login');
+    }
+    document.getElementById('setupForm').addEventListener('submit',async(event)=>{event.preventDefault();const password=document.getElementById('newPassword').value;const confirm=document.getElementById('confirmPassword').value;if(password!==confirm){message('The passwords do not match.',true);return}message('Saving your password...');const {data,error}=await client.auth.updateUser({password});if(error){message(error.message,true);return}await continueWithQuickLock(data.session||(await client.auth.getSession()).data.session)});
+    document.getElementById('loginForm').addEventListener('submit',async(event)=>{event.preventDefault();message('Signing in...');const {data,error}=await client.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(error){message(error.message,true);return}await continueWithQuickLock(data.session)});
+    document.getElementById('pinSetupForm').addEventListener('submit',async(event)=>{event.preventDefault();const pin=document.getElementById('newPin').value;const confirm=document.getElementById('confirmPin').value;if(!/^\d{4}$/.test(pin)){message('Use exactly four digits.',true);return}if(pin!==confirm){message('The PINs do not match.',true);return}const salt=crypto.randomUUID();localStorage.setItem(lockKey(window.currentLoanOfficerSession.user.id),JSON.stringify({salt,hash:await pinDigest(pin,salt)}));await openDashboard(window.currentLoanOfficerSession).catch((error)=>message(error.message,true))});
+    document.getElementById('pinUnlockForm').addEventListener('submit',async(event)=>{event.preventDefault();const lock=loadLock(window.currentLoanOfficerSession);const hash=await pinDigest(document.getElementById('unlockPin').value,lock.salt);if(hash!==lock.hash){message('That PIN did not match.',true);return}await openDashboard(window.currentLoanOfficerSession).catch((error)=>message(error.message,true))});
+    document.getElementById('usePassword').addEventListener('click',async()=>{await client.auth.signOut();show('login')});
+    document.getElementById('forgot').addEventListener('click',async()=>{const email=document.getElementById('email').value.trim();if(!email){message('Enter your approved email address first.',true);return}message('Sending password reset...');const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}/loan-officer-account?mode=setup`});message(error?error.message:'Check your email for the password reset link.',Boolean(error))});
+    boot().catch((error)=>{show('login');message(error.message||'Unable to open your account.',true)});
+  </script>
+</body>
+</html>

@@ -36,11 +36,16 @@ async function approve(request) {
         p_company_name: clean(request.company_name, 180),
         p_phone: clean(request.phone, 80),
         p_email: clean(request.email, 320),
-        p_photo_url: '', p_logo_url: '', p_cta_url: '', p_calendar_url: '',
+        p_photo_url: clean(request.metadata?.photo_url, 1000), p_logo_url: '', p_cta_url: '', p_calendar_url: '',
         p_bio: clean(request.experience, 2000),
         p_areas: clean(request.coverage_areas, 1000).split(',').map((item) => item.trim()).filter(Boolean)
       })
     }));
+  } else if (!profile.photo_url && request.metadata?.photo_url) {
+    profile = one(await supabaseRest(`verified_profiles?uid=eq.${enc(profile.uid)}`, {
+      method:'PATCH', headers:{ Prefer:'return=representation' },
+      body:JSON.stringify({ photo_url:clean(request.metadata.photo_url, 1000) })
+    })) || profile;
   }
   if (!profile?.uid) throw new Error('Profile approval did not return a loan officer UID.');
   const now = new Date().toISOString();
@@ -57,6 +62,37 @@ async function approve(request) {
 
 function appBaseUrl() {
   return clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '');
+}
+
+async function sendPasswordSetupInvite(request, profile) {
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  const email = clean(request.email, 320).toLowerCase();
+  if (!url || !key || !email) return { channel:'auth_email', status:'not_configured', warning:'Supabase Auth invitation is not configured.' };
+  const redirectTo = `${appBaseUrl()}/loan-officer-account?mode=setup`;
+  const inviteResponse = await fetch(`${url}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method:'POST',
+    headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
+    body:JSON.stringify({
+      email,
+      data:{ full_name:clean(request.full_name, 160), verified_profile_uid:profile.uid, account_role:'loan_officer' }
+    })
+  });
+  const inviteData = await inviteResponse.json().catch(() => ({}));
+  if (inviteResponse.ok) return { channel:'auth_email', status:'sent', mode:'invite', user_id:inviteData?.id || inviteData?.user?.id || null };
+
+  if (!/already|registered|exists/i.test(inviteData?.message || inviteData?.msg || inviteData?.error_description || '')) {
+    throw new Error(inviteData?.message || inviteData?.msg || inviteData?.error_description || `Password invitation failed: ${inviteResponse.status}`);
+  }
+
+  const recoveryResponse = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method:'POST',
+    headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
+    body:JSON.stringify({ email })
+  });
+  const recoveryData = await recoveryResponse.json().catch(() => ({}));
+  if (!recoveryResponse.ok) throw new Error(recoveryData?.message || recoveryData?.msg || recoveryData?.error_description || `Password setup email failed: ${recoveryResponse.status}`);
+  return { channel:'auth_email', status:'sent', mode:'recovery' };
 }
 
 async function sendApprovalSms(request, activationUrl) {
@@ -95,12 +131,13 @@ async function sendApprovalEmail(request, activationUrl) {
   return { channel:'email', status:'sent', provider_id:data.id || null };
 }
 
-async function notifyApproval(request, activationUrl) {
+async function notifyApproval(request, profile, activationUrl) {
   const settle = async (channel, task) => {
     try { return await task(); }
     catch (error) { return { channel, status:'failed', error:error.message || String(error) }; }
   };
   return Promise.all([
+    request.email ? settle('auth_email', () => sendPasswordSetupInvite(request, profile)) : Promise.resolve({ channel:'auth_email', status:'skipped', warning:'Applicant email is missing.' }),
     request.phone ? settle('sms', () => sendApprovalSms(request, activationUrl)) : Promise.resolve({ channel:'sms', status:'skipped', warning:'Applicant phone is missing.' }),
     request.email ? settle('email', () => sendApprovalEmail(request, activationUrl)) : Promise.resolve({ channel:'email', status:'skipped', warning:'Applicant email is missing.' })
   ]);
@@ -126,8 +163,8 @@ module.exports = async function handler(req, res) {
     }
     const sourceRequest = await loadRequest(body.request_id);
     const result = await approve(sourceRequest);
-    const activationUrl = `${appBaseUrl()}/nmb-activate?uid=${encodeURIComponent(result.profile.uid)}`;
-    const notifications = body.notify === false ? [] : await notifyApproval(sourceRequest, activationUrl);
+    const activationUrl = `${appBaseUrl()}/loan-officer-account?mode=setup`;
+    const notifications = body.notify === false ? [] : await notifyApproval(sourceRequest, result.profile, activationUrl);
     sendJson(res, 200, {
       ok:true, ...result, notifications,
       activation_url:activationUrl,

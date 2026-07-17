@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
 
 const ALLOWED_ORIGINS = new Set([
@@ -54,6 +55,25 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+async function uploadHeadshot(dataUrl) {
+  const match = clean(dataUrl, 1500000).match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw Object.assign(new Error('Please upload a valid profile headshot.'), { status:400 });
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > 700000) throw Object.assign(new Error('The compressed headshot is too large.'), { status:400 });
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  const extension = match[1] === 'jpg' ? 'jpeg' : match[1];
+  const path = `headshots/registration-${crypto.randomUUID()}.${extension === 'jpeg' ? 'jpg' : extension}`;
+  const response = await fetch(`${url}/storage/v1/object/verified-assets/${path}`, {
+    method:'POST',
+    headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':`image/${extension}`, 'x-upsert':'false' },
+    body:bytes
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || payload?.error || 'Unable to upload the profile headshot.');
+  return `${url}/storage/v1/object/public/verified-assets/${path}`;
+}
+
 module.exports = async function handler(req, res) {
   applyCors(req, res);
 
@@ -79,6 +99,7 @@ module.exports = async function handler(req, res) {
     const coverageAreas = clean(body.coverage_areas || body.coverageAreas, 1000);
     const availability = clean(body.availability, 1000);
     const notes = clean(body.notes, 1500);
+    const photoDataUrl = clean(body.photo_data_url, 1500000);
 
     if (fullName.length < 2) {
       sendJson(res, 400, { ok: false, error: 'Please enter your name.' });
@@ -105,6 +126,13 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (!photoDataUrl) {
+      sendJson(res, 400, { ok:false, error:'Please add a profile headshot.' });
+      return;
+    }
+
+    const photoUrl = await uploadHeadshot(photoDataUrl);
+
     const payload = {
       full_name: fullName,
       company_name: companyName,
@@ -123,7 +151,8 @@ module.exports = async function handler(req, res) {
       metadata: {
         path: clean(body.source_path, 300) || null,
         host: clean(body.source_host, 200) || null,
-        submitted_at: new Date().toISOString()
+        submitted_at: new Date().toISOString(),
+        photo_url: photoUrl
       }
     };
 

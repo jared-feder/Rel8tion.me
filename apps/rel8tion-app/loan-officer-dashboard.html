@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=/field-dashboard?role=loan_officer">
+  <meta http-equiv="refresh" content="0; url=/loan-officer-account">
   <title>Opening Loan Officer Dashboard</title>
 </head>
 <body>
   <script>
-    const target = new URL('/field-dashboard', window.location.origin);
-    target.searchParams.set('role', 'loan_officer');
+    const target = new URL('/loan-officer-account', window.location.origin);
     for (const [key, value] of new URLSearchParams(window.location.search).entries()) {
-      if (key !== 'role') target.searchParams.set(key, value);
+      target.searchParams.set(key, value);
     }
     window.location.replace(`${target.pathname}${target.search}${window.location.hash}`);
   </script>

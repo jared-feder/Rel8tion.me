@@ -196,3 +196,6 @@ Automatic agent outreach is restricted to future open houses. When the operator 
 ### Loan officer registration approval
 
 Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, sends an activation SMS, attempts an activation email, and opens the activation page so profile details can be completed before dashboard use. Email remains dependent on Resend sender configuration.
+### Loan officer password account
+
+Approved loan officers receive a Supabase Auth email invitation and create a password at `/loan-officer-account`. Password login is matched server-side to the active `verified_profiles.email` row before the loan officer dashboard opens. The service-role key remains server-only; the browser uses the public anon key and the signed-in user's access token.
