@@ -82,6 +82,14 @@
     const cleanPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '');
     const telHref = (phone) => phone ? `tel:${cleanPhone(phone)}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${cleanPhone(phone)}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    function directionsHref(address) {
+      const destination = String(address || '').trim();
+      if (!destination) return '#';
+      const isAppleDevice = /iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent || '');
+      return isAppleDevice
+        ? `https://maps.apple.com/?daddr=${encodeURIComponent(destination)}&dirflg=d`
+        : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+    }
     function visitCalendarHref(visit) {
       const start = new Date(visit?.scheduled_start || Date.now());
       const end = new Date(visit?.scheduled_end || start.getTime() + 2 * 60 * 60 * 1000);
@@ -831,6 +839,7 @@
                   <p class="mt-1 text-sm font-bold text-slate-600">${esc(visit.address || visit.open_house_id || visit.open_house_event_id || 'Open house')}</p>
                   <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
                   <p class="mt-2 text-xs font-black uppercase tracking-[.12em] text-slate-400">${buyers} buyer check-in${buyers === 1 ? '' : 's'}</p>
+                  <a href="${esc(directionsHref(visit.address))}" target="_blank" rel="noopener" class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-sm font-black text-white ${visit.address ? '' : 'pointer-events-none opacity-40'}">Directions</a>
                   </div>
                 </article>
               `;
@@ -925,6 +934,7 @@
                 <a href="${esc(telHref(visit.agent_phone))}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call Agent</a>
                 <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text Agent</a>
                 <a href="${visit.agent_email ? `mailto:${esc(visit.agent_email)}` : '#'}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_email ? '' : 'pointer-events-none opacity-40'}">Email Agent</a>
+                <a href="${esc(directionsHref(visit.address))}" target="_blank" rel="noopener" class="rounded-full bg-emerald-600 px-3 py-3 text-center text-xs font-black text-white ${visit.address ? '' : 'pointer-events-none opacity-40'}">Directions</a>
                 <a href="${esc(visitCalendarHref(visit))}" target="_blank" rel="noopener" class="rounded-full bg-sky-600 px-3 py-3 text-center text-xs font-black text-white sm:col-span-3">Add Coverage to Calendar</a>
               </div>
             </div>
