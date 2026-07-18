@@ -165,7 +165,23 @@ export function showError(title, message) {
   `);
 }
 
-export function showIntro(notice = '') {
+export function showIntro(notice = '', eventPass = false) {
+  if (eventPass) {
+    render(`
+      <div class="text-center">
+        <div class="inline-flex items-center justify-center mb-4">
+          <div class="px-4 py-2 rounded-full bg-white/60 border border-white/80 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Event Pass • Next Step</div>
+        </div>
+        <h1 class="font-['Poppins'] text-[34px] md:text-[48px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-3">Find My<br>Open House</h1>
+        <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-xl mx-auto mb-5">We use your current location to show the nearby open house. When your phone asks, tap <b>Allow</b>.</p>
+        <img src="/apps/rel8tion-app/assets/locate-my-open-house.webp" alt="Locate my open house" class="w-full rounded-[24px] shadow-[0_18px_42px_rgba(23,34,79,0.13)] mb-5">
+        ${notice ? `<div class="mb-5 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+        <button onclick="startFieldFlow()" class="w-full py-5 rounded-full font-black text-[17px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Allow Location &amp; Find My Open House</button>
+        <div class="mt-4 rounded-[20px] border border-slate-200 bg-white/75 px-5 py-4 text-left text-[13px] leading-relaxed text-slate-600"><b class="text-slate-800">If nothing happens on iPhone:</b><br>Open Settings → Apps → Safari → Location, choose <b>While Using the App</b>, then return and tap the button again.</div>
+      </div>
+    `);
+    return;
+  }
   render(`
     <div class="text-center">
       <div class="inline-flex items-center justify-center mb-6">

@@ -229,7 +229,7 @@ function bindClaimBrowserHistory() {
 
 function showIntroWithHistory(notice = '', mode = 'push') {
   writeClaimHistory('intro', { notice }, mode);
-  showIntro(notice);
+  showIntro(notice, isEventPassClaimFlow());
 }
 
 function showBrokerageStepWithHistory(notice = '', mode = 'push') {
