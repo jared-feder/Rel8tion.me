@@ -84,6 +84,7 @@ Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR 
 ### Event Pass And Sponsored Event Pass
 
 - `[IMPLEMENTED]` `/pass` resolves Event Pass printed QR rows from `smart_sign_inventory.public_code`.
+- `[IMPLEMENTED]` A fresh Event Pass QR scan presents a visual NFC handoff showing the physical pass approaching the correct iPhone and Android NFC areas; public codes and chip-status jargon are hidden from the normal field instruction.
 - `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes.
 - `[IMPLEMENTED]` Sponsored Event Pass activation records `event_pass_coverage_consents` before sponsor visibility.
 - `[IMPLEMENTED]` Event Pass and Smart Sign may both be active for the same listing/open-house context because routing is device/sign-aware.
