@@ -175,6 +175,10 @@
       gap: 14px;
     }
     .offer-panel { display:grid; gap:14px; padding:18px; border-radius:26px; background:rgba(255,255,255,.78); border:1px solid rgba(255,255,255,.92); box-shadow:0 22px 54px rgba(19,42,92,.13); }
+    .kit-product-visual { margin:0; padding:12px; border-radius:22px; background:linear-gradient(145deg,#eef8ff,#fff); border:1px solid rgba(26,55,118,.08); overflow:hidden; }
+    .kit-product-visual img { display:none; width:100%; max-height:310px; object-fit:contain; border-radius:16px; }
+    .kit-product-visual img.ready { display:block; }
+    .kit-product-visual figcaption { padding:10px 5px 2px; color:#263b68; font-size:14px; font-weight:850; text-align:center; }
     .offer-choice { padding:20px; border-radius:22px; background:#fff; border:2px solid rgba(26,55,118,.1); text-align:left; }
     .offer-choice.featured { border-color:#246bdf; background:linear-gradient(145deg,#f5f9ff,#eaf4ff); box-shadow:0 16px 36px rgba(36,107,223,.14); }
     .offer-kicker { color:#246bdf; font-size:12px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
@@ -665,6 +669,10 @@
         </div>
 
         <div class="offer-panel" aria-label="Choose your Open House Kit plan">
+          <figure class="kit-product-visual">
+            <img id="kit-product-image" alt="REL8TION Open House Kit with smart sign and Rel8tionchips">
+            <figcaption>The reusable REL8TION Open House Kit</figcaption>
+          </figure>
           <section class="offer-choice">
             <div class="offer-kicker">Start simple</div>
             <strong id="monthly-price-label" class="offer-price">$199 today</strong>
@@ -867,6 +875,12 @@
         const annualService = money(pricing.annual?.amount, currency);
         const monthlyToday = money(pricing.monthly?.due_today, currency);
         const annualToday = money(pricing.annual?.due_today, currency);
+        const kitImage = pricing.kit?.product?.images?.[0] || '';
+        const kitImageElement = document.getElementById('kit-product-image');
+        if (kitImageElement && /^https:\/\//i.test(kitImage)) {
+          kitImageElement.src = kitImage;
+          kitImageElement.classList.add('ready');
+        }
 
         document.getElementById('monthly-price-label').textContent = `${monthlyToday} today`;
         const trialDays = Number(pricing.monthly?.trial_days || 0);
