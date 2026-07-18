@@ -18,7 +18,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Existing opt-out health gates and hard caps remain unchanged; this correction does not override sender-health suppression.
 - `[IMPLEMENTED]` Initial outreach now asks agents to reply `Y` to book support or `N` for another time while retaining the required `STOP to unsubscribe` instruction.
 - `[IMPLEMENTED]` Twilio inbound outreach replies recognize exact `Y`/`YES` and `N`/`NO` responses. Y marks the thread interested and confirms a follow-up call; N marks it `not_now` and sends the NMB Hard Loans contact positioning. Both automatic responses preserve STOP language and are mirrored into the outreach thread.
-- `[IMPLEMENTED]` Outreach sender hard ceilings now permit a future configuration of 20/hour and 100/day. Effective production values remain unchanged until the scheduled 2026-07-18 activation.
+- `[IMPLEMENTED]` As of 2026-07-18, production `send-agent-outreach` caps are 5/run, 20/hour, and 100/day. The rolling opt-out health gate remains enabled (7-day window, 20-send minimum, 1% maximum rate); future-event eligibility and old/manual/past-event backlog exclusions remain in force.
 
 This file tracks what is currently implemented, partial, intended, risky, or still needs verification. It should be updated after production-flow changes. `AGENTS.md` is the Codex operating guide; `REL8TION_SYSTEM_OVERVIEW.md` is the human architecture/product overview.
 
