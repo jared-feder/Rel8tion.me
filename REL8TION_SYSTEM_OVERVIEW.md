@@ -73,6 +73,8 @@ Production is intended to deploy from `main` through Vercel Git automation. Exac
 
 Agent and loan officer Rel8tionChip behavior is intentionally split: printed QR is public/profile oriented, while NFC is private owner/operator access.
 
+The agent owner dashboard validates the claimed NFC UID/agent pairing before loading private data. A new phone must pass a rate-limited six-digit SMS challenge sent to the saved agent number before it can enroll a local platform credential. Successful verification creates a signed secure device session; supported phones then require Face ID, fingerprint, or screen lock for later browser sessions. Full server-side WebAuthn signature persistence and account recovery remain future hardening work.
+
 ### Smart Signs
 
 - `[IMPLEMENTED]` `/sign-demo-activate` handles smart sign setup and listing binding.

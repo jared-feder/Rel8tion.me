@@ -296,3 +296,10 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - Admin confirmation and confirmed-visit assignment now create live `event_loan_officer_sessions` coverage whenever the open-house event already exists.
 - Smart Sign/Event Pass activation now reconciles a pre-existing primary financing-support assignment by open-house source id and links that loan officer to the live event.
 - Sponsored Event Pass activation remains excluded from this automatic reconciliation so its host-agent consent workflow stays authoritative.
+
+## 2026-07-18 Agent Phone-Lock Gate
+
+- `/agent-home` now validates that the NFC UID is currently claimed by the requested agent before loading private dashboard data.
+- New-phone enrollment requires a six-digit SMS code sent only to the agent phone already stored on the claimed profile. Codes expire after ten minutes, are attempt-limited, and cannot be resent more than once per minute.
+- Successful SMS verification creates a signed, secure, HttpOnly 30-day device session. On supported mobile browsers, the phone then enrolls a platform credential and later browser sessions require Face ID, fingerprint, or the phone's screen lock before leads and event details load.
+- The platform credential remains a device-local gate; the signed server session and SMS challenge prevent an arbitrary first scanner from enrolling a new phone. Full server-side WebAuthn signature persistence and recovery remain future hardening work.

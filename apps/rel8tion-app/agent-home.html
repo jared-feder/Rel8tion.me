@@ -155,6 +155,23 @@
       box-shadow: 0 10px 24px rgba(23,34,79,.08);
     }
 
+    .phone-lock {
+      width: min(560px, 100%);
+      margin: 30px auto;
+      border-radius: 34px;
+      padding: 30px;
+      text-align: center;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .phone-lock h2 { margin: 14px 0 10px; font: 800 clamp(28px, 7vw, 44px)/1 "Plus Jakarta Sans", Inter, sans-serif; }
+    .phone-lock p { color: var(--muted); font-weight: 700; line-height: 1.55; }
+    .phone-lock .btn { width: 100%; margin-top: 12px; }
+    .lock-icon { font-size: 48px; line-height: 1; }
+
     .stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -326,6 +343,8 @@
     const activeEventId = params.get('active_event') || params.get('event') || '';
     const profileSaved = params.get('profile_saved') === '1';
     const app = document.getElementById('app');
+    const PHONE_LOCK_PREFIX = 'rel8tion_agent_phone_lock_v1';
+    const PHONE_UNLOCK_PREFIX = 'rel8tion_agent_phone_unlocked_v1';
 
     function esc(value) {
       return String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -335,6 +354,222 @@
         '"': '&quot;',
         "'": '&#39;'
       }[char]));
+    }
+
+    function phoneLockAvailable() {
+      return Boolean(window.isSecureContext && window.PublicKeyCredential && navigator.credentials?.create && navigator.credentials?.get);
+    }
+
+    function phoneLockKey() {
+      return `${PHONE_LOCK_PREFIX}:${agentSlug}:${uid}`;
+    }
+
+    function phoneUnlockKey() {
+      return `${PHONE_UNLOCK_PREFIX}:${agentSlug}:${uid}`;
+    }
+
+    function bytesToBase64Url(bytes) {
+      let binary = '';
+      new Uint8Array(bytes).forEach((byte) => { binary += String.fromCharCode(byte); });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlToBytes(value) {
+      const base64 = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const binary = atob(padded);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    }
+
+    function randomBytes(length = 32) {
+      return crypto.getRandomValues(new Uint8Array(length));
+    }
+
+    function loadPhoneLock() {
+      try { return JSON.parse(localStorage.getItem(phoneLockKey()) || 'null'); } catch (_) { return null; }
+    }
+
+    function phoneUnlocked() {
+      try { return sessionStorage.getItem(phoneUnlockKey()) === '1'; } catch (_) { return false; }
+    }
+
+    function rememberPhoneUnlock() {
+      try { sessionStorage.setItem(phoneUnlockKey(), '1'); } catch (_) {}
+    }
+
+    function renderPhoneLock({ setup = false, message = '' } = {}) {
+      app.className = '';
+      app.innerHTML = `
+        <section class="phone-lock">
+          <div class="lock-icon" aria-hidden="true">${setup ? '🔐' : '🔒'}</div>
+          <div class="badge">Private Agent Dashboard</div>
+          <h2>${setup ? 'Protect This Phone' : 'Verify It Is You'}</h2>
+          <p>${setup
+            ? 'Your Rel8tionChip is verified. Set up this phone so Face ID, fingerprint, or your phone screen lock is required before private dashboard information appears.'
+            : 'Use Face ID, fingerprint, or your phone screen lock to open the private agent dashboard.'}</p>
+          ${message ? `<p style="color:#b91c1c;">${esc(message)}</p>` : ''}
+          <button id="phoneLockAction" class="btn" type="button">${setup ? 'Set Up Phone Lock' : 'Unlock With Phone'}</button>
+          <p style="font-size:12px;margin-top:16px;">The printed QR remains public. This protection applies only to the NFC owner dashboard on this phone.</p>
+        </section>`;
+    }
+
+    function renderSmsVerification({ verificationId = '', phoneLastFour = '', message = '' } = {}) {
+      app.className = '';
+      app.innerHTML = `
+        <section class="phone-lock">
+          <div class="lock-icon" aria-hidden="true">📱</div>
+          <div class="badge">Verify Agent</div>
+          <h2>${verificationId ? 'Enter Your Code' : 'Confirm This Phone'}</h2>
+          <p>${verificationId
+            ? `We texted a six-digit code to the agent phone ending in ${esc(phoneLastFour)}.`
+            : 'Before this phone can use Face ID, fingerprint, or screen lock, REL8TION will text a one-time code to the agent phone number already on file.'}</p>
+          ${message ? `<p style="color:#b91c1c;">${esc(message)}</p>` : ''}
+          ${verificationId ? `
+            <input id="agentSmsCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="6-digit code" style="width:100%;margin-top:12px;border:1px solid rgba(23,44,118,.14);border-radius:18px;background:#fff;padding:16px;text-align:center;font:900 24px/1 Inter,sans-serif;letter-spacing:.2em;color:var(--ink);">
+            <button id="verifyAgentCode" class="btn" type="button">Verify Code</button>
+            <button id="requestNewAgentCode" class="btn secondary" type="button">Send A New Code</button>`
+            : '<button id="sendAgentCode" class="btn" type="button">Text Me A Verification Code</button>'}
+          <p style="font-size:12px;margin-top:16px;">Scanning the NFC link alone cannot enroll a new phone.</p>
+        </section>`;
+    }
+
+    async function phoneLockApi(action, extra = {}) {
+      const response = await fetch('/api/agent-phone-lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action, agent_slug: agentSlug, uid, ...extra })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Phone verification failed.');
+      return data;
+    }
+
+    async function ensureVerifiedPhoneSession() {
+      const status = await phoneLockApi('status');
+      if (status.verified) return;
+
+      let verificationId = '';
+      let phoneLastFour = '';
+      let message = '';
+      while (true) {
+        renderSmsVerification({ verificationId, phoneLastFour, message });
+        if (!verificationId) {
+          await new Promise((resolve) => document.getElementById('sendAgentCode')?.addEventListener('click', resolve, { once: true }));
+          const button = document.getElementById('sendAgentCode');
+          if (button) { button.disabled = true; button.textContent = 'Sending...'; }
+          try {
+            const result = await phoneLockApi('request_code');
+            verificationId = result.verification_id;
+            phoneLastFour = result.phone_last_four;
+            message = '';
+          } catch (error) {
+            message = error.message || 'Could not send the verification code.';
+          }
+          continue;
+        }
+
+        const choice = await new Promise((resolve) => {
+          document.getElementById('verifyAgentCode')?.addEventListener('click', () => resolve('verify'), { once: true });
+          document.getElementById('requestNewAgentCode')?.addEventListener('click', () => resolve('resend'), { once: true });
+        });
+        if (choice === 'resend') {
+          verificationId = '';
+          message = '';
+          continue;
+        }
+        const code = document.getElementById('agentSmsCode')?.value?.trim() || '';
+        if (!/^\d{6}$/.test(code)) {
+          message = 'Enter the complete six-digit code.';
+          continue;
+        }
+        const button = document.getElementById('verifyAgentCode');
+        if (button) { button.disabled = true; button.textContent = 'Verifying...'; }
+        try {
+          await phoneLockApi('verify_code', { verification_id: verificationId, code });
+          return;
+        } catch (error) {
+          message = error.message || 'That code could not be verified.';
+        }
+      }
+    }
+
+    async function registerPhoneLock(agentName) {
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: randomBytes(),
+          rp: { name: 'REL8TION' },
+          user: {
+            id: new TextEncoder().encode(uid),
+            name: agentSlug,
+            displayName: agentName || agentSlug || 'REL8TION Agent'
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },
+            { type: 'public-key', alg: -257 }
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            residentKey: 'preferred',
+            userVerification: 'required'
+          },
+          timeout: 60000,
+          attestation: 'none'
+        }
+      });
+      if (!credential?.rawId) throw new Error('Phone-lock setup was cancelled.');
+      localStorage.setItem(phoneLockKey(), JSON.stringify({
+        id: bytesToBase64Url(credential.rawId),
+        type: credential.type || 'public-key',
+        created_at: new Date().toISOString()
+      }));
+      rememberPhoneUnlock();
+    }
+
+    async function unlockWithPhone(lock) {
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: randomBytes(),
+          allowCredentials: [{
+            id: base64UrlToBytes(lock.id),
+            type: lock.type || 'public-key'
+          }],
+          userVerification: 'required',
+          timeout: 60000
+        }
+      });
+      if (!assertion?.rawId) throw new Error('Phone unlock was cancelled.');
+      rememberPhoneUnlock();
+    }
+
+    async function verifyClaimedAgentChip() {
+      if (!uid) throw new Error('Tap your Rel8tionChip to open this private dashboard.');
+      const rows = await safeRows(`keys?uid=eq.${encodeURIComponent(uid)}&agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid,agent_slug,claimed&limit=1`);
+      if (!rows.length) throw new Error('This NFC chip is not claimed by this agent. Tap the correct Rel8tionChip or contact REL8TION.');
+    }
+
+    async function requirePhoneUnlock(agentName) {
+      if (phoneUnlocked()) return;
+      if (!phoneLockAvailable()) {
+        throw new Error('This phone browser cannot use Face ID, fingerprint, or screen-lock verification. Open the NFC link in Safari on iPhone or Chrome on Android.');
+      }
+
+      let message = '';
+      while (!phoneUnlocked()) {
+        const lock = loadPhoneLock();
+        renderPhoneLock({ setup: !lock, message });
+        await new Promise((resolve) => {
+          document.getElementById('phoneLockAction')?.addEventListener('click', resolve, { once: true });
+        });
+        const button = document.getElementById('phoneLockAction');
+        if (button) { button.disabled = true; button.textContent = lock ? 'Verifying...' : 'Setting Up...'; }
+        try {
+          if (lock) await unlockWithPhone(lock);
+          else await registerPhoneLock(agentName);
+        } catch (error) {
+          message = error.message || 'Phone verification did not complete.';
+        }
+      }
     }
 
     async function request(path) {
@@ -649,6 +884,12 @@
         app.innerHTML = '<h2>Missing Agent</h2><p class="empty">This dashboard needs an agent slug.</p>';
         return;
       }
+
+      await verifyClaimedAgentChip();
+
+      const identityRows = await safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=slug,name&limit=1`);
+      await ensureVerifiedPhoneSession();
+      await requirePhoneUnlock(identityRows[0]?.name || agentSlug);
 
       const [agents, events, leads] = await Promise.all([
         safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=*&limit=1`),
