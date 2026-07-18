@@ -393,9 +393,15 @@ async function assignConfirmedVisit(visitId, loanOfficerUid) {
   const participant = existing?.id
     ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existing.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null)
     : await supabaseRest('field_demo_visit_participants', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null);
+  let live_coverage = null;
+  if (visit.open_house_event_id) {
+    const event = await loadEvent(visit.open_house_event_id);
+    await endLiveCoverage(event.id);
+    live_coverage = await insertLiveCoverage(event, profile);
+  }
   const availability_block = await blockConfirmedAvailability(visit, profile);
   const notifications = await notifyConfirmedAssignment(visit, profile);
-  return { visit, loan_officer: profile, participant, availability_block, notifications, calendar_url:assignmentLinks(visit).calendar };
+  return { visit, loan_officer: profile, participant, live_coverage, availability_block, notifications, calendar_url:assignmentLinks(visit).calendar };
 }
 
 async function assignLiveCoverage(eventId, loanOfficerUid) {

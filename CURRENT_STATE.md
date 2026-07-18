@@ -291,3 +291,8 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED 2026-07-17]` Assigning an active loan officer to a confirmed outreach visit sends transactional SMS confirmations to the loan officer and hosting agent, attempts Resend email when configured, returns an Add to Google Calendar link, and exposes the same calendar action on the loan-officer visit card. Notification failures are returned as warnings without rolling back the assignment.
 - `[IMPLEMENTED 2026-07-17]` The agent event dashboard no longer substitutes Jared Feder as default coverage. It renders the event's actual live `event_loan_officer_sessions` assignment or an explicit unassigned state, preventing placeholder identity from appearing as real coverage.
 - `[IMPLEMENTED 2026-07-17]` Confirming or assigning an open house automatically creates an overlapping `unavailable` availability block linked to that visit. Reassignment cancels only prior auto-generated blocks for the visit, preserving manually entered availability while preventing double booking.
+## 2026-07-18 Assigned Loan Officer Coverage Linking
+
+- Admin confirmation and confirmed-visit assignment now create live `event_loan_officer_sessions` coverage whenever the open-house event already exists.
+- Smart Sign/Event Pass activation now reconciles a pre-existing primary financing-support assignment by open-house source id and links that loan officer to the live event.
+- Sponsored Event Pass activation remains excluded from this automatic reconciliation so its host-agent consent workflow stays authoritative.

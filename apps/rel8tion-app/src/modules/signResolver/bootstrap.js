@@ -729,6 +729,14 @@ async function activateSignToHouse(sign, house) {
       setup_confirmed_at: new Date().toISOString()
     });
 
+    // An LO can be assigned before the agent activates the Event Pass. Link that
+    // existing appointment to the newly live event so coverage appears immediately.
+    await fetch('/api/event/link-assigned-coverage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: eventRow.id })
+    }).catch(() => null);
+
     const freshHouse = await getOpenHouseById(eventRow.open_house_source_id || house.id);
     activeView({ ...effectiveSign, active_event_id: eventRow.id, status: 'active' }, eventRow, freshHouse || house);
   } catch (error) {

@@ -333,12 +333,13 @@ async function confirmOpenHouse(body) {
     coverage_label: body.coverage_label
   });
   const participant = profile ? await upsertVisitParticipant(visit, profile) : null;
+  const live_coverage = profile ? await upsertLiveCoverageIfEventLinked(visit, profile) : null;
   const availability_block = profile ? await blockConfirmedAvailability(visit, profile) : null;
   const notifications = profile ? await notifyConfirmedAssignment(visit, profile) : [];
   const nextStatus = queue.review_status === 'accepted_open_house' ? 'accepted_open_house' : 'confirmed_open_house';
   const updated_queue = await markInterested(queue.id, nextStatus);
 
-  return { queue: updated_queue || queue, visit, participant, loan_officer: profile, availability_block, notifications };
+  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, availability_block, notifications };
 }
 
 async function scheduleDrip(body) {
