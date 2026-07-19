@@ -309,3 +309,8 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - REL8TION COMMAND's Signs area can reserve 1-100 next-available unprinted agent `rel8tion_chip_inventory` rows and download a single fulfillment ZIP.
 - Every export contains `agent-qr-batch.csv`, a matching `images/<chip_code>.png` for each row, and a README. QR images are 1024x1024 black-on-white PNGs with high error correction.
 - Exported rows are filtered on `is_printed=false`, then marked printed with `print_batch_id` and `printed_at` so later batches do not duplicate physical QR production.
+## 2026-07-19 Agent Selection Photos And Loan-Officer Phone Lock
+
+- `[IMPLEMENTED]` Sign and Event Pass agent selection now merges an existing `agents` profile into each `listing_agents` result by phone, email, or exact name. This preserves the agent's saved profile image when the listing snapshot is still awaiting photo enrichment.
+- `[IMPLEMENTED]` Agent selection cards now show a branded initials avatar if no usable image exists or an image URL fails to load, rather than a broken/blank photo area.
+- `[IMPLEMENTED]` `/loan-officer-account` now supports a platform phone lock (Face ID, fingerprint, or device screen lock) after Supabase account authentication. Existing four-digit phone PINs remain available as a fallback and password remains the recovery path.

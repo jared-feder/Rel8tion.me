@@ -16,7 +16,13 @@ export async function findListingAgentsByOpenHouse(openHouseId) {
   const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}`, {
     headers: authHeaders(KEY)
   });
-  return Array.isArray(rows) ? rows.map((row) => normalizeListingAgent(row)).filter(Boolean) : [];
+  if (!Array.isArray(rows)) return [];
+  return Promise.all(rows.map(async (row) => {
+    const normalized = normalizeListingAgent(row);
+    if (!normalized) return null;
+    const profile = await findMatchingAgentProfile(normalized).catch(() => null);
+    return normalizeListingAgent(normalized, profile || {});
+  })).then((agents) => agents.filter(Boolean));
 }
 
 export async function findAgentByEmail(email) {
@@ -33,6 +39,22 @@ export async function getAgentBySlug(slug) {
     headers: authHeaders(KEY)
   });
   return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+async function findMatchingAgentProfile(agent = {}) {
+  const filters = [];
+  const phone = String(agent.phone_normalized || agent.phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  if (phone) filters.push(`phone_normalized=eq.${encodeURIComponent(phone)}`);
+  if (agent.email) filters.push(`email=ilike.${encodeURIComponent(agent.email)}`);
+  if (agent.name && !isGenericAgentNameValue(agent.name)) filters.push(`name=ilike.${encodeURIComponent(agent.name)}`);
+
+  for (const filter of filters) {
+    const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/agents?${filter}&select=*&limit=1`, {
+      headers: authHeaders(KEY)
+    });
+    if (Array.isArray(rows) && rows.length) return rows[0];
+  }
+  return null;
 }
 
 function cleanText(value) {
@@ -91,8 +113,10 @@ export function normalizeListingAgent(row = {}, fallback = {}) {
   const phone = cleanText(row.phone || row.agent_phone || fallback.phone || fallback.agent_phone || '');
   const email = cleanText(row.email || row.agent_email || fallback.email || fallback.agent_email || '');
   const brokerage = cleanText(row.brokerage || row.office_name || row.company || fallback.brokerage || '');
-  const primaryPhoto = row.primary_photo_url || row.photo_url || row.image_url || fallback.primary_photo_url || fallback.image_url || '';
-  const directoryPhoto = row.directory_photo_url || row.profile_photo_url || fallback.directory_photo_url || '';
+  const primaryPhoto = row.primary_photo_url || row.photo_url || row.image_url || row.agent_photo_url
+    || fallback.primary_photo_url || fallback.photo_url || fallback.image_url || fallback.agent_photo_url || '';
+  const directoryPhoto = row.directory_photo_url || row.profile_photo_url
+    || fallback.directory_photo_url || fallback.profile_photo_url || '';
 
   return {
     ...row,
@@ -100,6 +124,7 @@ export function normalizeListingAgent(row = {}, fallback = {}) {
     phone,
     email,
     brokerage,
+    image_url: primaryPhoto || directoryPhoto || null,
     primary_photo_url: primaryPhoto || null,
     directory_photo_url: directoryPhoto || null
   };

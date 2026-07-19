@@ -23,7 +23,7 @@ import {
   isGenericAgentNameValue,
   upsertAgent,
   uploadFullProfilePhoto
-} from '../../api/agents.js?v=20260511-agent-labels';
+} from '../../api/agents.js?v=20260719-agent-photo';
 import { sendActivationSMS } from '../../api/notifications.js';
 import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
 import {
@@ -580,10 +580,11 @@ async function showAgentSelection() {
 
     const fallbackBrokerage = h?.brokerage || '';
     const cards = agents.map((a) => {
-      const photo = a.primary_photo_url || a.directory_photo_url || '';
+      const photo = a.image_url || a.primary_photo_url || a.directory_photo_url || '';
+      const initials = String(a.name || 'Agent').split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || 'AG';
       return `
         <div onclick="selectAgentByEncoded(this.dataset.agent)" data-agent="${encodeURIComponent(JSON.stringify(a))}" class="flex items-center gap-4 p-4 rounded-[24px] bg-white/80 border border-white/70 shadow hover:shadow-xl cursor-pointer">
-          ${photo ? `<img src="${photo}" class="w-16 h-16 rounded-full object-cover bg-white">` : `<div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-black">AG</div>`}
+          ${photo ? `<img src="${photo}" alt="${a.name || 'Agent'}" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');this.nextElementSibling.classList.add('flex')" class="w-16 h-16 rounded-full object-cover bg-white"><div class="hidden w-16 h-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 items-center justify-center text-white font-black">${initials}</div>` : `<div class="w-16 h-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 flex items-center justify-center text-white font-black">${initials}</div>`}
           <div class="text-left">
             <div class="font-black text-lg text-[#1f2a5a]">${a.name || 'Agent'}</div>
             <div class="text-sm text-slate-500">${a.phone || ''}</div>
@@ -670,10 +671,10 @@ function selectAgent(agent) {
     phone: agent.phone || state.prefilledAgent?.phone || '',
     email: agent.email || state.prefilledAgent?.email || '',
     brokerage: agent.brokerage || state.detectedHouse?.brokerage || state.prefilledAgent?.brokerage || '',
-    image_url: agent.primary_photo_url || agent.directory_photo_url || state.prefilledAgent?.image_url || ''
+    image_url: agent.image_url || agent.primary_photo_url || agent.directory_photo_url || state.prefilledAgent?.image_url || ''
   });
 
-  setDetectedAgentPhoto(agent.primary_photo_url || agent.directory_photo_url || '');
+  setDetectedAgentPhoto(agent.image_url || agent.primary_photo_url || agent.directory_photo_url || '');
   showVerifyAgentWithHistory();
 }
 
