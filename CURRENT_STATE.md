@@ -303,3 +303,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - New-phone enrollment requires a six-digit SMS code sent only to the agent phone already stored on the claimed profile. Codes expire after ten minutes, are attempt-limited, and cannot be resent more than once per minute.
 - Successful SMS verification creates a signed, secure, HttpOnly 30-day device session. On supported mobile browsers, the phone then enrolls a platform credential and later browser sessions require Face ID, fingerprint, or the phone's screen lock before leads and event details load.
 - The platform credential remains a device-local gate; the signed server session and SMS challenge prevent an arbitrary first scanner from enrolling a new phone. Full server-side WebAuthn signature persistence and recovery remain future hardening work.
+
+## 2026-07-19 Agent QR Print Batches
+
+- REL8TION COMMAND's Signs area can reserve 1-100 next-available unprinted agent `rel8tion_chip_inventory` rows and download a single fulfillment ZIP.
+- Every export contains `agent-qr-batch.csv`, a matching `images/<chip_code>.png` for each row, and a README. QR images are 1024x1024 black-on-white PNGs with high error correction.
+- Exported rows are filtered on `is_printed=false`, then marked printed with `print_batch_id` and `printed_at` so later batches do not duplicate physical QR production.

@@ -3797,6 +3797,7 @@ ${rowsHtml}
       document.querySelectorAll('[data-reset-event-pass]').forEach((button) => {
         button.addEventListener('click', () => resetEventPass(button.dataset.resetEventPass));
       });
+      document.getElementById('exportAgentQrBatch')?.addEventListener('click', exportAgentQrBatch);
       document.querySelectorAll('[data-sponsored-reuse]').forEach((button) => {
         button.addEventListener('click', () => setSponsoredPassReuse(button.dataset.sponsoredReuse, button.dataset.reuseStatus));
       });
@@ -4620,6 +4621,50 @@ ${rowsHtml}
       }
     }
 
+    async function exportAgentQrBatch() {
+      const quantityInput = document.getElementById('agentQrBatchQuantity');
+      const quantity = Math.floor(Number(quantityInput?.value || 1));
+      if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100) {
+        showToast('Choose between 1 and 100 agent QR codes.');
+        quantityInput?.focus();
+        return;
+      }
+      if (!window.confirm(`Reserve the next ${quantity} unprinted agent QR code${quantity === 1 ? '' : 's'}, mark them printed, and download the ZIP?`)) return;
+
+      state.actionKey = 'export_agent_qr_batch';
+      refreshAreaContent();
+      try {
+        const response = await fetch('/api/admin/agent-qr-batch', {
+          method: 'POST',
+          cache: 'no-store',
+          headers: authHeaders(),
+          body: JSON.stringify({ quantity })
+        });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || `QR export failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') || '';
+        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `agent-qr-batch-${Date.now()}.zip`;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        const count = response.headers.get('x-rel8tion-code-count') || quantity;
+        showToast(`${count} agent QR code${Number(count) === 1 ? '' : 's'} exported and marked printed.`);
+      } catch (error) {
+        showToast(error.message || 'Unable to export agent QR codes.');
+      } finally {
+        state.actionKey = '';
+        refreshAreaContent();
+      }
+    }
+
     function signAssignmentLabel(row) {
       const owner = row.owner_agent_slug || '';
       const assigned = row.assigned_agent_slug || '';
@@ -4696,6 +4741,23 @@ ${rowsHtml}
       const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
       const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
       return `
+        <div class="section-head">
+          <div>
+            <h2>Agent Rel8tionChip QR Printing</h2>
+            <div class="sub">Reserve the next available unprinted agent codes and download one ZIP containing the batch CSV plus a matching 1024px PNG for every QR.</div>
+          </div>
+          <div class="row-actions">
+            <input id="agentQrBatchQuantity" class="field" type="number" inputmode="numeric" min="1" max="100" value="1" aria-label="Number of agent QR codes" style="width:110px;">
+            <button class="btn primary" id="exportAgentQrBatch" ${state.actionKey === 'export_agent_qr_batch' ? 'disabled' : ''}>
+              <i data-lucide="file-archive"></i><span>${state.actionKey === 'export_agent_qr_batch' ? 'Building ZIP...' : 'Print Agent QR Batch'}</span>
+            </button>
+          </div>
+        </div>
+        <div class="glass-card" style="padding:18px;margin-bottom:24px;">
+          <div class="primary">ZIP contents</div>
+          <div class="secondary">agent-qr-batch.csv | images/&lt;chip_code&gt;.png | README.txt</div>
+          <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Exporting marks those inventory rows printed so the next batch cannot duplicate them.</div>
+        </div>
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>
