@@ -11,6 +11,26 @@ export async function getEventById(eventId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
+export async function getActiveEventForHostAndHouse(hostAgentSlug, openHouseSourceId) {
+  if (!hostAgentSlug || !openHouseSourceId) return null;
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/open_house_events?host_agent_slug=eq.${encodeURIComponent(hostAgentSlug)}` +
+      `&open_house_source_id=eq.${encodeURIComponent(openHouseSourceId)}` +
+      '&status=eq.active&ended_at=is.null&select=*&order=created_at.desc&limit=1',
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+export async function getActiveEventDeviceCount(eventId) {
+  if (!eventId) return 0;
+  const rows = await fetchJson(
+    `${SUPABASE_URL}/rest/v1/smart_signs?active_event_id=eq.${encodeURIComponent(eventId)}&select=id`,
+    { headers: authHeaders(KEY) }
+  );
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 export async function touchEvent(eventId) {
   if (!eventId) return null;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/open_house_events?id=eq.${encodeURIComponent(eventId)}`, {

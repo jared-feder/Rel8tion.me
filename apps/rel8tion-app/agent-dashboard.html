@@ -552,9 +552,10 @@
           <aside class="grid gap-4">
             ${renderLoanOfficerCard()}
             <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
-              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Sign Status</div>
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Shared Coverage Devices</div>
               <div class="mt-2 text-xl font-black">${esc(state.sign?.public_code || state.code || '-')}</div>
-              <div class="mt-2 text-sm font-bold text-slate-500">Front buyer chip opens check-in. Rear agent chip opens this dashboard after keychain verification.</div>
+              <div class="mt-2 text-sm font-bold text-slate-500">${esc(state.event?.setup_context?.coverage_device_count || 1)} of 3 connected. The agent and loan officer can each carry an Event Pass while one Smart Sign or LO Coverage Sign stays with the property.</div>
+              <div class="mt-3 rounded-2xl bg-sky-50 p-3 text-xs font-bold leading-relaxed text-sky-900">To add another device, activate it normally and select this same agent and open house. It will join this event automatically instead of creating a duplicate.</div>
               <div class="mt-4 grid gap-2">
                 <button onclick="window.moveSignToAnotherOpenHouse()" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-sm">Move Sign To Another Open House</button>
                 <button onclick="window.endCurrentOpenHouse()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">End This Open House</button>
@@ -623,7 +624,7 @@
           last_activity_at: now
         })
       });
-      await request(`smart_signs?id=eq.${encodeURIComponent(state.sign.id)}`, {
+      await request(`smart_signs?active_event_id=eq.${encodeURIComponent(state.event.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
           active_event_id: null,
@@ -638,6 +639,16 @@
           signed_out_at: now,
           updated_at: now,
           last_seen_at: now
+        })
+      }).catch(() => null);
+      await request(`loan_officer_coverage_signs?active_event_id=eq.${encodeURIComponent(state.event.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          active_event_id: null,
+          active_event_pass_inventory_id: null,
+          active_smart_sign_id: null,
+          status: 'assigned',
+          updated_at: now
         })
       }).catch(() => null);
 

@@ -93,26 +93,25 @@ async function endEvent(eventId) {
   });
   const updatedEvent = Array.isArray(eventRows) ? eventRows[0] || null : null;
 
-  let sign = null;
-  if (event.smart_sign_id) {
-    const signRows = await supabaseRest(
-      `smart_signs?id=eq.${enc(event.smart_sign_id)}&active_event_id=eq.${enc(event.id)}`,
-      {
-        method: 'PATCH',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({
-          active_event_id: null,
-          status: 'inactive',
-          deactivated_at: now
-        })
-      }
-    );
-    sign = Array.isArray(signRows) ? signRows[0] || null : null;
-  }
+  const signRows = await supabaseRest(
+    `smart_signs?active_event_id=eq.${enc(event.id)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        active_event_id: null,
+        status: 'inactive',
+        deactivated_at: now,
+        updated_at: now
+      })
+    }
+  );
+  const signs = Array.isArray(signRows) ? signRows : [];
+  const sign = signs.find((row) => row.id === event.smart_sign_id) || signs[0] || null;
 
   const loan_officer_coverage = await endLoanOfficerCoverage(event.id, now);
   const loan_officer_coverage_signs = await clearLoanOfficerCoverageSigns(event.id, now);
-  return { event: updatedEvent || event, sign, loan_officer_coverage, loan_officer_coverage_signs };
+  return { event: updatedEvent || event, sign, signs, loan_officer_coverage, loan_officer_coverage_signs };
 }
 
 module.exports = async function handler(req, res) {

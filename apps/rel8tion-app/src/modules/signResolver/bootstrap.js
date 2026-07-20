@@ -1,5 +1,5 @@
 import { ASSETS, KEY, ROUTES, SUPABASE_URL } from '../../core/config.js';
-import { closeEvent, createOpenHouseEvent, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260426-1455';
+import { closeEvent, createOpenHouseEvent, getActiveEventDeviceCount, getActiveEventForHostAndHouse, getEventById, resolveEventLifecycle } from '../../api/events.js?v=20260720-shared-coverage';
 import { findNearestOpenHouses, getOpenHouseById } from '../../api/openHouses.js?v=20260509-local-rank';
 import { getHostSession, hostSessionLabel, savePendingSignActivation } from '../../core/hostSession.js?v=20260426-1455';
 import {
@@ -680,10 +680,16 @@ async function activateSignToHouse(sign, house) {
     };
 
     const activeEvent = await getActiveSmartSignEvent(effectiveSign.id);
+    const sharedEvent = activeEvent || await getActiveEventForHostAndHouse(pageState.hostSession.agentSlug, house.id);
+    if (!activeEvent && sharedEvent?.id && await getActiveEventDeviceCount(sharedEvent.id) >= 3) {
+      throw new Error('This open house already has three connected coverage devices. End or replace one before adding another.');
+    }
     const lifecycle = resolveEventLifecycle({ activeEvent, request });
 
-    let eventRow = null;
-    if (lifecycle.action === 'resume') {
+    let eventRow = sharedEvent && !activeEvent ? sharedEvent : null;
+    if (eventRow) {
+      pageState.statusMessage = 'Joining this sign to the existing shared open house event...';
+    } else if (lifecycle.action === 'resume') {
       eventRow = activeEvent;
     } else {
       if (activeEvent && lifecycle.action === 'close_and_create_new') {

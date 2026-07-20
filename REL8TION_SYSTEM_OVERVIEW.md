@@ -27,6 +27,7 @@ The current product connects:
 - `[IMPLEMENTED]` Sponsored Event Passes issued by verified loan officers and activated by agents per open house with consent.
 - `[IMPLEMENTED]` Loan Officer Coverage Signs that stay with the loan officer and route through `/lo-sign`.
 - `[IMPLEMENTED]` Live open house event records, buyer check-ins, disclosures, and optional financing-help routing.
+- `[IMPLEMENTED]` Shared open-house coverage supports two carried Event Passes plus one stationary Smart Sign or Loan Officer Coverage Sign, all pointing to one event and dashboard with a three-device cap.
 - `[PARTIAL]` REL8TION COMMAND admin operations.
 - `[PARTIAL]` Agent Ranking / Production Intelligence for admin-only production-report imports, opportunity scoring, and manual outreach staging.
 - `[PARTIAL]` Agent outreach, enrichment, and SMS follow-up.

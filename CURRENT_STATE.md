@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-20: Three-device shared open-house coverage
+
+- `[IMPLEMENTED]` One live open house may have up to three connected coverage devices: one Event Pass carried by the host agent, one Event Pass carried by the assigned loan officer, and one stationary Smart Sign or Loan Officer Coverage Sign.
+- `[IMPLEMENTED]` Activating another supported device for the same host agent and `open_house_source_id` joins the existing active event instead of creating a duplicate event. All devices resolve to the same buyer flow, check-ins, disclosures, financing requests, loan-officer session, and dashboard.
+- `[IMPLEMENTED]` A fourth device is rejected until one of the three connected devices is ended or replaced.
+- `[IMPLEMENTED]` Ending the shared event clears every `smart_signs.active_event_id` link plus connected Loan Officer Coverage Sign state, rather than clearing only the event's primary sign.
+- `[NEEDS VERIFICATION]` Field-test the complete sequence on physical hardware: agent Event Pass first, loan-officer Event Pass second, then Smart Sign or LO Coverage Sign third; scan all three buyer QR/NFC routes and confirm one event/check-in list.
+
 ## 2026-07-20: OneKey outreach headshot enrichment
 
 - `[IMPLEMENTED]` `npm run enrich:headshots` previews upcoming outreach headshots by matching compatible exact agent names and requiring the matching 10-digit phone on the OneKey profile before accepting its member image. Brokerage is retained as a secondary consistency signal so a legitimate company change does not reject the correct person.
