@@ -225,3 +225,6 @@ Confirmed LO assignments create a linked `field_coverage_availability.status=una
 ## Loan-Officer Device Unlock
 
 The authenticated loan-officer account page can enroll a WebAuthn platform credential on the current phone. Returning access uses the phone's Face ID, fingerprint, or device screen lock before opening the field dashboard. The Supabase password/session remains the account security and recovery layer; the locally stored credential identifier is only the device convenience gate. A four-digit local PIN remains available as a compatibility fallback.
+## Event Pass Versus Agent Keychain Access
+
+Event Pass NFC identity is event-scoped. It opens the live or historical dashboard for its own event and cannot authorize `/agent-home` or enroll the agent phone-lock session. A regular claimed agent keychain is required for permanent agent-dashboard access and Smart Sign ownership verification.

@@ -60,8 +60,12 @@ async function claimedSubject(slug, uid) {
   if (!slug || !uid) {
     const error = new Error('Missing agent or NFC UID.'); error.status = 400; throw error;
   }
-  const key = one(await supabaseRest(`keys?uid=eq.${enc(uid)}&agent_slug=eq.${enc(slug)}&claimed=eq.true&select=uid,agent_slug&limit=1`));
+  const key = one(await supabaseRest(`keys?uid=eq.${enc(uid)}&agent_slug=eq.${enc(slug)}&claimed=eq.true&select=uid,agent_slug,device_role&limit=1`));
   if (!key) { const error = new Error('This NFC chip is not claimed by this agent.'); error.status = 403; throw error; }
+  const role = String(key.device_role || '').trim().toLowerCase();
+  if (role && !['keychain', 'chip'].includes(role)) {
+    const error = new Error('This NFC device is not an agent dashboard keychain.'); error.status = 403; throw error;
+  }
   const agent = one(await supabaseRest(`agents?slug=eq.${enc(slug)}&select=slug,name,phone,phone_normalized&limit=1`));
   const phone = normalizePhone(agent?.phone_normalized || agent?.phone);
   if (!agent || !phone) { const error = new Error('This agent does not have a verified mobile number on file.'); error.status = 409; throw error; }

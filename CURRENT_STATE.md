@@ -314,3 +314,7 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` Sign and Event Pass agent selection now merges an existing `agents` profile into each `listing_agents` result by phone, email, or exact name. This preserves the agent's saved profile image when the listing snapshot is still awaiting photo enrichment.
 - `[IMPLEMENTED]` Agent selection cards now show a branded initials avatar if no usable image exists or an image URL fails to load, rather than a broken/blank photo area.
 - `[IMPLEMENTED]` `/loan-officer-account` now supports a platform phone lock (Face ID, fingerprint, or device screen lock) after Supabase account authentication. Existing four-digit phone PINs remain available as a fallback and password remains the recovery path.
+## 2026-07-20 Event Pass And Agent-Keychain Access Separation
+
+- `[IMPLEMENTED]` Agent phone-lock and `/agent-home` authorization now accept only regular agent keychain roles. Event Pass NFC UIDs cannot authorize the permanent agent dashboard even when they are claimed to the same agent.
+- `[IMPLEMENTED]` Tapping a completed Event Pass opens that pass's historical event dashboard. Active Event Passes continue to open their live event dashboard; unused passes remain in Event Pass activation mode.

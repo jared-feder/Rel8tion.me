@@ -544,8 +544,12 @@
 
     async function verifyClaimedAgentChip() {
       if (!uid) throw new Error('Tap your Rel8tionChip to open this private dashboard.');
-      const rows = await safeRows(`keys?uid=eq.${encodeURIComponent(uid)}&agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid,agent_slug,claimed&limit=1`);
+      const rows = await safeRows(`keys?uid=eq.${encodeURIComponent(uid)}&agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid,agent_slug,claimed,device_role&limit=1`);
       if (!rows.length) throw new Error('This NFC chip is not claimed by this agent. Tap the correct Rel8tionChip or contact REL8TION.');
+      const role = String(rows[0]?.device_role || '').trim().toLowerCase();
+      if (role && !['keychain', 'chip'].includes(role)) {
+        throw new Error('This NFC device opens an event experience, not the private agent dashboard. Tap your agent Rel8tionChip instead.');
+      }
     }
 
     async function requirePhoneUnlock(agentName) {

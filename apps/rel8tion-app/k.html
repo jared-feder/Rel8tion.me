@@ -1388,7 +1388,13 @@
             const priorEvent = await findRecentEventBySignId(eventPassSign.id);
             if (priorEvent?.id) {
               window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
-              setStatus('Event Pass Used', 'This one-event pass has already been used. Contact the sponsoring loan officer to renew it for another open house.');
+              saveHostSession({ agentSlug: record.agent_slug, uid, source: 'event-pass-history-dashboard' });
+              setStatus('Event Pass Dashboard', 'Opening the event dashboard for this Event Pass.');
+              goToAgentDashboard({
+                agentSlug: priorEvent.host_agent_slug || record.agent_slug,
+                eventId: priorEvent.id,
+                signId: eventPassSign.id
+              });
               return;
             }
             setStatus('Event Pass Ready', 'Opening setup for the next open house.');
