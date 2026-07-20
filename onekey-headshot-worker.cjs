@@ -75,6 +75,10 @@ async function patch(table, filter, body) {
   });
 }
 
+function idFilter(ids) {
+  return `id=in.(${ids.map((id) => encodeURIComponent(id)).join(',')})`;
+}
+
 async function upcomingTargets({ days = 14, limit = 8, dryRun = false } = {}) {
   const now = new Date();
   const end = new Date(now.getTime() + days * 86400000);
@@ -89,8 +93,11 @@ async function upcomingTargets({ days = 14, limit = 8, dryRun = false } = {}) {
   const byPhone = new Map();
   for (const row of rows) {
     const phone = normalizePhone(row.agent_phone_normalized || row.agent_phone);
-    if (!phone || byPhone.has(phone)) continue;
-    byPhone.set(phone, { name: row.agent_name, phone, brokerage: row.brokerage || '' });
+    if (!phone) continue;
+    if (!byPhone.has(phone)) {
+      byPhone.set(phone, { name: row.agent_name, phone, brokerage: row.brokerage || '', queueIds: [] });
+    }
+    byPhone.get(phone).queueIds.push(row.id);
   }
 
   const targets = [];
@@ -100,12 +107,11 @@ async function upcomingTargets({ days = 14, limit = 8, dryRun = false } = {}) {
       `listing_agents?phone_normalized=eq.${encodeURIComponent(target.phone)}` +
       '&select=id,primary_photo_url,directory_photo_url,photo_last_checked_at&order=photo_last_checked_at.desc.nullslast&limit=10'
     );
+    target.agentIds = agents.map((agent) => agent.id);
     const existing = agents.find((agent) => agent.primary_photo_url || agent.directory_photo_url);
     if (existing) {
       const url = existing.primary_photo_url || existing.directory_photo_url;
-      if (!dryRun) {
-        await patch('agent_outreach_queue', `agent_phone_normalized=eq.${encodeURIComponent(target.phone)}&or=(agent_photo_url.is.null,agent_photo_url.eq.)`, { agent_photo_url: url });
-      }
+      if (!dryRun && target.queueIds.length) await patch('agent_outreach_queue', idFilter(target.queueIds), { agent_photo_url: url });
       continue;
     }
     const recentlyChecked = agents.some((agent) => agent.photo_last_checked_at && new Date(agent.photo_last_checked_at) > cooldown);
@@ -182,19 +188,24 @@ async function persist(target, match) {
   if (!upload.ok) throw new Error(`Headshot upload ${upload.status}: ${await upload.text()}`);
   const publicUrl = `${url}/storage/v1/object/public/${BUCKET}/${path}`;
   const checkedAt = new Date().toISOString();
-  await patch('listing_agents', `phone_normalized=eq.${encodeURIComponent(target.phone)}&or=(primary_photo_url.is.null,primary_photo_url.eq.)`, {
-    primary_photo_url: publicUrl,
-    photo_enriched: true,
-    photo_status: 'primary',
-    photo_last_checked_at: checkedAt,
-    photo_source_page_url: match.profileUrl
-  });
-  const queue = await patch('agent_outreach_queue', `agent_phone_normalized=eq.${encodeURIComponent(target.phone)}&or=(agent_photo_url.is.null,agent_photo_url.eq.)`, { agent_photo_url: publicUrl });
+  if (target.agentIds.length) {
+    await patch('listing_agents', idFilter(target.agentIds), {
+      primary_photo_url: publicUrl,
+      photo_enriched: true,
+      photo_status: 'primary',
+      photo_last_checked_at: checkedAt,
+      photo_source_page_url: match.profileUrl
+    });
+  }
+  const queue = target.queueIds.length
+    ? await patch('agent_outreach_queue', idFilter(target.queueIds), { agent_photo_url: publicUrl })
+    : [];
   return { publicUrl, queueRows: queue.length };
 }
 
 async function markChecked(target, status) {
-  await patch('listing_agents', `phone_normalized=eq.${encodeURIComponent(target.phone)}&or=(primary_photo_url.is.null,primary_photo_url.eq.)`, {
+  if (!target.agentIds.length) return;
+  await patch('listing_agents', idFilter(target.agentIds), {
     photo_status: status,
     photo_last_checked_at: new Date().toISOString()
   });
