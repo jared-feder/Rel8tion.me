@@ -350,3 +350,8 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` The one-block Elementor home-page source now matches the live Summer 2026 Open House Kit offer: $199 today with 31 included service days then $29/month, or $499 today for the kit, 12 months of service, and the custom agent website, renewing at $300/year.
 - `[IMPLEMENTED]` Home-page offer copy now includes the expanded buyer/event capture, financing-interest, SMS follow-up, reporting, website, and AI marketing-tool positioning. Its price labels refresh from the public checkout pricing API, with verified current prices retained as a fallback.
 - `[IMPLEMENTED]` The checkout pricing API permits read access from the REL8TION WordPress origins so the one-block home page can stay synchronized with Stripe-backed pricing.
+# Annual bundle savings and Website Builder handoff (2026-07-20)
+
+- `[IMPLEMENTED]` Summer annual sales copy shows the first-year comparison: $547 for REL8TION plus $439 for the standalone Website Builder equals $986, making the $499 annual bundle a $487 first-year savings.
+- `[IMPLEMENTED]` The Open House Kit image is restored above the WordPress pricing cards. Paid annual orders generate a deterministic `R8WEB-*` promo code and the secured kit dashboard launches `my.rel8tion.me/get-started` directly with that code in the URL so the root redirect cannot discard it.
+- `[IMPLEMENTED]` The Website Builder get-started page reads the `promo` query parameter, populates the promo field, and automatically verifies it instead of requiring the buyer to retype it.

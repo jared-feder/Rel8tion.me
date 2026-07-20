@@ -683,7 +683,7 @@
           <section class="offer-choice featured">
             <div class="offer-kicker">Summer 2026 best value</div>
             <strong id="annual-price-label" class="offer-price">$499 total</strong>
-            <p id="annual-price-detail">Pay once today and get the Open House Kit, one full year of service, and a custom REL8TION agent website.</p>
+            <p id="annual-price-detail">Pay once today and get the Open House Kit, one full year of service, and a custom REL8TION agent website. That is a $487 first-year savings versus purchasing both separately ($986).</p>
             <ul class="offer-list"><li>Everything in the Open House Kit</li><li>12 months of platform service</li><li>Custom agent website included</li></ul>
             <button class="btn secondary plan-cta" type="button" data-plan="annual">Get Summer Bundle · $499</button>
           </section>
@@ -896,7 +896,7 @@
           : `${kitPrice} kit + ${monthlyService}/month service, then ${monthlyService}/month.`;
         document.getElementById('annual-price-label').textContent = `${annualToday} total`;
         document.getElementById('annual-price-detail').textContent = pricing.annual?.website_builder_included
-          ? `Pay ${annualToday} today for the kit, one full year of service, and your custom agent website. Service renews at ${annualService}/year.`
+          ? `Pay ${annualToday} today for the kit, one full year of service, and your custom agent website—a $487 first-year savings versus $986 purchased separately. Service renews at ${annualService}/year.`
           : `${kitPrice} kit + ${annualService}/year service, then ${annualService}/year.`;
         document.querySelectorAll('.plan-cta[data-plan="monthly"]').forEach((button) => {
           button.textContent = `Get Started · ${monthlyToday} Today`;
