@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-20: OneKey outreach headshot enrichment
+
+- `[IMPLEMENTED]` `npm run enrich:headshots` previews upcoming outreach headshots by matching compatible exact agent names and requiring the matching 10-digit phone on the OneKey profile before accepting its member image. Brokerage is retained as a secondary consistency signal so a legitimate company change does not reject the correct person.
+- `[IMPLEMENTED]` The local command is preview-only unless `--write` is supplied. The production `/api/cron/enrich-agent-headshots` route requires Vercel's `CRON_SECRET`, runs every six hours at minute 17, checks at most eight agents per run, observes a 24-hour unsuccessful-match cooldown, copies accepted images into `enriched-photos`, does not overwrite existing photos, and propagates accepted photos to matching `listing_agents` and `agent_outreach_queue` rows.
+- `[IMPLEMENTED]` Seven verified agents were enriched in production on 2026-07-20, updating eight of this week's missing outreach rows. This week's coverage is now 11 of 23 rows; the remaining 12 rows were left blank because no verified OneKey image was available.
+- `[PARTIAL]` The initial live update uses OneKey's historical member-image CDN URLs. New cron-enriched images are copied into the REL8TION `enriched-photos` bucket for independent storage.
+
 ## 2026-07-16: New York agent-website compliance controls
 
 - `[IMPLEMENTED]` `agent_websites` now stores the exact NY license type, brokerage address/phone, brokerage website, and employing broker Standardized Operating Procedures URL.

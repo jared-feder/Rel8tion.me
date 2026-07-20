@@ -30,6 +30,7 @@ The current product connects:
 - `[PARTIAL]` REL8TION COMMAND admin operations.
 - `[PARTIAL]` Agent Ranking / Production Intelligence for admin-only production-report imports, opportunity scoring, and manual outreach staging.
 - `[PARTIAL]` Agent outreach, enrichment, and SMS follow-up.
+- `[IMPLEMENTED]` OneKey headshot enrichment uses compatible exact-name candidates plus exact phone verification, copies accepted photos into REL8TION storage, previews locally by default, never replaces an existing agent photo, and runs in bounded six-hour cron batches for upcoming outreach.
 - `[PARTIAL]` Agent website builder and AI Studio tooling.
 
 ## Core Business Rules

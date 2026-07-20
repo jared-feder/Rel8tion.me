@@ -21,6 +21,10 @@
     {
       "path": "/api/cron/replay-android-inbox",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/enrich-agent-headshots",
+      "schedule": "17 */6 * * *"
     }
   ],
   "redirects": [

@@ -7,6 +7,7 @@
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:command-search": "node scripts/verify-command-search.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",
+    "enrich:headshots": "node scripts/enrich-onekey-headshots.cjs",
     "refresh:onekey": "node onekey-freshness-worker.cjs",
     "refresh:onekey:dry-run": "node onekey-freshness-worker.cjs --dry-run"
   },
