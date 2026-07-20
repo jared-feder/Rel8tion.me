@@ -214,6 +214,13 @@ async function readBody(req) {
 }
 
 module.exports = async function handler(req, res) {
+  const requestOrigin = String(req.headers.origin || '');
+  if (['https://rel8tion.me', 'https://www.rel8tion.me', 'https://getrel8tion.com', 'https://www.getrel8tion.com', 'https://app.rel8tion.me'].includes(requestOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     res.setHeader('Allow', 'GET, POST, OPTIONS');
     res.statusCode = 204;

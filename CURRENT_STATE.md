@@ -345,3 +345,8 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` Agents can optionally identify their current loan specialist and request that professional for coverage. When that option is not completed, the request is saved with the `nmb_default` sponsorship route.
 - `[IMPLEMENTED]` Requests are stored server-side in `event_pass_requests` and appear in REL8TION COMMAND under LO assignments with contact buttons for both the agent and, when supplied, the requested loan specialist.
 - `[NEEDS VERIFICATION]` WordPress source tracked outside the Vercel app must still be pasted/published through the live Elementor HTML block before the home-page button is live.
+# WordPress offer alignment (2026-07-20)
+
+- `[IMPLEMENTED]` The one-block Elementor home-page source now matches the live Summer 2026 Open House Kit offer: $199 today with 31 included service days then $29/month, or $499 today for the kit, 12 months of service, and the custom agent website, renewing at $300/year.
+- `[IMPLEMENTED]` Home-page offer copy now includes the expanded buyer/event capture, financing-interest, SMS follow-up, reporting, website, and AI marketing-tool positioning. Its price labels refresh from the public checkout pricing API, with verified current prices retained as a fallback.
+- `[IMPLEMENTED]` The checkout pricing API permits read access from the REL8TION WordPress origins so the one-block home page can stay synchronized with Stripe-backed pricing.
