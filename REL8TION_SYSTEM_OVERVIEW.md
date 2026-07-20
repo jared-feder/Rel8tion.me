@@ -233,3 +233,6 @@ Event Pass NFC identity is event-scoped. It opens the live or historical dashboa
 # Weekly event closeout
 
 Every Monday at 9 AM America/New_York, the protected weekly production job closes stale open events from before that Monday, releases their linked coverage devices, and ends active loan-officer event sessions. It then builds one prior-week production report covering Monday through Sunday. Delivery uses Resend and is idempotent by reporting week; production requires `RESEND_API_KEY` and `PRODUCTION_REPORT_EMAILS`.
+# Agent Event Pass requests
+
+The WordPress home page can submit agent Event Pass requests to the service-role-backed `/api/event-pass-request` route. Agent identity and open-house details are stored in `event_pass_requests`. If the agent requests coverage from an existing loan specialist, that professional's name, company, phone, and email are stored for sponsorship follow-up; otherwise the request routes to NMB by default. Submission does not itself assign coverage or grant buyer visibility.

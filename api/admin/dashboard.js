@@ -641,7 +641,8 @@ module.exports = async function handler(req, res) {
       outreach,
       inbox,
       kitOrders,
-      agentWebsites
+      agentWebsites,
+      eventPassRequests
     ] = await Promise.all([
       safeRest('agents?select=id,slug,name,phone,phone_normalized,email,brokerage,image_url,website&order=name.asc&limit=250', [], warnings, 'agents'),
       safeRest('keys?select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1000', [], warnings, 'keys'),
@@ -661,7 +662,8 @@ module.exports = async function handler(req, res) {
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
       loadDashboardInbox(warnings),
       safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders'),
-      safeRest('agent_websites?select=id,name,slug,title,brokerage,email,phone,bio,photo_url,hero_image_url,about_image_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,license_type,brokerage_address,brokerage_phone,brokerage_website_url,standardized_operating_procedure_url,listing_sync_enabled,listing_sync_status,listing_sync_last_run_at,listing_sync_last_error,updated_at&order=updated_at.desc&limit=250', [], warnings, 'agent_websites')
+      safeRest('agent_websites?select=id,name,slug,title,brokerage,email,phone,bio,photo_url,hero_image_url,about_image_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,license_type,brokerage_address,brokerage_phone,brokerage_website_url,standardized_operating_procedure_url,listing_sync_enabled,listing_sync_status,listing_sync_last_run_at,listing_sync_last_error,updated_at&order=updated_at.desc&limit=250', [], warnings, 'agent_websites'),
+      safeRest('event_pass_requests?select=*&order=created_at.desc&limit=250', [], warnings, 'event_pass_requests')
     ]);
 
     const reportOutreach = await loadMissingReportQueueRows({
@@ -760,6 +762,8 @@ module.exports = async function handler(req, res) {
         open_events_without_lo: eventRows.filter((row) => row.status === 'active' && !row.ended_at && !row.live_loan_officer).length,
         loan_officer_support_requests: loanOfficerRequests.length,
         new_loan_officer_support_requests: loanOfficerRequests.filter((row) => (row.status || 'new') === 'new').length,
+        event_pass_requests: eventPassRequests.length,
+        new_event_pass_requests: eventPassRequests.filter((row) => (row.status || 'new') === 'new').length,
         confirmed_open_houses: confirmedOpenHouseRows.length,
         incoming_threads: inbox.length,
         needs_reply: inbox.filter((row) => (row.queue_row_id || row.agent_name || row.agent_phone || row.agent_phone_normalized) && row.direction !== 'outbound' && !row.any_opt_out && !row.latest_reply_opt_out && !['interested', 'not_now', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled', 'opted_out', 'android_opted_out'].includes(row.review_status)).length,
@@ -792,6 +796,7 @@ module.exports = async function handler(req, res) {
       confirmed_open_houses: confirmedOpenHouseRows,
       loan_officers: verifiedProfiles,
       loan_officer_requests: loanOfficerRequests,
+      event_pass_requests: eventPassRequests,
       loan_sessions: loanSessions,
       payments: paymentRows,
       open_house_kit_orders: kitOrders,

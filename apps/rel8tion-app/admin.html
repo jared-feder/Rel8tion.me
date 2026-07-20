@@ -4818,6 +4818,7 @@ ${rowsHtml}
       const sessions = filterByQuery(state.command?.loan_sessions || []);
       const visits = filterByQuery(state.command?.field_visits || []);
       const requests = filterByQuery(state.command?.loan_officer_requests || []);
+      const eventPassRequests = filterByQuery(state.command?.event_pass_requests || []);
       const newRequests = requests.filter((row) => (row.status || 'new') === 'new');
       const activeProfiles = profiles.filter((row) => row.is_active !== false);
       const events = filterByQuery(state.command?.events || [])
@@ -4827,12 +4828,26 @@ ${rowsHtml}
         <div class="section-head">
           <div>
             <h2>LO assignments</h2>
-            <div class="sub">${events.length} active open houses, ${activeProfiles.length} active loan officers, ${newRequests.length} new support requests</div>
+            <div class="sub">${events.length} active open houses, ${activeProfiles.length} active loan officers, ${eventPassRequests.filter((row) => (row.status || 'new') === 'new').length} new Event Pass requests</div>
           </div>
           <button class="btn primary" id="autoAssignLo" ${activeProfiles.length && events.length ? '' : 'disabled'}>
             <i data-lucide="wand-sparkles"></i><span>${state.actionKey === 'auto_assign' ? 'Assigning...' : 'Auto assign open houses'}</span>
           </button>
         </div>
+        ${renderRows('Agent Event Pass requests', `${eventPassRequests.length} requests · blank loan-specialist selections default to NMB`, eventPassRequests.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.agent_name || 'Agent request')}</div>
+            <div class="secondary">${esc([row.agent_brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
+            <div class="secondary">${esc([row.open_house_address, row.open_house_date].filter(Boolean).join(' | ') || 'Open house not supplied')}</div>
+          </div>
+          <div>${badge(row.sponsorship_route === 'agent_loan_officer' ? 'Agent LO' : 'NMB', row.sponsorship_route === 'agent_loan_officer' ? 'warn' : 'ok')}</div>
+          <div>${badge(fmtDate(row.created_at) || 'no date', 'info')}</div>
+          <div>
+            <div class="primary">${esc(row.loan_officer_name || 'NMB coverage')}</div>
+            <div class="secondary">${esc([row.loan_officer_company, fmtPhone(row.loan_officer_phone), row.loan_officer_email].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div class="row-actions">${contactActions(row.agent_phone, row.agent_email)}${row.loan_officer_phone || row.loan_officer_email ? contactActions(row.loan_officer_phone, row.loan_officer_email) : ''}</div>
+        `)}
         ${renderRows('LO support requests', `${requests.length} recent requests from loan officers available for open house support`, requests.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.full_name || 'Loan officer request')}</div>

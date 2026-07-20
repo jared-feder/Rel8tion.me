@@ -339,3 +339,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` The job closes active events from before the current Monday, releases linked Smart Signs and Loan Officer Coverage Signs, and ends live loan-officer sessions while preserving event/check-in records.
 - `[IMPLEMENTED]` The prior Monday-through-Sunday report includes event totals, buyer check-ins, financing-help requests, disclosures, messages, LO guidance, the host agent, assigned loan officer, and device count.
 - `[NEEDS CONFIGURATION]` Automatic email delivery requires `RESEND_API_KEY` and `PRODUCTION_REPORT_EMAILS` in Vercel production. `REL8TION_FROM_EMAIL` is optional but recommended for a verified sender domain.
+# WordPress Event Pass requests (2026-07-20)
+
+- `[IMPLEMENTED]` The one-block Elementor home-page source now opens an agent Event Pass request form and submits to `/api/event-pass-request`.
+- `[IMPLEMENTED]` Agents can optionally identify their current loan specialist and request that professional for coverage. When that option is not completed, the request is saved with the `nmb_default` sponsorship route.
+- `[IMPLEMENTED]` Requests are stored server-side in `event_pass_requests` and appear in REL8TION COMMAND under LO assignments with contact buttons for both the agent and, when supplied, the requested loan specialist.
+- `[NEEDS VERIFICATION]` WordPress source tracked outside the Vercel app must still be pasted/published through the live Elementor HTML block before the home-page button is live.
