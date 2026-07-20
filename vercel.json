@@ -25,6 +25,10 @@
     {
       "path": "/api/cron/enrich-agent-headshots",
       "schedule": "17 */6 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-production-report",
+      "schedule": "5 13,14 * * 1"
     }
   ],
   "redirects": [

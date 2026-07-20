@@ -333,3 +333,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 
 - `[IMPLEMENTED]` Agent phone-lock and `/agent-home` authorization now accept only regular agent keychain roles. Event Pass NFC UIDs cannot authorize the permanent agent dashboard even when they are claimed to the same agent.
 - `[IMPLEMENTED]` Tapping a completed Event Pass opens that pass's historical event dashboard. Active Event Passes continue to open their live event dashboard; unused passes remain in Event Pass activation mode.
+# Weekly production closeout and report (2026-07-20)
+
+- `[IMPLEMENTED]` `/api/cron/weekly-production-report` runs from Vercel's Monday cron lane and uses an America/New_York 9 AM guard so daylight-saving changes do not shift the business-time schedule.
+- `[IMPLEMENTED]` The job closes active events from before the current Monday, releases linked Smart Signs and Loan Officer Coverage Signs, and ends live loan-officer sessions while preserving event/check-in records.
+- `[IMPLEMENTED]` The prior Monday-through-Sunday report includes event totals, buyer check-ins, financing-help requests, disclosures, messages, LO guidance, the host agent, assigned loan officer, and device count.
+- `[NEEDS CONFIGURATION]` Automatic email delivery requires `RESEND_API_KEY` and `PRODUCTION_REPORT_EMAILS` in Vercel production. `REL8TION_FROM_EMAIL` is optional but recommended for a verified sender domain.

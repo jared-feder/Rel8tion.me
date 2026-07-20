@@ -230,3 +230,6 @@ The authenticated loan-officer account page can enroll a WebAuthn platform crede
 ## Event Pass Versus Agent Keychain Access
 
 Event Pass NFC identity is event-scoped. It opens the live or historical dashboard for its own event and cannot authorize `/agent-home` or enroll the agent phone-lock session. A regular claimed agent keychain is required for permanent agent-dashboard access and Smart Sign ownership verification.
+# Weekly event closeout
+
+Every Monday at 9 AM America/New_York, the protected weekly production job closes stale open events from before that Monday, releases their linked coverage devices, and ends active loan-officer event sessions. It then builds one prior-week production report covering Monday through Sunday. Delivery uses Resend and is idempotent by reporting week; production requires `RESEND_API_KEY` and `PRODUCTION_REPORT_EMAILS`.
