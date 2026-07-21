@@ -170,6 +170,14 @@ Status labels used in this file:
 - `[IMPLEMENTED]` Commit `97b418c` was pushed to the website-builder audit branch and fast-forwarded to `main`; Vercel production deployment `dpl_GsdJP9j4Z6CZuGzWrcumAdvNNVYD` reached Ready and owns `my.rel8tion.me`, `llsellsny.com`, and the other agent-domain aliases.
 - `[NEEDS VERIFICATION]` This workstation resolves `llsellsny.com` and `www.llsellsny.com` to `0.0.0.0`, preventing a direct custom-domain capture. The public canonical production route `/ll` returned 200 and included the rate control; custom-domain DNS should be checked from a normal external resolver/device.
 
+### 2026-07-21 Lisa Luttinger Neptune listing correction
+
+- `[IMPLEMENTED]` Lisa's `703 Neptune Blvd, Long Beach, NY 11561` record (OneKey MLS `971018`, website-listing id `1e34f054-d25b-480e-b4ed-5a9138fbd81a`) now displays Pending, $1,350,000, 5 beds, 3.5 baths, 3,128 sqft, 5,000 sqft lot, built 2006, $18,321 annual taxes, $432/sqft, $0 HOA, and Single Family Residence.
+- `[IMPLEMENTED]` Current status and price were cross-checked on 2026-07-21 against OneKey-derived Redfin and Realtor.com pages; both report Pending effective 2026-06-26 at $1,350,000.
+- `[RISK]` The source scraper snapshot attached to this row is from 2026-05-09 and still reports Active/$1,399,998. It reverted the first manual correction during this audit, proving that a database-only fix was not durable.
+- `[IMPLEMENTED]` Website-builder commits `fc35ad4` and `54cbcf9` add an explicit allowlisted `metadata.manual_listing_override` merge path for verified stale-feed exceptions, including top-level listing fields plus `price_per_sqft` and `hoa_monthly`. The override is installed only on Neptune.
+- `[IMPLEMENTED]` A real production sync was run after deployment: it wrote both Lisa listings with no errors, and Neptune remained Pending at $1,350,000 afterward through both direct Supabase readback and the live `/api/agent-listings` response.
+
 - `[PARTIAL]` `apps/agent-website-builder` contains the separate Next.js website-builder app formerly known as `v0-real-estate-agent-template`.
 - `[IMPLEMENTED]` Vercel project `v0-real-estate-agent-template` has been used for `https://my.rel8tion.me` and custom agent domains.
 - `[IMPLEMENTED]` Website records live in `agent_websites`; site-owned listing records live in `agent_website_listings`.
