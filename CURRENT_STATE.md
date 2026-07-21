@@ -162,6 +162,14 @@ Status labels used in this file:
 - `[IMPLEMENTED]` Website-builder commit `1293366` contains only the reusable crop component and the shared site editor integration; unrelated uncommitted design and rate-consultation work remains outside the commit.
 - `[NEEDS VERIFICATION]` Full local production build remains blocked by pre-existing missing local `nodemailer`/`sharp` installations and unavailable Google Font downloads. The changed crop files produced no focused TypeScript errors.
 
+### 2026-07-21 public site visual and rate-lead restoration
+
+- `[IMPLEMENTED]` Website-builder commit `97b418c` restored the preserved public-site refresh: branded calculator gradient, reduced section spacing, non-invented fallback trust band when an agent has no testimonials, and a visually alternating transition into Contact instead of a continuous white region.
+- `[IMPLEMENTED]` The calculator again displays `Check today's rate` at the section heading and beside the interest-rate input. Its private request dialog requires name, phone, and email and submits through `/api/contact` as `rate_consultation`.
+- `[IMPLEMENTED]` Rate-consultation email delivery selects `RATE_LEAD_NOTIFICATION_EMAIL` before the general lead fallback; the production variable was verified as configured for Jared's masked `jf***@nmbnow.com` recipient.
+- `[IMPLEMENTED]` Commit `97b418c` was pushed to the website-builder audit branch and fast-forwarded to `main`; Vercel production deployment `dpl_GsdJP9j4Z6CZuGzWrcumAdvNNVYD` reached Ready and owns `my.rel8tion.me`, `llsellsny.com`, and the other agent-domain aliases.
+- `[NEEDS VERIFICATION]` This workstation resolves `llsellsny.com` and `www.llsellsny.com` to `0.0.0.0`, preventing a direct custom-domain capture. The public canonical production route `/ll` returned 200 and included the rate control; custom-domain DNS should be checked from a normal external resolver/device.
+
 - `[PARTIAL]` `apps/agent-website-builder` contains the separate Next.js website-builder app formerly known as `v0-real-estate-agent-template`.
 - `[IMPLEMENTED]` Vercel project `v0-real-estate-agent-template` has been used for `https://my.rel8tion.me` and custom agent domains.
 - `[IMPLEMENTED]` Website records live in `agent_websites`; site-owned listing records live in `agent_website_listings`.
