@@ -111,6 +111,7 @@ Preserve these priorities:
 - `[IMPLEMENTED]` The agent Auth callback canonicalizes every non-local success/error destination to `https://my.rel8tion.me`; custom agent domains must not become WebAuthn/Auth callback origins.
 - `[RISK]` A successful `vercel promote` command is not proof that `my.rel8tion.me` has switched. Verify the live domain itself and confirm the new route exists before sending any account link.
 - `[IMPLEMENTED]` Run `npm run verify:agent-auth-routes` inside `apps/v0-real-estate-agent-template` before agent Auth deployments.
+- `[IMPLEMENTED]` Agent-managed website image uploads open a client-side crop step before storage upload. Preserve the slot contracts: headshot 4:5 at 1200×1500, homepage hero 16:9 at 1920×1080, About image 4:5 at 1200×1500, and gallery image 4:3 at 1600×1200. Guidance must remain visible beside each upload control.
 
 - `[IMPLEMENTED]` Root `vercel.json` defines app rewrites, short QR/link routes, API routes, and cron entries. Inspect it before route or cron assumptions.
 - `[IMPLEMENTED]` Route-map guardrails exist. Run `npm run verify:routes` before production route/API changes.

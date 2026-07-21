@@ -155,6 +155,13 @@ Status labels used in this file:
 - `[IMPLEMENTED]` Lisa Luttinger's replacement recovery SMS was queued through Twilio at 2026-07-21 15:50 Eastern. The logged URL host is `my.rel8tion.me`, path `/auth/callback`, and contains no `localhost`; the one-time token was not printed or documented.
 - `[IMPLEMENTED]` Website-builder Git branch `codex/agent-auth-route-audit` contains code commit `0998c82` and explicit environment rebuild commit `0a24d41`. The verified `0a24d41` artifact was promoted to production and then fast-forwarded to the website-builder `main` branch. Pre-existing uncommitted site-design files were not included in either commit.
 
+### 2026-07-21 guided agent image cropping
+
+- `[IMPLEMENTED]` Agent dashboard image selection now opens a visual crop dialog before uploading to Supabase Storage. Agents can reposition horizontally and vertically, zoom, preview the exact output, and then upload the generated JPEG.
+- `[IMPLEMENTED]` Upload guidance and output dimensions match the live template: headshot 4:5 at 1200×1500, homepage hero 16:9 at 1920×1080, About image 4:5 at 1200×1500, and gallery image 4:3 at 1600×1200.
+- `[IMPLEMENTED]` Website-builder commit `1293366` contains only the reusable crop component and the shared site editor integration; unrelated uncommitted design and rate-consultation work remains outside the commit.
+- `[NEEDS VERIFICATION]` Full local production build remains blocked by pre-existing missing local `nodemailer`/`sharp` installations and unavailable Google Font downloads. The changed crop files produced no focused TypeScript errors.
+
 - `[PARTIAL]` `apps/agent-website-builder` contains the separate Next.js website-builder app formerly known as `v0-real-estate-agent-template`.
 - `[IMPLEMENTED]` Vercel project `v0-real-estate-agent-template` has been used for `https://my.rel8tion.me` and custom agent domains.
 - `[IMPLEMENTED]` Website records live in `agent_websites`; site-owned listing records live in `agent_website_listings`.
