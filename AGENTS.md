@@ -90,6 +90,11 @@ Preserve these priorities:
 
 ## Supabase Boundaries
 
+- `[IMPLEMENTED]` The agent website builder at `my.rel8tion.me` uses Supabase project `nicanqrfqlbnlmnoernb` for browser Auth, server session exchange, middleware/proxy session refresh, `agent_websites` data, admin routes, cron routes, and SMS account recovery. These layers must not resolve to different Supabase projects.
+- `[IMPLEMENTED]` Agent-builder code uses the project-specific variables `REL8TION_SUPABASE_URL`, `REL8TION_SUPABASE_ANON_KEY`, and server-only `REL8TION_SUPABASE_SERVICE_ROLE_KEY`. Generic Vercel integration variables such as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY` may belong to another project and must not drive agent-builder Auth or data.
+- `[RISK]` Never send Supabase's generated `action_link` directly by SMS for agent-builder access. A stale Auth Site URL can fall back to `localhost`. Extract/use the one-time hashed token and build the REL8TION-owned callback: `https://my.rel8tion.me/auth/callback?token_hash=...&type=invite|recovery&next=/agent/dashboard`.
+- `[IMPLEMENTED]` `send-lead-sms` is deployed on `nicanqrfqlbnlmnoernb` and the agent access-link route calls it with `category=event_transactional`; suppression and provider routing remain centralized in the shared SMS layer.
+
 - `[IMPLEMENTED]` Client-side app code uses the public Supabase anon key in `apps/rel8tion-app/src/core/config.js`, several standalone HTML pages, and root `b.html`.
 - `[IMPLEMENTED]` The anon key is intentionally public. Do not hardcode service-role keys, Twilio secrets, Vercel tokens, Stripe secrets, or admin reset tokens.
 - `[IMPLEMENTED]` Sponsored Event Pass and Loan Officer Coverage Sign privileged writes go through service-role serverless routes:
@@ -101,6 +106,11 @@ Preserve these priorities:
 - `[INTENDED]` Sensitive writes should continue moving toward Edge Functions or serverless APIs with explicit validation. Current browser code still performs some direct Supabase writes.
 
 ## Vercel Boundaries
+
+- `[IMPLEMENTED]` Agent website Vercel project `v0-real-estate-agent-template` owns `my.rel8tion.me`. Its canonical system routes are `/agent/login`, `/auth/callback`, `/agent/dashboard`, and `/api/agent/access-link`.
+- `[IMPLEMENTED]` The agent Auth callback canonicalizes every non-local success/error destination to `https://my.rel8tion.me`; custom agent domains must not become WebAuthn/Auth callback origins.
+- `[RISK]` A successful `vercel promote` command is not proof that `my.rel8tion.me` has switched. Verify the live domain itself and confirm the new route exists before sending any account link.
+- `[IMPLEMENTED]` Run `npm run verify:agent-auth-routes` inside `apps/v0-real-estate-agent-template` before agent Auth deployments.
 
 - `[IMPLEMENTED]` Root `vercel.json` defines app rewrites, short QR/link routes, API routes, and cron entries. Inspect it before route or cron assumptions.
 - `[IMPLEMENTED]` Route-map guardrails exist. Run `npm run verify:routes` before production route/API changes.

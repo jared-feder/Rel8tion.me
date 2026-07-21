@@ -144,6 +144,17 @@ Status labels used in this file:
 
 ## Agent Website Builder
 
+### 2026-07-21 agent Auth and route unification
+
+- `[IMPLEMENTED]` The agent website builder now has one canonical Auth contract: portal `https://my.rel8tion.me`, login `/agent/login`, one-time callback `/auth/callback`, dashboard `/agent/dashboard`, and recovery API `/api/agent/access-link`.
+- `[IMPLEMENTED]` Browser, server, proxy/middleware, admin, storage, promo, and cron clients now resolve agent-builder data/Auth through Supabase project `nicanqrfqlbnlmnoernb` using the project-specific `REL8TION_SUPABASE_*` namespace. Generic Vercel Supabase integration variables no longer override those clients.
+- `[IMPLEMENTED]` SMS account setup/recovery uses the saved `agent_websites.phone`, returns a generic anti-enumeration response, rate-limits repeat sends, generates invite or recovery tokens server-side, and sends only a REL8TION-owned `https://my.rel8tion.me/auth/callback?token_hash=...` URL. It does not send Supabase's generated `action_link`.
+- `[IMPLEMENTED]` The callback accepts PKCE `code` links plus hashed `invite`, `recovery`, `magiclink`, and `email` OTP links, establishes the Supabase session, and canonicalizes success/error navigation to `my.rel8tion.me` outside localhost development.
+- `[IMPLEMENTED]` Supabase Edge Function `send-lead-sms` was deployed to `nicanqrfqlbnlmnoernb`. Vercel production variables `REL8TION_SUPABASE_URL`, `REL8TION_SUPABASE_ANON_KEY`, and sensitive production-only `REL8TION_SUPABASE_SERVICE_ROLE_KEY` were aligned to that project; the audit branch preview has branch-scoped equivalents.
+- `[IMPLEMENTED]` Vercel preview and production checks passed on 2026-07-21: login 200; unauthenticated dashboard 307 to `/agent/login`; incomplete callback 307 to `https://my.rel8tion.me/agent/login?...`; fake-email recovery 200 with generic response.
+- `[IMPLEMENTED]` Lisa Luttinger's replacement recovery SMS was queued through Twilio at 2026-07-21 15:50 Eastern. The logged URL host is `my.rel8tion.me`, path `/auth/callback`, and contains no `localhost`; the one-time token was not printed or documented.
+- `[IMPLEMENTED]` Website-builder Git branch `codex/agent-auth-route-audit` contains code commit `0998c82` and explicit environment rebuild commit `0a24d41`. The verified `0a24d41` artifact was promoted to production and then fast-forwarded to the website-builder `main` branch. Pre-existing uncommitted site-design files were not included in either commit.
+
 - `[PARTIAL]` `apps/agent-website-builder` contains the separate Next.js website-builder app formerly known as `v0-real-estate-agent-template`.
 - `[IMPLEMENTED]` Vercel project `v0-real-estate-agent-template` has been used for `https://my.rel8tion.me` and custom agent domains.
 - `[IMPLEMENTED]` Website records live in `agent_websites`; site-owned listing records live in `agent_website_listings`.
