@@ -104,7 +104,9 @@ export async function resolveSmartSignPublicCode(publicCode, options = {}) {
     ? await getSmartSignById(inventory.smart_sign_id).catch(() => null)
     : null;
 
-  if (!sign && allowSignPublicCodeFallback) {
+  const allowLegacyFallback = allowSignPublicCodeFallback
+    && (!inventory || inventory.inventory_type !== 'event_pass');
+  if (!sign && allowLegacyFallback) {
     sign = await getSmartSignByLegacyPublicCode(publicCode).catch(() => null);
   }
 

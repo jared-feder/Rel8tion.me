@@ -43,12 +43,12 @@ async function loadEventPassInventory({ inventoryId, publicCode }) {
   let row = null;
   if (inventoryId) {
     row = await one(
-      `smart_sign_inventory?id=eq.${enc(inventoryId)}&select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,notes,created_at`,
+      `smart_sign_inventory?id=eq.${enc(inventoryId)}&select=*`,
       'Event Pass inventory'
     );
   } else if (publicCode) {
     row = await one(
-      `smart_sign_inventory?public_code=eq.${enc(publicCode)}&select=id,public_code,inventory_type,qr_url,smart_sign_id,is_printed,claimed_at,notes,created_at`,
+      `smart_sign_inventory?public_code=eq.${enc(publicCode)}&select=*`,
       'Event Pass inventory'
     );
   } else {
@@ -59,6 +59,47 @@ async function loadEventPassInventory({ inventoryId, publicCode }) {
     throw httpError(400, 'That QR inventory row is not an Event Pass.');
   }
   return row;
+}
+
+function extractEventPassPublicCode(scannedValue) {
+  const raw = String(scannedValue || '').trim();
+  if (!raw) throw httpError(400, 'Scan an Event Pass QR code or enter its printed code.');
+
+  let code = raw;
+  try {
+    const url = new URL(raw);
+    code = String(url.searchParams.get('code') || '').trim();
+    if (!code) throw httpError(400, 'That QR URL does not contain an Event Pass code.');
+  } catch (error) {
+    if (error?.status) throw error;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+      throw httpError(400, 'That QR URL is not a valid Event Pass link.');
+    }
+  }
+
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{3,119}$/.test(code)) {
+    throw httpError(400, 'That scan does not look like a REL8TION Event Pass code.');
+  }
+  return code;
+}
+
+function safeMetadata(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function freshInventoryMetadata(inventory, now, reason, source) {
+  const metadata = { ...safeMetadata(inventory?.metadata) };
+  delete metadata.current_event_id;
+  delete metadata.coverage_device_role;
+  delete metadata.active_event_id;
+  delete metadata.host_agent_slug;
+  delete metadata.activated_agent_slug;
+  return {
+    ...metadata,
+    freshened_at: now,
+    freshened_reason: reason || 'admin_reset',
+    freshened_source: source || 'admin'
+  };
 }
 
 async function loadEventPassSign(inventory) {
@@ -161,6 +202,62 @@ async function cancelPendingActivationSessionsForCode(publicCode, now) {
   ).catch((error) => ({ warning: error.message || String(error) }));
 }
 
+function isEventPassSign(sign) {
+  return /event_pass/i.test(`${sign?.activation_method || ''} ${sign?.primary_device_type || ''}`);
+}
+
+async function resetEventPassNfcKey(sign) {
+  const uid = String(sign?.activation_uid_primary || sign?.uid_primary || '').trim();
+  if (!uid || !isEventPassSign(sign)) return null;
+
+  const rows = await list(
+    `keys?uid=eq.${enc(uid)}&device_role=eq.event_pass_keychain&select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1`
+  );
+  const key = rows[0] || null;
+  if (!key) return null;
+
+  const updated = await supabaseRest(`keys?uid=eq.${enc(uid)}&device_role=eq.event_pass_keychain`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      agent_slug: null,
+      claimed: false,
+      assigned_slot: null,
+      device_role: 'event_pass_keychain'
+    })
+  });
+  return {
+    before: key,
+    key: Array.isArray(updated) ? updated[0] || null : null
+  };
+}
+
+async function loadEventPassAliases(sign, inventory) {
+  const aliases = [inventory];
+  if (sign?.id) {
+    aliases.push(...await list(
+      `smart_sign_inventory?smart_sign_id=eq.${enc(sign.id)}&inventory_type=eq.event_pass&select=*&limit=100`
+    ));
+  }
+  return uniqueById(aliases);
+}
+
+async function clearEventPassInventory(inventory, now, reason, source) {
+  const rows = await supabaseRest(`smart_sign_inventory?id=eq.${enc(inventory.id)}&inventory_type=eq.event_pass`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      smart_sign_id: null,
+      claimed_at: null,
+      assigned_agent_slug: null,
+      assigned_agent_phone: null,
+      last_activated_at: null,
+      metadata: freshInventoryMetadata(inventory, now, reason, source)
+    })
+  });
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
 async function detachSign(signId, confirmation) {
   if (String(confirmation || '').trim() !== 'REL8TION') {
     throw httpError(400, 'Type REL8TION to detach this sign.');
@@ -206,18 +303,28 @@ async function detachSign(signId, confirmation) {
   };
 }
 
-async function resetEventPass({ inventoryId, publicCode, confirmation }) {
-  if (String(confirmation || '').trim() !== 'REL8TION') {
+async function resetEventPass({
+  inventoryId,
+  publicCode,
+  confirmation,
+  skipConfirmation = false,
+  reason = 'admin_reset',
+  source = 'admin_sign_action'
+}) {
+  if (!skipConfirmation && String(confirmation || '').trim() !== 'REL8TION') {
     throw httpError(400, 'Type REL8TION to reset this Event Pass.');
   }
 
   const inventory = await loadEventPassInventory({ inventoryId, publicCode });
   const sign = await loadEventPassSign(inventory);
+  const aliases = await loadEventPassAliases(sign, inventory);
   const now = new Date().toISOString();
   const endedEvents = [];
   const loanOfficerCoverage = [];
+  const inventoryRows = [];
   let signRows = [];
   let sessionCleanup = null;
+  let nfcKeyReset = null;
 
   if (sign?.id) {
     const events = await loadEventsForSign(sign);
@@ -241,6 +348,7 @@ async function resetEventPass({ inventoryId, publicCode, confirmation }) {
         assigned_slot: null,
         activation_uid_primary: null,
         activation_uid_secondary: null,
+        activation_method: 'event_pass_keychain',
         primary_device_type: 'event_pass_qr',
         secondary_device_type: null,
         deactivated_at: now,
@@ -248,25 +356,27 @@ async function resetEventPass({ inventoryId, publicCode, confirmation }) {
       })
     });
 
+    nfcKeyReset = await resetEventPassNfcKey(sign);
     sessionCleanup = await cancelPendingActivationSessions(sign, now);
   } else {
     sessionCleanup = await cancelPendingActivationSessionsForCode(inventory.public_code, now);
   }
 
-  const inventoryRows = await supabaseRest(`smart_sign_inventory?id=eq.${enc(inventory.id)}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
-      smart_sign_id: null,
-      claimed_at: null
-    })
-  });
+  for (const alias of aliases) {
+    inventoryRows.push(await clearEventPassInventory(alias, now, reason, source));
+    if (alias.public_code && alias.public_code !== inventory.public_code) {
+      await cancelPendingActivationSessionsForCode(alias.public_code, now);
+    }
+  }
 
   return {
     inventory_before: inventory,
-    inventory: Array.isArray(inventoryRows) ? inventoryRows[0] || null : null,
+    inventory: inventoryRows.find((row) => row?.id === inventory.id) || inventoryRows[0] || null,
+    inventories: inventoryRows.filter(Boolean),
+    cleared_inventory_count: inventoryRows.filter(Boolean).length,
     sign_before: sign || null,
     sign: Array.isArray(signRows) ? signRows[0] || null : null,
+    nfc_key_reset: nfcKeyReset,
     ended_events: endedEvents,
     loan_officer_coverage: loanOfficerCoverage,
     session_cleanup: sessionCleanup
@@ -290,7 +400,7 @@ module.exports = async function handler(req, res) {
 
     const body = parseBody(req);
     const action = String(body.action || '').trim();
-    if (!['detach_sign', 'reset_event_pass'].includes(action)) {
+    if (!['detach_sign', 'reset_event_pass', 'freshen_event_pass'].includes(action)) {
       sendJson(res, 400, { ok: false, error: 'Unsupported sign action.' });
       return;
     }
@@ -303,7 +413,19 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const result = action === 'reset_event_pass'
+    if (action === 'freshen_event_pass' && !body.scanned_value && !body.public_code) {
+      sendJson(res, 400, { ok: false, error: 'Scan an Event Pass QR code or enter its printed code.' });
+      return;
+    }
+
+    const result = action === 'freshen_event_pass'
+      ? await resetEventPass({
+        publicCode: extractEventPassPublicCode(body.scanned_value || body.public_code),
+        skipConfirmation: true,
+        reason: 'admin_scanner_freshen',
+        source: String(body.source || 'admin_event_pass_scanner').slice(0, 120)
+      })
+      : action === 'reset_event_pass'
       ? await resetEventPass({
         inventoryId: body.inventory_id,
         publicCode: body.public_code,
@@ -319,3 +441,5 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports.extractEventPassPublicCode = extractEventPassPublicCode;

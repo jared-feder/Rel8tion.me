@@ -612,6 +612,48 @@
       font-weight: 800;
     }
 
+    .event-pass-freshener {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+      gap: 16px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+
+    .event-pass-freshener-copy,
+    .event-pass-freshener-controls {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+    }
+
+    .event-pass-camera {
+      display: none;
+      width: 100%;
+      max-height: 420px;
+      border-radius: 8px;
+      background: #10172f;
+      object-fit: cover;
+    }
+
+    .event-pass-camera.active { display: block; }
+
+    .event-pass-scanner-status {
+      min-height: 42px;
+      border: 1px solid rgba(119, 146, 173, .28);
+      border-radius: 8px;
+      background: rgba(255,255,255,.62);
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .event-pass-scanner-status[data-tone="ok"] { color: var(--ok); border-color: rgba(15,123,95,.28); }
+    .event-pass-scanner-status[data-tone="bad"] { color: var(--bad); border-color: rgba(180,35,24,.28); }
+    .event-pass-scanner-status[data-tone="working"] { color: var(--teal); border-color: rgba(31,42,90,.28); }
+
     .outreach-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -1413,6 +1455,7 @@
     }
 
     @media (max-width: 760px) {
+      .event-pass-freshener { grid-template-columns: 1fr; }
       .app { padding: 10px; }
       .command-shell { min-height: calc(100vh - 20px); }
       .command-sidebar,
@@ -1517,7 +1560,17 @@
       health: null,
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
-      drafts: readDrafts()
+      drafts: readDrafts(),
+      eventPassFreshenerResult: null
+    };
+
+    const eventPassScanner = {
+      stream: null,
+      frame: 0,
+      detecting: false,
+      submitting: false,
+      detector: null,
+      decoderPromise: null
     };
 
     const app = document.getElementById('app');
@@ -2371,6 +2424,7 @@ ${rowsHtml}
     }
 
     function setArea(area) {
+      if (area !== 'signs') stopEventPassScanner({ silent: true });
       state.area = area;
       window.localStorage.setItem(AREA_KEY, area);
       render();
@@ -3100,7 +3154,7 @@ ${rowsHtml}
           ? `Linked sign: ${pass.linked_sign_id}`
           : 'Already fresh / no linked event';
       const typed = window.prompt(
-        `Reset Event Pass ${code}?\n${current}\n\nThis will end any live open house event, end live LO coverage, clear the QR/event link, and make the printed Event Pass ready for the next demo. It will NOT delete the inventory row or change the public code.\n\nType REL8TION to continue.`
+        `Freshen Event Pass ${code}?\n${current}\n\nThis will end any live open house event and LO coverage, clear the old host and Event Pass NFC owner, remove duplicate Event Pass QR links to the same backing sign, and make the printed pass ready for the next host. It will NOT delete history, inventory, sponsor settings, or change the public code.\n\nType REL8TION to continue.`
       );
       if (typed === null) return;
       if (typed.trim() !== 'REL8TION') {
@@ -3117,13 +3171,212 @@ ${rowsHtml}
         });
         state.actionKey = '';
         const endedCount = Array.isArray(result.ended_events) ? result.ended_events.length : 0;
-        showToast(endedCount ? `Event Pass reset. Ended ${endedCount} event${endedCount === 1 ? '' : 's'}.` : 'Event Pass reset and ready to reuse.');
+        showToast(endedCount ? `Event Pass freshened. Ended ${endedCount} event${endedCount === 1 ? '' : 's'}.` : 'Event Pass freshened and ready to reuse.');
         await loadAll();
       } catch (error) {
         state.actionKey = '';
         showToast(error.message || 'Unable to reset Event Pass.');
         render();
       }
+    }
+
+    function setEventPassScannerStatus(message, tone = '') {
+      const status = document.getElementById('eventPassScannerStatus');
+      if (!status) return;
+      status.textContent = message;
+      status.dataset.tone = tone;
+    }
+
+    function stopEventPassScanner({ silent = false } = {}) {
+      if (eventPassScanner.frame) window.cancelAnimationFrame(eventPassScanner.frame);
+      eventPassScanner.frame = 0;
+      eventPassScanner.detecting = false;
+      if (eventPassScanner.stream) {
+        eventPassScanner.stream.getTracks().forEach((track) => track.stop());
+      }
+      eventPassScanner.stream = null;
+      const video = document.getElementById('eventPassScannerVideo');
+      if (video) {
+        video.pause();
+        video.srcObject = null;
+        video.classList.remove('active');
+      }
+      if (!silent && !eventPassScanner.submitting) {
+        setEventPassScannerStatus('Camera stopped. Open it again when you are ready to scan another Event Pass.');
+      }
+    }
+
+    async function ensureEventPassQrDecoder() {
+      if (eventPassScanner.detector || window.jsQR) return;
+      if ('BarcodeDetector' in window) {
+        try {
+          eventPassScanner.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+          return;
+        } catch (_) {}
+      }
+      if (!eventPassScanner.decoderPromise) {
+        eventPassScanner.decoderPromise = new Promise((resolve, reject) => {
+          const existing = document.querySelector('script[data-event-pass-qr-decoder]');
+          if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', () => reject(new Error('Unable to load the QR decoder.')), { once: true });
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+          script.async = true;
+          script.dataset.eventPassQrDecoder = 'true';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Unable to load the QR decoder.'));
+          document.head.appendChild(script);
+        });
+      }
+      await eventPassScanner.decoderPromise;
+      if (!window.jsQR) throw new Error('This browser could not start the QR decoder.');
+    }
+
+    async function detectEventPassQr(canvas) {
+      if (eventPassScanner.detector) {
+        const codes = await eventPassScanner.detector.detect(canvas);
+        return String(codes?.[0]?.rawValue || '').trim();
+      }
+      if (!window.jsQR) return '';
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      return String(window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' })?.data || '').trim();
+    }
+
+    async function freshenEventPassValue(scannedValue) {
+      const value = String(scannedValue || '').trim();
+      if (!value || eventPassScanner.submitting) return;
+      eventPassScanner.submitting = true;
+      state.actionKey = 'freshen_event_pass';
+      stopEventPassScanner({ silent: true });
+      setEventPassScannerStatus('Event Pass found. Clearing the old host, live event link, and Event Pass NFC owner...', 'working');
+      document.querySelectorAll('[data-event-pass-scanner-action]').forEach((button) => { button.disabled = true; });
+      try {
+        const result = await api('/api/admin/sign-action', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'freshen_event_pass',
+            scanned_value: value,
+            source: 'admin_event_pass_scanner'
+          })
+        });
+        const code = result.inventory_before?.public_code || result.inventory?.public_code || 'Event Pass';
+        const endedCount = Array.isArray(result.ended_events) ? result.ended_events.length : 0;
+        const clearedCount = Number(result.cleared_inventory_count || 1);
+        state.eventPassFreshenerResult = {
+          code,
+          endedCount,
+          clearedCount,
+          nfcReset: Boolean(result.nfc_key_reset?.key),
+          completedAt: new Date().toISOString()
+        };
+        state.actionKey = '';
+        eventPassScanner.submitting = false;
+        showToast(`${code} is fresh and ready for the next host.`);
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        eventPassScanner.submitting = false;
+        setEventPassScannerStatus(error.message || 'Unable to freshen this Event Pass.', 'bad');
+        showToast(error.message || 'Unable to freshen this Event Pass.');
+        document.querySelectorAll('[data-event-pass-scanner-action]').forEach((button) => { button.disabled = false; });
+      }
+    }
+
+    async function scanEventPassCameraFrame() {
+      if (!eventPassScanner.stream || eventPassScanner.submitting) return;
+      const video = document.getElementById('eventPassScannerVideo');
+      const canvas = document.getElementById('eventPassScannerCanvas');
+      if (!video || !canvas) return stopEventPassScanner({ silent: true });
+      if (!eventPassScanner.detecting && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        eventPassScanner.detecting = true;
+        try {
+          const width = Math.min(video.videoWidth, 1280);
+          const height = Math.round(video.videoHeight * (width / video.videoWidth));
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0, width, height);
+          const value = await detectEventPassQr(canvas);
+          if (value) {
+            await freshenEventPassValue(value);
+            return;
+          }
+        } catch (error) {
+          stopEventPassScanner({ silent: true });
+          setEventPassScannerStatus(error.message || 'The camera could not read that QR code.', 'bad');
+          return;
+        } finally {
+          eventPassScanner.detecting = false;
+        }
+      }
+      if (eventPassScanner.stream) eventPassScanner.frame = window.requestAnimationFrame(scanEventPassCameraFrame);
+    }
+
+    async function startEventPassScanner() {
+      if (eventPassScanner.submitting) return;
+      stopEventPassScanner({ silent: true });
+      setEventPassScannerStatus('Opening the rear camera...', 'working');
+      try {
+        await ensureEventPassQrDecoder();
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera scanning is not supported in this browser. Use QR photo or enter the code.');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+        const video = document.getElementById('eventPassScannerVideo');
+        if (!video) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        eventPassScanner.stream = stream;
+        video.srcObject = stream;
+        video.classList.add('active');
+        await video.play();
+        setEventPassScannerStatus('Point the camera at the printed Event Pass QR. It will freshen immediately after one successful scan.', 'working');
+        eventPassScanner.frame = window.requestAnimationFrame(scanEventPassCameraFrame);
+      } catch (error) {
+        stopEventPassScanner({ silent: true });
+        setEventPassScannerStatus(error.message || 'Unable to open the camera. Use QR photo or enter the printed code.', 'bad');
+      }
+    }
+
+    async function scanEventPassImage(event) {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (!file || eventPassScanner.submitting) return;
+      stopEventPassScanner({ silent: true });
+      setEventPassScannerStatus('Reading the Event Pass QR photo...', 'working');
+      try {
+        await ensureEventPassQrDecoder();
+        const bitmap = await window.createImageBitmap(file);
+        const canvas = document.getElementById('eventPassScannerCanvas');
+        const width = Math.min(bitmap.width, 1800);
+        const height = Math.round(bitmap.height * (width / bitmap.width));
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d', { willReadFrequently: true }).drawImage(bitmap, 0, 0, width, height);
+        bitmap.close?.();
+        const value = await detectEventPassQr(canvas);
+        if (!value) throw new Error('No QR code was found in that image. Try a closer, brighter photo.');
+        await freshenEventPassValue(value);
+      } catch (error) {
+        setEventPassScannerStatus(error.message || 'Unable to read that QR image.', 'bad');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    function submitEventPassManual(event) {
+      event.preventDefault();
+      const value = document.getElementById('eventPassManualCode')?.value || '';
+      if (!value.trim()) {
+        setEventPassScannerStatus('Enter the printed Event Pass code or paste its QR URL.', 'bad');
+        return;
+      }
+      freshenEventPassValue(value);
     }
 
     async function setSponsoredPassReuse(inventoryId, reuseStatus) {
@@ -3302,6 +3555,7 @@ ${rowsHtml}
     }
 
     function signOut() {
+      stopEventPassScanner({ silent: true });
       window.localStorage.removeItem(ADMIN_UID_KEY);
       window.localStorage.removeItem(ADMIN_TOKEN_KEY);
       clearAdminLockSession();
@@ -3797,6 +4051,10 @@ ${rowsHtml}
       document.querySelectorAll('[data-reset-event-pass]').forEach((button) => {
         button.addEventListener('click', () => resetEventPass(button.dataset.resetEventPass));
       });
+      document.getElementById('startEventPassScanner')?.addEventListener('click', startEventPassScanner);
+      document.getElementById('stopEventPassScanner')?.addEventListener('click', () => stopEventPassScanner());
+      document.getElementById('eventPassQrImage')?.addEventListener('change', scanEventPassImage);
+      document.getElementById('eventPassManualForm')?.addEventListener('submit', submitEventPassManual);
       document.getElementById('exportAgentQrBatch')?.addEventListener('click', exportAgentQrBatch);
       document.querySelectorAll('[data-sponsored-reuse]').forEach((button) => {
         button.addEventListener('click', () => setSponsoredPassReuse(button.dataset.sponsoredReuse, button.dataset.reuseStatus));
@@ -4693,7 +4951,7 @@ ${rowsHtml}
         <div class="row-actions">
           ${row.qr_url ? `<a class="btn soft" href="${esc(row.qr_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open</span></a>` : ''}
           <button class="btn bad" data-reset-event-pass="${esc(row.id)}" ${state.actionKey === resetKey ? 'disabled' : ''}>
-            <i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Resetting...' : 'Reset QR'}</span>
+            <i data-lucide="rotate-ccw"></i><span>${state.actionKey === resetKey ? 'Freshening...' : 'Freshen'}</span>
           </button>
         </div>
       `;
@@ -4740,7 +4998,55 @@ ${rowsHtml}
       const events = filterByQuery(state.command?.events || []);
       const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
       const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
+      const freshened = state.eventPassFreshenerResult;
       return `
+        <div class="glass-card event-pass-freshener">
+          <div class="event-pass-freshener-copy">
+            <div>
+              <div class="hero-label">Admin scanner</div>
+              <h2 style="margin:5px 0 0;font-family:'Plus Jakarta Sans',Inter,sans-serif;font-size:28px;">Freshen Event Pass</h2>
+            </div>
+            <div class="secondary" style="font-size:14px;line-height:1.55;">
+              Scan the printed Event Pass QR to make it fresh immediately. This ends its old live event, clears the old host and Event Pass NFC owner, removes duplicate QR links to the same pass, and cancels unfinished activation sessions.
+            </div>
+            <div class="secondary" style="font-size:13px;line-height:1.5;">
+              Check-ins, disclosures, event history, the printed QR code, and sponsored-pass settings stay saved. The camera stops after one successful scan.
+            </div>
+            ${freshened ? `
+              <div class="event-pass-scanner-status" data-tone="ok">
+                <strong>${esc(freshened.code)} is fresh.</strong><br>
+                ${freshened.endedCount ? `Ended ${freshened.endedCount} old event${freshened.endedCount === 1 ? '' : 's'}. ` : 'No live event needed ending. '}
+                ${freshened.nfcReset ? 'Old Event Pass NFC owner cleared. ' : 'No claimed Event Pass NFC owner was attached. '}
+                ${freshened.clearedCount > 1 ? `Cleared ${freshened.clearedCount} QR aliases.` : 'Printed QR preserved.'}
+              </div>
+            ` : ''}
+          </div>
+          <div class="event-pass-freshener-controls">
+            <div class="row-actions">
+              <button class="btn primary" id="startEventPassScanner" data-event-pass-scanner-action ${state.actionKey === 'freshen_event_pass' ? 'disabled' : ''}>
+                <i data-lucide="scan-line"></i><span>Open camera</span>
+              </button>
+              <button class="btn soft" id="stopEventPassScanner" type="button">
+                <i data-lucide="square"></i><span>Stop</span>
+              </button>
+              <label class="btn soft" for="eventPassQrImage">
+                <i data-lucide="image-up"></i><span>Use QR photo</span>
+              </label>
+              <input id="eventPassQrImage" type="file" accept="image/*" capture="environment" hidden ${state.actionKey === 'freshen_event_pass' ? 'disabled' : ''}>
+            </div>
+            <video id="eventPassScannerVideo" class="event-pass-camera" playsinline muted></video>
+            <canvas id="eventPassScannerCanvas" hidden></canvas>
+            <div id="eventPassScannerStatus" class="event-pass-scanner-status" data-tone="${freshened ? 'ok' : ''}">
+              ${freshened ? `${esc(freshened.code)} is ready for the next host. Scan another whenever you are ready.` : 'Open the rear camera, use a QR photo, or enter the code below.'}
+            </div>
+            <form id="eventPassManualForm" class="row-actions">
+              <input id="eventPassManualCode" class="field" autocomplete="off" placeholder="Event Pass code or QR URL" aria-label="Event Pass code or QR URL" style="flex:1 1 220px;">
+              <button class="btn primary" type="submit" data-event-pass-scanner-action ${state.actionKey === 'freshen_event_pass' ? 'disabled' : ''}>
+                <i data-lucide="rotate-ccw"></i><span>Freshen now</span>
+              </button>
+            </form>
+          </div>
+        </div>
         <div class="section-head">
           <div>
             <h2>Agent Rel8tionChip QR Printing</h2>
