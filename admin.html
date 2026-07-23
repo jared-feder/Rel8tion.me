@@ -52,38 +52,11 @@
   <main class="boot" aria-live="polite">
     <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion">
     <div>Opening REL8TION COMMAND</div>
-    <p>Loading the admin dashboard without changing this URL.</p>
+    <p>Loading the full admin dashboard.</p>
   </main>
   <script>
-    (async () => {
-      const target = `/apps/rel8tion-app/admin.html${window.location.search}${window.location.hash}`;
-      try {
-        const response = await fetch(target, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Admin app returned ${response.status}`);
-        const html = await response.text();
-        document.open();
-        document.write(html);
-        document.close();
-      } catch (error) {
-        document.body.textContent = '';
-        const shell = document.createElement('main');
-        shell.className = 'boot';
-        const logo = document.createElement('img');
-        logo.src = 'https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png';
-        logo.alt = 'Rel8tion';
-        const title = document.createElement('div');
-        title.textContent = 'Admin dashboard could not load.';
-        const detail = document.createElement('p');
-        detail.textContent = String(error && error.message ? error.message : error);
-        const action = document.createElement('p');
-        const link = document.createElement('a');
-        link.href = target;
-        link.textContent = 'Open the dashboard directly';
-        action.appendChild(link);
-        shell.append(logo, title, detail, action);
-        document.body.appendChild(shell);
-      }
-    })();
+    const target = `/apps/rel8tion-app/admin.html${window.location.search}${window.location.hash}`;
+    window.location.replace(target);
   </script>
 </body>
 </html>
