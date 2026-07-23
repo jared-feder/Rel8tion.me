@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-23: Outreach cap adjustment
+
+- `[IMPLEMENTED]` Production `send-agent-outreach` caps are 5 per run, 20 per rolling hour, and 100 per rolling 24 hours. The 2026-07-23 dry run inspected 9 future candidates and sent nothing; no old, manual, or past-event backlog was released.
+- `[IMPLEMENTED]` The opt-out health gate remains enabled and is currently blocking sends: 281 seven-day outreach sends, 23 opt-outs (8.19%), against the 1% maximum rate with a 20-send minimum. The same dry run reported 0 sends in the previous hour and 14 in the previous 24 hours.
+
 ## 2026-07-20: Three-device shared open-house coverage
 
 - `[IMPLEMENTED]` One live open house may have up to three connected coverage devices: one Event Pass carried by the host agent, one Event Pass carried by the assigned loan officer, and one stationary Smart Sign or Loan Officer Coverage Sign.
