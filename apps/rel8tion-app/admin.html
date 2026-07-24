@@ -1865,6 +1865,13 @@
       return Boolean(thread?.queue_row_id || thread?.agent_name || thread?.agent_phone || thread?.agent_phone_normalized);
     }
 
+    function isUnlinkedAndroidThread(thread) {
+      const android = thread?.raw_inbound === true ||
+        thread?.account_sid === 'android_gateway' ||
+        String(thread?.latest_message_sid || '').startsWith('raw-android:');
+      return android && !(thread?.queue_row_id && (thread?.agent_name || thread?.agent_phone || thread?.agent_phone_normalized));
+    }
+
     function isHandledThread(thread) {
       return ['interested', 'confirmed_open_house', 'accepted_open_house', 'drip_scheduled'].includes(thread?.review_status);
     }
@@ -2011,6 +2018,7 @@
     function filteredInbox() {
       const query = state.query.trim().toLowerCase();
       return state.inbox.filter((thread) => {
+        if (isUnlinkedAndroidThread(thread)) return false;
         if (query) return outreachThreadHaystack(thread).includes(query);
         return passesOutreachFilter(thread);
       });
@@ -2022,7 +2030,7 @@
 
     function latestInboundThreads(limit = 8) {
       return [...(state.inbox || [])]
-        .filter((thread) => thread.direction !== 'outbound' && (isLinkedOutreachThread(thread) || thread.raw_inbound))
+        .filter((thread) => thread.direction !== 'outbound' && isLinkedOutreachThread(thread) && !isUnlinkedAndroidThread(thread))
         .sort(newestFirst)
         .slice(0, limit);
     }
