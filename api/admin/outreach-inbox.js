@@ -21,6 +21,23 @@ function phoneDigits(value) {
   return digits;
 }
 
+function isAndroidInboxRow(row) {
+  return row?.raw_inbound === true ||
+    row?.account_sid === 'android_gateway' ||
+    String(row?.latest_message_sid || '').startsWith('raw-android:');
+}
+
+function hasAgentAssociation(row) {
+  return Boolean(
+    row?.queue_row_id &&
+    (row?.agent_name || row?.agent_phone || row?.agent_phone_normalized)
+  );
+}
+
+function shouldShowInboxRow(row) {
+  return !isAndroidInboxRow(row) || hasAgentAssociation(row);
+}
+
 function sortCounts(rows) {
   const counts = {
     all: rows.length,
@@ -163,12 +180,13 @@ async function rawInboundToInboxRows(rawRows) {
   const rows = Array.isArray(rawRows) ? rawRows : [];
   const queueByPhone = await loadQueueRowsByPhone(rows.map((row) => row.from_phone));
 
-  return rows.map((row) => {
+  return rows.flatMap((row) => {
     const fromPhoneNormalized = phoneDigits(row.from_phone);
     const queue = fromPhoneNormalized ? queueByPhone.get(fromPhoneNormalized) || null : null;
-    return {
-      thread_key: queue?.id || `raw-android:${row.id}`,
-      queue_row_id: queue?.id || null,
+    if (!queue?.id || !(queue.agent_name || queue.agent_phone || queue.agent_phone_normalized)) return [];
+    return [{
+      thread_key: queue.id,
+      queue_row_id: queue.id,
       latest_reply_id: null,
       latest_raw_inbound_id: row.id,
       last_reply_at: row.created_at,
@@ -184,12 +202,10 @@ async function rawInboundToInboxRows(rawRows) {
       direction: 'inbound',
       open_house_id: queue?.open_house_id || null,
       raw_inbound: true,
-      raw_inbound_only: !queue?.id,
-      raw_inbound_warning: queue?.id
-        ? 'Android webhook row was visible before the reply thread caught up.'
-        : 'Android webhook row has no matched outreach queue row yet.',
-      ...(queue || {})
-    };
+      raw_inbound_only: false,
+      raw_inbound_warning: 'Android webhook row was visible before the reply thread caught up.',
+      ...queue
+    }];
   });
 }
 
@@ -205,8 +221,10 @@ async function loadInboxRows(limit) {
   const rawInboxRows = await rawInboundToInboxRows(rawAndroidRows);
 
   // Load inbound rows separately so a burst of outbound sends cannot push real replies out of REL8TION COMMAND.
-  // Include raw Android webhook rows so current replies remain visible even if queue linking fails.
-  return mergeRows(rawInboxRows, inboundRows, recentRows).slice(0, Math.max(fetchLimit, limit * 2));
+  // Include raw Android webhook rows only when their phone resolves to an actual outreach agent.
+  return mergeRows(rawInboxRows, inboundRows, recentRows)
+    .filter(shouldShowInboxRow)
+    .slice(0, Math.max(fetchLimit, limit * 2));
 }
 
 async function loadQueueRows(ids) {
@@ -329,13 +347,18 @@ async function loadThread(threadKey) {
   const queueMap = await loadQueueRows(thread.queue_row_id ? [thread.queue_row_id] : []);
   const queue = thread.queue_row_id ? queueMap.get(thread.queue_row_id) || null : null;
 
+  const enrichedThread = {
+    ...thread,
+    ...(queue || {}),
+    thread_key: thread.thread_key,
+    queue_row_id: thread.queue_row_id,
+    queue
+  };
+  if (!shouldShowInboxRow(enrichedThread)) return { thread: null, messages: [] };
+
   return {
     thread: {
-      ...thread,
-      ...(queue || {}),
-      thread_key: thread.thread_key,
-      queue_row_id: thread.queue_row_id,
-      queue
+      ...enrichedThread
     },
     messages: Array.isArray(messages) ? messages : []
   };
@@ -365,7 +388,7 @@ module.exports = async function handler(req, res) {
 
     const limit = clampLimit(readQuery(req, 'limit'));
     const rows = await loadInboxRows(limit);
-    const inbox = await enrichInboxRows(rows);
+    const inbox = (await enrichInboxRows(rows)).filter(shouldShowInboxRow);
 
     sendJson(res, 200, {
       ok: true,
