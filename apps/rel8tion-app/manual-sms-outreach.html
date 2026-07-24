@@ -47,11 +47,21 @@
     }
 
     .topbar {
+      position: sticky;
+      top: 8px;
+      z-index: 20;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 14px;
       margin-bottom: 18px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.82);
+      border-radius: 18px;
+      background: rgba(239, 250, 255, .88);
+      box-shadow: 0 14px 34px rgba(23, 34, 79, .12);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
     }
 
     .brand {
@@ -279,7 +289,7 @@
           <span>REL8TION COMMAND</span>
         </div>
       </div>
-      <a class="btn" href="/admin"><i data-lucide="layout-dashboard"></i><span>Admin</span></a>
+      <a class="btn" href="/admin"><i data-lucide="arrow-left"></i><span>Back to REL8TION COMMAND</span></a>
     </div>
 
     <section class="panel" id="loginPanel">
