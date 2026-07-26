@@ -1558,6 +1558,7 @@
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
       health: null,
+      relationships: [],
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
       drafts: readDrafts(),
@@ -2100,6 +2101,80 @@
       };
     }
 
+    function agentRelationship(row) {
+      if (!row) return null;
+      const phone = phoneDigits(row.agent_phone_normalized || row.phone_normalized || row.agent_phone || row.phone);
+      const email = String(row.agent_email || row.email || '').trim().toLowerCase();
+      const slug = String(row.agent_slug || row.slug || '').trim().toLowerCase();
+      const name = String(row.agent_name || row.name || '').trim().toLowerCase();
+      const brokerage = String(row.brokerage || row.company || '').trim().toLowerCase();
+      const relationships = state.relationships || [];
+      const findMatch = (predicate) => relationships.find((relationship) => {
+        const relationshipPhone = phoneDigits(relationship.phone_normalized || relationship.phone);
+        const relationshipEmail = String(relationship.email || '').trim().toLowerCase();
+        const relationshipSlug = String(relationship.agent_slug || '').trim().toLowerCase();
+        const relationshipName = String(relationship.name || relationship.display_name || '').trim().toLowerCase();
+        const relationshipBrokerage = String(relationship.company || relationship.brokerage || '').trim().toLowerCase();
+        return predicate({
+          relationshipPhone,
+          relationshipEmail,
+          relationshipSlug,
+          relationshipName,
+          relationshipBrokerage
+        });
+      }) || null;
+      if (phone) return findMatch(({ relationshipPhone }) => phone === relationshipPhone);
+      if (slug) return findMatch(({ relationshipSlug }) => slug === relationshipSlug);
+      if (email) return findMatch(({ relationshipEmail }) => email === relationshipEmail);
+      return findMatch(({ relationshipName, relationshipBrokerage }) => (
+        name && name === relationshipName && (!brokerage || !relationshipBrokerage || brokerage === relationshipBrokerage)
+      ));
+    }
+
+    function agentIsPinned(row) {
+      return Boolean(agentRelationship(row)?.pinned);
+    }
+
+    async function toggleAgentPin(key) {
+      const thread = findThread(key);
+      if (!thread) {
+        showToast('Agent record was not found.');
+        return;
+      }
+      const pinned = agentIsPinned(thread);
+      state.actionKey = actionId(pinned ? 'unpin_agent' : 'pin_agent', key);
+      render();
+      try {
+        const result = await api('/api/admin/agent-relationships', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: pinned ? 'unpin' : 'pin',
+            agent: {
+              id: thread.agent_id || thread.queue_row_id || thread.id,
+              agent_slug: thread.agent_slug || thread.slug || '',
+              name: thread.agent_name || thread.name,
+              phone: thread.agent_phone || thread.phone,
+              phone_normalized: thread.agent_phone_normalized || thread.phone_normalized,
+              email: thread.agent_email || thread.email,
+              brokerage: thread.brokerage || thread.company,
+              photo_url: thread.agent_photo_url || thread.photo_url
+            },
+            source_system: 'rel8tion_admin',
+            source_table: 'agent_outreach_queue',
+            source_record_id: `${thread.queue_row_id || thread.id}:${pinned ? 'unpin' : 'pin'}:${Date.now()}`
+          })
+        });
+        state.relationships = result.agents || state.relationships;
+        state.actionKey = '';
+        showToast(result.message || (pinned ? 'Agent unpinned.' : 'Agent pinned to the top.'));
+        render();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to update the agent pin.');
+        render();
+      }
+    }
+
     function reportRowToThread(row) {
       if (!row?.queue_row_id) return null;
       return {
@@ -2186,15 +2261,17 @@
         restoreUiState(uiSnapshot);
       }
       try {
-        const [dashboard, inbox, health] = await Promise.all([
+        const [dashboard, inbox, health, relationships] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
           api('/api/admin/outreach-inbox?limit=120'),
-          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
+          api('/api/admin/agent-relationships?limit=1000').catch((error) => ({ ok: false, error: error.message, agents: [] }))
         ]);
         state.command = dashboard.ok === false ? null : dashboard;
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
+        state.relationships = relationships.agents || [];
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -4000,6 +4077,9 @@ ${rowsHtml}
       document.querySelectorAll('[data-mark-interested]').forEach((button) => {
         button.addEventListener('click', () => markInterested(button.dataset.markInterested));
       });
+      document.querySelectorAll('[data-toggle-agent-pin]').forEach((button) => {
+        button.addEventListener('click', () => toggleAgentPin(button.dataset.toggleAgentPin));
+      });
       document.querySelectorAll('[data-confirm-open-house]').forEach((button) => {
         button.addEventListener('click', () => confirmOpenHouse(button.dataset.confirmOpenHouse));
       });
@@ -4413,6 +4493,8 @@ ${rowsHtml}
       const confirmed = row.review_status === 'confirmed_open_house' || row.review_status === 'accepted_open_house';
       const confirmBusy = state.actionKey === actionId('confirm_open_house', key);
       const markBusy = state.actionKey === actionId('mark_interested', key);
+      const pinned = agentIsPinned(thread);
+      const pinBusy = state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', key);
       const confirmLabel = confirmed ? 'Update date' : 'Confirm OH';
       return `
         <div class="data-row">
@@ -4442,6 +4524,9 @@ ${rowsHtml}
                 ${sendApprovalControls(thread, key)}
                 <button class="btn soft" data-mark-interested="${esc(key)}" ${optedOut || markBusy ? 'disabled' : ''}>
                   <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Interested'}</span>
+                </button>
+                <button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(key)}" ${pinBusy ? 'disabled' : ''}>
+                  <i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned' : 'Pin to top'}</span>
                 </button>
                 <button class="btn primary" data-confirm-open-house="${esc(key)}" ${optedOut || confirmBusy ? 'disabled' : ''}>
                   <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Saving...' : confirmLabel}</span>
@@ -4710,6 +4795,8 @@ ${rowsHtml}
       const confirmBusy = state.actionKey === actionId('confirm_open_house', key);
       const acceptBusy = state.actionKey === actionId('accept_open_house', key);
       const dripBusy = state.actionKey === actionId('schedule_drip', key);
+      const pinned = agentIsPinned(thread);
+      const pinBusy = state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', key);
       const hasVisit = Boolean(assignment.visit || assignment.report);
       const accepted = thread.review_status === 'accepted_open_house' || Boolean(assignment.participant);
       const confirmed = thread.review_status === 'confirmed_open_house' || (hasVisit && !accepted);
@@ -4728,9 +4815,14 @@ ${rowsHtml}
               <div class="mini-title">Open house workflow</div>
               <div class="small">${interested ? 'Reply looks positive or was marked interested.' : 'Use these controls when an agent says yes.'}</div>
             </div>
-            <button class="btn soft" data-mark-interested="${esc(key)}" ${disabled || markBusy ? 'disabled' : ''}>
-              <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Mark interested'}</span>
-            </button>
+            <div class="row-actions">
+              <button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(key)}" ${pinBusy ? 'disabled' : ''}>
+                <i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned to top' : 'Pin to top'}</span>
+              </button>
+              <button class="btn soft" data-mark-interested="${esc(key)}" ${disabled || markBusy ? 'disabled' : ''}>
+                <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Mark interested'}</span>
+              </button>
+            </div>
           </div>
           ${renderAcceptedSummary(thread)}
           <div class="action-grid">
@@ -5583,6 +5675,9 @@ ${rowsHtml}
       const facts = [money(row.price), row.beds ? `${row.beds} beds` : '', row.baths ? `${row.baths} baths` : ''].filter(Boolean).join(' | ');
       const updateKey = row.queue_row_id ? queueThreadKey({ id: row.queue_row_id }) : '';
       const updateBusy = updateKey && state.actionKey === actionId('confirm_open_house', updateKey);
+      const reportThread = reportRowToThread(row);
+      const pinned = agentIsPinned(reportThread);
+      const pinBusy = updateKey && state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', updateKey);
       const listedWindow = reportDisplayWindow(
         row.listed_open_start || (!row.confirmed_coverage_start ? row.scheduled_start : ''),
         row.listed_open_end || (!row.confirmed_coverage_end ? row.scheduled_end : '')
@@ -5606,6 +5701,7 @@ ${rowsHtml}
               ${badge(row.visit_status || 'confirmed', row.visit_status === 'cancelled' ? 'bad' : 'ok')}
               ${badge(row.review_status || 'confirmed open house', 'info')}
               ${badge(`${row.message_count || 0} messages`, row.message_count ? 'ok' : 'warn')}
+              ${updateKey ? `<button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(updateKey)}" ${pinBusy ? 'disabled' : ''}><i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned' : 'Pin to top'}</span></button>` : ''}
               ${updateKey ? `<button class="btn soft" data-confirm-open-house="${esc(updateKey)}" ${updateBusy ? 'disabled' : ''}><i data-lucide="calendar-days"></i><span>${updateBusy ? 'Saving...' : 'Update date'}</span></button>` : ''}
             </div>
             <div class="report-detail-grid">

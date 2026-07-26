@@ -243,6 +243,12 @@ Status labels used in this file:
 
 ## Supabase, Schema, And RLS
 
+- `[IMPLEMENTED]` Repository migration `20260726193000_agent_relationship_stream.sql` defines canonical `agent_relationships`, append-only `agent_relationship_events`, source-table ingestion triggers, historical backfill, and the service-role-only `agent_board_v1` view.
+- `[IMPLEMENTED]` `/api/admin/agent-relationships` provides authenticated board reads plus pin, unpin, note, and relationship-evidence synchronization actions without exposing the service-role key to the browser.
+- `[IMPLEMENTED]` REL8TION COMMAND outreach and confirmed-open-house surfaces include `Pin to top` controls backed by the shared relationship API.
+- `[IMPLEMENTED]` On 2026-07-26, migration `20260726193000_agent_relationship_stream.sql` was applied successfully to live Supabase project `nicanqrfqlbnlmnoernb`. A read-only audit found 2,651 relationship rows with 2,651 unique canonical keys, zero duplicate canonical-key groups, zero duplicate phone groups, and 5,444 relationship events with zero duplicate source-event groups.
+- `[IMPLEMENTED]` One email is shared by two distinct phone identities in the source data. Pin matching therefore prioritizes canonical key and phone before email so the shared email cannot redirect a pin to the wrong agent.
+- `[NEEDS VERIFICATION]` The relationship API and admin controls require deployment after the migration, followed by a live pin/note/read-back test.
 - `[IMPLEMENTED]` Browser code uses the public anon key in app config and standalone pages.
 - `[IMPLEMENTED]` Service-role serverless routes exist for Sponsored Event Pass, Loan Officer Coverage Sign, admin reset, admin actions, checkout, and selected privileged flows.
 - `[NEEDS VERIFICATION]` Live RLS policy state is not fully confirmed.
@@ -280,6 +286,7 @@ Routes:
 ```powershell
 npm run verify:routes
 npm run verify:production-routes
+npm run verify:agent-relationships
 ```
 
 Static app:

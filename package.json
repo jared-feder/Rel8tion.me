@@ -5,6 +5,7 @@
     "verify:agent-ranking-identity": "node scripts/verify-agent-ranking-identity.cjs",
     "verify:rel8tionos-api": "node scripts/verify-rel8tionos-api.cjs",
     "verify:kit-pricing": "node scripts/verify-open-house-kit-pricing.cjs",
+    "verify:agent-relationships": "node scripts/verify-agent-relationship-stream.cjs",
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:command-search": "node scripts/verify-command-search.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",

@@ -135,6 +135,11 @@ The agent owner dashboard validates the claimed NFC UID/agent pairing before loa
 
 Important tables and fields:
 
+- `[IMPLEMENTED]` `agent_relationships` is the canonical per-agent relationship record for identity, pin state, priority rank, pin reason, and last-contact state.
+- `[IMPLEMENTED]` `agent_relationship_events` is the deduplicated chronological relationship stream for outreach, replies, confirmed open houses, field visits, notes, pins, referrals, and REL8TION OS synchronization.
+- `[IMPLEMENTED]` `agent_board_v1` is the service-role-only, `security_invoker` board projection used by relation.me and REL8TION OS.
+- `[IMPLEMENTED]` `/api/admin/agent-relationships` is the privileged read/write boundary for the shared stream. Browser and desktop clients must not receive the Supabase service-role key.
+- `[PARTIAL]` REL8TION OS retains local pin/note storage as a rollout fallback and dual-writes to relation.me when its relationship-stream environment variables are configured. The local history migration must be run after the database migration and API deployment.
 - `[IMPLEMENTED]` `agents.slug` identifies agent profiles.
 - `[IMPLEMENTED]` `keys.uid` stores NFC UID rows; `keys.agent_slug` links claimed agent keychains by convention.
 - `[IMPLEMENTED]` `rel8tion_chip_inventory` stores printed agent/LO QR inventory.
