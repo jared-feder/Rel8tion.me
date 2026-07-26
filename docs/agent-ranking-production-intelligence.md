@@ -1,6 +1,6 @@
 # Agent Ranking / Production Intelligence
 
-Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and `identity_key` migrations were applied and verified on linked Supabase. The dashboard view now filters to trusted ListReports mappings with valid `identity_key`/phone and hides old bad-mapping rows without deleting stored history. As of 2026-07-03, blank numeric filter inputs are interpreted as no limit instead of zero, market values are canonicalized before filtering, stale browser filter responses are ignored, and ranking reads page through Supabase in 1,000-row chunks so campaign criteria do not hide or shuffle valid imported rows. Authenticated end-to-end upload testing still needs verification.
+Status: `[PARTIAL]` source exists in this repo. The linked Supabase schema was applied and catalog/advisor verified for the base objects and ListReports activity columns on 2026-06-28. The 2026-06-30 county/location, open-house match, and initial `identity_key` migrations were applied and verified on linked Supabase. On 2026-07-26, production current rankings were consolidated from 42,149 derived rows to 12,524 canonical rows while preserving 114,153 raw import-history rows. Identity is canonicalized at both the application and database layers so location variants upsert one current ranking. Authenticated end-to-end upload testing still needs verification.
 
 ## Purpose
 
@@ -19,6 +19,7 @@ It is not a scraping tool, login automation tool, consumer lead resale workflow,
 - Base schema migration: `supabase/migrations/20260628125530_agent_ranking_production_intelligence.sql`
 - Location/open-house migration: `supabase/migrations/20260630065516_agent_ranking_location_open_house_matching.sql`
 - Identity-key migration: `supabase/migrations/20260630075547_agent_ranking_identity_key.sql`
+- Canonical-identity consolidation: `supabase/migrations/20260726060928_consolidate_agent_ranking_identity.sql`
 
 The page uses the same admin UID/token headers as REL8TION COMMAND.
 
@@ -54,9 +55,9 @@ Rankings use `agent_rankings.identity_key`, not phone alone, as the database ups
 
 Identity format:
 
-`import:{normalized_agent_name}|{normalized_brokerage}|{normalized_phone}|{normalized_county_or_market}`
+`import:{normalized_agent_name}|{normalized_brokerage}|{normalized_phone}`
 
-Rows missing agent name or phone are skipped during final import and counted in the final import summary. Multiple agents sharing the same office/brokerage phone remain separate when their names, brokerages, or county/market values differ. Upload batches are deduped by `identity_key` before ranking upsert, and the admin API uses Supabase/PostgREST upsert with `on_conflict=identity_key`.
+Rows missing agent name or phone are skipped during final import and counted in the final import summary. Location is intentionally excluded, so the same agent in Nassau, Suffolk, Long Island, or another report market updates one current ranking. Multiple agents sharing the same office/brokerage phone remain separate because normalized agent name and brokerage remain in the identity. Upload batches are deduped by canonical `identity_key` before ranking upsert, the admin API uses Supabase/PostgREST upsert with `on_conflict=identity_key`, and a database trigger rewrites stale location-based keys before the unique index is checked.
 
 Final import summaries include uploaded rows, valid rows, skipped missing phone/name, duplicates skipped, new rankings inserted, existing rankings updated, and failed rows.
 
@@ -69,7 +70,7 @@ The dashboard list is intentionally stricter than raw storage. It shows only ran
 - Come from a trusted ListReports upload mapping with the core ListReports activity fields
 - Do not come from older mappings that treated buyside or recency columns as production volume, transaction count, sold listings, or average price
 
-Hidden rows are not deleted. They are excluded from the dashboard count and surfaced through the data-quality gate summary.
+The display layer retains a defensive duplicate collapse and data-quality summary, but production cleanup on 2026-07-26 left the current ranking table with 12,524 rows, 12,524 distinct identities, and zero missing identities. Historical uploaded rows remain in `agent_production_import_rows`, not in the current-ranking table.
 
 ## Location Intelligence
 

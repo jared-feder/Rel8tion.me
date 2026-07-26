@@ -939,7 +939,7 @@ async function postRowsResilient(path, rows, options = {}, chunkSize = 100) {
 }
 
 function rankingIdentity(row) {
-  return row.identity_key || identityKeyForAgentRanking(row);
+  return identityKeyForAgentRanking(row) || row.identity_key;
 }
 
 function displayDedupeKey(row) {
@@ -1150,7 +1150,7 @@ async function upsertRankings(rankings) {
   const existingIdentityKeys = new Set((existing || []).map((row) => row.identity_key).filter(Boolean));
   const payloadRows = deduped.rows.map((ranking) => ({
     ...ranking,
-    identity_key: ranking.identity_key || identityKeyForAgentRanking(ranking)
+    identity_key: identityKeyForAgentRanking(ranking) || ranking.identity_key
   })).filter((ranking) => ranking.identity_key);
 
   const result = await postRowsResilient('agent_rankings?on_conflict=identity_key', payloadRows, {
