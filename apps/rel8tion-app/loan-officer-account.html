@@ -29,9 +29,12 @@
     const deviceLockSetupRequested=new URLSearchParams(location.search).get('device_lock')==='setup';
     const sections=['loading','setup','login','phoneLockSetup','phoneUnlock','pinSetup','pinUnlock'];
     const status=document.getElementById('status');
+    const DASHBOARD_UNLOCK_TTL_MS=12*60*60*1000;
     function show(id){sections.forEach((name)=>document.getElementById(name).classList.toggle('hide',name!==id));status.textContent='';status.className='status'}
     function message(text,error=false){status.textContent=text;status.className=`status${error?' error':''}`}
     function lockKey(userId){return `rel8tion_lo_quick_lock:${userId}`}
+    function dashboardUnlockKey(userId){return `rel8tion_lo_dashboard_unlock:${userId}`}
+    function markDashboardUnlocked(session){sessionStorage.setItem(dashboardUnlockKey(session.user.id),JSON.stringify({userId:session.user.id,unlockedAt:Date.now(),expiresAt:Date.now()+DASHBOARD_UNLOCK_TTL_MS}))}
     async function pinDigest(pin,salt){const bytes=new TextEncoder().encode(`${salt}:${pin}`);const digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}
     function loadLock(session){try{return JSON.parse(localStorage.getItem(lockKey(session.user.id))||'null')}catch{return null}}
     function bytesToBase64url(bytes){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
@@ -65,6 +68,7 @@
       const response=await fetch('/api/loan-officer-account',{headers:{Authorization:`Bearer ${session.access_token}`}});
       const data=await response.json().catch(()=>({}));
       if(!response.ok||!data.profile?.uid)throw new Error(data.error||'Approved loan officer profile not found.');
+      markDashboardUnlocked(session);
       location.replace(`/field-dashboard?role=loan_officer&uid=${encodeURIComponent(data.profile.uid)}`);
     }
     async function boot(){
@@ -83,11 +87,16 @@
       const {data}=await client.auth.getSession();
       if(data.session){
         if(mode==='setup'||location.hash.includes('type=invite')||location.hash.includes('type=recovery'))show('setup');
-        else await continueWithQuickLock(data.session);
+        else if(loadLock(data.session))await continueWithQuickLock(data.session);
+        else{
+          await client.auth.signOut({scope:'local'});
+          show('login');
+          message('Sign in with your password to unlock this browser.');
+        }
       }else show('login');
     }
-    document.getElementById('setupForm').addEventListener('submit',async(event)=>{event.preventDefault();const password=document.getElementById('newPassword').value;const confirm=document.getElementById('confirmPassword').value;if(password!==confirm){message('The passwords do not match.',true);return}message('Saving your password...');const {data,error}=await client.auth.updateUser({password});if(error){message(error.message,true);return}await continueWithQuickLock(data.session||(await client.auth.getSession()).data.session)});
-    document.getElementById('loginForm').addEventListener('submit',async(event)=>{event.preventDefault();message('Signing in...');const {data,error}=await client.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(error){message(error.message,true);return}await continueWithQuickLock(data.session)});
+    document.getElementById('setupForm').addEventListener('submit',async(event)=>{event.preventDefault();const password=document.getElementById('newPassword').value;const confirm=document.getElementById('confirmPassword').value;if(password!==confirm){message('The passwords do not match.',true);return}message('Saving your password...');const {data,error}=await client.auth.updateUser({password});if(error){message(error.message,true);return}const session=data.session||(await client.auth.getSession()).data.session;if(deviceLockSetupRequested)await continueWithQuickLock(session);else await openDashboard(session)});
+    document.getElementById('loginForm').addEventListener('submit',async(event)=>{event.preventDefault();message('Signing in...');const {data,error}=await client.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(error){message(error.message,true);return}await openDashboard(data.session)});
     document.getElementById('setupPhoneLock').addEventListener('click',()=>{message('Follow your device prompt...');enrollPhoneLock().catch((error)=>message(error.name==='NotAllowedError'?'Device lock setup was canceled.':error.message,true))});
     document.getElementById('unlockWithPhone').addEventListener('click',()=>{message('Follow your device prompt...');unlockPhone().catch((error)=>message(error.name==='NotAllowedError'?'Device unlock was canceled.':error.message,true))});
     document.getElementById('skipDeviceLock').addEventListener('click',()=>openDashboard(window.currentLoanOfficerSession).catch((error)=>message(error.message,true)));
@@ -97,8 +106,8 @@
     document.getElementById('backToPhoneUnlock').addEventListener('click',()=>show('phoneUnlock'));
     document.getElementById('pinSetupForm').addEventListener('submit',async(event)=>{event.preventDefault();const pin=document.getElementById('newPin').value;const confirm=document.getElementById('confirmPin').value;if(!/^\d{4}$/.test(pin)){message('Use exactly four digits.',true);return}if(pin!==confirm){message('The PINs do not match.',true);return}const salt=crypto.randomUUID();localStorage.setItem(lockKey(window.currentLoanOfficerSession.user.id),JSON.stringify({salt,hash:await pinDigest(pin,salt)}));await openDashboard(window.currentLoanOfficerSession).catch((error)=>message(error.message,true))});
     document.getElementById('pinUnlockForm').addEventListener('submit',async(event)=>{event.preventDefault();const lock=loadLock(window.currentLoanOfficerSession);const hash=await pinDigest(document.getElementById('unlockPin').value,lock.salt);if(hash!==lock.hash){message('That PIN did not match.',true);return}await openDashboard(window.currentLoanOfficerSession).catch((error)=>message(error.message,true))});
-    document.getElementById('usePassword').addEventListener('click',async()=>{await client.auth.signOut();show('login')});
-    document.getElementById('usePasswordFromPhone').addEventListener('click',async()=>{await client.auth.signOut();show('login')});
+    document.getElementById('usePassword').addEventListener('click',async()=>{await client.auth.signOut({scope:'local'});show('login')});
+    document.getElementById('usePasswordFromPhone').addEventListener('click',async()=>{await client.auth.signOut({scope:'local'});show('login')});
     document.getElementById('forgot').addEventListener('click',async()=>{const email=document.getElementById('email').value.trim();if(!email){message('Enter your approved email address first.',true);return}message('Creating your secure account link...');try{const response=await fetch('/api/loan-officer-access-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Unable to send the secure link.');message(payload.delivery||'Check the text messages on your approved mobile number.')}catch(error){message(error.message||'Unable to send the secure link.',true)}});
     boot().catch((error)=>{show('login');message(error.message||'Unable to open your account.',true)});
   </script>

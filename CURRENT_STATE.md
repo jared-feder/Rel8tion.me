@@ -311,6 +311,13 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` Loan officer registration requires a headshot, compresses it in the browser, stores it in the existing public `verified-assets` bucket through a server route, and carries the image into the approved verified profile.
 - `[IMPLEMENTED]` After the first secure password setup, a loan officer can create a four-digit quick-unlock PIN stored as a salted hash on that phone. It is a device convenience lock, while the Supabase password remains the actual account credential and recovery path.
 - `[IMPLEMENTED]` The loan officer dashboard is phone-first with a fixed thumb navigation bar, compact mobile cards/header, larger touch targets, 16px form controls, safe-area spacing, and horizontal overflow protection.
+
+### 2026-07-26 - Loan officer dashboard duplicate and return-access fix
+
+- `[IMPLEMENTED]` Loan-officer dashboard visits are collapsed by live event, outreach queue row, or exact listing/time identity before rendering. Separate historical visit rows for the same assigned open house no longer produce duplicate overview or Open Houses + Buyers cards.
+- `[IMPLEMENTED]` The general field-visit create route reuses an existing non-cancelled visit with the same event, outreach queue row, or exact listing/time and reuses the same participant responsibility assignment. Repeated scheduling requests no longer create another active copy.
+- `[IMPLEMENTED]` Returning loan-officer dashboard access requires a current browser-tab unlock marker created only after the account API validates a password, device-lock, or device-PIN unlock. A remembered Supabase session without a configured quick lock returns to password login instead of opening automatically.
+- `[IMPLEMENTED]` Direct loan-officer-mode field-dashboard URLs no longer fall back to a public profile UID when signed identity validation fails. The dashboard also exposes an explicit local Sign Out action.
 ### 2026-07-17 - Editable loan officer identity and complete visit cards
 
 - `[IMPLEMENTED]` Authenticated loan officers can edit name, login email, phone, company, title, and headshot from the dashboard Account section. Email changes synchronize the Supabase Auth login and verified profile.
