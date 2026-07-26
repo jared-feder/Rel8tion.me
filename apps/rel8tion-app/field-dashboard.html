@@ -537,7 +537,7 @@
         <aside class="hidden rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-sm lg:sticky lg:top-4 lg:block lg:self-start">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Dashboard Sections</div>
           <nav class="mt-3 grid gap-2">
-            ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : 'Open Houses + Buyers')}</a>`).join('')}
+            ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : label === 'Houses' ? 'Open Houses + Buyers' : label)}</a>`).join('')}
           </nav>
         </aside>
         <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
