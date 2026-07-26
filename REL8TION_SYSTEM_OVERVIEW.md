@@ -139,7 +139,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `agent_relationship_events` is the deduplicated chronological relationship stream for outreach, replies, confirmed open houses, field visits, notes, pins, referrals, and REL8TION OS synchronization.
 - `[IMPLEMENTED]` `agent_board_v1` is the service-role-only, `security_invoker` board projection used by relation.me and REL8TION OS.
 - `[IMPLEMENTED]` `/api/admin/agent-relationships` is the privileged read/write boundary for the shared stream. Browser and desktop clients must not receive the Supabase service-role key.
-- `[PARTIAL]` REL8TION OS retains local pin/note storage as a rollout fallback and dual-writes to relation.me when its relationship-stream environment variables are configured. The local history migration must be run after the database migration and API deployment.
+- `[IMPLEMENTED]` REL8TION OS uses a dedicated production credential to read and dual-write the relation.me relationship stream. The one-time local history migration completed on 2026-07-26 for 404 worked-with agents and one saved note; local pin/note storage remains only as an offline fallback.
 - `[IMPLEMENTED]` `agents.slug` identifies agent profiles.
 - `[IMPLEMENTED]` `keys.uid` stores NFC UID rows; `keys.agent_slug` links claimed agent keychains by convention.
 - `[IMPLEMENTED]` `rel8tion_chip_inventory` stores printed agent/LO QR inventory.
