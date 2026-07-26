@@ -1832,6 +1832,11 @@
       }).format(date);
     }
 
+    function phoneDigits(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+    }
+
     function fmtPhone(value) {
       const digits = String(value || '').replace(/\D/g, '');
       const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;

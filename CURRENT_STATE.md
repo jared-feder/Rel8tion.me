@@ -4,6 +4,10 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-26: REL8TION COMMAND phone-unlock recovery
+
+- `[IMPLEMENTED]` REL8TION COMMAND now defines the phone-number normalization helper used by agent relationship matching. The missing helper no longer interrupts dashboard rendering after a successful phone/PIN unlock or sends the owner back to the fallback admin-credential screen.
+
 ## 2026-07-26: Agent Ranking canonical identity consolidation
 
 - `[IMPLEMENTED]` Production `agent_rankings` was consolidated from 42,149 derived rows to 12,524 canonical agent rows. The 16,386 location-variant duplicates plus 13,239 hidden legacy/untrusted derived rows were removed from the current ranking table; all 114,153 normalized raw import-history rows remain in `agent_production_import_rows`.
