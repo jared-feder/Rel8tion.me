@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-26: Loan-officer desktop access
+
+- `[IMPLEMENTED]` A signed-in loan officer without a browser-local device lock now opens the dashboard directly. Device lock is optional and its UI now correctly names supported device security such as Windows Hello, Face ID, fingerprint, or a device screen lock.
+- `[IMPLEMENTED]` The loan-officer desktop sidebar labels the account section `Profile`; only the houses section is labeled `Open Houses + Buyers`.
+
 ## 2026-07-20: Three-device shared open-house coverage
 
 - `[IMPLEMENTED]` One live open house may have up to three connected coverage devices: one Event Pass carried by the host agent, one Event Pass carried by the assigned loan officer, and one stationary Smart Sign or Loan Officer Coverage Sign.
