@@ -45,6 +45,8 @@ for (const required of [
 }
 
 async function verifyApiContract() {
+  const originalRelationshipToken = process.env.REL8TION_RELATIONSHIP_TOKEN;
+  process.env.REL8TION_RELATIONSHIP_TOKEN = 'relationship-verification-token';
   const calls = [];
   const relationship = {
     id: 'relationship-1',
@@ -70,7 +72,7 @@ async function verifyApiContract() {
     if (request === 'crypto') return require('crypto');
     if (request === '../../lib/admin-auth') {
       return {
-        adminAuthorized: () => ({ ok: true }),
+        adminAuthorized: () => ({ ok: false, error: 'Unauthorized.' }),
         assertAdminConfig: () => {},
         sendJson: (res, status, payload) => res.status(status).json(payload),
         supabaseRest: mockRest
@@ -93,6 +95,7 @@ async function verifyApiContract() {
   };
   await apiModule.exports({
     method: 'POST',
+    headers: { 'x-admin-token': 'relationship-verification-token' },
     query: {},
     body: {
       action: 'pin',
@@ -108,6 +111,11 @@ async function verifyApiContract() {
   }
   if (!calls.some((call) => call.path === 'agent_relationship_events')) {
     throw new Error('Relationship API pin contract did not append an event.');
+  }
+  if (originalRelationshipToken === undefined) {
+    delete process.env.REL8TION_RELATIONSHIP_TOKEN;
+  } else {
+    process.env.REL8TION_RELATIONSHIP_TOKEN = originalRelationshipToken;
   }
 }
 

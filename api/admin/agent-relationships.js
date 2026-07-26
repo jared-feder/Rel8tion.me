@@ -1,5 +1,7 @@
-const { createHash, randomUUID } = require('crypto');
+const { createHash, randomUUID, timingSafeEqual } = require('crypto');
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+
+const RELATIONSHIP_TOKEN = process.env.REL8TION_RELATIONSHIP_TOKEN || '';
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -65,6 +67,26 @@ function enc(value) {
 
 function one(rows) {
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+function relationshipAuthorized(req) {
+  const provided = String(
+    req.headers?.['x-admin-token']
+    || req.headers?.['X-Admin-Token']
+    || req.headers?.authorization
+    || ''
+  ).replace(/^Bearer\s+/i, '').trim();
+  if (RELATIONSHIP_TOKEN && provided) {
+    const expectedBuffer = Buffer.from(RELATIONSHIP_TOKEN);
+    const providedBuffer = Buffer.from(provided);
+    if (
+      expectedBuffer.length === providedBuffer.length
+      && timingSafeEqual(expectedBuffer, providedBuffer)
+    ) {
+      return { ok: true, method: 'relationship_token' };
+    }
+  }
+  return adminAuthorized(req);
 }
 
 async function findRelationship(payload) {
@@ -219,8 +241,8 @@ async function mutateRelationship(body) {
 
 module.exports = async function handler(req, res) {
   try {
-    assertAdminConfig();
-    const auth = adminAuthorized(req);
+    if (!RELATIONSHIP_TOKEN) assertAdminConfig();
+    const auth = relationshipAuthorized(req);
     if (!auth.ok) {
       sendJson(res, 401, { ok: false, error: auth.error });
       return;
