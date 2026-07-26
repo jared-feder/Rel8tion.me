@@ -8,6 +8,7 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` The printed agent QR resolver may hand a deliberately converted code from `/c/:code` to `/pass?code=...` only when the original `rel8tion_chip_inventory` row is retired and a matching `smart_sign_inventory` Event Pass row carries the original inventory id in explicit conversion metadata.
 - `[IMPLEMENTED]` This narrow compatibility path preserves `smart_sign_inventory.public_code` as the Event Pass source of truth and does not change normal linked or unassigned agent QR behavior.
+- `[VERIFIED]` Production codes `ra0034c0` and `ra00cff8` were converted by owner request on 2026-07-26. Their original printed-agent rows are retired, their matching Event Pass inventory rows are unclaimed single-event passes, each printed `/c/:code` URL redirects to its matching `/pass?code=...` route, and both live pass pages return HTTP 200.
 
 ## 2026-07-26: REL8TION COMMAND phone-unlock recovery
 
