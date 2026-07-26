@@ -12,10 +12,8 @@
     html,body{max-width:100%;overflow-x:hidden}
     button,a,input,select,textarea{touch-action:manipulation}
     @media(max-width:639px){
-      body{padding-bottom:78px}
       #app{padding:14px!important;border-radius:24px!important}
       #profileLabel{max-width:62vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem}
-      .lo-mobile-nav{padding-bottom:max(10px,env(safe-area-inset-bottom))}
       article,section{scroll-margin-top:16px}
       input,select,textarea{font-size:16px!important}
     }
@@ -603,7 +601,7 @@
             ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : label === 'Houses' ? 'Open Houses + Buyers' : label)}</a>`).join('')}
           </nav>
         </aside>
-        <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
+        <nav class="lo-mobile-nav sticky top-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
           ${items.map(([id,label])=>`<a href="${esc(dashboardSectionHref(id))}" class="flex min-h-12 items-center justify-center rounded-2xl px-1 text-center text-[11px] font-black ${id===active?'bg-sky-600 text-white':'text-slate-600'}">${esc(label)}</a>`).join('')}
         </nav>
       `;

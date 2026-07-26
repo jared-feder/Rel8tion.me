@@ -121,6 +121,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
 - `[IMPLEMENTED]` `/agent-dashboard` is the live event dashboard for the host agent.
 - `[PARTIAL]` `/loan-officer-dashboard` is the clean LO operations alias; `/lo-field-dashboard` remains a backward-compatible alias.
+- `[IMPLEMENTED 2026-07-26]` The loan-officer dashboard's mobile section menu appears at the top of the dashboard and remains sticky while scrolling instead of occupying the bottom of the viewport.
 - `[PARTIAL]` `/nmb-activate` and `/nmb-verified` are loan officer tag/profile pages. Formal remote LO coverage management is not built.
 - `[IMPLEMENTED]` `/c/:code` and `/chip/:code` resolve printed Rel8tionChip QR inventory.
 - `[IMPLEMENTED]` `/a` redirects legacy/public profile traffic to `/b`.
