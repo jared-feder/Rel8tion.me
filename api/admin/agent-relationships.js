@@ -172,7 +172,28 @@ async function loadBoard(limitValue) {
     rows.push(...page);
     if (page.length < pageSize) break;
   }
-  return rows.slice(0, limit);
+  const visibleRows = rows.slice(0, limit);
+  const historicalEvents = await supabaseRest(
+    'agent_relationship_events?event_type=in.(historical_open_house_confirmed,historical_open_house_removed)&select=id,relationship_id,event_type,occurred_at&order=occurred_at.asc&limit=5000'
+  );
+  const latestHistoricalState = new Map();
+  for (const event of historicalEvents) {
+    if (event.relationship_id) latestHistoricalState.set(event.relationship_id, event);
+  }
+  return visibleRows.map((row) => {
+    const historicalEvent = latestHistoricalState.get(row.id);
+    const historicalOpenHouseAgent = historicalEvent?.event_type === 'historical_open_house_confirmed';
+    const relationshipSources = Array.isArray(row.relationship_sources) ? row.relationship_sources : [];
+    return {
+      ...row,
+      historical_open_house_agent: historicalOpenHouseAgent,
+      historical_open_houses: historicalOpenHouseAgent ? 1 : 0,
+      worked_with_agent: Boolean(row.worked_with_agent || historicalOpenHouseAgent),
+      relationship_sources: historicalOpenHouseAgent
+        ? [...new Set([...relationshipSources, 'historical_open_house'])]
+        : relationshipSources.filter((source) => source !== 'historical_open_house')
+    };
+  });
 }
 
 async function loadScheduledOpenHouses(fromValue, toValue) {
@@ -311,6 +332,21 @@ async function mutateRelationship(body) {
       ));
     }
     return { relationship, events: events.filter(Boolean), message: `${relationship.display_name} was synchronized.` };
+  }
+
+  if (action === 'historical_open_house') {
+    const worked = body.worked !== false;
+    const event = await recordEvent(
+      relationship.id,
+      body,
+      worked ? 'historical_open_house_confirmed' : 'historical_open_house_removed',
+      worked ? 'Historical open house worked together' : 'Historical open-house marker removed'
+    );
+    return {
+      relationship,
+      event,
+      message: `${relationship.display_name} ${worked ? 'was added to' : 'was removed from'} historical open-house matches.`
+    };
   }
 
   const error = new Error('Unsupported relationship action.');

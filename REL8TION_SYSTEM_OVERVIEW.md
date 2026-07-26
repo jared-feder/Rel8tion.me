@@ -260,3 +260,5 @@ The WordPress home page can submit agent Event Pass requests to the service-role
 ## REL8TION OS Schedule Projection
 
 `field_demo_visits` remains the source of truth for confirmed open-house coverage. REL8TION OS reads a narrow day-window projection through `/api/admin/agent-relationships?view=schedule&from=...&to=...`, authenticated by the dedicated relationship-stream token. The projection excludes cancelled visits and enriches display-only agent and address fields from `agent_outreach_queue` and `open_houses`; it does not create, update, or delete schedule records.
+
+Historical open houses that were completed before the field-visit workflow are represented by append-only `agent_relationship_events` markers rather than fabricated visit rows. The relationship API projects the latest confirmed/removed marker into `historical_open_house_agent`, keeping automatic visit evidence and user-confirmed legacy history distinct.

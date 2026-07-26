@@ -422,3 +422,4 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` The existing token-protected `/api/admin/agent-relationships` integration now exposes a read-only `view=schedule` mode for a caller-supplied time window.
 - `[IMPLEMENTED]` Scheduled, non-cancelled `field_demo_visits` are returned with their canonical coverage times, agent identity, and property address enriched from the linked outreach queue and open-house listing.
 - `[SECURITY]` The schedule view uses the existing dedicated `REL8TION_RELATIONSHIP_TOKEN`; it does not expose the general admin dashboard or allow schedule mutations.
+- `[IMPLEMENTED]` Older open houses that predate `field_demo_visits` can be preserved as append-only `historical_open_house_confirmed` relationship events. A later removal is also append-only, so the audit history is retained.

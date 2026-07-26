@@ -64,6 +64,7 @@ async function verifyApiContract() {
       return [{ ...relationship, ...JSON.parse(options.body) }];
     }
     if (requestPath === 'agent_relationship_events') return [{ id: 'event-1' }];
+    if (requestPath.startsWith('agent_relationship_events?event_type=in.')) return [];
     if (requestPath.startsWith('agent_board_v1?')) return [{ ...relationship, name: relationship.display_name, pinned: true }];
     if (requestPath.startsWith('field_demo_visits?')) {
       return [{
@@ -132,6 +133,23 @@ async function verifyApiContract() {
   }
   if (!calls.some((call) => call.path === 'agent_relationship_events')) {
     throw new Error('Relationship API pin contract did not append an event.');
+  }
+
+  responsePayload = null;
+  await apiModule.exports({
+    method: 'POST',
+    headers: { 'x-admin-token': 'relationship-verification-token' },
+    query: {},
+    body: {
+      action: 'historical_open_house',
+      worked: true,
+      agent: { name: 'Test Agent', phone: '(516) 555-1212' },
+      source_record_id: 'verification-historical-open-house',
+      include_board: false
+    }
+  }, response);
+  if (response.statusCode !== 200 || responsePayload?.event?.id !== 'event-1') {
+    throw new Error('Relationship API historical open-house contract did not append an event.');
   }
 
   responsePayload = null;
