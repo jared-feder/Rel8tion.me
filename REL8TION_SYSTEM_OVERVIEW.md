@@ -256,3 +256,7 @@ Every Monday at 9 AM America/New_York, the protected weekly production job close
 # Agent Event Pass requests
 
 The WordPress home page can submit agent Event Pass requests to the service-role-backed `/api/event-pass-request` route. Agent identity and open-house details are stored in `event_pass_requests`. If the agent requests coverage from an existing loan specialist, that professional's name, company, phone, and email are stored for sponsorship follow-up; otherwise the request routes to NMB by default. Submission does not itself assign coverage or grant buyer visibility.
+
+## REL8TION OS Schedule Projection
+
+`field_demo_visits` remains the source of truth for confirmed open-house coverage. REL8TION OS reads a narrow day-window projection through `/api/admin/agent-relationships?view=schedule&from=...&to=...`, authenticated by the dedicated relationship-stream token. The projection excludes cancelled visits and enriches display-only agent and address fields from `agent_outreach_queue` and `open_houses`; it does not create, update, or delete schedule records.

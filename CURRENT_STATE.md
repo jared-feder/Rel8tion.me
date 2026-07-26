@@ -416,3 +416,9 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` Summer annual sales copy shows the first-year comparison: $547 for REL8TION plus $439 for the standalone Website Builder equals $986, making the $499 annual bundle a $487 first-year savings.
 - `[IMPLEMENTED]` The Open House Kit image is restored above the WordPress pricing cards. Paid annual orders generate a deterministic `R8WEB-*` promo code and the secured kit dashboard launches `my.rel8tion.me/get-started` directly with that code in the URL so the root redirect cannot discard it.
 - `[IMPLEMENTED]` The Website Builder get-started page reads the `promo` query parameter, populates the promo field, and automatically verifies it instead of requiring the buyer to retype it.
+
+## 2026-07-26 REL8TION OS Scheduled Open-House Feed
+
+- `[IMPLEMENTED]` The existing token-protected `/api/admin/agent-relationships` integration now exposes a read-only `view=schedule` mode for a caller-supplied time window.
+- `[IMPLEMENTED]` Scheduled, non-cancelled `field_demo_visits` are returned with their canonical coverage times, agent identity, and property address enriched from the linked outreach queue and open-house listing.
+- `[SECURITY]` The schedule view uses the existing dedicated `REL8TION_RELATIONSHIP_TOKEN`; it does not expose the general admin dashboard or allow schedule mutations.

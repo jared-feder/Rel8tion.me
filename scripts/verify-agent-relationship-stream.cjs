@@ -65,6 +65,27 @@ async function verifyApiContract() {
     }
     if (requestPath === 'agent_relationship_events') return [{ id: 'event-1' }];
     if (requestPath.startsWith('agent_board_v1?')) return [{ ...relationship, name: relationship.display_name, pinned: true }];
+    if (requestPath.startsWith('field_demo_visits?')) {
+      return [{
+        id: 'visit-1',
+        outreach_queue_id: 'queue-1',
+        open_house_id: 'open-house-1',
+        scheduled_start: '2026-07-26T14:00:00.000Z',
+        scheduled_end: '2026-07-26T16:00:00.000Z',
+        status: 'scheduled'
+      }];
+    }
+    if (requestPath.startsWith('agent_outreach_queue?')) {
+      return [{
+        id: 'queue-1',
+        open_house_id: 'open-house-1',
+        address: '1 Main St',
+        city: 'Huntington',
+        state: 'NY',
+        agent_name: 'Test Agent'
+      }];
+    }
+    if (requestPath.startsWith('open_houses?')) return [];
     throw new Error(`Unexpected relationship API request: ${requestPath}`);
   };
   const apiModule = { exports: {} };
@@ -111,6 +132,23 @@ async function verifyApiContract() {
   }
   if (!calls.some((call) => call.path === 'agent_relationship_events')) {
     throw new Error('Relationship API pin contract did not append an event.');
+  }
+
+  responsePayload = null;
+  await apiModule.exports({
+    method: 'GET',
+    headers: { 'x-admin-token': 'relationship-verification-token' },
+    query: {
+      view: 'schedule',
+      from: '2026-07-26T04:00:00.000Z',
+      to: '2026-07-27T04:00:00.000Z'
+    }
+  }, response);
+  if (response.statusCode !== 200 || responsePayload?.count !== 1) {
+    throw new Error('Relationship API schedule view did not return the scheduled visit.');
+  }
+  if (responsePayload?.scheduled_open_houses?.[0]?.property_address !== '1 Main St Huntington, NY') {
+    throw new Error('Relationship API schedule view did not normalize the scheduled visit.');
   }
   if (originalRelationshipToken === undefined) {
     delete process.env.REL8TION_RELATIONSHIP_TOKEN;

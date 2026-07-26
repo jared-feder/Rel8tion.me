@@ -65,6 +65,29 @@ function enc(value) {
   return encodeURIComponent(String(value || ''));
 }
 
+function unique(values) {
+  return [...new Set((values || []).filter(Boolean))];
+}
+
+function inFilter(values) {
+  return `in.(${values.map((value) => enc(value)).join(',')})`;
+}
+
+function firstPresent(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return '';
+}
+
+function compactAddress({ address, city, state, zip }) {
+  return [
+    address,
+    [city, state].filter(Boolean).join(', '),
+    zip
+  ].filter(Boolean).join(' ');
+}
+
 function one(rows) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
@@ -150,6 +173,62 @@ async function loadBoard(limitValue) {
     if (page.length < pageSize) break;
   }
   return rows.slice(0, limit);
+}
+
+async function loadScheduledOpenHouses(fromValue, toValue) {
+  const from = clean(fromValue, 100);
+  const to = clean(toValue, 100);
+  if (!from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to))) {
+    const error = new Error('Valid from and to timestamps are required for the schedule view.');
+    error.status = 400;
+    throw error;
+  }
+
+  const visits = await supabaseRest(
+    `field_demo_visits?select=*&scheduled_start=gte.${enc(from)}&scheduled_start=lt.${enc(to)}&status=neq.cancelled&order=scheduled_start.asc&limit=250`
+  );
+  const queueIds = unique(visits.map((visit) => visit.outreach_queue_id));
+  const openHouseIds = unique(visits.map((visit) => visit.open_house_id));
+  const [queueRows, openHouseRows] = await Promise.all([
+    queueIds.length
+      ? supabaseRest(`agent_outreach_queue?id=${inFilter(queueIds)}&select=*&limit=${queueIds.length}`)
+      : [],
+    openHouseIds.length
+      ? supabaseRest(`open_houses?id=${inFilter(openHouseIds)}&select=*&limit=${openHouseIds.length}`)
+      : []
+  ]);
+  const queueById = new Map(queueRows.map((row) => [row.id, row]));
+  const openHouseById = new Map(openHouseRows.map((row) => [row.id, row]));
+
+  return visits.map((visit) => {
+    const queue = queueById.get(visit.outreach_queue_id) || {};
+    const openHouse = openHouseById.get(visit.open_house_id || queue.open_house_id) || {};
+    const address = firstPresent(visit.address, visit.property_address, queue.address, openHouse.address);
+    const city = firstPresent(visit.city, queue.city, openHouse.city);
+    const state = firstPresent(visit.state, queue.state, openHouse.state);
+    const zip = firstPresent(visit.property_zip, visit.zip, queue.zip, openHouse.zip);
+    const propertyAddress = compactAddress({ address, city, state, zip }) || 'Scheduled open house';
+    return {
+      id: visit.id,
+      field_visit_id: visit.id,
+      open_house_id: firstPresent(visit.open_house_id, queue.open_house_id, openHouse.id),
+      outreach_queue_id: visit.outreach_queue_id || null,
+      scheduled_start: visit.scheduled_start,
+      scheduled_end: visit.scheduled_end || null,
+      status: visit.status || 'scheduled',
+      property_address: propertyAddress,
+      address,
+      city,
+      state,
+      zip,
+      agent_name: firstPresent(visit.agent_name, queue.agent_name, openHouse.agent_name),
+      agent_phone: firstPresent(visit.agent_phone, queue.agent_phone, openHouse.agent_phone),
+      agent_email: firstPresent(visit.agent_email, queue.agent_email, openHouse.agent_email),
+      brokerage: firstPresent(visit.brokerage, queue.brokerage, openHouse.brokerage),
+      notes: visit.notes || '',
+      source: 'field_demo_visits'
+    };
+  });
 }
 
 async function recordEvent(relationshipId, body, eventType, summary) {
@@ -249,6 +328,17 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      if (clean(req.query?.view, 40).toLowerCase() === 'schedule') {
+        const scheduledOpenHouses = await loadScheduledOpenHouses(req.query?.from, req.query?.to);
+        sendJson(res, 200, {
+          ok: true,
+          source: 'field_demo_visits',
+          scheduled_open_houses: scheduledOpenHouses,
+          count: scheduledOpenHouses.length,
+          updated_at: new Date().toISOString()
+        });
+        return;
+      }
       const agents = await loadBoard(req.query?.limit);
       sendJson(res, 200, {
         ok: true,
