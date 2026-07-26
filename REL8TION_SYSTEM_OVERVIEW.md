@@ -54,6 +54,7 @@ REL8TION is deliberately lightweight:
 - `[IMPLEMENTED]` Root static wrappers and public pages such as `index.html`, `a.html`, and `b.html`.
 - `[IMPLEMENTED]` Root Vercel serverless API routes under `api/`.
 - `[IMPLEMENTED]` A private server-to-server Rel8tionOS API under `api/rel8tionos/` exposes scoped outreach conversation, reply, Open House acceptance, and loan-officer assignment operations. It authenticates with a dedicated server-only shared key and returns no-store, versioned JSON responses.
+- `[IMPLEMENTED]` The private relationship schedule feed reads confirmed field visits for a requested time range and collapses duplicate visit rows by open-house identity, scheduled window, and agent identity without altering source records.
 - `[IMPLEMENTED]` Supabase REST/RPC calls from browser code where allowed by anon policies.
 - `[IMPLEMENTED]` Supabase Edge Functions under `supabase/functions`.
 - `[PARTIAL]` Android SMS Gateway as a temporary outreach-volume provider fallback while Twilio paths remain intact.

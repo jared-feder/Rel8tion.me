@@ -221,7 +221,7 @@ async function loadScheduledOpenHouses(fromValue, toValue) {
   const queueById = new Map(queueRows.map((row) => [row.id, row]));
   const openHouseById = new Map(openHouseRows.map((row) => [row.id, row]));
 
-  return visits.map((visit) => {
+  const scheduledOpenHouses = visits.map((visit) => {
     const queue = queueById.get(visit.outreach_queue_id) || {};
     const openHouse = openHouseById.get(visit.open_house_id || queue.open_house_id) || {};
     const address = firstPresent(visit.address, visit.property_address, queue.address, openHouse.address);
@@ -250,6 +250,38 @@ async function loadScheduledOpenHouses(fromValue, toValue) {
       source: 'field_demo_visits'
     };
   });
+
+  const deduped = new Map();
+  for (const scheduled of scheduledOpenHouses) {
+    const identity = [
+      clean(scheduled.open_house_id || scheduled.property_address, 500).toLowerCase(),
+      clean(scheduled.scheduled_start, 100),
+      clean(scheduled.scheduled_end, 100),
+      phoneDigits(scheduled.agent_phone) || clean(scheduled.agent_name, 300).toLowerCase()
+    ].join('|');
+    const existing = deduped.get(identity);
+    if (!existing) {
+      deduped.set(identity, {
+        ...scheduled,
+        source_record_count: 1,
+        source_field_visit_ids: [scheduled.field_visit_id]
+      });
+      continue;
+    }
+    const sourceFieldVisitIds = unique([
+      ...existing.source_field_visit_ids,
+      scheduled.field_visit_id
+    ]).sort();
+    deduped.set(identity, {
+      ...existing,
+      status: existing.status === 'confirmed' || scheduled.status !== 'confirmed'
+        ? existing.status
+        : scheduled.status,
+      source_record_count: sourceFieldVisitIds.length,
+      source_field_visit_ids: sourceFieldVisitIds
+    });
+  }
+  return [...deduped.values()];
 }
 
 async function recordEvent(relationshipId, body, eventType, summary) {

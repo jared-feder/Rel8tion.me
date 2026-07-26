@@ -67,14 +67,24 @@ async function verifyApiContract() {
     if (requestPath.startsWith('agent_relationship_events?event_type=in.')) return [];
     if (requestPath.startsWith('agent_board_v1?')) return [{ ...relationship, name: relationship.display_name, pinned: true }];
     if (requestPath.startsWith('field_demo_visits?')) {
-      return [{
-        id: 'visit-1',
-        outreach_queue_id: 'queue-1',
-        open_house_id: 'open-house-1',
-        scheduled_start: '2026-07-26T14:00:00.000Z',
-        scheduled_end: '2026-07-26T16:00:00.000Z',
-        status: 'scheduled'
-      }];
+      return [
+        {
+          id: 'visit-1',
+          outreach_queue_id: 'queue-1',
+          open_house_id: 'open-house-1',
+          scheduled_start: '2026-07-26T14:00:00.000Z',
+          scheduled_end: '2026-07-26T16:00:00.000Z',
+          status: 'scheduled'
+        },
+        {
+          id: 'visit-duplicate',
+          outreach_queue_id: 'queue-1',
+          open_house_id: 'open-house-1',
+          scheduled_start: '2026-07-26T14:00:00.000Z',
+          scheduled_end: '2026-07-26T16:00:00.000Z',
+          status: 'confirmed'
+        }
+      ];
     }
     if (requestPath.startsWith('agent_outreach_queue?')) {
       return [{
@@ -167,6 +177,9 @@ async function verifyApiContract() {
   }
   if (responsePayload?.scheduled_open_houses?.[0]?.property_address !== '1 Main St Huntington, NY') {
     throw new Error('Relationship API schedule view did not normalize the scheduled visit.');
+  }
+  if (responsePayload?.scheduled_open_houses?.[0]?.source_record_count !== 2) {
+    throw new Error('Relationship API schedule view did not collapse duplicate source visits.');
   }
   if (originalRelationshipToken === undefined) {
     delete process.env.REL8TION_RELATIONSHIP_TOKEN;

@@ -8,6 +8,12 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` REL8TION COMMAND now defines the phone-number normalization helper used by agent relationship matching. The missing helper no longer interrupts dashboard rendering after a successful phone/PIN unlock or sends the owner back to the fallback admin-credential screen.
 
+## 2026-07-26: REL8TION OS schedule feed deduplication
+
+- `[IMPLEMENTED]` The authenticated relationship schedule view collapses repeated `field_demo_visits` that have the same open-house identity, scheduled window, and agent identity before sending them to REL8TION OS.
+- `[IMPLEMENTED]` Deduplication is read-only: every original production visit remains intact, while the response reports `source_record_count` and `source_field_visit_ids` for traceability.
+- `[VERIFIED]` The private production token connection returned the scheduled feed successfully. Local acceptance found two distinct July 26 open houses from three source rows because the Pablo Geymayr visit existed twice with the same open-house ID and time.
+
 ## 2026-07-26: Agent Ranking canonical identity consolidation
 
 - `[IMPLEMENTED]` Production `agent_rankings` was consolidated from 42,149 derived rows to 12,524 canonical agent rows. The 16,386 location-variant duplicates plus 13,239 hidden legacy/untrusted derived rows were removed from the current ranking table; all 114,153 normalized raw import-history rows remain in `agent_production_import_rows`.
