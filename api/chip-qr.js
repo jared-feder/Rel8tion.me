@@ -93,6 +93,22 @@ async function loadChip(code) {
   return one(`rel8tion_chip_inventory?chip_code=eq.${enc(code)}&select=*`);
 }
 
+async function loadConvertedEventPass(code) {
+  const inventory = await one(
+    `smart_sign_inventory?public_code=eq.${enc(code)}&inventory_type=eq.event_pass&select=id,public_code,inventory_type,qr_url,metadata`
+  );
+  return inventory?.metadata?.converted_from_agent_qr === true ? inventory : null;
+}
+
+function convertedEventPassMatchesChip(inventory, chip) {
+  return Boolean(
+    inventory?.public_code
+    && chip?.id
+    && chip.status === 'retired'
+    && String(inventory.metadata?.rel8tion_chip_inventory_id || '') === String(chip.id)
+  );
+}
+
 async function validateClaimedAgentKey({ uid, agentSlug }) {
   if (!uid || !agentSlug) {
     const error = new Error('Missing UID or agent slug.');
@@ -221,6 +237,28 @@ async function renderPublicQr(req, res, code) {
     method: 'PATCH',
     body: JSON.stringify({ last_scanned_at: new Date().toISOString() })
   }).catch(() => null);
+
+  const convertedEventPass = chip.status === 'retired' ? await loadConvertedEventPass(chipCode) : null;
+  if (convertedEventPassMatchesChip(convertedEventPass, chip)) {
+    const passUrl = `/pass?code=${encodeURIComponent(convertedEventPass.public_code)}`;
+    if (wantsJson(req)) {
+      sendJson(res, 200, {
+        ok: true,
+        event_pass: true,
+        converted_from_agent_qr: true,
+        inventory: {
+          id: convertedEventPass.id,
+          public_code: convertedEventPass.public_code,
+          inventory_type: convertedEventPass.inventory_type
+        },
+        pass_url: passUrl
+      });
+      return;
+    }
+    res.writeHead(302, { Location: passUrl });
+    res.end();
+    return;
+  }
 
   if (chip.status === 'linked' && chip.agent_slug) {
     if (wantsJson(req)) {

@@ -89,6 +89,7 @@ The agent owner dashboard validates the claimed NFC UID/agent pairing before loa
 ### Event Pass And Sponsored Event Pass
 
 - `[IMPLEMENTED]` `/pass` resolves Event Pass printed QR rows from `smart_sign_inventory.public_code`.
+- `[IMPLEMENTED]` A deliberately converted printed agent QR may route from `/c/:code` to `/pass?code=...` only when the original agent inventory row is retired and the matching Event Pass row contains explicit conversion metadata tied to that original row id. `smart_sign_inventory.public_code` remains the Event Pass source of truth.
 - `[IMPLEMENTED]` A fresh Event Pass QR scan presents a visual NFC handoff showing the physical pass approaching the correct iPhone and Android NFC areas; public codes and chip-status jargon are hidden from the normal field instruction.
 - `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes.
 - `[IMPLEMENTED]` Sponsored Event Pass activation records `event_pass_coverage_consents` before sponsor visibility.

@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-26: Printed agent QR to Event Pass conversion
+
+- `[IMPLEMENTED]` The printed agent QR resolver may hand a deliberately converted code from `/c/:code` to `/pass?code=...` only when the original `rel8tion_chip_inventory` row is retired and a matching `smart_sign_inventory` Event Pass row carries the original inventory id in explicit conversion metadata.
+- `[IMPLEMENTED]` This narrow compatibility path preserves `smart_sign_inventory.public_code` as the Event Pass source of truth and does not change normal linked or unassigned agent QR behavior.
+
 ## 2026-07-26: REL8TION COMMAND phone-unlock recovery
 
 - `[IMPLEMENTED]` REL8TION COMMAND now defines the phone-number normalization helper used by agent relationship matching. The missing helper no longer interrupts dashboard rendering after a successful phone/PIN unlock or sends the owner back to the fallback admin-credential screen.

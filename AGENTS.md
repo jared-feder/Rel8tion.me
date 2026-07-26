@@ -84,6 +84,7 @@ Preserve these priorities:
 
 - `[IMPLEMENTED]` Printed agent Rel8tionChip QR inventory lives in `rel8tion_chip_inventory` and resolves through `/c/:code` or `/chip/:code`.
 - `[IMPLEMENTED]` Linked agent QR rows redirect to `/b?agent=<slug>`. Do not route printed agent QR codes directly to `/agent-home`.
+- `[IMPLEMENTED]` A printed agent QR may be deliberately converted to an Event Pass only by retiring its agent inventory row and creating a matching `smart_sign_inventory` Event Pass row with explicit conversion metadata tied to the original row id. Only that narrow case may redirect `/c/:code` to `/pass?code=...`; `smart_sign_inventory.public_code` remains the Event Pass source of truth.
 - `[IMPLEMENTED]` Linked loan-officer/NMB/verified-professional QR rows redirect to `/nmb-verified?slug=<lo_slug>`. Do not route printed LO QR codes directly to `/loan-officer-dashboard` or `/lo-field-dashboard`.
 - `[IMPLEMENTED]` Smart Sign and Event Pass printable QR rows use `smart_sign_inventory.public_code`.
 - `[RISK]` `smart_signs.public_code` may still exist as a legacy fallback for old smart sign links. It must not be used for new QR printing or Event Pass source-of-truth behavior.
