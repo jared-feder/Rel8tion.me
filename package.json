@@ -2,6 +2,7 @@
   "private": true,
   "scripts": {
     "verify:routes": "node scripts/verify-route-map.cjs",
+    "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
     "verify:chip-qr-conversion": "node scripts/verify-chip-qr-conversion.cjs",
     "verify:agent-ranking-identity": "node scripts/verify-agent-ranking-identity.cjs",
     "verify:rel8tionos-api": "node scripts/verify-rel8tionos-api.cjs",

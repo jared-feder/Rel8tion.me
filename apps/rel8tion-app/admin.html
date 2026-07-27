@@ -1562,7 +1562,8 @@
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
       drafts: readDrafts(),
-      eventPassFreshenerResult: null
+      eventPassFreshenerResult: null,
+      qrBatchType: 'agent'
     };
 
     const eventPassScanner = {
@@ -4192,7 +4193,10 @@ ${rowsHtml}
       document.getElementById('stopEventPassScanner')?.addEventListener('click', () => stopEventPassScanner());
       document.getElementById('eventPassQrImage')?.addEventListener('change', scanEventPassImage);
       document.getElementById('eventPassManualForm')?.addEventListener('submit', submitEventPassManual);
-      document.getElementById('exportAgentQrBatch')?.addEventListener('click', exportAgentQrBatch);
+      document.getElementById('qrBatchInventoryType')?.addEventListener('change', (event) => {
+        state.qrBatchType = event.currentTarget.value === 'event_pass' ? 'event_pass' : 'agent';
+      });
+      document.getElementById('exportQrBatch')?.addEventListener('click', exportQrBatch);
       document.querySelectorAll('[data-sponsored-reuse]').forEach((button) => {
         button.addEventListener('click', () => setSponsoredPassReuse(button.dataset.sponsoredReuse, button.dataset.reuseStatus));
       });
@@ -5038,24 +5042,28 @@ ${rowsHtml}
       }
     }
 
-    async function exportAgentQrBatch() {
-      const quantityInput = document.getElementById('agentQrBatchQuantity');
+    async function exportQrBatch() {
+      const typeInput = document.getElementById('qrBatchInventoryType');
+      const inventoryType = typeInput?.value === 'event_pass' ? 'event_pass' : 'agent';
+      const typeLabel = inventoryType === 'event_pass' ? 'Event Pass' : 'Agent Rel8tionChip';
+      const quantityInput = document.getElementById('qrBatchQuantity');
       const quantity = Math.floor(Number(quantityInput?.value || 1));
       if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100) {
-        showToast('Choose between 1 and 100 agent QR codes.');
+        showToast(`Choose between 1 and 100 ${typeLabel} QR codes.`);
         quantityInput?.focus();
         return;
       }
-      if (!window.confirm(`Reserve the next ${quantity} unprinted agent QR code${quantity === 1 ? '' : 's'}, mark them printed, and download the ZIP?`)) return;
+      if (!window.confirm(`Reserve the next ${quantity} fresh unprinted ${typeLabel} QR code${quantity === 1 ? '' : 's'}, mark them printed, and download the ZIP?`)) return;
 
-      state.actionKey = 'export_agent_qr_batch';
+      state.qrBatchType = inventoryType;
+      state.actionKey = 'export_qr_batch';
       refreshAreaContent();
       try {
         const response = await fetch('/api/admin/agent-qr-batch', {
           method: 'POST',
           cache: 'no-store',
           headers: authHeaders(),
-          body: JSON.stringify({ quantity })
+          body: JSON.stringify({ quantity, inventory_type: inventoryType })
         });
         if (!response.ok) {
           const error = await response.json().catch(() => ({}));
@@ -5063,7 +5071,7 @@ ${rowsHtml}
         }
         const blob = await response.blob();
         const disposition = response.headers.get('content-disposition') || '';
-        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `agent-qr-batch-${Date.now()}.zip`;
+        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `${inventoryType === 'event_pass' ? 'event-pass-qr' : 'agent-qr'}-batch-${Date.now()}.zip`;
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -5073,9 +5081,9 @@ ${rowsHtml}
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
         const count = response.headers.get('x-rel8tion-code-count') || quantity;
-        showToast(`${count} agent QR code${Number(count) === 1 ? '' : 's'} exported and marked printed.`);
+        showToast(`${count} ${typeLabel} QR code${Number(count) === 1 ? '' : 's'} exported and marked printed.`);
       } catch (error) {
-        showToast(error.message || 'Unable to export agent QR codes.');
+        showToast(error.message || `Unable to export ${typeLabel} QR codes.`);
       } finally {
         state.actionKey = '';
         refreshAreaContent();
@@ -5208,20 +5216,24 @@ ${rowsHtml}
         </div>
         <div class="section-head">
           <div>
-            <h2>Agent Rel8tionChip QR Printing</h2>
-            <div class="sub">Reserve the next available unprinted agent codes and download one ZIP containing the batch CSV plus a matching 1024px PNG for every QR.</div>
+            <h2>QR Batch Printing</h2>
+            <div class="sub">Choose Agent Rel8tionChip or Event Pass, reserve fresh unprinted inventory, and download one ZIP containing the batch CSV plus a matching 1024px PNG for every QR.</div>
           </div>
           <div class="row-actions">
-            <input id="agentQrBatchQuantity" class="field" type="number" inputmode="numeric" min="1" max="100" value="1" aria-label="Number of agent QR codes" style="width:110px;">
-            <button class="btn primary" id="exportAgentQrBatch" ${state.actionKey === 'export_agent_qr_batch' ? 'disabled' : ''}>
-              <i data-lucide="file-archive"></i><span>${state.actionKey === 'export_agent_qr_batch' ? 'Building ZIP...' : 'Print Agent QR Batch'}</span>
+            <select id="qrBatchInventoryType" class="field" aria-label="QR inventory type" style="min-width:210px;">
+              <option value="agent" ${state.qrBatchType === 'agent' ? 'selected' : ''}>Agent Rel8tionChip QR</option>
+              <option value="event_pass" ${state.qrBatchType === 'event_pass' ? 'selected' : ''}>Event Pass QR</option>
+            </select>
+            <input id="qrBatchQuantity" class="field" type="number" inputmode="numeric" min="1" max="100" value="1" aria-label="Number of QR codes" style="width:110px;">
+            <button class="btn primary" id="exportQrBatch" ${state.actionKey === 'export_qr_batch' ? 'disabled' : ''}>
+              <i data-lucide="file-archive"></i><span>${state.actionKey === 'export_qr_batch' ? 'Building ZIP...' : 'Print QR Batch'}</span>
             </button>
           </div>
         </div>
         <div class="glass-card" style="padding:18px;margin-bottom:24px;">
           <div class="primary">ZIP contents</div>
-          <div class="secondary">agent-qr-batch.csv | images/&lt;chip_code&gt;.png | README.txt</div>
-          <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Exporting marks those inventory rows printed so the next batch cannot duplicate them.</div>
+          <div class="secondary">agent-qr-batch.csv or event-pass-qr-batch.csv | images/&lt;code&gt;.png | README.txt</div>
+          <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Event Pass export only reserves fresh, unclaimed single-event inventory. Exporting marks rows printed so the next batch cannot duplicate them.</div>
         </div>
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>

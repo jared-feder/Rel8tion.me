@@ -87,6 +87,7 @@ Preserve these priorities:
 - `[IMPLEMENTED]` A printed agent QR may be deliberately converted to an Event Pass only by retiring its agent inventory row and creating a matching `smart_sign_inventory` Event Pass row with explicit conversion metadata tied to the original row id. Only that narrow case may redirect `/c/:code` to `/pass?code=...`; `smart_sign_inventory.public_code` remains the Event Pass source of truth.
 - `[IMPLEMENTED]` Linked loan-officer/NMB/verified-professional QR rows redirect to `/nmb-verified?slug=<lo_slug>`. Do not route printed LO QR codes directly to `/loan-officer-dashboard` or `/lo-field-dashboard`.
 - `[IMPLEMENTED]` Smart Sign and Event Pass printable QR rows use `smart_sign_inventory.public_code`.
+- `[IMPLEMENTED]` REL8TION COMMAND Event Pass QR batch export may reserve only fresh, unprinted, unclaimed, unassigned, non-sponsored `single_event` rows. It must not print active, historical, sponsored, or reusable passes, and it must record print-batch metadata without changing `public_code`.
 - `[RISK]` `smart_signs.public_code` may still exist as a legacy fallback for old smart sign links. It must not be used for new QR printing or Event Pass source-of-truth behavior.
 
 ## Supabase Boundaries

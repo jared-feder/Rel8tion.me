@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-27: Event Pass QR batch printing in REL8TION COMMAND
+
+- `[IMPLEMENTED]` REL8TION COMMAND's QR Batch Printing control now offers an Agent Rel8tionChip / Event Pass dropdown and exports 1-100 selected codes as a fulfillment ZIP with a CSV, matching 1024px PNG files, and a README.
+- `[IMPLEMENTED]` Agent export keeps its existing inventory and ZIP format. Event Pass export reserves only fresh, unprinted, unclaimed, unassigned, non-sponsored `single_event` rows from `smart_sign_inventory`, records the print batch and timestamp in row metadata, and uses `/pass?code=...` as the encoded destination.
+- `[IMPLEMENTED]` `smart_sign_inventory.public_code` remains the Event Pass QR source of truth; Event Pass export never converts agent inventory or reserves an active, claimed, sponsored, reusable, or historical pass.
+
 ## 2026-07-27: Complete confirmed open-house history in REL8TION COMMAND
 
 - `[IMPLEMENTED]` REL8TION COMMAND Reports now opens to **All confirmed** instead of hiding past events behind the Upcoming confirmed filter. The combined view uses newest-first smart sorting so recent follow-up opportunities appear first.

@@ -149,7 +149,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `agents.slug` identifies agent profiles.
 - `[IMPLEMENTED]` `keys.uid` stores NFC UID rows; `keys.agent_slug` links claimed agent keychains by convention.
 - `[IMPLEMENTED]` `rel8tion_chip_inventory` stores printed agent/LO QR inventory.
-- `[IMPLEMENTED]` REL8TION COMMAND can export the next 1-100 unprinted agent QR rows as a fulfillment ZIP containing a CSV and identically named high-resolution PNG files, while recording the print batch and timestamp on each reserved row.
+- `[IMPLEMENTED]` REL8TION COMMAND can export the next 1-100 unprinted Agent Rel8tionChip or Event Pass QR rows from one dropdown as a fulfillment ZIP containing a CSV and identically named high-resolution PNG files. Agent export preserves the existing agent inventory format; Event Pass export reserves only fresh unclaimed `single_event` rows and records the print batch and timestamp in `smart_sign_inventory.metadata`.
 - `[IMPLEMENTED]` `smart_signs` stores physical smart sign state including `uid_primary`, `uid_secondary`, and `active_event_id`.
 - `[IMPLEMENTED]` `smart_sign_inventory.public_code` stores printed Smart Sign and Event Pass QR source-of-truth codes.
 - `[IMPLEMENTED]` `loan_officer_coverage_signs` stores LO Coverage Sign public code and NFC assignment.

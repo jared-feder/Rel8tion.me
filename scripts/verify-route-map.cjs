@@ -11,6 +11,7 @@ const criticalProductionFiles = [
   ['api/loan-officer-support-request.js', 'loan officer support request form'],
   ['api/sms/android-inbound.js', 'Android Gateway inbound webhook'],
   ['api/admin/android-inbox-replay.js', 'admin Android inbox replay'],
+  ['api/admin/agent-qr-batch.js', 'admin Agent and Event Pass QR batch export'],
   ['api/admin/key-action.js', 'protected admin key maintenance'],
   ['api/admin/outreach-health.js', 'admin outreach health panel'],
   ['api/admin/outreach-search.js', 'admin outreach full-table search'],
