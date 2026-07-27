@@ -3,7 +3,7 @@ const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('
 function clampLimit(value) {
   const parsed = Number(value || 60);
   if (!Number.isFinite(parsed)) return 60;
-  return Math.max(1, Math.min(parsed, 150));
+  return Math.max(1, Math.min(parsed, 600));
 }
 
 function readQuery(req, name) {
@@ -231,32 +231,39 @@ async function loadQueueRows(ids) {
   const uniqueIds = [...new Set((ids || []).filter(Boolean))];
   if (!uniqueIds.length) return new Map();
 
-  let rows;
-  try {
-    rows = await supabaseRest(
-      `agent_outreach_queue?id=${inFilter(uniqueIds)}&select=${QUEUE_SELECT}&limit=${uniqueIds.length}`
-    );
-  } catch (error) {
-    rows = await supabaseRest(
-      `agent_outreach_queue?id=${inFilter(uniqueIds)}&select=*&limit=${uniqueIds.length}`
-    );
+  const loadedRows = [];
+  for (let index = 0; index < uniqueIds.length; index += 80) {
+    const chunk = uniqueIds.slice(index, index + 80);
+    let rows;
+    try {
+      rows = await supabaseRest(
+        `agent_outreach_queue?id=${inFilter(chunk)}&select=${QUEUE_SELECT}&limit=${chunk.length}`
+      );
+    } catch (error) {
+      rows = await supabaseRest(
+        `agent_outreach_queue?id=${inFilter(chunk)}&select=*&limit=${chunk.length}`
+      );
+    }
+    if (Array.isArray(rows)) loadedRows.push(...rows);
   }
 
-  return new Map((Array.isArray(rows) ? rows : []).map((row) => [row.id, row]));
+  return new Map(loadedRows.map((row) => [row.id, row]));
 }
 
 async function loadMessagesForQueueRows(ids) {
   const uniqueIds = [...new Set((ids || []).filter(Boolean))];
   if (!uniqueIds.length) return new Map();
 
-  const rows = await supabaseRest(
-    `agent_outreach_replies?queue_row_id=${inFilter(uniqueIds)}&select=id,queue_row_id,from_phone,to_phone,body,direction,opt_out,message_sid,received_at,created_at&order=received_at.asc&limit=1000`
-  );
   const grouped = new Map();
-
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (!grouped.has(row.queue_row_id)) grouped.set(row.queue_row_id, []);
-    grouped.get(row.queue_row_id).push(row);
+  for (let index = 0; index < uniqueIds.length; index += 80) {
+    const chunk = uniqueIds.slice(index, index + 80);
+    const rows = await supabaseRest(
+      `agent_outreach_replies?queue_row_id=${inFilter(chunk)}&select=id,queue_row_id,from_phone,to_phone,body,direction,opt_out,message_sid,received_at,created_at&order=received_at.asc&limit=1000`
+    );
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (!grouped.has(row.queue_row_id)) grouped.set(row.queue_row_id, []);
+      grouped.get(row.queue_row_id).push(row);
+    }
   }
 
   return grouped;

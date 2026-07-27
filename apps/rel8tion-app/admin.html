@@ -2268,7 +2268,7 @@
       try {
         const [dashboard, inbox, health, relationships] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
-          api('/api/admin/outreach-inbox?limit=120'),
+          api('/api/admin/outreach-inbox?limit=600'),
           api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
           api('/api/admin/agent-relationships?limit=1000').catch((error) => ({ ok: false, error: error.message, agents: [] }))
         ]);
@@ -5481,6 +5481,57 @@ ${rowsHtml}
         .sort(compareConfirmedRows);
     }
 
+    function unfiledConfirmationRows() {
+      const excluded = new Set([
+        'confirmed_open_house',
+        'accepted_open_house',
+        'not_now',
+        'drip_scheduled',
+        'opted_out',
+        'android_opted_out'
+      ]);
+      return filterByQuery(state.inbox || [])
+        .filter((thread) =>
+          thread.queue_row_id &&
+          thread.direction !== 'outbound' &&
+          !isUnlinkedAndroidThread(thread) &&
+          !isOptOutThread(thread) &&
+          !excluded.has(thread.review_status) &&
+          (
+            thread.latest_reply_body ||
+            (thread.messages || []).some((message) => message.direction !== 'outbound' && message.body)
+          )
+        )
+        .sort(newestFirst);
+    }
+
+    function renderUnfiledConfirmationCard(thread) {
+      const key = thread.thread_key || thread.queue_row_id;
+      const reply = thread.latest_reply_body ||
+        [...(thread.messages || [])].reverse().find((message) => message.direction !== 'outbound' && message.body)?.body ||
+        'Reply received.';
+      const openWindow = reportDisplayWindow(thread.open_start, thread.open_end);
+      const busy = state.actionKey === actionId('confirm_open_house', key);
+      return `
+        <article class="glass-card" style="padding:16px;">
+          <div class="section-head" style="margin-bottom:10px;">
+            <div>
+              <div class="mini-title">${esc(thread.agent_name || 'Agent reply')}</div>
+              <div class="sub">${esc(thread.address || 'No property address')}${openWindow ? ` | ${esc(openWindow)}` : ''}</div>
+            </div>
+            ${badge(thread.review_status || 'reply received', 'warn')}
+          </div>
+          <div class="conversation-preview">${esc(reply)}</div>
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <span class="small">Received ${esc(fmtDate(thread.last_reply_at || thread.created_at))}</span>
+            <button class="btn primary" data-confirm-open-house="${esc(key)}" ${busy ? 'disabled' : ''}>
+              <i data-lucide="calendar-check"></i><span>${busy ? 'Saving...' : 'Review & confirm'}</span>
+            </button>
+          </div>
+        </article>
+      `;
+    }
+
     function compactReportDate(value) {
       if (!value) return '';
       const date = new Date(value);
@@ -5750,6 +5801,7 @@ ${rowsHtml}
       const outreach = state.command?.outreach || {};
       const confirmed = confirmedReportRows();
       const allConfirmed = state.command?.confirmed_open_houses || [];
+      const unfiled = unfiledConfirmationRows();
       const now = Date.now();
       const upcomingCount = allConfirmed.filter((row) => {
         const end = reportDateMs(row.scheduled_end) || reportDateMs(row.scheduled_start) || reportDateMs(row.confirmed_at);
@@ -5784,6 +5836,15 @@ ${rowsHtml}
         </div>
         <div class="confirmed-report-grid">
           ${confirmed.length ? confirmed.map(renderConfirmedReportCard).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No confirmed open houses match this report view.</div>'}
+        </div>
+        <div class="section-head" style="margin-top:24px;">
+          <div>
+            <h2>Replies awaiting confirmation</h2>
+            <div class="sub">${unfiled.length} historical reply threads are not yet linked to a confirmed open-house visit. Review the reply and choose the correct coverage date before confirming.</div>
+          </div>
+        </div>
+        <div class="confirmed-report-grid">
+          ${unfiled.length ? unfiled.map(renderUnfiledConfirmationCard).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No unfiled reply threads match this report view.</div>'}
         </div>
         <div class="report-grid">
           ${renderBarCard('Review status', outreach.by_review_status || {})}
