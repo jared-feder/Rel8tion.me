@@ -454,4 +454,4 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` REL8TION COMMAND can mark or clear an agent for follow-up from outreach and confirmed-open-house agent controls.
 - `[IMPLEMENTED]` Follow-up state is appended to the existing `agent_relationship_events` stream as `follow_up_marked` or `follow_up_cleared`; no agent, note, pin, or open-house rows are replaced.
 - `[IMPLEMENTED]` `/api/admin/agent-relationships` projects the latest follow-up state and its optional title, due time, note, and marked time for REL8TION OS.
-- `[NEEDS VERIFICATION]` Production deployment and the live REL8TION OS read are not claimed until both apps are deployed and checked.
+- `[IMPLEMENTED]` Commit `a06e90b` deployed as production deployment `dpl_9eR485yAHrv3bYyrHBRHTgcyXX11` and reached `READY`. The live dashboard asset contains the follow-up control, and an authenticated REL8TION OS read returned the new follow-up fields without mutating an agent.
