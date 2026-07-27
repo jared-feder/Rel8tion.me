@@ -160,6 +160,148 @@ async function ensureRelationship(agent) {
   }));
 }
 
+function queueMatchesRelationship(queue, relationship) {
+  const relationshipPhone = phoneDigits(relationship.phone_normalized || relationship.phone);
+  const queuePhone = phoneDigits(queue.agent_phone_normalized || queue.agent_phone);
+  const relationshipEmail = clean(relationship.email, 320).toLowerCase();
+  const queueEmail = clean(queue.agent_email, 320).toLowerCase();
+  const relationshipSourceId = clean(relationship.agent_source_id, 300);
+  const queueId = clean(queue.id, 300);
+  return Boolean(
+    (relationshipPhone && queuePhone && relationshipPhone === queuePhone)
+    || (relationshipEmail && queueEmail && relationshipEmail === queueEmail)
+    || (relationshipSourceId && queueId && relationshipSourceId === queueId)
+  );
+}
+
+function queueAddress(queue) {
+  return compactAddress({
+    address: queue.address,
+    city: queue.city,
+    state: queue.state,
+    zip: queue.zip
+  });
+}
+
+function conversationItem(queue, message, source) {
+  return {
+    id: clean(message.id || message.message_sid, 300) || `${source}:${queue.id}:${message.occurred_at || message.received_at || message.created_at || ''}`,
+    queue_row_id: queue.id,
+    open_house_id: queue.open_house_id || null,
+    property_address: queueAddress(queue),
+    direction: message.direction === 'outbound' ? 'outbound' : 'inbound',
+    body: clean(message.body, 4000),
+    occurred_at: clean(message.occurred_at || message.received_at || message.created_at, 100),
+    source,
+    opt_out: message.opt_out === true
+  };
+}
+
+async function attachFollowUpConversations(rows) {
+  const markedRelationships = rows.filter((row) => row.follow_up_marked);
+  if (!markedRelationships.length) return rows;
+
+  const sourceIds = unique(markedRelationships.map((row) => clean(row.agent_source_id, 300)));
+  const phones = unique(markedRelationships.map((row) => phoneDigits(row.phone_normalized || row.phone)));
+  const emails = unique(markedRelationships.map((row) => clean(row.email, 320).toLowerCase()));
+  const queueSelect = [
+    'id', 'open_house_id', 'address', 'city', 'state', 'zip',
+    'agent_name', 'agent_phone', 'agent_phone_normalized', 'agent_email', 'brokerage',
+    'selected_sms', 'initial_sent_at', 'followup_sms', 'followup_sent_at',
+    'last_outreach_at', 'created_at'
+  ].join(',');
+  const queueRequests = [];
+  if (sourceIds.length) {
+    queueRequests.push(supabaseRest(
+      `agent_outreach_queue?id=${inFilter(sourceIds)}&select=${queueSelect}&limit=1000`
+    ));
+  }
+  if (phones.length) {
+    queueRequests.push(supabaseRest(
+      `agent_outreach_queue?agent_phone_normalized=${inFilter(phones)}&select=${queueSelect}&order=created_at.asc&limit=1000`
+    ));
+  }
+  if (emails.length) {
+    queueRequests.push(supabaseRest(
+      `agent_outreach_queue?agent_email=${inFilter(emails)}&select=${queueSelect}&order=created_at.asc&limit=1000`
+    ));
+  }
+
+  const queueById = new Map();
+  for (const result of await Promise.all(queueRequests)) {
+    for (const queue of Array.isArray(result) ? result : []) {
+      if (queue?.id) queueById.set(queue.id, queue);
+    }
+  }
+  const queueRows = [...queueById.values()];
+  const queueIds = queueRows.map((queue) => queue.id);
+  const repliesByQueue = new Map();
+  for (let index = 0; index < queueIds.length; index += 80) {
+    const chunk = queueIds.slice(index, index + 80);
+    const replies = await supabaseRest(
+      `agent_outreach_replies?queue_row_id=${inFilter(chunk)}&select=id,queue_row_id,body,direction,opt_out,message_sid,received_at,created_at&order=received_at.asc&limit=1000`
+    );
+    for (const reply of Array.isArray(replies) ? replies : []) {
+      if (!repliesByQueue.has(reply.queue_row_id)) repliesByQueue.set(reply.queue_row_id, []);
+      repliesByQueue.get(reply.queue_row_id).push(reply);
+    }
+  }
+
+  return rows.map((relationship) => {
+    if (!relationship.follow_up_marked) {
+      return {
+        ...relationship,
+        conversation_log: [],
+        conversation_count: 0,
+        conversation_threads: 0
+      };
+    }
+    const matchingQueues = queueRows.filter((queue) => queueMatchesRelationship(queue, relationship));
+    const conversations = [];
+    for (const queue of matchingQueues) {
+      const initialSentAt = queue.initial_sent_at || queue.last_outreach_at || '';
+      if (queue.selected_sms && initialSentAt) {
+        conversations.push(conversationItem(queue, {
+          id: `initial:${queue.id}`,
+          body: queue.selected_sms,
+          direction: 'outbound',
+          occurred_at: initialSentAt
+        }, 'initial_outreach'));
+      }
+      if (queue.followup_sms && queue.followup_sent_at) {
+        conversations.push(conversationItem(queue, {
+          id: `followup:${queue.id}`,
+          body: queue.followup_sms,
+          direction: 'outbound',
+          occurred_at: queue.followup_sent_at
+        }, 'scheduled_follow_up'));
+      }
+      for (const reply of repliesByQueue.get(queue.id) || []) {
+        conversations.push(conversationItem(queue, reply, 'outreach_reply'));
+      }
+    }
+    const deduped = new Map();
+    for (const message of conversations) {
+      if (!message.body) continue;
+      const key = message.id || [
+        message.direction,
+        message.occurred_at,
+        message.body
+      ].join('|');
+      deduped.set(key, message);
+    }
+    const conversationLog = [...deduped.values()]
+      .sort((left, right) => new Date(left.occurred_at || 0) - new Date(right.occurred_at || 0))
+      .slice(-200);
+    return {
+      ...relationship,
+      conversation_log: conversationLog,
+      conversation_count: conversationLog.length,
+      conversation_threads: matchingQueues.length
+    };
+  });
+}
+
 async function loadBoard(limitValue) {
   const requestedLimit = Math.max(1, Math.min(Number(limitValue) || 1000, 5000));
   const fetchLimit = 5000;
@@ -193,7 +335,7 @@ async function loadBoard(limitValue) {
       latestFollowUpState.set(event.relationship_id, event);
     }
   }
-  return rows.map((row, sourceOrder) => {
+  const boardRows = rows.map((row, sourceOrder) => {
     const historicalEvent = latestHistoricalState.get(row.id);
     const followUpEvent = latestFollowUpState.get(row.id);
     const historicalOpenHouseAgent = historicalEvent?.event_type === 'historical_open_house_confirmed';
@@ -224,6 +366,7 @@ async function loadBoard(limitValue) {
     || Number(Boolean(right.follow_up_marked)) - Number(Boolean(left.follow_up_marked))
     || left._source_order - right._source_order
   )).slice(0, requestedLimit).map(({ _source_order, ...row }) => row);
+  return attachFollowUpConversations(boardRows);
 }
 
 async function loadScheduledOpenHouses(fromValue, toValue) {

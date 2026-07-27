@@ -10,6 +10,13 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Agent export keeps its existing inventory and ZIP format. Event Pass export reserves only fresh, unprinted, unclaimed, unassigned, non-sponsored `single_event` rows from `smart_sign_inventory`, records the print batch and timestamp in row metadata, and uses `/pass?code=...` as the encoded destination.
 - `[IMPLEMENTED]` `smart_sign_inventory.public_code` remains the Event Pass QR source of truth; Event Pass export never converts agent inventory or reserves an active, claimed, sponsored, reusable, or historical pass.
 
+## 2026-07-27: Follow-up agent conversation context for REL8TION OS
+
+- `[IMPLEMENTED]` The authenticated agent relationship projection now includes chronological sent/received outreach context only for agents whose latest relationship state is marked Follow Up.
+- `[IMPLEMENTED]` Conversation matching uses exact normalized phone, exact email, or the canonical outreach source-row id. It does not use fuzzy name matching.
+- `[IMPLEMENTED]` The projection is read-only: message bodies remain in the existing `agent_outreach_queue` and `agent_outreach_replies` records; no message, relationship, open house, or agent record is copied, edited, or sent.
+- `[NEEDS VERIFICATION]` Verify the production deployment and confirm how many of the ten currently marked follow-up agents have linked message history.
+
 ## 2026-07-27: Complete confirmed open-house history in REL8TION COMMAND
 
 - `[IMPLEMENTED]` REL8TION COMMAND Reports now opens to **All confirmed** instead of hiding past events behind the Upcoming confirmed filter. The combined view uses newest-first smart sorting so recent follow-up opportunities appear first.

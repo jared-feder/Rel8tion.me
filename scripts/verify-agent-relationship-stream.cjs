@@ -108,7 +108,19 @@ async function verifyApiContract() {
         address: '1 Main St',
         city: 'Huntington',
         state: 'NY',
-        agent_name: 'Test Agent'
+        agent_name: 'Test Agent',
+        agent_phone_normalized: '5165551212',
+        selected_sms: 'Would you like help with your next open house?',
+        initial_sent_at: '2026-07-27T13:00:00.000Z'
+      }];
+    }
+    if (requestPath.startsWith('agent_outreach_replies?')) {
+      return [{
+        id: 'reply-1',
+        queue_row_id: 'queue-1',
+        body: 'Yes, call me tomorrow.',
+        direction: 'inbound',
+        received_at: '2026-07-27T13:05:00.000Z'
       }];
     }
     if (requestPath.startsWith('open_houses?')) return [];
@@ -161,6 +173,13 @@ async function verifyApiContract() {
     || responsePayload?.agents?.[0]?.follow_up_title !== 'Call about the next open house'
   ) {
     throw new Error('Relationship API board contract did not project the latest follow-up marker.');
+  }
+  if (
+    responsePayload?.agents?.[0]?.conversation_count !== 2
+    || responsePayload?.agents?.[0]?.conversation_log?.[0]?.direction !== 'outbound'
+    || responsePayload?.agents?.[0]?.conversation_log?.[1]?.direction !== 'inbound'
+  ) {
+    throw new Error('Relationship API board contract did not project the linked conversation in order.');
   }
   if (!calls.some((call) => call.path === 'agent_relationship_events')) {
     throw new Error('Relationship API pin contract did not append an event.');

@@ -146,6 +146,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` `agent_board_v1` is the service-role-only, `security_invoker` board projection used by relation.me and REL8TION OS.
 - `[IMPLEMENTED]` `/api/admin/agent-relationships` is the privileged read/write boundary for the shared stream. Browser and desktop clients must not receive the Supabase service-role key.
 - `[IMPLEMENTED]` REL8TION OS uses a dedicated production credential to read and dual-write the relation.me relationship stream. The one-time local history migration completed on 2026-07-26 for 404 worked-with agents and one saved note; local pin/note storage remains only as an offline fallback.
+- `[IMPLEMENTED]` For relationships currently marked Follow Up, the authenticated board projection also reads existing sent outreach from `agent_outreach_queue` and linked inbound/outbound history from `agent_outreach_replies`. Exact phone, email, or source-row identity is required; the projection does not duplicate or mutate message records.
 - `[IMPLEMENTED]` `agents.slug` identifies agent profiles.
 - `[IMPLEMENTED]` `keys.uid` stores NFC UID rows; `keys.agent_slug` links claimed agent keychains by convention.
 - `[IMPLEMENTED]` `rel8tion_chip_inventory` stores printed agent/LO QR inventory.
