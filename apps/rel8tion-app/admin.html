@@ -1526,7 +1526,7 @@
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       query: '',
       outreachFilter: 'needs_reply',
-      reportWindow: 'upcoming',
+      reportWindow: 'all',
       reportSort: 'auto',
       buyerFinder: {
         loading: false,
@@ -5446,7 +5446,7 @@ ${rowsHtml}
     }
 
     function compareConfirmedRows(a, b) {
-      const fallback = () => compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, state.reportWindow === 'past' ? 'desc' : 'asc');
+      const fallback = () => compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, state.reportWindow === 'upcoming' ? 'asc' : 'desc');
       switch (state.reportSort) {
         case 'open_start_asc':
           return compareDateSort(a.scheduled_start || a.confirmed_at, b.scheduled_start || b.confirmed_at, 'asc');
@@ -5783,7 +5783,7 @@ ${rowsHtml}
           </div>
         </div>
         <div class="confirmed-report-grid">
-          ${confirmed.length ? confirmed.slice(0, 120).map(renderConfirmedReportCard).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No confirmed open houses match this report view.</div>'}
+          ${confirmed.length ? confirmed.map(renderConfirmedReportCard).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No confirmed open houses match this report view.</div>'}
         </div>
         <div class="report-grid">
           ${renderBarCard('Review status', outreach.by_review_status || {})}

@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-27: Complete confirmed open-house history in REL8TION COMMAND
+
+- `[IMPLEMENTED]` REL8TION COMMAND Reports now opens to **All confirmed** instead of hiding past events behind the Upcoming confirmed filter. The combined view uses newest-first smart sorting so recent follow-up opportunities appear first.
+- `[IMPLEMENTED]` The admin dashboard loads all field visits and visit participants in bounded pages and separately loads every confirmed/accepted outreach row, rather than depending on the newest 1,000 outreach rows or the first 250 visits to reconstruct history.
+- `[IMPLEMENTED]` Confirmed report cards no longer stop rendering after 120 rows. Upcoming and Previous filters remain available when the operator wants a narrower view.
+
 ## 2026-07-26: Printed agent QR to Event Pass conversion
 
 - `[IMPLEMENTED]` The printed agent QR resolver may hand a deliberately converted code from `/c/:code` to `/pass?code=...` only when the original `rel8tion_chip_inventory` row is retired and a matching `smart_sign_inventory` Event Pass row carries the original inventory id in explicit conversion metadata.

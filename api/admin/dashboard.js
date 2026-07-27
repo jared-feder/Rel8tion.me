@@ -149,6 +149,34 @@ async function safeRestInChunks(ids, buildPath, fallback, warnings, label, chunk
   return rows.flat();
 }
 
+async function safeRestAll(path, fallback, warnings, label, pageSize = 500, maxRows = 5000) {
+  const rows = [];
+  const separator = path.includes('?') ? '&' : '?';
+  try {
+    for (let offset = 0; offset < maxRows; offset += pageSize) {
+      const page = await supabaseRest(`${path}${separator}limit=${pageSize}&offset=${offset}`);
+      if (!Array.isArray(page)) return rows.length ? rows : fallback;
+      rows.push(...page);
+      if (page.length < pageSize) return rows;
+    }
+    warnings.push({ label, error: `Admin history reached the ${maxRows}-row safety ceiling.` });
+    return rows;
+  } catch (error) {
+    warnings.push({ label, error: error.message || String(error) });
+    return rows.length ? rows : fallback;
+  }
+}
+
+function mergeRowsById(...groups) {
+  const merged = new Map();
+  for (const group of groups) {
+    for (const row of Array.isArray(group) ? group : []) {
+      if (row?.id) merged.set(row.id, row);
+    }
+  }
+  return [...merged.values()];
+}
+
 function phoneDigits(value) {
   const digits = String(value || '').replace(/\D/g, '');
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
@@ -639,6 +667,7 @@ module.exports = async function handler(req, res) {
       loanOfficerSignEvents,
       coverageConsents,
       outreach,
+      confirmedOutreach,
       inbox,
       kitOrders,
       agentWebsites,
@@ -653,13 +682,14 @@ module.exports = async function handler(req, res) {
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
       safeRest('verified_profiles?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
       safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
-      safeRest('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc&limit=250', [], warnings, 'field_demo_visits'),
-      safeRest('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc&limit=500', [], warnings, 'field_demo_visit_participants'),
+      safeRestAll('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc', [], warnings, 'field_demo_visits'),
+      safeRestAll('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc', [], warnings, 'field_demo_visit_participants'),
       safeRest('loan_officer_support_requests?select=id,full_name,company_name,email,phone,phone_normalized,experience,coverage_areas,availability,notes,status,source,created_at,updated_at&order=created_at.desc&limit=250', [], warnings, 'loan_officer_support_requests'),
       safeRest('loan_officer_coverage_signs?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'loan_officer_coverage_signs'),
       safeRest('loan_officer_sign_events?select=*&order=created_at.desc&limit=500', [], warnings, 'loan_officer_sign_events'),
       safeRest('event_pass_coverage_consents?select=*&order=created_at.desc&limit=500', [], warnings, 'event_pass_coverage_consents'),
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
+      safeRestAll(`agent_outreach_queue?or=(review_status.eq.confirmed_open_house,review_status.eq.accepted_open_house)&select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc`, [], warnings, 'confirmed_open_house_queue_history'),
       loadDashboardInbox(warnings),
       safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders'),
       safeRest('agent_websites?select=id,name,slug,title,brokerage,email,phone,bio,photo_url,hero_image_url,about_image_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,license_type,brokerage_address,brokerage_phone,brokerage_website_url,standardized_operating_procedure_url,listing_sync_enabled,listing_sync_status,listing_sync_last_run_at,listing_sync_last_error,updated_at&order=updated_at.desc&limit=250', [], warnings, 'agent_websites'),
@@ -667,7 +697,7 @@ module.exports = async function handler(req, res) {
     ]);
 
     const reportOutreach = await loadMissingReportQueueRows({
-      outreach,
+      outreach: mergeRowsById(outreach, confirmedOutreach),
       visits: fieldVisits,
       warnings
     });
