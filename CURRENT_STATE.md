@@ -15,7 +15,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The authenticated agent relationship projection now includes chronological sent/received outreach context only for agents whose latest relationship state is marked Follow Up.
 - `[IMPLEMENTED]` Conversation matching uses exact normalized phone, exact email, or the canonical outreach source-row id. It does not use fuzzy name matching.
 - `[IMPLEMENTED]` The projection is read-only: message bodies remain in the existing `agent_outreach_queue` and `agent_outreach_replies` records; no message, relationship, open house, or agent record is copied, edited, or sent.
-- `[NEEDS VERIFICATION]` Verify the production deployment and confirm how many of the ten currently marked follow-up agents have linked message history.
+- `[VERIFIED]` Production commit `c5551f0` deployed READY on 2026-07-27. The authenticated projection returned all ten currently marked follow-up agents with linked history: 63 messages total, including 43 outbound and 20 inbound messages.
 
 ## 2026-07-27: Complete confirmed open-house history in REL8TION COMMAND
 
