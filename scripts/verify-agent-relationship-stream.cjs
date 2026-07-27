@@ -36,8 +36,11 @@ for (const match of scripts) new Function(match[1]);
 for (const required of [
   '/api/admin/agent-relationships',
   'data-toggle-agent-pin',
+  'data-toggle-agent-follow-up',
   'Pin to top',
-  'Pinned to top'
+  'Pinned to top',
+  'Mark follow-up',
+  'Follow-up marked'
 ]) {
   if (!adminSource.includes(required)) {
     throw new Error(`REL8TION admin UI is missing: ${required}`);
@@ -64,7 +67,19 @@ async function verifyApiContract() {
       return [{ ...relationship, ...JSON.parse(options.body) }];
     }
     if (requestPath === 'agent_relationship_events') return [{ id: 'event-1' }];
-    if (requestPath.startsWith('agent_relationship_events?event_type=in.')) return [];
+    if (requestPath.startsWith('agent_relationship_events?event_type=in.')) {
+      return [{
+        id: 'follow-up-event-1',
+        relationship_id: relationship.id,
+        event_type: 'follow_up_marked',
+        summary: 'Call about the next open house',
+        occurred_at: '2026-07-27T14:00:00.000Z',
+        metadata: {
+          title: 'Call about the next open house',
+          due_at: '2026-07-28T14:00:00.000Z'
+        }
+      }];
+    }
     if (requestPath.startsWith('agent_board_v1?')) return [{ ...relationship, name: relationship.display_name, pinned: true }];
     if (requestPath.startsWith('field_demo_visits?')) {
       return [
@@ -141,6 +156,12 @@ async function verifyApiContract() {
   if (!responsePayload?.agents?.[0]?.pinned) {
     throw new Error('Relationship API pin contract did not return a pinned board row.');
   }
+  if (
+    responsePayload?.agents?.[0]?.follow_up_marked !== true
+    || responsePayload?.agents?.[0]?.follow_up_title !== 'Call about the next open house'
+  ) {
+    throw new Error('Relationship API board contract did not project the latest follow-up marker.');
+  }
   if (!calls.some((call) => call.path === 'agent_relationship_events')) {
     throw new Error('Relationship API pin contract did not append an event.');
   }
@@ -160,6 +181,31 @@ async function verifyApiContract() {
   }, response);
   if (response.statusCode !== 200 || responsePayload?.event?.id !== 'event-1') {
     throw new Error('Relationship API historical open-house contract did not append an event.');
+  }
+
+  responsePayload = null;
+  await apiModule.exports({
+    method: 'POST',
+    headers: { 'x-admin-token': 'relationship-verification-token' },
+    query: {},
+    body: {
+      action: 'follow_up',
+      follow_up: true,
+      title: 'Call about the next open house',
+      agent: { name: 'Test Agent', phone: '(516) 555-1212' },
+      source_record_id: 'verification-follow-up',
+      include_board: false
+    }
+  }, response);
+  if (response.statusCode !== 200 || responsePayload?.event?.id !== 'event-1') {
+    throw new Error('Relationship API follow-up contract did not append an event.');
+  }
+  const followUpEventCall = calls
+    .filter((call) => call.path === 'agent_relationship_events' && call.options?.method === 'POST')
+    .map((call) => JSON.parse(call.options.body))
+    .find((event) => event.event_type === 'follow_up_marked');
+  if (followUpEventCall?.metadata?.title !== 'Call about the next open house') {
+    throw new Error('Relationship API follow-up contract did not preserve follow-up metadata.');
   }
 
   responsePayload = null;

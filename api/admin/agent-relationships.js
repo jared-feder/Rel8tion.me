@@ -161,10 +161,11 @@ async function ensureRelationship(agent) {
 }
 
 async function loadBoard(limitValue) {
-  const limit = Math.max(1, Math.min(Number(limitValue) || 1000, 5000));
-  const pageSize = Math.min(limit, 1000);
+  const requestedLimit = Math.max(1, Math.min(Number(limitValue) || 1000, 5000));
+  const fetchLimit = 5000;
+  const pageSize = 1000;
   const rows = [];
-  while (rows.length < limit) {
+  while (rows.length < fetchLimit) {
     const page = await supabaseRest(
       `agent_board_v1?select=*&order=pinned.desc,priority_rank.asc.nullslast,confirmed_open_houses.desc,last_contact_at.desc.nullslast,name.asc&limit=${pageSize}&offset=${rows.length}`
     );
@@ -172,20 +173,43 @@ async function loadBoard(limitValue) {
     rows.push(...page);
     if (page.length < pageSize) break;
   }
-  const visibleRows = rows.slice(0, limit);
-  const historicalEvents = await supabaseRest(
-    'agent_relationship_events?event_type=in.(historical_open_house_confirmed,historical_open_house_removed)&select=id,relationship_id,event_type,occurred_at&order=occurred_at.asc&limit=5000'
+  const stateEvents = await supabaseRest(
+    'agent_relationship_events?event_type=in.(historical_open_house_confirmed,historical_open_house_removed,follow_up_marked,follow_up_cleared)&select=id,relationship_id,event_type,summary,occurred_at,metadata&order=occurred_at.desc&limit=5000'
   );
   const latestHistoricalState = new Map();
-  for (const event of historicalEvents) {
-    if (event.relationship_id) latestHistoricalState.set(event.relationship_id, event);
+  const latestFollowUpState = new Map();
+  for (const event of stateEvents) {
+    if (!event.relationship_id) continue;
+    if (
+      !latestHistoricalState.has(event.relationship_id)
+      && (event.event_type === 'historical_open_house_confirmed' || event.event_type === 'historical_open_house_removed')
+    ) {
+      latestHistoricalState.set(event.relationship_id, event);
+    }
+    if (
+      !latestFollowUpState.has(event.relationship_id)
+      && (event.event_type === 'follow_up_marked' || event.event_type === 'follow_up_cleared')
+    ) {
+      latestFollowUpState.set(event.relationship_id, event);
+    }
   }
-  return visibleRows.map((row) => {
+  return rows.map((row, sourceOrder) => {
     const historicalEvent = latestHistoricalState.get(row.id);
+    const followUpEvent = latestFollowUpState.get(row.id);
     const historicalOpenHouseAgent = historicalEvent?.event_type === 'historical_open_house_confirmed';
+    const followUpMarked = followUpEvent?.event_type === 'follow_up_marked';
+    const followUpMetadata = followUpEvent?.metadata && typeof followUpEvent.metadata === 'object'
+      ? followUpEvent.metadata
+      : {};
     const relationshipSources = Array.isArray(row.relationship_sources) ? row.relationship_sources : [];
     return {
       ...row,
+      follow_up_marked: followUpMarked,
+      follow_up_title: followUpMarked ? clean(followUpMetadata.title || followUpEvent?.summary, 1000) : '',
+      follow_up_due_at: followUpMarked ? clean(followUpMetadata.due_at, 100) : '',
+      follow_up_note: followUpMarked ? clean(followUpMetadata.note, 4000) : '',
+      follow_up_marked_at: followUpMarked ? clean(followUpEvent?.occurred_at, 100) : '',
+      _source_order: sourceOrder,
       historical_open_house_agent: historicalOpenHouseAgent,
       historical_open_houses: historicalOpenHouseAgent ? 1 : 0,
       worked_with_agent: Boolean(row.worked_with_agent || historicalOpenHouseAgent),
@@ -193,7 +217,13 @@ async function loadBoard(limitValue) {
         ? [...new Set([...relationshipSources, 'historical_open_house'])]
         : relationshipSources.filter((source) => source !== 'historical_open_house')
     };
-  });
+  }).sort((left, right) => (
+    Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
+    || (Number.isFinite(Number(left.priority_rank)) ? Number(left.priority_rank) : 1_000_000)
+      - (Number.isFinite(Number(right.priority_rank)) ? Number(right.priority_rank) : 1_000_000)
+    || Number(Boolean(right.follow_up_marked)) - Number(Boolean(left.follow_up_marked))
+    || left._source_order - right._source_order
+  )).slice(0, requestedLimit).map(({ _source_order, ...row }) => row);
 }
 
 async function loadScheduledOpenHouses(fromValue, toValue) {
@@ -378,6 +408,31 @@ async function mutateRelationship(body) {
       relationship,
       event,
       message: `${relationship.display_name} ${worked ? 'was added to' : 'was removed from'} historical open-house matches.`
+    };
+  }
+
+  if (action === 'follow_up') {
+    const followUp = body.follow_up !== false;
+    const title = clean(body.title, 1000) || `Follow up with ${relationship.display_name}`;
+    const event = await recordEvent(
+      relationship.id,
+      {
+        ...body,
+        metadata: followUp
+          ? {
+              title,
+              due_at: clean(body.due_at, 100) || null,
+              note: clean(body.note, 4000) || null
+            }
+          : {}
+      },
+      followUp ? 'follow_up_marked' : 'follow_up_cleared',
+      followUp ? title : 'Follow-up marker cleared'
+    );
+    return {
+      relationship,
+      event,
+      message: `${relationship.display_name} ${followUp ? 'was marked for follow-up' : 'was cleared from follow-up'}.`
     };
   }
 

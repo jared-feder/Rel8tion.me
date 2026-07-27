@@ -448,3 +448,10 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` Scheduled, non-cancelled `field_demo_visits` are returned with their canonical coverage times, agent identity, and property address enriched from the linked outreach queue and open-house listing.
 - `[SECURITY]` The schedule view uses the existing dedicated `REL8TION_RELATIONSHIP_TOKEN`; it does not expose the general admin dashboard or allow schedule mutations.
 - `[IMPLEMENTED]` Older open houses that predate `field_demo_visits` can be preserved as append-only `historical_open_house_confirmed` relationship events. A later removal is also append-only, so the audit history is retained.
+
+## 2026-07-27: Shared agent follow-up marker
+
+- `[IMPLEMENTED]` REL8TION COMMAND can mark or clear an agent for follow-up from outreach and confirmed-open-house agent controls.
+- `[IMPLEMENTED]` Follow-up state is appended to the existing `agent_relationship_events` stream as `follow_up_marked` or `follow_up_cleared`; no agent, note, pin, or open-house rows are replaced.
+- `[IMPLEMENTED]` `/api/admin/agent-relationships` projects the latest follow-up state and its optional title, due time, note, and marked time for REL8TION OS.
+- `[NEEDS VERIFICATION]` Production deployment and the live REL8TION OS read are not claimed until both apps are deployed and checked.

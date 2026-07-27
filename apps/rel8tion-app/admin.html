@@ -2140,6 +2140,23 @@
       return Boolean(agentRelationship(row)?.pinned);
     }
 
+    function agentNeedsFollowUp(row) {
+      return Boolean(agentRelationship(row)?.follow_up_marked);
+    }
+
+    function relationshipAgentPayload(thread) {
+      return {
+        id: thread.agent_id || thread.queue_row_id || thread.id,
+        agent_slug: thread.agent_slug || thread.slug || '',
+        name: thread.agent_name || thread.name,
+        phone: thread.agent_phone || thread.phone,
+        phone_normalized: thread.agent_phone_normalized || thread.phone_normalized,
+        email: thread.agent_email || thread.email,
+        brokerage: thread.brokerage || thread.company,
+        photo_url: thread.agent_photo_url || thread.photo_url
+      };
+    }
+
     async function toggleAgentPin(key) {
       const thread = findThread(key);
       if (!thread) {
@@ -2154,16 +2171,7 @@
           method: 'POST',
           body: JSON.stringify({
             action: pinned ? 'unpin' : 'pin',
-            agent: {
-              id: thread.agent_id || thread.queue_row_id || thread.id,
-              agent_slug: thread.agent_slug || thread.slug || '',
-              name: thread.agent_name || thread.name,
-              phone: thread.agent_phone || thread.phone,
-              phone_normalized: thread.agent_phone_normalized || thread.phone_normalized,
-              email: thread.agent_email || thread.email,
-              brokerage: thread.brokerage || thread.company,
-              photo_url: thread.agent_photo_url || thread.photo_url
-            },
+            agent: relationshipAgentPayload(thread),
             source_system: 'rel8tion_admin',
             source_table: 'agent_outreach_queue',
             source_record_id: `${thread.queue_row_id || thread.id}:${pinned ? 'unpin' : 'pin'}:${Date.now()}`
@@ -2176,6 +2184,39 @@
       } catch (error) {
         state.actionKey = '';
         showToast(error.message || 'Unable to update the agent pin.');
+        render();
+      }
+    }
+
+    async function toggleAgentFollowUp(key) {
+      const thread = findThread(key);
+      if (!thread) {
+        showToast('Agent record was not found.');
+        return;
+      }
+      const followUpMarked = agentNeedsFollowUp(thread);
+      state.actionKey = actionId(followUpMarked ? 'clear_agent_follow_up' : 'mark_agent_follow_up', key);
+      render();
+      try {
+        const result = await api('/api/admin/agent-relationships', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'follow_up',
+            follow_up: !followUpMarked,
+            title: `Follow up with ${thread.agent_name || thread.name || 'agent'}`,
+            agent: relationshipAgentPayload(thread),
+            source_system: 'rel8tion_admin',
+            source_table: 'agent_outreach_queue',
+            source_record_id: `${thread.queue_row_id || thread.id}:follow_up:${Date.now()}`
+          })
+        });
+        state.relationships = result.agents || state.relationships;
+        state.actionKey = '';
+        showToast(result.message || (followUpMarked ? 'Follow-up cleared.' : 'Agent marked for follow-up.'));
+        render();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to update the follow-up marker.');
         render();
       }
     }
@@ -4085,6 +4126,9 @@ ${rowsHtml}
       document.querySelectorAll('[data-toggle-agent-pin]').forEach((button) => {
         button.addEventListener('click', () => toggleAgentPin(button.dataset.toggleAgentPin));
       });
+      document.querySelectorAll('[data-toggle-agent-follow-up]').forEach((button) => {
+        button.addEventListener('click', () => toggleAgentFollowUp(button.dataset.toggleAgentFollowUp));
+      });
       document.querySelectorAll('[data-confirm-open-house]').forEach((button) => {
         button.addEventListener('click', () => confirmOpenHouse(button.dataset.confirmOpenHouse));
       });
@@ -4500,6 +4544,8 @@ ${rowsHtml}
       const markBusy = state.actionKey === actionId('mark_interested', key);
       const pinned = agentIsPinned(thread);
       const pinBusy = state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', key);
+      const followUpMarked = agentNeedsFollowUp(thread);
+      const followUpBusy = state.actionKey === actionId(followUpMarked ? 'clear_agent_follow_up' : 'mark_agent_follow_up', key);
       const confirmLabel = confirmed ? 'Update date' : 'Confirm OH';
       return `
         <div class="data-row">
@@ -4532,6 +4578,9 @@ ${rowsHtml}
                 </button>
                 <button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(key)}" ${pinBusy ? 'disabled' : ''}>
                   <i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned' : 'Pin to top'}</span>
+                </button>
+                <button class="btn ${followUpMarked ? 'primary' : 'soft'}" data-toggle-agent-follow-up="${esc(key)}" ${followUpBusy ? 'disabled' : ''}>
+                  <i data-lucide="bell-ring"></i><span>${followUpBusy ? 'Saving...' : followUpMarked ? 'Follow-up marked' : 'Mark follow-up'}</span>
                 </button>
                 <button class="btn primary" data-confirm-open-house="${esc(key)}" ${optedOut || confirmBusy ? 'disabled' : ''}>
                   <i data-lucide="badge-check"></i><span>${confirmBusy ? 'Saving...' : confirmLabel}</span>
@@ -4802,6 +4851,8 @@ ${rowsHtml}
       const dripBusy = state.actionKey === actionId('schedule_drip', key);
       const pinned = agentIsPinned(thread);
       const pinBusy = state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', key);
+      const followUpMarked = agentNeedsFollowUp(thread);
+      const followUpBusy = state.actionKey === actionId(followUpMarked ? 'clear_agent_follow_up' : 'mark_agent_follow_up', key);
       const hasVisit = Boolean(assignment.visit || assignment.report);
       const accepted = thread.review_status === 'accepted_open_house' || Boolean(assignment.participant);
       const confirmed = thread.review_status === 'confirmed_open_house' || (hasVisit && !accepted);
@@ -4823,6 +4874,9 @@ ${rowsHtml}
             <div class="row-actions">
               <button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(key)}" ${pinBusy ? 'disabled' : ''}>
                 <i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned to top' : 'Pin to top'}</span>
+              </button>
+              <button class="btn ${followUpMarked ? 'primary' : 'soft'}" data-toggle-agent-follow-up="${esc(key)}" ${followUpBusy ? 'disabled' : ''}>
+                <i data-lucide="bell-ring"></i><span>${followUpBusy ? 'Saving...' : followUpMarked ? 'Follow-up marked' : 'Mark follow-up'}</span>
               </button>
               <button class="btn soft" data-mark-interested="${esc(key)}" ${disabled || markBusy ? 'disabled' : ''}>
                 <i data-lucide="thumbs-up"></i><span>${markBusy ? 'Marking...' : 'Mark interested'}</span>
@@ -5736,6 +5790,8 @@ ${rowsHtml}
       const reportThread = reportRowToThread(row);
       const pinned = agentIsPinned(reportThread);
       const pinBusy = updateKey && state.actionKey === actionId(pinned ? 'unpin_agent' : 'pin_agent', updateKey);
+      const followUpMarked = agentNeedsFollowUp(reportThread);
+      const followUpBusy = updateKey && state.actionKey === actionId(followUpMarked ? 'clear_agent_follow_up' : 'mark_agent_follow_up', updateKey);
       const listedWindow = reportDisplayWindow(
         row.listed_open_start || (!row.confirmed_coverage_start ? row.scheduled_start : ''),
         row.listed_open_end || (!row.confirmed_coverage_end ? row.scheduled_end : '')
@@ -5760,6 +5816,7 @@ ${rowsHtml}
               ${badge(row.review_status || 'confirmed open house', 'info')}
               ${badge(`${row.message_count || 0} messages`, row.message_count ? 'ok' : 'warn')}
               ${updateKey ? `<button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(updateKey)}" ${pinBusy ? 'disabled' : ''}><i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned' : 'Pin to top'}</span></button>` : ''}
+              ${updateKey ? `<button class="btn ${followUpMarked ? 'primary' : 'soft'}" data-toggle-agent-follow-up="${esc(updateKey)}" ${followUpBusy ? 'disabled' : ''}><i data-lucide="bell-ring"></i><span>${followUpBusy ? 'Saving...' : followUpMarked ? 'Follow-up marked' : 'Mark follow-up'}</span></button>` : ''}
               ${updateKey ? `<button class="btn soft" data-confirm-open-house="${esc(updateKey)}" ${updateBusy ? 'disabled' : ''}><i data-lucide="calendar-days"></i><span>${updateBusy ? 'Saving...' : 'Update date'}</span></button>` : ''}
             </div>
             <div class="report-detail-grid">
