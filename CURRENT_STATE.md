@@ -10,6 +10,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The admin dashboard loads all field visits and visit participants in bounded pages and separately loads every confirmed/accepted outreach row, rather than depending on the newest 1,000 outreach rows or the first 250 visits to reconstruct history.
 - `[IMPLEMENTED]` Confirmed report cards no longer stop rendering after 120 rows. Upcoming and Previous filters remain available when the operator wants a narrower view.
 - `[IMPLEMENTED]` Reports includes a **Replies awaiting confirmation** recovery lane. REL8TION COMMAND loads up to 600 historical reply threads with chunked queue/message enrichment so older affirmative replies can be reviewed and promoted with the correct event date instead of being silently omitted or automatically misclassified.
+- `[IMPLEMENTED]` The recovery lane inspects saved inbound messages, not only the thread's latest direction, so a later outbound follow-up cannot hide an older agent reply that still needs confirmation review.
 
 ## 2026-07-26: Printed agent QR to Event Pass conversion
 

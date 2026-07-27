@@ -5481,6 +5481,12 @@ ${rowsHtml}
         .sort(compareConfirmedRows);
     }
 
+    function latestInboundMessage(thread) {
+      return [...(thread.messages || [])]
+        .reverse()
+        .find((message) => message.direction !== 'outbound' && message.body) || null;
+    }
+
     function unfiledConfirmationRows() {
       const excluded = new Set([
         'confirmed_open_house',
@@ -5493,23 +5499,19 @@ ${rowsHtml}
       return filterByQuery(state.inbox || [])
         .filter((thread) =>
           thread.queue_row_id &&
-          thread.direction !== 'outbound' &&
           !isUnlinkedAndroidThread(thread) &&
           !isOptOutThread(thread) &&
           !excluded.has(thread.review_status) &&
-          (
-            thread.latest_reply_body ||
-            (thread.messages || []).some((message) => message.direction !== 'outbound' && message.body)
-          )
+          latestInboundMessage(thread)
         )
         .sort(newestFirst);
     }
 
     function renderUnfiledConfirmationCard(thread) {
       const key = thread.thread_key || thread.queue_row_id;
-      const reply = thread.latest_reply_body ||
-        [...(thread.messages || [])].reverse().find((message) => message.direction !== 'outbound' && message.body)?.body ||
-        'Reply received.';
+      const inbound = latestInboundMessage(thread);
+      const reply = inbound?.body || 'Reply received.';
+      const receivedAt = inbound?.received_at || inbound?.created_at || thread.last_reply_at || thread.created_at;
       const openWindow = reportDisplayWindow(thread.open_start, thread.open_end);
       const busy = state.actionKey === actionId('confirm_open_house', key);
       return `
@@ -5523,7 +5525,7 @@ ${rowsHtml}
           </div>
           <div class="conversation-preview">${esc(reply)}</div>
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
-            <span class="small">Received ${esc(fmtDate(thread.last_reply_at || thread.created_at))}</span>
+            <span class="small">Received ${esc(fmtDate(receivedAt))}</span>
             <button class="btn primary" data-confirm-open-house="${esc(key)}" ${busy ? 'disabled' : ''}>
               <i data-lucide="calendar-check"></i><span>${busy ? 'Saving...' : 'Review & confirm'}</span>
             </button>
