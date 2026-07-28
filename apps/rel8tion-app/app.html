@@ -871,7 +871,7 @@
         const visible = mobile ? items.slice(0, 4) : items;
         const withMore = mobile && items.length > 4 ? [...visible, ['settings', 'More', '•••', 'settings.manage']] : visible;
         return withMore.map(([view, label, icon]) => `
-          <a class="${mobile ? '' : 'nav-link '}${state.view === view ? 'active' : ''}" href="/${view === 'home' ? 'home' : view}" data-view="${esc(view)}">
+          <a class="${mobile ? '' : 'nav-link '}${state.view === view ? 'active' : ''}" href="${view === 'home' ? '/' : `/${view}`}" data-view="${esc(view)}">
             ${mobile ? `<b>${esc(icon)}</b><span>${esc(label)}</span>` : `<span class="nav-icon">${esc(icon)}</span><span>${esc(label)}</span>`}
           </a>`).join('');
       }
@@ -884,7 +884,7 @@
         root.innerHTML = `
           <div class="app-layout">
             <aside class="sidebar">
-              <a class="brand" href="/home" data-view="home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
+              <a class="brand" href="/" data-view="home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
               <nav class="sidebar-nav" aria-label="Main application navigation">${navMarkup(false)}</nav>
               <div class="sidebar-bottom">
                 ${can('platform.admin') ? '<a class="nav-link" href="/admin"><span class="nav-icon">⌘</span><span>Platform admin</span></a>' : ''}
@@ -1031,7 +1031,7 @@
           if (event.currentTarget.origin && event.currentTarget.origin !== location.origin) return;
           event.preventDefault();
           state.view = event.currentTarget.dataset.view || 'home';
-          history.pushState({}, '', state.view === 'home' ? '/home' : `/${state.view}`);
+          history.pushState({}, '', state.view === 'home' ? '/' : `/${state.view}`);
           appShell();
         }));
         document.getElementById('aiForm')?.addEventListener('submit', (event) => {

@@ -27,11 +27,11 @@ const adminSummary = read('api/app/admin-summary.js');
 const appAuth = read('lib/app-auth.js');
 
 assert(!fs.existsSync(path.join(ROOT, 'index.html')), 'A root index.html shadows the universal app rewrite on Vercel.');
-assert.strictEqual(rewriteDestination(config, '/'), '/apps/rel8tion-app/app.html', 'Root must use the universal app shell.');
-assert.strictEqual(rewriteDestination(config, '/home'), '/apps/rel8tion-app/app.html', '/home must use the shared shell.');
+assert.strictEqual(rewriteDestination(config, '/'), '/apps/rel8tion-app/app', 'Root must use the universal app shell artifact.');
+assert.strictEqual(rewriteDestination(config, '/relationships'), '/apps/rel8tion-app/app', 'Shared routes must use the clean app artifact.');
 assert.strictEqual(rewriteDestination(config, '/admin'), '/api/app/admin-entry', '/admin must be server-gated.');
 assert.strictEqual(rewriteDestination(config, '/admin.html'), '/api/app/admin-entry', '/admin.html must be server-gated.');
-assert.strictEqual(rewriteDestination(config, '/command'), '/apps/rel8tion-app/admin.html', 'Legacy COMMAND must remain available separately.');
+assert.strictEqual(rewriteDestination(config, '/command'), '/apps/rel8tion-app/admin', 'Legacy COMMAND must remain available separately.');
 
 const permanentRoutes = new Map([
   ['/k', '/apps/rel8tion-app/k.html'],
