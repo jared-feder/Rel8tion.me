@@ -107,6 +107,14 @@ function candidateSummary(candidates, tracked) {
 function cleanSourceNeedsWrapper(source, destination) {
   const src = String(source || '');
   const dest = String(destination || '');
+  // Universal authenticated and protected internal routes intentionally use
+  // application-owned shells. They are not physical QR/NFC URL contracts and
+  // do not need duplicate root wrappers.
+  if ([
+    '/apps/rel8tion-app/app.html',
+    '/apps/rel8tion-app/platform-admin.html',
+    '/apps/rel8tion-app/admin.html'
+  ].includes(dest)) return false;
   return src.startsWith('/')
     && src !== '/'
     && !src.includes(':')
