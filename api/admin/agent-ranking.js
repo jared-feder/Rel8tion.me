@@ -1759,7 +1759,7 @@ async function handleConfirm(body, auth) {
 async function handleList(req) {
   const filters = parseRankingFilters(req);
   const page = Math.max(1, Number.parseInt(readQuery(req, 'page') || '1', 10) || 1);
-  const pageSize = clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 250);
+  const pageSize = clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 1000);
   const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
   const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
   const [rankings, uploads] = await Promise.all([

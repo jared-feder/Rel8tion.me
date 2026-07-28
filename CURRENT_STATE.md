@@ -8,7 +8,8 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` The Agent Ranking GET endpoint accepts a dedicated server-only `REL8TION_RANKING_TOKEN` through `x-rel8tion-ranking-token`, allowing REL8TION OS to read ranking records without receiving the broad reset/admin credential.
 - `[IMPLEMENTED]` The dedicated token is read-only. Agent Ranking POST actions still require the existing admin authorization path, and invalid ranking tokens return HTTP 401.
-- `[PARTIAL]` The same generated `REL8TION_RANKING_TOKEN` is configured as a Sensitive, Production-only Vercel variable and in the REL8TION OS backend. Deployment and live ranking-card verification remain outstanding.
+- `[IMPLEMENTED]` Authenticated list reads accept a bounded page size of up to 1,000 records so REL8TION OS can load the complete ranking population without silently stopping at the first 5,000 agents.
+- `[PARTIAL]` The same generated `REL8TION_RANKING_TOKEN` is configured as a Sensitive, Production-only Vercel variable and in the REL8TION OS backend. The initial token deployment is live; complete-population deployment and final ranking-card verification remain outstanding.
 
 ## 2026-07-27: Event Pass QR batch printing in REL8TION COMMAND
 
