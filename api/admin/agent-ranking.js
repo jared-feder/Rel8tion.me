@@ -1,3 +1,4 @@
+const { timingSafeEqual } = require('crypto');
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 const {
   buildPitch,
@@ -17,6 +18,8 @@ const {
 } = require('../../lib/agent-ranking');
 const { buildOpenHouseRows, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
+
+const REL8TION_RANKING_TOKEN = process.env.REL8TION_RANKING_TOKEN || '';
 
 const OPEN_HOUSE_BASE_SELECT = [
   'id',
@@ -124,6 +127,25 @@ function readQuery(req, name) {
   } catch (_) {
     return '';
   }
+}
+
+function rankingReadAuthorized(req) {
+  const provided = String(
+    req.headers?.['x-rel8tion-ranking-token']
+    || req.headers?.['X-Rel8tion-Ranking-Token']
+    || ''
+  ).trim();
+  if (REL8TION_RANKING_TOKEN && provided) {
+    const expectedBuffer = Buffer.from(REL8TION_RANKING_TOKEN);
+    const providedBuffer = Buffer.from(provided);
+    if (
+      expectedBuffer.length === providedBuffer.length
+      && timingSafeEqual(expectedBuffer, providedBuffer)
+    ) {
+      return { ok: true, method: 'ranking_token' };
+    }
+  }
+  return adminAuthorized(req);
 }
 
 function uploadMetadata(body, auth) {
@@ -1944,16 +1966,21 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (req.method === 'GET') {
+      const auth = rankingReadAuthorized(req);
+      if (!auth.ok) {
+        sendJson(res, 401, { ok: false, error: auth.error });
+        return;
+      }
+      const payload = await handleList(req);
+      sendJson(res, 200, { ok: true, ...payload });
+      return;
+    }
+
     assertAdminConfig();
     const auth = adminAuthorized(req);
     if (!auth.ok) {
       sendJson(res, 401, { ok: false, error: auth.error });
-      return;
-    }
-
-    if (req.method === 'GET') {
-      const payload = await handleList(req);
-      sendJson(res, 200, { ok: true, ...payload });
       return;
     }
 

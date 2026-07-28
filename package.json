@@ -5,6 +5,7 @@
     "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
     "verify:chip-qr-conversion": "node scripts/verify-chip-qr-conversion.cjs",
     "verify:agent-ranking-identity": "node scripts/verify-agent-ranking-identity.cjs",
+    "verify:agent-ranking-token": "node scripts/verify-agent-ranking-token.cjs",
     "verify:rel8tionos-api": "node scripts/verify-rel8tionos-api.cjs",
     "verify:kit-pricing": "node scripts/verify-open-house-kit-pricing.cjs",
     "verify:agent-relationships": "node scripts/verify-agent-relationship-stream.cjs",
