@@ -51,7 +51,7 @@ The current product connects:
 REL8TION is deliberately lightweight:
 
 - `[IMPLEMENTED]` Static Vercel pages in `apps/rel8tion-app`.
-- `[IMPLEMENTED]` Root static wrappers and public pages such as `a.html` and `b.html`. On the role-aware feature branch, the obsolete root smoke-test `index.html` is removed so it cannot shadow the universal `/` rewrite in Vercel's static filesystem.
+- `[IMPLEMENTED]` Root static wrappers and public pages such as `a.html` and `b.html`. On the role-aware feature branch, the obsolete root `index.html` smoke test and `admin.html` forwarding alias are removed so Vercel's static filesystem cannot shadow the universal `/` rewrite or bypass the server-authorized `/admin` entry.
 - `[IMPLEMENTED]` Root Vercel serverless API routes under `api/`.
 - `[IMPLEMENTED]` A private server-to-server Rel8tionOS API under `api/rel8tionos/` exposes scoped outreach conversation, reply, Open House acceptance, and loan-officer assignment operations. Outreach thread projections include `agent.photo_url` from the queue's current enriched agent photo. It authenticates with a dedicated server-only shared key and returns no-store, versioned JSON responses.
 - `[IMPLEMENTED]` The private relationship schedule feed reads confirmed field visits for a requested time range and collapses duplicate visit rows by open-house identity, scheduled window, and agent identity without altering source records.

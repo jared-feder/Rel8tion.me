@@ -27,6 +27,7 @@ const adminSummary = read('api/app/admin-summary.js');
 const appAuth = read('lib/app-auth.js');
 
 assert(!fs.existsSync(path.join(ROOT, 'index.html')), 'A root index.html shadows the universal app rewrite on Vercel.');
+assert(!fs.existsSync(path.join(ROOT, 'admin.html')), 'A root admin.html bypasses the server-authorized /admin route on Vercel.');
 assert.strictEqual(rewriteDestination(config, '/'), '/apps/rel8tion-app/app', 'Root must use the universal app shell artifact.');
 assert.strictEqual(rewriteDestination(config, '/relationships'), '/apps/rel8tion-app/app', 'Shared routes must use the clean app artifact.');
 assert.strictEqual(rewriteDestination(config, '/admin'), '/api/app/admin-entry', '/admin must be server-gated.');
