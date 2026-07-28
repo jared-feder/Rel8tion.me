@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-28: Read-only REL8TION Agent Ranking API token
+
+- `[IMPLEMENTED]` The Agent Ranking GET endpoint accepts a dedicated server-only `REL8TION_RANKING_TOKEN` through `x-rel8tion-ranking-token`, allowing REL8TION OS to read ranking records without receiving the broad reset/admin credential.
+- `[IMPLEMENTED]` The dedicated token is read-only. Agent Ranking POST actions still require the existing admin authorization path, and invalid ranking tokens return HTTP 401.
+- `[PARTIAL]` The same generated `REL8TION_RANKING_TOKEN` is configured as a Sensitive, Production-only Vercel variable and in the REL8TION OS backend. Deployment and live ranking-card verification remain outstanding.
+
 ## 2026-07-27: Event Pass QR batch printing in REL8TION COMMAND
 
 - `[IMPLEMENTED]` REL8TION COMMAND's QR Batch Printing control now offers an Agent Rel8tionChip / Event Pass dropdown and exports 1-100 selected codes as a fulfillment ZIP with a CSV, matching 1024px PNG files, and a README.
