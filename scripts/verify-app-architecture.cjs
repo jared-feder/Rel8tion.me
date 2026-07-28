@@ -26,6 +26,7 @@ const adminEntry = read('api/app/admin-entry.js');
 const adminSummary = read('api/app/admin-summary.js');
 const appAuth = read('lib/app-auth.js');
 
+assert(!fs.existsSync(path.join(ROOT, 'index.html')), 'A root index.html shadows the universal app rewrite on Vercel.');
 assert.strictEqual(rewriteDestination(config, '/'), '/apps/rel8tion-app/app.html', 'Root must use the universal app shell.');
 assert.strictEqual(rewriteDestination(config, '/home'), '/apps/rel8tion-app/app.html', '/home must use the shared shell.');
 assert.strictEqual(rewriteDestination(config, '/admin'), '/api/app/admin-entry', '/admin must be server-gated.');
