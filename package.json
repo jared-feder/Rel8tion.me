@@ -4,7 +4,6 @@
     "lint": "node scripts/verify-app-architecture.cjs",
     "typecheck": "node scripts/verify-app-architecture.cjs",
     "test": "node tests/app-auth.test.cjs",
-    "build": "npm run verify:routes && npm run verify:app",
     "verify:app": "node scripts/verify-app-architecture.cjs",
     "verify:routes": "node scripts/verify-route-map.cjs",
     "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
