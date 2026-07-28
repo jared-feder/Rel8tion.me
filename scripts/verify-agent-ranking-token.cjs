@@ -23,6 +23,10 @@ async function invoke(handler, method, headers = {}) {
 }
 
 async function verify() {
+  if (!apiSource.includes("clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 1000)")) {
+    throw new Error('Agent Ranking GET pagination no longer supports the bounded 1,000-row REL8TION OS page size.');
+  }
+
   const originalToken = process.env.REL8TION_RANKING_TOKEN;
   process.env.REL8TION_RANKING_TOKEN = 'ranking-verification-token';
   const apiModule = { exports: {} };
