@@ -44,6 +44,7 @@ GET /threads?filter=needs_reply&limit=40&cursor=2026-07-15T12:00:00.000Z
 ```
 
 Supported filters are `all`, `inbound`, `needs_reply`, `interested`, and `opt_out`. Only conversations linked to a REL8TION outreach queue row are returned.
+Each thread's agent object includes `photo_url`, projected from `agent_outreach_queue.agent_photo_url`, so Rel8tionOS can display the current enriched agent portrait.
 
 ### Conversation detail
 
@@ -52,6 +53,7 @@ GET /messages?thread_id=<queue-row-uuid>
 ```
 
 Returns the property/agent context, the ordered message history, and any linked Open House field assignment.
+The detail response uses the same agent object, including `photo_url`.
 
 ### Send a reply
 

@@ -15,6 +15,7 @@ const queueRow = {
   agent_phone: '(516) 555-8059',
   agent_phone_normalized: '5165558059',
   agent_email: 'owner@example.test',
+  agent_photo_url: 'https://example.test/agent.jpg',
   brokerage: 'REL8TION Test',
   address: '118 S 31st St',
   city: 'Wyandanch',
@@ -125,12 +126,14 @@ async function main() {
   const listed = await outreach.listThreads({ filter: 'needs_reply', limit: 10 });
   assert.equal(listed.threads.length, 1);
   assert.equal(listed.threads[0].id, THREAD_ID);
+  assert.equal(listed.threads[0].agent.photo_url, queueRow.agent_photo_url);
   assert.equal(listed.threads[0].latest_message.body, 'TEST');
   assert.equal(listed.threads[0].can_reply, true);
   await assert.rejects(() => outreach.listThreads({ filter: 'surprise' }), /filter must be/);
 
   const detail = await outreach.getThread(THREAD_ID);
   assert.equal(detail.thread.id, THREAD_ID);
+  assert.equal(detail.thread.agent.photo_url, queueRow.agent_photo_url);
   assert.equal(detail.messages.length, 1);
   assert.equal(detail.messages[0].message_sid, 'SM_TEST');
 
