@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1830">
+  <title>Rel8tion</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #0b1830;
+      --ink-soft: #233655;
+      --muted: #63718a;
+      --line: #dce5f0;
+      --panel: rgba(255, 255, 255, .92);
+      --panel-strong: #fff;
+      --canvas: #f3f7fb;
+      --blue: #1768f2;
+      --blue-deep: #0b47b8;
+      --cyan: #41c9ef;
+      --lime: #bff06a;
+      --orange: #ffb15b;
+      --red: #d83a52;
+      --shadow: 0 24px 70px rgba(15, 39, 73, .12);
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --radius-sm: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--canvas); }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 4% -8%, rgba(65, 201, 239, .28), transparent 30rem),
+        radial-gradient(circle at 96% 5%, rgba(23, 104, 242, .16), transparent 26rem),
+        var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 3px solid rgba(23, 104, 242, .35); outline-offset: 3px; }
+
+    .loading-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .loading-mark {
+      width: 64px;
+      height: 64px;
+      border: 7px solid rgba(23, 104, 242, .15);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: -.045em;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      color: white;
+      background: linear-gradient(135deg, var(--cyan), var(--blue) 66%, var(--blue-deep));
+      box-shadow: 0 10px 24px rgba(23, 104, 242, .28);
+      font-size: 16px;
+      letter-spacing: -.08em;
+    }
+
+    .gateway {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .gateway-header {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .quiet-link {
+      border: 0;
+      background: transparent;
+      color: var(--ink-soft);
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .gateway-main {
+      width: min(1180px, calc(100% - 32px));
+      margin: auto;
+      padding: 26px 0 58px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(340px, .92fr);
+      gap: clamp(28px, 6vw, 88px);
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+      color: var(--blue-deep);
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 8px;
+      height: 8px;
+      content: "";
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 0 5px rgba(65, 201, 239, .14);
+    }
+
+    .gateway h1 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(45px, 7.2vw, 92px);
+      line-height: .96;
+      letter-spacing: -.075em;
+    }
+
+    .gateway-lede {
+      max-width: 650px;
+      margin: 24px 0 0;
+      color: var(--ink-soft);
+      font-size: clamp(17px, 2vw, 21px);
+      line-height: 1.55;
+    }
+
+    .gateway-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .gateway-points span {
+      padding: 9px 12px;
+      border: 1px solid rgba(11, 24, 48, .08);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .62);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .gateway-card {
+      position: relative;
+      padding: clamp(22px, 4vw, 36px);
+      border: 1px solid rgba(255, 255, 255, .84);
+      border-radius: 34px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .gateway-card::before {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      right: -35px;
+      top: -45px;
+      content: "";
+      border-radius: 50%;
+      background: linear-gradient(145deg, rgba(191, 240, 106, .7), rgba(65, 201, 239, .18));
+      filter: blur(4px);
+      pointer-events: none;
+    }
+
+    .gateway-card h2 {
+      position: relative;
+      margin: 0 0 8px;
+      font-size: 25px;
+      letter-spacing: -.04em;
+    }
+
+    .gateway-card > p {
+      position: relative;
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .gateway-actions { display: grid; gap: 11px; position: relative; }
+
+    .action-button {
+      min-height: 58px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 13px 17px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: #fff;
+      color: var(--ink);
+      text-align: left;
+      text-decoration: none;
+      font-weight: 850;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .action-button:hover {
+      transform: translateY(-2px);
+      border-color: rgba(23, 104, 242, .35);
+      box-shadow: 0 12px 28px rgba(15, 39, 73, .09);
+    }
+
+    .action-button.primary {
+      border-color: transparent;
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .action-button .arrow {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: rgba(23, 104, 242, .09);
+      color: var(--blue);
+    }
+
+    .action-button.primary .arrow { background: rgba(255, 255, 255, .12); color: #fff; }
+
+    .gateway-footer {
+      padding: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .notice {
+      margin-bottom: 18px;
+      padding: 13px 15px;
+      border: 1px solid rgba(216, 58, 82, .18);
+      border-radius: 14px;
+      background: rgba(216, 58, 82, .07);
+      color: #8f2337;
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.45;
+    }
+
+    .notice.info {
+      border-color: rgba(23, 104, 242, .18);
+      background: rgba(23, 104, 242, .07);
+      color: var(--blue-deep);
+    }
+
+    .auth-panel {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .form-grid { display: grid; gap: 13px; }
+    .form-label { display: grid; gap: 7px; color: var(--ink-soft); font-size: 12px; font-weight: 850; }
+    .form-input {
+      min-height: 51px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .form-input:focus { border-color: var(--blue); outline: 3px solid rgba(23, 104, 242, .1); }
+
+    .submit-button {
+      min-height: 52px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--blue);
+      color: white;
+      font-weight: 900;
+    }
+
+    .submit-button:disabled { cursor: wait; opacity: .65; }
+
+    .app-layout {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 18px;
+      border-right: 1px solid rgba(255, 255, 255, .1);
+      color: #fff;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(65, 201, 239, .22), transparent 18rem),
+        linear-gradient(180deg, #0b1830, #101f39);
+    }
+
+    .sidebar .brand { padding: 2px 8px 26px; color: #fff; }
+    .sidebar-nav { display: grid; gap: 5px; }
+
+    .nav-link {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 13px;
+      color: rgba(255, 255, 255, .65);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .nav-link:hover, .nav-link.active { color: #fff; background: rgba(255, 255, 255, .09); }
+    .nav-icon { width: 22px; color: var(--cyan); text-align: center; font-size: 15px; }
+    .sidebar-bottom { margin-top: auto; display: grid; gap: 9px; }
+
+    .workspace-chip {
+      padding: 14px;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .workspace-chip strong, .workspace-chip span { display: block; }
+    .workspace-chip strong { font-size: 13px; }
+    .workspace-chip span { margin-top: 4px; color: rgba(255, 255, 255, .55); font-size: 11px; }
+
+    .app-main { min-width: 0; }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 14px clamp(18px, 4vw, 46px);
+      border-bottom: 1px solid rgba(11, 24, 48, .07);
+      background: rgba(243, 247, 251, .86);
+      backdrop-filter: blur(18px);
+    }
+
+    .workspace-picker { min-width: 0; margin-right: auto; }
+    .workspace-picker label { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .workspace-select {
+      max-width: min(48vw, 330px);
+      padding: 0 24px 0 0;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .header-button {
+      min-width: 42px;
+      min-height: 42px;
+      display: grid;
+      place-items: center;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, .85);
+      color: var(--ink);
+      font-weight: 850;
+    }
+
+    .profile-button { display: flex; gap: 9px; text-align: left; }
+    .avatar {
+      width: 29px;
+      height: 29px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--ink);
+      color: white;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .profile-copy strong, .profile-copy span { display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .profile-copy strong { font-size: 12px; }
+    .profile-copy span { margin-top: 2px; color: var(--muted); font-size: 10px; }
+
+    .content {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: clamp(24px, 4vw, 48px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      max-width: 860px;
+      margin: 0;
+      font-size: clamp(34px, 5.2vw, 64px);
+      line-height: .99;
+      letter-spacing: -.065em;
+    }
+
+    .hero p:not(.eyebrow) { max-width: 760px; margin: 15px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .live-badge { padding: 10px 13px; border-radius: 999px; background: rgba(44, 173, 115, .11); color: #147548; font-size: 11px; font-weight: 900; }
+
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 20px; align-items: start; }
+    .stack { display: grid; gap: 20px; }
+    .panel { padding: 23px; border: 1px solid rgba(11, 24, 48, .08); border-radius: var(--radius-lg); background: var(--panel); box-shadow: 0 12px 40px rgba(15, 39, 73, .06); }
+
+    .next-action {
+      position: relative;
+      overflow: hidden;
+      min-height: 260px;
+      display: grid;
+      align-content: end;
+      padding: clamp(25px, 5vw, 42px);
+      color: white;
+      background:
+        radial-gradient(circle at 88% 8%, rgba(65, 201, 239, .36), transparent 17rem),
+        linear-gradient(140deg, #0b1830 0%, #16335e 64%, #105cc4 120%);
+    }
+
+    .next-action::after {
+      position: absolute;
+      width: 170px;
+      height: 170px;
+      right: -25px;
+      bottom: -70px;
+      content: "";
+      border: 2px solid rgba(255, 255, 255, .12);
+      border-radius: 50%;
+      box-shadow: 0 0 0 26px rgba(255, 255, 255, .035), 0 0 0 54px rgba(255, 255, 255, .025);
+    }
+
+    .next-action .eyebrow { color: var(--cyan); }
+    .next-action h2 { position: relative; z-index: 1; max-width: 760px; margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1.05; letter-spacing: -.055em; }
+    .next-action p { position: relative; z-index: 1; max-width: 680px; margin: 13px 0 0; color: rgba(255, 255, 255, .68); line-height: 1.55; }
+    .next-action-footer { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 24px; }
+    .next-action-meta { color: rgba(255, 255, 255, .58); font-size: 12px; font-weight: 750; }
+
+    .button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 16px;
+      border: 0;
+      border-radius: 13px;
+      background: var(--blue);
+      color: #fff;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .button.light { background: #fff; color: var(--ink); }
+    .button.soft { background: rgba(23, 104, 242, .09); color: var(--blue-deep); }
+
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .panel-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; }
+    .panel-kicker { color: var(--muted); font-size: 11px; font-weight: 800; }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .metric { min-height: 112px; padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: rgba(247, 250, 253, .78); }
+    .metric strong { display: block; font-size: 31px; letter-spacing: -.055em; }
+    .metric span { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 800; line-height: 1.35; }
+    .metric.urgent { border-color: rgba(216, 58, 82, .2); background: rgba(216, 58, 82, .055); }
+    .metric.unavailable strong { font-size: 16px; }
+
+    .relationship-list, .activity-list, .quick-grid { display: grid; gap: 10px; }
+    .relationship {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: #fff;
+    }
+
+    .relationship h3 { margin: 0; font-size: 15px; }
+    .relationship-type { margin-left: 7px; color: var(--blue); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .relationship p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .relationship-step { color: var(--ink-soft) !important; font-weight: 750; }
+
+    .activity { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+    .activity:last-child { border-bottom: 0; }
+    .activity-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 4px rgba(65, 201, 239, .12); }
+    .activity strong { display: block; font-size: 12px; }
+    .activity span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+    .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .quick-action { min-height: 78px; display: flex; align-items: flex-end; padding: 15px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, #fff, #f6f9fc); color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 900; }
+    .quick-action:hover { border-color: rgba(23, 104, 242, .35); }
+
+    .ai-panel { background: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(236, 246, 255, .95)); }
+    .ai-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+    .ai-input { min-height: 48px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); }
+    .ai-help { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .empty {
+      padding: 24px;
+      border: 1px dashed #cbd8e7;
+      border-radius: 18px;
+      background: rgba(247, 250, 253, .7);
+      text-align: center;
+    }
+
+    .empty strong { display: block; font-size: 14px; }
+    .empty p { margin: 7px auto 0; max-width: 480px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+    .warning-box { margin-top: 20px; padding: 14px 16px; border: 1px solid rgba(255, 177, 91, .25); border-radius: 16px; background: rgba(255, 177, 91, .08); color: #7e501b; font-size: 11px; line-height: 1.5; }
+    .warning-box summary { cursor: pointer; font-weight: 900; }
+    .warning-box ul { margin: 10px 0 0; padding-left: 18px; }
+
+    .view-panel { min-height: 55vh; display: grid; place-items: center; }
+    .view-panel .empty { max-width: 660px; }
+
+    .mobile-nav { display: none; }
+
+    @media (max-width: 1020px) {
+      .gateway-main { grid-template-columns: 1fr; max-width: 760px; }
+      .gateway-copy { text-align: center; }
+      .gateway-lede { margin-left: auto; margin-right: auto; }
+      .gateway-points { justify-content: center; }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(3, minmax(130px, 1fr)); overflow-x: auto; padding-bottom: 3px; }
+    }
+
+    @media (max-width: 760px) {
+      .gateway-header { padding-top: 18px; }
+      .gateway-main { width: min(100% - 24px, 680px); padding-top: 10px; }
+      .gateway h1 { font-size: clamp(44px, 15vw, 68px); }
+      .gateway-card { border-radius: 26px; }
+      .app-layout { display: block; padding-bottom: 74px; }
+      .sidebar { display: none; }
+      .app-header { min-height: 66px; padding: 10px 14px; }
+      .profile-copy { display: none; }
+      .workspace-select { max-width: 56vw; }
+      .content { padding: 24px 14px 34px; }
+      .hero { grid-template-columns: 1fr; gap: 12px; }
+      .hero h1 { font-size: 39px; }
+      .hero p:not(.eyebrow) { font-size: 14px; }
+      .live-badge { justify-self: start; }
+      .panel { padding: 17px; border-radius: 21px; }
+      .next-action { min-height: 310px; padding: 24px; }
+      .next-action h2 { font-size: 32px; }
+      .metrics { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+      .relationship { grid-template-columns: 1fr; }
+      .quick-grid { grid-template-columns: 1fr 1fr; }
+      .ai-form { grid-template-columns: 1fr; }
+      .mobile-nav {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        z-index: 40;
+        min-height: 62px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 2px;
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, .15);
+        border-radius: 19px;
+        background: rgba(11, 24, 48, .94);
+        box-shadow: 0 18px 50px rgba(11, 24, 48, .25);
+        backdrop-filter: blur(16px);
+      }
+
+      .mobile-nav a { min-width: 0; display: grid; place-items: center; gap: 2px; padding: 6px 2px; border-radius: 12px; color: rgba(255, 255, 255, .55); text-decoration: none; font-size: 9px; font-weight: 800; }
+      .mobile-nav a.active { color: #fff; background: rgba(255, 255, 255, .1); }
+      .mobile-nav b { color: var(--cyan); font-size: 15px; }
+    }
+
+    @media (max-width: 420px) {
+      .gateway-header .quiet-link { font-size: 12px; }
+      .gateway h1 { font-size: 46px; }
+      .gateway-lede { font-size: 16px; }
+      .gateway-points { display: none; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metric { min-height: 104px; }
+      .quick-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" aria-live="polite">
+    <div class="loading-screen"><div class="loading-mark" aria-label="Loading Rel8tion"></div></div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('app');
+      const state = {
+        session: null,
+        home: null,
+        busy: false,
+        error: '',
+        intent: new URLSearchParams(location.search).get('intent') || '',
+        notice: new URLSearchParams(location.search).get('notice') || '',
+        view: routeView(location.pathname)
+      };
+
+      const NAV = [
+        ['home', 'Home', '⌂', 'app.home'],
+        ['relationships', 'Relationships', '◎', 'relationships.read'],
+        ['contacts', 'Contacts', '◇', 'contacts.read'],
+        ['events', 'Events', '◫', 'events.read'],
+        ['buyers', 'Buyers', '♡', 'buyers.read'],
+        ['messages', 'Messages', '✦', 'messages.read'],
+        ['tasks', 'Tasks', '✓', 'tasks.read'],
+        ['reports', 'Reports', '▥', 'reports.read'],
+        ['settings', 'Settings', '⚙', 'settings.manage']
+      ];
+
+      function routeView(path) {
+        const value = String(path || '/').split('/').filter(Boolean)[0] || 'home';
+        return ['agent', 'loan-officer', 'broker', 'buyer', 'staff', 'founder'].includes(value) ? 'home' : value;
+      }
+
+      function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+      }
+
+      function initials(value) {
+        return String(value || 'R').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+      }
+
+      function fmtTime(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      }
+
+      function can(permission) {
+        return Boolean(state.home?.permissions?.includes(permission) || state.session?.permissions?.includes(permission));
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          credentials: 'same-origin',
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(payload.error || `Request failed with ${response.status}.`);
+          error.status = response.status;
+          throw error;
+        }
+        return payload;
+      }
+
+      function noticeText() {
+        if (state.notice === 'admin-sign-in-required') return 'Sign in with a platform-administrator account before opening administration.';
+        if (state.notice === 'admin-access-denied') return 'This account is not authorized for platform administration.';
+        return '';
+      }
+
+      function gateway() {
+        const showAuth = ['signin', 'invite'].includes(state.intent) || Boolean(state.error) || Boolean(noticeText());
+        root.innerHTML = `
+          <div class="gateway">
+            <header class="gateway-header">
+              <a class="brand" href="/" aria-label="Rel8tion application home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
+              <a class="quiet-link" href="https://rel8tion.me">Visit rel8tion.me</a>
+            </header>
+            <main class="gateway-main">
+              <section class="gateway-copy">
+                <p class="eyebrow">The relationship operating system</p>
+                <h1>Know what matters. Do what’s next.</h1>
+                <p class="gateway-lede">One secure application for open houses, buyer follow-up, lending support, team accountability, and the relationships that move real estate forward.</p>
+                <div class="gateway-points" aria-label="Rel8tion application capabilities">
+                  <span>Role-aware</span><span>Action-first</span><span>Mobile-ready</span><span>Permission-scoped</span>
+                </div>
+              </section>
+              <section class="gateway-card" aria-labelledby="gateway-title">
+                <h2 id="gateway-title">Open Rel8tion</h2>
+                <p>Choose the path that matches why you’re here.</p>
+                ${noticeText() ? `<div class="notice">${esc(noticeText())}</div>` : ''}
+                <div class="gateway-actions">
+                  <button class="action-button primary" type="button" data-intent="signin"><span>Sign in</span><span class="arrow">→</span></button>
+                  <a class="action-button" href="/claim"><span>Activate my Rel8tion device</span><span class="arrow">↗</span></a>
+                  <button class="action-button" type="button" data-intent="invite"><span>I was invited</span><span class="arrow">→</span></button>
+                  <button class="action-button" type="button" data-intent="code"><span>Enter event or activation code</span><span class="arrow">→</span></button>
+                </div>
+                <div class="auth-panel" ${showAuth ? '' : 'hidden'}>
+                  ${authPanel()}
+                </div>
+              </section>
+            </main>
+            <footer class="gateway-footer">Rel8tion keeps application access separate from the public marketing website and internal platform administration.</footer>
+          </div>`;
+        bindGateway();
+      }
+
+      function authPanel() {
+        if (state.intent === 'code') {
+          return `
+            <form id="codeForm" class="form-grid">
+              <div class="notice info">Enter the code printed on the Event Pass, Smart Sign, or activation material.</div>
+              <label class="form-label">Event or activation code<input class="form-input" name="code" autocomplete="one-time-code" required placeholder="Enter code"></label>
+              <button class="submit-button" type="submit">Continue securely</button>
+            </form>`;
+        }
+        const invited = state.intent === 'invite';
+        return `
+          <form id="signinForm" class="form-grid">
+            ${invited ? '<div class="notice info">Use the account credentials from your invitation. If your invitation includes a secure link, open that original link to finish setup.</div>' : ''}
+            ${state.error ? `<div class="notice">${esc(state.error)}</div>` : ''}
+            <label class="form-label">Email<input class="form-input" type="email" name="email" autocomplete="username" required></label>
+            <label class="form-label">Password<input class="form-input" type="password" name="password" autocomplete="current-password" required></label>
+            <button class="submit-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Signing in…' : 'Sign in to Rel8tion'}</button>
+          </form>`;
+      }
+
+      function bindGateway() {
+        document.querySelectorAll('[data-intent]').forEach((button) => button.addEventListener('click', () => {
+          state.intent = button.dataset.intent;
+          state.error = '';
+          gateway();
+          document.querySelector('.auth-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }));
+        document.getElementById('signinForm')?.addEventListener('submit', signIn);
+        document.getElementById('codeForm')?.addEventListener('submit', openCode);
+      }
+
+      async function signIn(event) {
+        event.preventDefault();
+        if (state.busy) return;
+        const data = new FormData(event.currentTarget);
+        state.busy = true;
+        state.error = '';
+        gateway();
+        try {
+          state.session = await api('/api/app/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: data.get('email'), password: data.get('password') })
+          });
+          state.busy = false;
+          await loadHome(state.session.active_workspace?.id);
+        } catch (error) {
+          state.busy = false;
+          state.error = error.message || 'Unable to sign in.';
+          gateway();
+        }
+      }
+
+      function openCode(event) {
+        event.preventDefault();
+        const code = String(new FormData(event.currentTarget).get('code') || '').trim();
+        if (!code) return;
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(code);
+        location.href = uuid ? `/event?event=${encodeURIComponent(code)}` : `/s?code=${encodeURIComponent(code)}`;
+      }
+
+      async function loadSession() {
+        try {
+          state.session = await api('/api/app/session');
+          if (!state.session.authenticated) {
+            gateway();
+            return;
+          }
+          const requestedRole = String(location.pathname).split('/').filter(Boolean)[0];
+          const roleWorkspace = state.session.workspaces?.find((workspace) => workspace.role.replace('_', '-') === requestedRole);
+          await loadHome(roleWorkspace?.id || state.session.active_workspace?.id);
+        } catch (error) {
+          state.error = error.message || 'Rel8tion could not load this session.';
+          gateway();
+        }
+      }
+
+      async function loadHome(workspaceId) {
+        root.innerHTML = '<div class="loading-screen"><div class="loading-mark" aria-label="Loading workspace"></div></div>';
+        try {
+          state.home = await api('/api/app/home', {
+            headers: workspaceId ? { 'X-Rel8tion-Workspace': workspaceId } : {}
+          });
+          state.session = {
+            ...state.session,
+            authenticated: true,
+            user: state.home.user,
+            workspaces: state.home.workspaces,
+            active_workspace: state.home.workspace,
+            permissions: state.home.permissions
+          };
+          appShell();
+        } catch (error) {
+          if (error.status === 401) {
+            state.session = null;
+            state.home = null;
+            state.error = 'Your session ended. Sign in again to continue.';
+            state.intent = 'signin';
+            gateway();
+            return;
+          }
+          root.innerHTML = `
+            <div class="loading-screen">
+              <div class="panel empty">
+                <strong>We could not load this workspace.</strong>
+                <p>${esc(error.message || 'Try again in a moment.')}</p>
+                <button class="button" id="retryButton" type="button">Try again</button>
+              </div>
+            </div>`;
+          document.getElementById('retryButton')?.addEventListener('click', () => loadHome(workspaceId));
+        }
+      }
+
+      function permittedNav() {
+        return NAV.filter(([, , , permission]) => can(permission));
+      }
+
+      function navMarkup(mobile = false) {
+        const items = permittedNav();
+        const visible = mobile ? items.slice(0, 4) : items;
+        const withMore = mobile && items.length > 4 ? [...visible, ['settings', 'More', '•••', 'settings.manage']] : visible;
+        return withMore.map(([view, label, icon]) => `
+          <a class="${mobile ? '' : 'nav-link '}${state.view === view ? 'active' : ''}" href="/${view === 'home' ? 'home' : view}" data-view="${esc(view)}">
+            ${mobile ? `<b>${esc(icon)}</b><span>${esc(label)}</span>` : `<span class="nav-icon">${esc(icon)}</span><span>${esc(label)}</span>`}
+          </a>`).join('');
+      }
+
+      function appShell() {
+        const home = state.home;
+        const workspace = home.workspace;
+        const user = home.user;
+        const organization = workspace.organization?.name || 'Independent workspace';
+        root.innerHTML = `
+          <div class="app-layout">
+            <aside class="sidebar">
+              <a class="brand" href="/home" data-view="home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
+              <nav class="sidebar-nav" aria-label="Main application navigation">${navMarkup(false)}</nav>
+              <div class="sidebar-bottom">
+                ${can('platform.admin') ? '<a class="nav-link" href="/admin"><span class="nav-icon">⌘</span><span>Platform admin</span></a>' : ''}
+                <div class="workspace-chip"><strong>${esc(workspace.role_label)}</strong><span>${esc(organization)}</span></div>
+              </div>
+            </aside>
+            <main class="app-main">
+              <header class="app-header">
+                <div class="workspace-picker">
+                  <label for="workspaceSelect">Active workspace</label>
+                  <select class="workspace-select" id="workspaceSelect" ${home.workspaces.length < 2 ? 'disabled' : ''}>
+                    ${home.workspaces.map((item) => `<option value="${esc(item.id)}" ${item.id === workspace.id ? 'selected' : ''}>${esc(item.role_label)}${item.organization?.name ? ` · ${esc(item.organization.name)}` : ''}</option>`).join('')}
+                  </select>
+                </div>
+                <button class="header-button" type="button" aria-label="Notifications" title="Notifications">○</button>
+                <button class="header-button profile-button" id="signOutButton" type="button" title="Sign out">
+                  <span class="avatar">${esc(initials(user.name))}</span>
+                  <span class="profile-copy"><strong>${esc(user.name || 'Rel8tion user')}</strong><span>${esc(user.email)}</span></span>
+                </button>
+              </header>
+              <div class="content" id="viewContent">${state.view === 'home' ? homeView() : secondaryView()}</div>
+            </main>
+          </div>
+          <nav class="mobile-nav" aria-label="Mobile application navigation">${navMarkup(true)}</nav>`;
+        bindShell();
+      }
+
+      function homeView() {
+        const data = state.home;
+        const action = data.next_action || {};
+        return `
+          <section class="hero">
+            <div>
+              <p class="eyebrow">${esc(data.hero.eyebrow)}</p>
+              <h1>${esc(data.hero.title)}</h1>
+              <p>${esc(data.hero.description)}</p>
+            </div>
+            <div class="live-badge">Live authorized data</div>
+          </section>
+          <div class="dashboard-grid">
+            <div class="stack">
+              <section class="panel next-action">
+                <p class="eyebrow">${esc(action.eyebrow || 'Next action')}</p>
+                <h2>${esc(action.title || 'No action assigned')}</h2>
+                <p>${esc(action.description || '')}</p>
+                <div class="next-action-footer">
+                  <span class="next-action-meta">${esc(action.meta || '')}</span>
+                  ${action.action ? `<a class="button light" href="${esc(action.action.href)}">${esc(action.action.label)}</a>` : ''}
+                </div>
+              </section>
+              <section class="panel">
+                <div class="panel-heading"><h2>Today</h2><span class="panel-kicker">Only your authorized scope</span></div>
+                <div class="metrics">${metricsMarkup(data.today)}</div>
+              </section>
+              <section class="panel">
+                <div class="panel-heading"><h2>Relationships requiring attention</h2><span class="panel-kicker">${data.relationships.length} assigned</span></div>
+                <div class="relationship-list">${relationshipsMarkup(data.relationships)}</div>
+              </section>
+            </div>
+            <div class="stack">
+              <section class="panel">
+                <div class="panel-heading"><h2>Quick actions</h2><span class="panel-kicker">Permission-based</span></div>
+                <div class="quick-grid">${data.quick_actions.length ? data.quick_actions.map((item) => `<a class="quick-action" href="${esc(item.href)}">${esc(item.label)} →</a>`).join('') : emptyMarkup('No actions available', 'This workspace has not been granted action permissions.')}</div>
+              </section>
+              <section class="panel">
+                <div class="panel-heading"><h2>Recent activity</h2><span class="panel-kicker">Workspace scoped</span></div>
+                <div class="activity-list">${activityMarkup(data.activity)}</div>
+              </section>
+              <section class="panel ai-panel">
+                <div class="panel-heading"><h2>Ask Rel8tion</h2><span class="panel-kicker">Command preview</span></div>
+                <form class="ai-form" id="aiForm">
+                  <input class="ai-input" name="command" required placeholder="Build today’s priority list…">
+                  <button class="button" type="submit">Ask</button>
+                </form>
+                <p class="ai-help" id="aiHelp">The command service is intentionally read-only and not connected in this preview. Rel8tion will never claim an action completed when it did not.</p>
+              </section>
+            </div>
+          </div>
+          ${warningsMarkup(data.data_status?.warnings || [])}`;
+      }
+
+      function metricsMarkup(metrics) {
+        if (!metrics?.length) return emptyMarkup('No authorized metrics yet', 'Metrics appear after this workspace receives domain assignments.');
+        return metrics.map((metric) => `
+          <article class="metric ${metric.urgent ? 'urgent' : ''} ${metric.unavailable ? 'unavailable' : ''}">
+            <strong>${metric.unavailable ? 'Not connected' : esc(metric.value)}</strong>
+            <span>${esc(metric.label)}</span>
+          </article>`).join('');
+      }
+
+      function relationshipsMarkup(items) {
+        if (!items?.length) return emptyMarkup('No relationships need attention', 'Assigned relationships with a verified reason and recommended action will appear here.');
+        return items.map((item) => `
+          <article class="relationship">
+            <div>
+              <h3>${esc(item.name)}<span class="relationship-type">${esc(item.type)}</span></h3>
+              <p>${esc(item.reason)}</p>
+              <p class="relationship-step">Next: ${esc(item.recommended_next_step)}</p>
+              ${item.last_interaction ? `<p>Last interaction: ${esc(fmtTime(item.last_interaction))}</p>` : ''}
+            </div>
+            <a class="button soft" href="${esc(item.action.href)}">${esc(item.action.label)}</a>
+          </article>`).join('');
+      }
+
+      function activityMarkup(items) {
+        if (!items?.length) return emptyMarkup('No recent workspace activity', 'Verified event, check-in, disclosure, invitation, message, and coverage activity will appear here.');
+        return items.map((item) => `
+          <article class="activity">
+            <span class="activity-dot"></span>
+            <div><strong>${esc(item.title)}</strong><span>${esc(item.description)}${item.occurred_at ? ` · ${esc(fmtTime(item.occurred_at))}` : ''}</span></div>
+          </article>`).join('');
+      }
+
+      function emptyMarkup(title, description) {
+        return `<div class="empty"><strong>${esc(title)}</strong><p>${esc(description)}</p></div>`;
+      }
+
+      function warningsMarkup(warnings) {
+        if (!warnings?.length) return '';
+        return `
+          <details class="warning-box">
+            <summary>Some workspace sources are not provisioned yet</summary>
+            <ul>${warnings.map((warning) => `<li>${esc(warning)}</li>`).join('')}</ul>
+          </details>`;
+      }
+
+      function secondaryView() {
+        const labels = Object.fromEntries(NAV.map(([key, label]) => [key, label]));
+        const label = labels[state.view] || 'Workspace';
+        const role = state.home.workspace.role_label;
+        return `
+          <section class="hero">
+            <div><p class="eyebrow">${esc(role)}</p><h1>${esc(label)}</h1><p>This section uses the same server-verified workspace and permission scope as your home dashboard.</p></div>
+          </section>
+          <section class="panel view-panel">
+            ${emptyMarkup(`${label} workspace is ready for domain modules`, 'The shared shell and authorization boundary are active. Existing production workflows remain available through their current routes while this module is connected incrementally.')}
+          </section>`;
+      }
+
+      function bindShell() {
+        document.getElementById('workspaceSelect')?.addEventListener('change', (event) => loadHome(event.target.value));
+        document.getElementById('signOutButton')?.addEventListener('click', signOut);
+        document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => {
+          if (event.currentTarget.origin && event.currentTarget.origin !== location.origin) return;
+          event.preventDefault();
+          state.view = event.currentTarget.dataset.view || 'home';
+          history.pushState({}, '', state.view === 'home' ? '/home' : `/${state.view}`);
+          appShell();
+        }));
+        document.getElementById('aiForm')?.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const command = String(new FormData(event.currentTarget).get('command') || '').trim();
+          const help = document.getElementById('aiHelp');
+          if (help) help.textContent = command
+            ? `“${command}” was not executed. The AI command service is not connected in this preview.`
+            : 'Enter a command to preview the interaction.';
+        });
+      }
+
+      async function signOut() {
+        try { await api('/api/app/auth/logout', { method: 'POST', body: '{}' }); } catch (_) {}
+        state.session = null;
+        state.home = null;
+        state.intent = '';
+        state.error = '';
+        history.replaceState({}, '', '/');
+        gateway();
+      }
+
+      addEventListener('popstate', () => {
+        state.view = routeView(location.pathname);
+        if (state.home) appShell();
+      });
+
+      loadSession();
+    })();
+  </script>
+</body>
+</html>
