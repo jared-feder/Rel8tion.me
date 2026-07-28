@@ -269,3 +269,63 @@ The WordPress home page can submit agent Event Pass requests to the service-role
 `field_demo_visits` remains the source of truth for confirmed open-house coverage. REL8TION OS reads a narrow day-window projection through `/api/admin/agent-relationships?view=schedule&from=...&to=...`, authenticated by the dedicated relationship-stream token. The projection excludes cancelled visits and enriches display-only agent and address fields from `agent_outreach_queue` and `open_houses`; it does not create, update, or delete schedule records.
 
 Historical open houses that were completed before the field-visit workflow are represented by append-only `agent_relationship_events` markers rather than fabricated visit rows. The relationship API projects the latest confirmed/removed marker into `historical_open_house_agent`, keeping automatic visit evidence and user-confirmed legacy history distinct.
+
+## Universal Authenticated Application Architecture
+
+The universal application work is implemented on the isolated `feature/role-aware-dashboard` branch and is not a production claim until its preview and deployment state are separately verified.
+
+### Application and marketing boundaries
+
+- `rel8tion.me` remains the public marketing website.
+- `app.rel8tion.me` is designed as the authenticated operating application.
+- An unauthenticated application request receives a compact gateway for sign-in, invitation, device activation, or event/activation-code entry.
+- Authenticated users share one responsive application shell. Role-specific behavior is configuration and server-authorized data scope, not a collection of unrelated dashboards.
+- Physical NFC, QR, Event Pass, Smart Sign, check-in, disclosure, activation, profile, and invitation URLs remain separate permanent public contracts.
+
+### Session boundary
+
+The universal shell does not trust a role, organization, or workspace value supplied by the browser. Password authentication is exchanged with Supabase Auth by a serverless route. The server stores access and refresh tokens in Secure, HttpOnly, SameSite=Lax cookies, verifies the user through Supabase Auth on session requests, refreshes expired access tokens server-side, and marks all authenticated responses `private, no-store`.
+
+The server resolves available workspaces from database membership records. A workspace-switch request contains only an opaque workspace id; the server accepts it only when the authenticated user has an active membership. User-editable Auth `user_metadata` may provide a display name but never grants a role or permission.
+
+### Role, permission, and assignment model
+
+The additive `app_*` schema proposal separates:
+
+- Organizations
+- Role-specific workspaces
+- User-to-workspace memberships
+- Fine-grained permission overrides
+- Domain assignments for organizations, teams, territories, agents, buyers, events, accounts, or support cases
+- Tasks
+- Activity events
+- Privileged audit records
+
+Supported role configurations are agent, loan officer, broker/team leader, buyer, internal staff, founder, and platform administrator. A user may belong to multiple role/organization workspaces. Platform administration is a permission in addition to an operating role; it is not the default homepage.
+
+Every proposed table has RLS enabled. Authenticated read policies require the caller's active membership or direct assignment, and no anon access is granted. Privileged writes remain reserved for server APIs using the service role after application authorization and audit checks.
+
+The migration is intentionally unapplied by the feature branch. Because current Vercel previews inherit production-connected Supabase credentials, UI preview testing must be read-only until an isolated Supabase branch or test project is configured.
+
+### Data adapters and honest empty states
+
+Dashboard data is assembled server-side after role, permission, organization, and domain-assignment verification. The home response contains:
+
+- One highest-priority assigned action
+- Authorized today counts
+- Assigned relationships requiring attention
+- Verified workspace activity
+- Permission-filtered quick actions
+- A non-executing AI command interface
+
+No demonstration metrics are presented as production facts. When the required assignment or source table does not exist, the shell displays a setup or empty state and explicitly reports that the optional source is not provisioned.
+
+For backward compatibility, an authenticated user may receive a loan-officer workspace only when the Supabase Auth user id exactly matches an active `verified_profiles.uid`. This fallback never derives role authority from browser parameters or Auth user metadata. Other unprovisioned accounts receive an onboarding-only workspace with no customer-data access.
+
+### Internal administration
+
+`/admin` is a server-gated entry. An application user needs the server-resolved `platform.admin` permission before entering the platform administration shell, and `/api/app/admin-summary` independently enforces the same permission before returning data.
+
+The existing REL8TION COMMAND tool remains separate at `/command` and retains its dedicated token or allowlisted admin NFC UID boundary. Existing admin NFC scans that include the verified UID continue through `/admin?uid=...` and are redirected to COMMAND only after server verification.
+
+The administration shell itself embeds no platform data. A direct request that does not pass the data API authorization receives no administrative payload.

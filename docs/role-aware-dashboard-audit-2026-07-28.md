@@ -1,7 +1,9 @@
 # Universal Rel8tion Application Audit
 
-Date: 2026-07-28  
-Branch: `feature/role-aware-dashboard`  
+Date: 2026-07-28
+
+Branch: `feature/role-aware-dashboard`
+
 Baseline: `origin/main` at `4db129ed5f2790394df9b2ace2057fdff5ec60c1`
 
 ## Current architecture
@@ -101,4 +103,3 @@ Live baseline checks confirmed that `/event`, `/claim`, `/s.html`, `/a`, and `/b
 8. Add a server-gated `/admin` entry and permission-checked admin data API while preserving legacy COMMAND access separately.
 9. Return real authorized counts when a server-verified assignment exists; otherwise return explicit empty/setup states rather than fabricated metrics.
 10. Add route-map and authorization regression checks before any preview deployment.
-
