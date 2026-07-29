@@ -60,6 +60,8 @@ for (const phrase of ['Sign in', 'Activate my Rel8tion device', 'I was invited',
 assert(appHtml.includes('/api/app/session'), 'The shared shell must resolve its server session.');
 assert(appHtml.includes('X-Rel8tion-Workspace'), 'Workspace switching must send a server-verified workspace id.');
 assert(appHtml.includes('was not executed'), 'The AI command preview must not claim an action completed.');
+assert(appHtml.includes('logo150x100trans.png'), 'The universal shell must use the official Rel8tion logo.');
+assert(!appHtml.includes('<span class="brand-mark">R8</span>'), 'The placeholder R8 brand mark must not return.');
 assert(adminEntry.includes("hasPermission(context, 'platform.admin')"), '/admin entry must require platform.admin.');
 assert(adminEntry.includes("redirect(res, '/command?entry=admin')"), '/admin must preserve the same-origin legacy COMMAND credential path.');
 assert(adminSummary.includes('buildAdminSummary(context)'), 'Admin data must go through the permission-checked service.');
