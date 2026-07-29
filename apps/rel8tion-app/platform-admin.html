@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1830">
+  <title>Rel8tion Platform Administration</title>
+  <style>
+    :root { --ink:#0b1830; --muted:#65748c; --line:#dce5f0; --blue:#1768f2; --canvas:#f3f7fb; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); background:radial-gradient(circle at 10% 0%,rgba(65,201,239,.24),transparent 28rem),var(--canvas); font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    a { color:inherit; }
+    header { min-height:74px; display:flex; align-items:center; gap:18px; padding:14px clamp(18px,4vw,48px); border-bottom:1px solid rgba(11,24,48,.08); background:rgba(243,247,251,.88); backdrop-filter:blur(18px); }
+    .brand { margin-right:auto; font-size:18px; font-weight:950; letter-spacing:-.045em; text-decoration:none; }
+    .back { padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:#fff; font-size:12px; font-weight:850; text-decoration:none; }
+    main { width:min(1240px,calc(100% - 28px)); margin:0 auto; padding:clamp(30px,5vw,60px) 0; }
+    .eyebrow { margin:0 0 12px; color:var(--blue); font-size:11px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; }
+    h1 { max-width:840px; margin:0; font-size:clamp(38px,6vw,70px); line-height:.98; letter-spacing:-.065em; }
+    .lede { max-width:760px; margin:16px 0 32px; color:var(--muted); line-height:1.6; }
+    .panel { padding:22px; border:1px solid rgba(11,24,48,.08); border-radius:25px; background:rgba(255,255,255,.92); box-shadow:0 18px 55px rgba(15,39,73,.08); }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; }
+    .metric { min-height:115px; padding:16px; border:1px solid var(--line); border-radius:17px; background:#f8fafc; }
+    .metric strong,.metric span { display:block; }
+    .metric strong { font-size:31px; letter-spacing:-.05em; }
+    .metric span { margin-top:8px; color:var(--muted); font-size:11px; font-weight:800; line-height:1.35; }
+    .areas { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:22px; }
+    .area { padding:15px; border:1px solid var(--line); border-radius:15px; background:#fff; font-size:12px; font-weight:850; }
+    .status { margin-top:18px; padding:14px; border-radius:15px; background:rgba(23,104,242,.07); color:#0b47b8; font-size:12px; line-height:1.5; }
+    .status.error { background:rgba(216,58,82,.07); color:#8f2337; }
+    .legacy { margin-top:22px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 20px; border-radius:18px; color:#fff; background:#0b1830; }
+    .legacy p { margin:4px 0 0; color:rgba(255,255,255,.62); font-size:12px; }
+    .legacy a { flex:0 0 auto; padding:11px 14px; border-radius:12px; background:#fff; color:var(--ink); font-size:12px; font-weight:900; text-decoration:none; }
+    @media(max-width:850px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.areas{grid-template-columns:1fr}}
+    @media(max-width:480px){.metrics{grid-template-columns:1fr 1fr}.legacy{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+  <header><a class="brand" href="/home">Rel8tion · Platform Administration</a><a class="back" href="/home">Back to operating dashboard</a></header>
+  <main>
+    <p class="eyebrow">Deliberate privileged workspace</p>
+    <h1>Platform administration, separated from daily operations.</h1>
+    <p class="lede">This route and every data request require a server-verified platform-administrator workspace. The page contains no embedded administrative data.</p>
+    <section class="panel" id="adminContent" aria-live="polite">
+      <div class="status">Verifying platform-administrator access…</div>
+    </section>
+  </main>
+  <script>
+    const root = document.getElementById('adminContent');
+    const params = new URLSearchParams(location.search);
+    const workspace = params.get('workspace') || '';
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+    fetch('/api/app/admin-summary', {
+      credentials: 'same-origin',
+      headers: workspace ? { 'X-Rel8tion-Workspace': workspace } : {}
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Administrator access was not accepted.');
+      root.innerHTML = `
+        <div class="metrics">${payload.metrics.map((metric) => `<article class="metric"><strong>${esc(metric.value)}</strong><span>${esc(metric.label)}</span></article>`).join('')}</div>
+        <div class="areas">${payload.areas.map((area) => `<div class="area">${esc(area)}</div>`).join('')}</div>
+        ${payload.warnings?.length ? `<div class="status">Some optional administration sources are not provisioned: ${payload.warnings.map(esc).join(' · ')}</div>` : '<div class="status">All displayed metrics were loaded through the permission-checked administration API.</div>'}
+        <div class="legacy"><div><strong>REL8TION COMMAND</strong><p>The existing operational administration tool remains separate and keeps its dedicated admin credential.</p></div><a href="/command">Open COMMAND</a></div>`;
+    }).catch((error) => {
+      root.innerHTML = `<div class="status error"><strong>Unauthorized</strong><br>${esc(error.message)} No platform data was returned.</div>`;
+    });
+  </script>
+</body>
+</html>

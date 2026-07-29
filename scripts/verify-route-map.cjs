@@ -95,6 +95,12 @@ function apiCandidates(destination) {
   ];
 }
 
+function staticCandidates(destination) {
+  const clean = stripDestination(destination);
+  if (path.extname(clean)) return [clean];
+  return [clean, `${clean}.html`, `${clean}/index.html`];
+}
+
 function candidateSummary(candidates, tracked) {
   for (const candidate of candidates) {
     if (fileState(candidate, tracked) === 'tracked') return { ok: true, file: candidate };
@@ -107,6 +113,17 @@ function candidateSummary(candidates, tracked) {
 function cleanSourceNeedsWrapper(source, destination) {
   const src = String(source || '');
   const dest = String(destination || '');
+  // Universal authenticated and protected internal routes intentionally use
+  // application-owned shells. They are not physical QR/NFC URL contracts and
+  // do not need duplicate root wrappers.
+  if ([
+    '/apps/rel8tion-app/app.html',
+    '/apps/rel8tion-app/app',
+    '/apps/rel8tion-app/platform-admin.html',
+    '/apps/rel8tion-app/platform-admin',
+    '/apps/rel8tion-app/admin.html',
+    '/apps/rel8tion-app/admin'
+  ].includes(dest)) return false;
   return src.startsWith('/')
     && src !== '/'
     && !src.includes(':')
@@ -129,7 +146,7 @@ function main() {
     const destination = stripDestination(rewrite.destination);
     const candidates = destination.startsWith('api/')
       ? apiCandidates(destination)
-      : [destination];
+      : staticCandidates(destination);
     const result = candidateSummary(candidates, tracked);
     if (!result.ok) {
       failures.push({
