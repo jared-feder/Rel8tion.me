@@ -61,6 +61,7 @@ assert(appHtml.includes('/api/app/session'), 'The shared shell must resolve its 
 assert(appHtml.includes('X-Rel8tion-Workspace'), 'Workspace switching must send a server-verified workspace id.');
 assert(appHtml.includes('was not executed'), 'The AI command preview must not claim an action completed.');
 assert(adminEntry.includes("hasPermission(context, 'platform.admin')"), '/admin entry must require platform.admin.');
+assert(adminEntry.includes("redirect(res, '/command?entry=admin')"), '/admin must preserve the same-origin legacy COMMAND credential path.');
 assert(adminSummary.includes('buildAdminSummary(context)'), 'Admin data must go through the permission-checked service.');
 assert(adminHtml.includes('/api/app/admin-summary'), 'The admin shell must load data from the protected API.');
 assert(!adminHtml.includes('SUPABASE_SERVICE_ROLE_KEY'), 'Admin HTML must not contain the service-role key.');

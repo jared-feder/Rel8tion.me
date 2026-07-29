@@ -36,7 +36,10 @@ module.exports = async function handler(req, res) {
   try {
     const context = await resolveSession(req, res);
     if (!context) {
-      redirect(res, '/?notice=admin-sign-in-required');
+      // Preserve the existing same-origin COMMAND login. Its browser-stored
+      // UID/token is not visible to this server entry route, while every
+      // privileged COMMAND request still verifies those credentials server-side.
+      redirect(res, '/command?entry=admin');
       return;
     }
     if (!hasPermission(context, 'platform.admin')) {

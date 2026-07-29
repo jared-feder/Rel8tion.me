@@ -324,8 +324,8 @@ For backward compatibility, an authenticated user may receive a loan-officer wor
 
 ### Internal administration
 
-`/admin` is a server-gated entry. An application user needs the server-resolved `platform.admin` permission before entering the platform administration shell, and `/api/app/admin-summary` independently enforces the same permission before returning data.
+`/admin` is a server-gated entry. An application user needs the server-resolved `platform.admin` permission before entering the platform administration shell, and `/api/app/admin-summary` independently enforces the same permission before returning data. When no universal-application session exists, the entry redirects to same-origin `/command?entry=admin`; this lets the established COMMAND page reuse a browser-stored admin UID/token that cannot be read by the server entry route, without embedding or returning privileged data.
 
-The existing REL8TION COMMAND tool remains separate at `/command` and retains its dedicated token or allowlisted admin NFC UID boundary. Existing admin NFC scans that include the verified UID continue through `/admin?uid=...` and are redirected to COMMAND only after server verification.
+The existing REL8TION COMMAND tool remains separate at `/command` and retains its dedicated token or allowlisted admin NFC UID boundary on every privileged API call. Existing admin NFC scans that include the verified UID continue through `/admin?uid=...` and are redirected to COMMAND only after server verification.
 
 The administration shell itself embeds no platform data. A direct request that does not pass the data API authorization receives no administrative payload.
