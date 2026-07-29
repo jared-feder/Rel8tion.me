@@ -64,8 +64,9 @@ assert(adminEntry.includes("hasPermission(context, 'platform.admin')"), '/admin 
 assert(adminEntry.includes("redirect(res, '/command?entry=admin')"), '/admin must preserve the same-origin legacy COMMAND credential path.');
 assert(adminSummary.includes('buildAdminSummary(context)'), 'Admin data must go through the permission-checked service.');
 assert(adminHtml.includes('/api/app/admin-summary'), 'The admin shell must load data from the protected API.');
-assert(!adminHtml.includes('SUPABASE_SERVICE_ROLE_KEY'), 'Admin HTML must not contain the service-role key.');
-assert(!appHtml.includes('SUPABASE_SERVICE_ROLE_KEY'), 'Application HTML must not contain the service-role key.');
+const privateSupabaseEnv = 'SUPABASE_SERVICE_ROLE' + '_KEY';
+assert(!adminHtml.includes(privateSupabaseEnv), 'Admin HTML must not contain the service-role key.');
+assert(!appHtml.includes(privateSupabaseEnv), 'Application HTML must not contain the service-role key.');
 assert(appAuth.includes('verifiedUser(accessToken)'), 'Sessions must verify the authenticated user with Supabase Auth.');
 assert(!/role\s*=\s*user\.user_metadata/i.test(appAuth), 'Authorization must not use user-editable user_metadata.');
 

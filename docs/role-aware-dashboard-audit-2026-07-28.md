@@ -45,7 +45,7 @@ Baseline: `origin/main` at `4db129ed5f2790394df9b2ace2057fdff5ec60c1`
 - Checked-in migrations cover product-specific tables such as outreach, Smart Signs, Event Passes, coverage, conversations, consent, field visits, and agent relationship streams.
 - The complete production schema and every live RLS policy are not reconstructable from the repository alone.
 - There is no checked-in universal application RBAC schema.
-- Vercel Preview currently receives the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` targets as Production. Preview must therefore be treated as production-data-connected.
+- Vercel Preview currently receives the same Supabase URL and server-only credential targets as Production. Preview must therefore be treated as production-data-connected.
 
 ## Permanent public-route contracts
 
