@@ -76,17 +76,11 @@
       letter-spacing: -.045em;
     }
 
-    .brand-mark {
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      border-radius: 11px;
-      color: white;
-      background: linear-gradient(135deg, var(--cyan), var(--blue) 66%, var(--blue-deep));
-      box-shadow: 0 10px 24px rgba(23, 104, 242, .28);
-      font-size: 16px;
-      letter-spacing: -.08em;
+    .brand-logo {
+      width: auto;
+      height: 46px;
+      display: block;
+      object-fit: contain;
     }
 
     .gateway {
@@ -337,6 +331,15 @@
     }
 
     .sidebar .brand { padding: 2px 8px 26px; color: #fff; }
+    .sidebar .brand-logo {
+      max-width: 182px;
+      height: 46px;
+      padding: 5px 9px;
+      border: 1px solid rgba(255, 255, 255, .5);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, .15);
+    }
     .sidebar-nav { display: grid; gap: 5px; }
 
     .nav-link {
@@ -718,7 +721,7 @@
         root.innerHTML = `
           <div class="gateway">
             <header class="gateway-header">
-              <a class="brand" href="/" aria-label="Rel8tion application home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
+              <a class="brand" href="/" aria-label="Rel8tion application home"><img class="brand-logo" src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion"></a>
               <a class="quiet-link" href="https://rel8tion.me">Visit rel8tion.me</a>
             </header>
             <main class="gateway-main">
@@ -884,7 +887,7 @@
         root.innerHTML = `
           <div class="app-layout">
             <aside class="sidebar">
-              <a class="brand" href="/" data-view="home"><span class="brand-mark">R8</span><span>Rel8tion</span></a>
+              <a class="brand" href="/" data-view="home"><img class="brand-logo" src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion"></a>
               <nav class="sidebar-nav" aria-label="Main application navigation">${navMarkup(false)}</nav>
               <div class="sidebar-bottom">
                 ${can('platform.admin') ? '<a class="nav-link" href="/admin"><span class="nav-icon">⌘</span><span>Platform admin</span></a>' : ''}
