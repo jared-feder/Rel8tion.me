@@ -1,7 +1,10 @@
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_MAX_OFFSETS = 15;
 const DEFAULT_STALE_AFTER_HOURS = 72;
+const ONEKEY_SITE_URL = 'https://www.onekeymls.com';
 const ONEKEY_BASE_URL = 'https://www.onekeymls.com/api/search';
+const ONEKEY_AGENT_DIRECTORY_URL = 'https://www.onekeymls.com/api/agents';
+const ONEKEY_AGENT_DISCOVERY_TYPES = ['Sale', 'Rent'];
 const CURRENT_STATUSES = new Set(['active', 'coming soon', 'pending']);
 const POSITIVE_REVIEW_STATUSES = new Set([
   'interested',
@@ -96,6 +99,18 @@ function readConfig(options = {}) {
     dryRun,
     oneKeyDiscoveryEnabled: options.oneKeyDiscoveryEnabled === true
       || process.env.AGENT_LISTING_INVENTORY_ONEKEY_DISCOVERY_ENABLED === 'true',
+    oneKeyAgentDiscoveryEnabled: options.oneKeyAgentDiscoveryEnabled === true
+      || process.env.AGENT_LISTING_INVENTORY_ONEKEY_AGENT_DISCOVERY_ENABLED === 'true',
+    oneKeyAgentConcurrency: positiveInt(
+      options.oneKeyAgentConcurrency || process.env.AGENT_LISTING_INVENTORY_ONEKEY_AGENT_CONCURRENCY,
+      6,
+      10
+    ),
+    oneKeyAgentLimit: positiveInt(
+      options.oneKeyAgentLimit || process.env.AGENT_LISTING_INVENTORY_ONEKEY_AGENT_LIMIT,
+      250,
+      1000
+    ),
     promoteOpenHouses: options.promoteOpenHouses === true
       || process.env.AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES === 'true',
     maxOffsets: positiveInt(
@@ -401,6 +416,22 @@ function primaryImage(record = {}) {
   );
 }
 
+function displayLocation(record = {}) {
+  const text = cleanText(record.DisplayLastLine);
+  const match = text.match(/^(.*?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  return match
+    ? { city: cleanText(match[1]), state: match[2].toUpperCase(), zip: match[3] }
+    : { city: '', state: '', zip: '' };
+}
+
+function oneKeyListingUrl(record = {}) {
+  const hash = cleanText(record.BUPI);
+  const slug = normalizeName(record.DisplayName).replace(/\s+/g, '-');
+  if (!hash || !slug) return null;
+  const saleType = firstPresent(record.Computed?.PropertySaleType?.[0], 'Sale');
+  return `${ONEKEY_SITE_URL}/home-details/${slug}/${encodeURIComponent(hash)}?propertySaleType=${encodeURIComponent(saleType)}`;
+}
+
 function sourcePayload(record, match) {
   return {
     unique_listing_id: record.UniqueListingId || null,
@@ -410,6 +441,9 @@ function sourcePayload(record, match) {
     source_agent_name: match.candidate.name || null,
     source_agent_phone: match.candidate.phone || null,
     source_agent_email: match.candidate.email || null,
+    source_agent_member_key: match.candidate.member_key || null,
+    source_agent_member_mls_id: match.candidate.member_mls_id || null,
+    source_agent_office_key: match.candidate.office_key || null,
     source_brokerage: recordBrokerage(record) || null,
     checked_at: new Date().toISOString()
   };
@@ -421,6 +455,7 @@ function inventoryPayload(record, match, nowIso) {
   const structure = record.Structure || {};
   const computed = record.Computed || {};
   const location = record.Location || {};
+  const displayedLocation = displayLocation(record);
   return {
     relationship_key: profile.relationship_key,
     relationship_source: profile.relationship_source,
@@ -437,16 +472,16 @@ function inventoryPayload(record, match, nowIso) {
     email: profile.email || match.candidate.email || null,
     listing_status: listingStatus(record),
     address: cleanText(record.DisplayName),
-    city: cleanText(location.City) || null,
-    state: cleanText(location.StateOrProvince) || 'NY',
-    zip: cleanText(location.PostalCode) || null,
+    city: cleanText(location.City) || displayedLocation.city || null,
+    state: cleanText(location.StateOrProvince) || displayedLocation.state || 'NY',
+    zip: cleanText(location.PostalCode) || displayedLocation.zip || null,
     price: numberOrNull(listing.Price?.ListPrice),
     beds: numberOrNull(structure.BedroomsTotal || computed.BedroomsTotalInteger),
     baths: numberOrNull(structure.BathroomsTotalInteger || computed.BathroomsTotalInteger),
     sqft: numberOrNull(structure.LivingArea || computed.LivingAreaSquareFeet),
     property_type: cleanText(record.PropertyType) || null,
     image_url: primaryImage(record) || null,
-    listing_url: firstPresent(record.CanonicalURL, record.ListingURL) || null,
+    listing_url: firstPresent(record.CanonicalURL, record.ListingURL, oneKeyListingUrl(record)) || null,
     open_start: computed.OpenHousesEarliestStartTime || null,
     open_end: computed.OpenHousesEarliestEndTime || null,
     lat: numberOrNull(record.LocationPoint?.lat),
@@ -648,21 +683,253 @@ function openHousePayload(record, match, nowIso) {
   });
 }
 
-async function fetchOneKeyPage(box, offset) {
-  const url = `${ONEKEY_BASE_URL}?topLeft=${encodeURIComponent(box.topLeft)}&bottomRight=${encodeURIComponent(box.bottomRight)}&propertySaleType=Sale&StateOrProvince=NY&offset=${offset}`;
+async function fetchOneKeyJson(url, label = 'OneKey request') {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json,text/plain,*/*',
       'User-Agent': 'Mozilla/5.0 (compatible; Rel8tionAgentListingInventory/1.0)'
-    }
-  });
+    },
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
   const raw = await response.text().catch(() => '');
-  if (!response.ok) throw new Error(raw || `OneKey request failed: ${response.status}`);
+  if (!response.ok) throw new Error(raw || `${label} failed: ${response.status}`);
   try {
     return JSON.parse(raw);
   } catch (error) {
-    throw new Error(`OneKey returned invalid JSON: ${error.message}`);
+    throw new Error(`${label} returned invalid JSON: ${error.message}`);
   }
+}
+
+async function fetchOneKeyPage(box, offset) {
+  const url = `${ONEKEY_BASE_URL}?topLeft=${encodeURIComponent(box.topLeft)}&bottomRight=${encodeURIComponent(box.bottomRight)}&propertySaleType=Sale&StateOrProvince=NY&offset=${offset}`;
+  return fetchOneKeyJson(url, 'OneKey geographic search');
+}
+
+function oneKeyAgentCandidate(row = {}) {
+  const office = row.OfficeMetadata || {};
+  return {
+    raw: row,
+    name: cleanText(row.MemberFullName),
+    phone: firstPresent(row.MemberMobilePhone, row.MemberDirectPhone),
+    email: normalizeEmail(row.MemberEmail),
+    brokerage: cleanText(office.OfficeName),
+    member_key: cleanText(row.MemberKey),
+    member_mls_id: cleanText(row.MemberMlsId),
+    office_key: cleanText(office.OfficeKey || row.OfficeKey)
+  };
+}
+
+function matchOneKeyAgentProfile(profile, rows = []) {
+  const exact = rows
+    .map(oneKeyAgentCandidate)
+    .filter((candidate) => (
+      candidate.name
+      && normalizeName(candidate.name) === profile.agent_name_normalized
+      && candidate.member_key
+    ));
+  const scored = [];
+
+  for (const candidate of exact) {
+    const candidatePhone = normalizePhone(candidate.phone);
+    const candidateEmail = normalizeEmail(candidate.email);
+    const phoneMatch = Boolean(
+      profile.phone_normalized
+      && candidatePhone
+      && profile.phone_normalized === candidatePhone
+    );
+    const emailMatch = Boolean(profile.email && candidateEmail && profile.email === candidateEmail);
+    const brokerageMatch = Boolean(
+      profile.brokerage
+      && candidate.brokerage
+      && similarBrokerage(profile.brokerage, candidate.brokerage)
+    );
+    const phoneConflict = Boolean(
+      profile.phone_normalized
+      && candidatePhone
+      && profile.phone_normalized !== candidatePhone
+    );
+    if (phoneConflict) continue;
+
+    let matchScore = 0;
+    let matchReason = '';
+    if (phoneMatch) {
+      matchScore = 100;
+      matchReason = 'onekey_agent_phone';
+    } else if (emailMatch) {
+      matchScore = 98;
+      matchReason = 'onekey_agent_email';
+    } else if (brokerageMatch) {
+      matchScore = 90;
+      matchReason = 'onekey_exact_name_brokerage';
+    } else if (exact.length === 1) {
+      matchScore = 80;
+      matchReason = 'onekey_unique_exact_name';
+    }
+    if (!matchScore) continue;
+    scored.push({
+      profile,
+      candidate,
+      match_score: matchScore,
+      match_reason: matchReason
+    });
+  }
+
+  scored.sort((left, right) => right.match_score - left.match_score);
+  if (!scored.length) return null;
+  if (scored[1] && scored[1].match_score === scored[0].match_score) return null;
+  return scored[0];
+}
+
+async function fetchOneKeyAgentDirectory(profile) {
+  const params = new URLSearchParams({
+    value: profile.agent_name,
+    page: '1'
+  });
+  return fetchOneKeyJson(
+    `${ONEKEY_AGENT_DIRECTORY_URL}?${params.toString()}`,
+    'OneKey agent directory'
+  );
+}
+
+async function fetchOneKeyAgentListings(config, match, saleType) {
+  const params = new URLSearchParams({
+    propertySaleType: saleType,
+    StateOrProvince: 'NY',
+    listAgentFullName: match.candidate.name,
+    listAgentKey: match.candidate.member_key
+  });
+  if (match.candidate.office_key) params.set('listOfficeKey', match.candidate.office_key);
+
+  const byId = new Map();
+  let total = 0;
+  let offset = 0;
+  let complete = false;
+  for (let index = 0; index < config.maxOffsets; index += 1) {
+    params.set('offset', String(offset));
+    const data = await fetchOneKeyJson(
+      `${ONEKEY_BASE_URL}?${params.toString()}`,
+      `OneKey ${saleType.toLowerCase()} listings`
+    );
+    const results = Array.isArray(data?.Results) ? data.Results : [];
+    total = Number(data?.Total || total || 0);
+    for (const record of results) {
+      const id = String(record?.UniqueListingId || '');
+      if (id) byId.set(id, record);
+    }
+    if (!results.length) {
+      complete = true;
+      break;
+    }
+    const declaredNext = Number(data?.NextOffset);
+    const nextOffset = Number.isFinite(declaredNext) && declaredNext > offset
+      ? declaredNext
+      : offset + results.length;
+    if ((total && nextOffset >= total) || results.length >= total) {
+      complete = true;
+      break;
+    }
+    if (nextOffset <= offset) break;
+    offset = nextOffset;
+  }
+  return { records: [...byId.values()], total, complete, sale_type: saleType };
+}
+
+async function discoverOneKeyListingsForProfile(config, profile) {
+  const directory = await fetchOneKeyAgentDirectory(profile);
+  const rows = Array.isArray(directory?.Results) ? directory.Results : [];
+  const match = matchOneKeyAgentProfile(profile, rows);
+  if (!match) {
+    return {
+      profile,
+      match: null,
+      records: [],
+      complete: true,
+      directory_total: Number(directory?.Total || rows.length || 0),
+      listing_totals: {}
+    };
+  }
+
+  const scans = await Promise.all(
+    ONEKEY_AGENT_DISCOVERY_TYPES.map((saleType) => fetchOneKeyAgentListings(config, match, saleType))
+  );
+  const byId = new Map();
+  for (const scan of scans) {
+    for (const record of scan.records) {
+      const id = String(record?.UniqueListingId || '');
+      if (id) byId.set(id, record);
+    }
+  }
+  return {
+    profile,
+    match,
+    records: [...byId.values()],
+    complete: scans.every((scan) => scan.complete),
+    directory_total: Number(directory?.Total || rows.length || 0),
+    listing_totals: Object.fromEntries(scans.map((scan) => [scan.sale_type, scan.total]))
+  };
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), Math.max(1, items.length)) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+async function scanOneKeyAgents(config, profiles = []) {
+  const actionable = profiles.filter((profile) => (
+    profile.relationship_status !== RANKING_RELATIONSHIP_STATUS
+    && profile.agent_name
+  ));
+  const selected = actionable.slice(0, config.oneKeyAgentLimit);
+  const results = await mapWithConcurrency(
+    selected,
+    config.oneKeyAgentConcurrency,
+    async (profile) => {
+      try {
+        return await discoverOneKeyListingsForProfile(config, profile);
+      } catch (error) {
+        return {
+          profile,
+          match: null,
+          records: [],
+          complete: false,
+          error: error.message || String(error),
+          directory_total: 0,
+          listing_totals: {}
+        };
+      }
+    }
+  );
+  const entries = [];
+  const matchReasons = {};
+  for (const result of results) {
+    if (!result.match) continue;
+    matchReasons[result.match.match_reason] = (matchReasons[result.match.match_reason] || 0) + 1;
+    for (const record of result.records) entries.push({ record, match: result.match });
+  }
+  return {
+    entries,
+    profiles_considered: actionable.length,
+    profiles_scanned: selected.length,
+    profiles_matched: results.filter((result) => result.match).length,
+    profiles_failed: results.filter((result) => !result.complete).length,
+    match_reasons: matchReasons,
+    complete: selected.length === actionable.length && results.every((result) => result.complete),
+    results
+  };
 }
 
 async function scanOneKey(config) {
@@ -673,8 +940,8 @@ async function scanOneKey(config) {
     let fetched = 0;
     let total = 0;
     let boxComplete = false;
+    let offset = 0;
     for (let index = 0; index < config.maxOffsets; index += 1) {
-      const offset = index * 100;
       const data = await fetchOneKeyPage(box, offset);
       const results = Array.isArray(data?.Results) ? data.Results : [];
       total = Number(data?.Total || total || 0);
@@ -687,14 +954,19 @@ async function scanOneKey(config) {
         const id = String(record?.UniqueListingId || '');
         if (id) byId.set(id, record);
       }
-      if (total && offset + results.length >= total) {
+      const declaredNext = Number(data?.NextOffset);
+      const nextOffset = Number.isFinite(declaredNext) && declaredNext > offset
+        ? declaredNext
+        : offset + results.length;
+      if (total && nextOffset >= total) {
         boxComplete = true;
         break;
       }
-      if (results.length < DEFAULT_BATCH_SIZE) {
+      if (nextOffset <= offset) {
         boxComplete = true;
         break;
       }
+      offset = nextOffset;
     }
     if (!boxComplete) complete = false;
     boxes.push({ ...box, fetched, total, complete: boxComplete });
@@ -732,6 +1004,37 @@ async function markStaleInventory(config, nowIso, scanComplete, sources = ['onek
     }
   );
   return { marked_inactive: Array.isArray(rows) ? rows.length : 0, skipped: false, cutoff };
+}
+
+async function markStaleOneKeyAgentInventory(config, nowIso, scan) {
+  if (config.dryRun) return { marked_inactive: 0, skipped: true };
+  const relationshipKeys = [
+    ...new Set(
+      (scan?.results || [])
+        .filter((result) => result.complete && result.profile?.relationship_key)
+        .map((result) => result.profile.relationship_key)
+    )
+  ];
+  if (!relationshipKeys.length) return { marked_inactive: 0, skipped: true };
+
+  const cutoff = new Date(
+    new Date(nowIso).getTime() - config.staleAfterHours * 60 * 60 * 1000
+  ).toISOString();
+  let markedInactive = 0;
+  for (let index = 0; index < relationshipKeys.length; index += DEFAULT_BATCH_SIZE) {
+    const batch = relationshipKeys.slice(index, index + DEFAULT_BATCH_SIZE);
+    const rows = await supabaseRequest(
+      config,
+      `agent_listing_inventory?source=eq.onekey&is_current=eq.true&last_seen_at=lt.${encodeURIComponent(cutoff)}&relationship_key=in.${encodeURIComponent(`(${batch.join(',')})`)}`,
+      {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ is_current: false, inactive_at: nowIso, updated_at: nowIso })
+      }
+    );
+    markedInactive += Array.isArray(rows) ? rows.length : 0;
+  }
+  return { marked_inactive: markedInactive, skipped: false, cutoff };
 }
 
 async function run(options = {}) {
@@ -784,6 +1087,30 @@ async function run(options = {}) {
     }
   }
 
+  const agentScan = config.oneKeyAgentDiscoveryEnabled
+    ? await scanOneKeyAgents(config, profiles)
+    : {
+        entries: [],
+        profiles_considered: 0,
+        profiles_scanned: 0,
+        profiles_matched: 0,
+        profiles_failed: 0,
+        match_reasons: {},
+        complete: false,
+        results: []
+      };
+  if (config.oneKeyAgentDiscoveryEnabled) {
+    for (const { record, match } of agentScan.entries) {
+      if (!currentListing(record)) continue;
+      const payload = inventoryPayload(record, match, nowIso);
+      if (!payload.source_listing_id || !payload.address) continue;
+      const key = inventorySemanticKey(payload);
+      inventoryByKey.set(key, mergeInventoryPayload(inventoryByKey.get(key), payload));
+      const openHouse = openHousePayload(record, match, nowIso);
+      if (openHouse?.id) openHousesById.set(openHouse.id, openHouse);
+    }
+  }
+
   const scan = config.oneKeyDiscoveryEnabled
     ? await scanOneKey(config)
     : { records: [], boxes: [], complete: false };
@@ -821,7 +1148,9 @@ async function run(options = {}) {
   );
   const oneKeyStale = config.oneKeyDiscoveryEnabled
     ? await markStaleInventory(config, nowIso, scan.complete, ['onekey'])
-    : { marked_inactive: 0, skipped: true };
+    : config.oneKeyAgentDiscoveryEnabled
+      ? await markStaleOneKeyAgentInventory(config, nowIso, agentScan)
+      : { marked_inactive: 0, skipped: true };
 
   return {
     ok: true,
@@ -830,6 +1159,14 @@ async function run(options = {}) {
     scanned: scan.records.length,
     scan_complete: config.oneKeyDiscoveryEnabled ? scan.complete : null,
     onekey_discovery_enabled: config.oneKeyDiscoveryEnabled,
+    onekey_agent_discovery_enabled: config.oneKeyAgentDiscoveryEnabled,
+    onekey_agent_profiles_considered: agentScan.profiles_considered,
+    onekey_agent_profiles_scanned: agentScan.profiles_scanned,
+    onekey_agent_profiles_matched: agentScan.profiles_matched,
+    onekey_agent_profiles_failed: agentScan.profiles_failed,
+    onekey_agent_match_reasons: agentScan.match_reasons,
+    onekey_agent_scan_complete: config.oneKeyAgentDiscoveryEnabled ? agentScan.complete : null,
+    onekey_agent_listings_scanned: agentScan.entries.length,
     boxes: scan.boxes,
     website_listings_scanned: internal.websiteListings.length,
     upcoming_open_houses_scanned: internal.openHouses.length,
@@ -851,6 +1188,7 @@ function parseCliArgs(argv = []) {
     if (arg === '--dry-run') options.dryRun = true;
     if (arg === '--promote-open-houses') options.promoteOpenHouses = true;
     if (arg === '--onekey-discovery') options.oneKeyDiscoveryEnabled = true;
+    if (arg === '--onekey-agent-discovery') options.oneKeyAgentDiscoveryEnabled = true;
     if (arg.startsWith('--max-offsets=')) options.maxOffsets = Number(arg.slice('--max-offsets='.length));
     if (arg.startsWith('--stale-hours=')) options.staleAfterHours = Number(arg.slice('--stale-hours='.length));
   }
@@ -873,8 +1211,10 @@ module.exports = {
   inventoryPayload,
   internalInventoryPayload,
   inventorySemanticKey,
+  discoverOneKeyListingsForProfile,
   listingAgentCandidates,
   matchProfiles,
+  matchOneKeyAgentProfile,
   normalizeBrokerage,
   normalizeName,
   normalizePhone,
@@ -885,6 +1225,8 @@ module.exports = {
   relationshipProfile,
   run,
   mergeInventoryPayload,
+  oneKeyListingUrl,
+  scanOneKeyAgents,
   sourceIdentityRecord,
   similarBrokerage
 };

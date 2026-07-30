@@ -1,11 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  discoverOneKeyListingsForProfile,
   inventoryPayload,
   internalInventoryPayload,
   inventorySemanticKey,
   matchProfiles,
+  matchOneKeyAgentProfile,
   mergeInventoryPayload,
+  oneKeyListingUrl,
   openHousePayload,
   profileIndexes,
   readConfig,
@@ -112,6 +115,115 @@ test('a shared office phone cannot assign one agent listing to a different agent
   assert.equal(matches[0].profile.agent_name, 'Ruth Chalco');
 });
 
+test('OneKey agent directory identity prefers an exact phone match', () => {
+  const profile = relationshipProfile({
+    id: 'agent-nina',
+    name: 'Nina Sabag',
+    brokerage: '5 Boro Realty Corp',
+    phone: '917-705-0005'
+  });
+  const match = matchOneKeyAgentProfile(profile, [{
+    MemberFullName: 'Nina Sabag',
+    MemberMobilePhone: '917-705-0005',
+    MemberKey: '326232401',
+    MemberMlsId: '223544',
+    OfficeMetadata: {
+      OfficeKey: '326109033',
+      OfficeName: '5 Boro Realty Corp'
+    }
+  }]);
+
+  assert.equal(match.match_score, 100);
+  assert.equal(match.match_reason, 'onekey_agent_phone');
+  assert.equal(match.candidate.member_key, '326232401');
+});
+
+test('OneKey agent directory rejects an exact name with a conflicting phone', () => {
+  const profile = relationshipProfile({
+    id: 'agent-nina',
+    name: 'Nina Sabag',
+    brokerage: '5 Boro Realty Corp',
+    phone: '917-705-0005'
+  });
+  const match = matchOneKeyAgentProfile(profile, [{
+    MemberFullName: 'Nina Sabag',
+    MemberMobilePhone: '516-555-9999',
+    MemberKey: 'other-member',
+    OfficeMetadata: {
+      OfficeKey: 'other-office',
+      OfficeName: '5 Boro Realty Corp'
+    }
+  }]);
+
+  assert.equal(match, null);
+});
+
+test('targeted OneKey discovery requests sale and rental listings by stable member key', async () => {
+  const previousFetch = global.fetch;
+  const requested = [];
+  const profile = relationshipProfile({
+    id: 'agent-nina',
+    name: 'Nina Sabag',
+    brokerage: '5 Boro Realty Corp',
+    phone: '917-705-0005'
+  });
+  const listing = (id, saleType) => oneKeyRecord({
+    UniqueListingId: id,
+    BUPI: `${id}-hash`,
+    DisplayLastLine: 'Brooklyn, NY 11207',
+    Location: {},
+    Listing: {
+      StandardStatus: 'Active',
+      Price: { ListPrice: saleType === 'Rent' ? 3500 : 1199999 },
+      AgentOffice: { ListOffice: { ListOfficeName: '5 Boro Realty Corp' } }
+    },
+    Computed: {
+      PropertySaleType: [saleType]
+    }
+  });
+
+  global.fetch = async (url) => {
+    requested.push(String(url));
+    let payload;
+    if (String(url).includes('/api/agents?')) {
+      payload = {
+        Results: [{
+          MemberFullName: 'Nina Sabag',
+          MemberMobilePhone: '917-705-0005',
+          MemberKey: '326232401',
+          MemberMlsId: '223544',
+          OfficeMetadata: {
+            OfficeKey: '326109033',
+            OfficeName: '5 Boro Realty Corp'
+          }
+        }],
+        Total: 1
+      };
+    } else if (String(url).includes('propertySaleType=Rent')) {
+      payload = { Results: [listing('RENT-1', 'Rent')], Total: 1, NextOffset: null };
+    } else {
+      payload = { Results: [listing('SALE-1', 'Sale')], Total: 1, NextOffset: null };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(payload)
+    };
+  };
+
+  try {
+    const result = await discoverOneKeyListingsForProfile({ maxOffsets: 3 }, profile);
+    assert.equal(result.complete, true);
+    assert.equal(result.records.length, 2);
+    assert.deepEqual(result.listing_totals, { Sale: 1, Rent: 1 });
+    assert.ok(requested.some((url) => url.includes('listAgentKey=326232401')));
+    assert.ok(requested.some((url) => url.includes('propertySaleType=Sale')));
+    assert.ok(requested.some((url) => url.includes('propertySaleType=Rent')));
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
 test('prebuilt profile indexes preserve ranked-agent matching without scanning every profile', () => {
   const profiles = [
     relationshipProfile({
@@ -160,6 +272,43 @@ test('inventory and upcoming open-house payloads use trusted relationship contac
   assert.equal(openHouse.agent_email, 'ruth@example.com');
   assert.equal(openHouse.agent_scraped, true);
   assert.equal(openHouse.agent_enriched, true);
+});
+
+test('OneKey listing payloads derive location and a clickable URL from current search fields', () => {
+  const profile = relationshipProfile({
+    id: 'agent-nina',
+    name: 'Nina Sabag',
+    brokerage: '5 Boro Realty Corp',
+    phone: '917-705-0005'
+  });
+  const match = {
+    profile,
+    candidate: {
+      name: 'Nina Sabag',
+      phone: '917-705-0005',
+      brokerage: '5 Boro Realty Corp',
+      member_key: '326232401'
+    },
+    match_score: 100,
+    match_reason: 'onekey_agent_phone'
+  };
+  const record = oneKeyRecord({
+    BUPI: '9Nuu3J1ViHD',
+    DisplayName: '405 Miller Ave, Brooklyn, NY 11207',
+    DisplayLastLine: 'Brooklyn, NY 11207',
+    Location: {},
+    Computed: { PropertySaleType: ['Sale'] }
+  });
+  const payload = inventoryPayload(record, match, '2026-07-30T00:00:00.000Z');
+
+  assert.equal(payload.city, 'Brooklyn');
+  assert.equal(payload.state, 'NY');
+  assert.equal(payload.zip, '11207');
+  assert.equal(
+    payload.listing_url,
+    'https://www.onekeymls.com/home-details/405-miller-ave-brooklyn-ny-11207/9Nuu3J1ViHD?propertySaleType=Sale'
+  );
+  assert.equal(oneKeyListingUrl(record), payload.listing_url);
 });
 
 test('verified website listings match ranked agents without enrichment', () => {
@@ -286,6 +435,7 @@ test('shadow mode is the default and the cron remains disabled until explicitly 
     url: process.env.SUPABASE_URL,
     anon: process.env.SUPABASE_ANON_KEY,
     promote: process.env.AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES,
+    oneKeyAgent: process.env.AGENT_LISTING_INVENTORY_ONEKEY_AGENT_DISCOVERY_ENABLED,
     secret: process.env.CRON_SECRET,
     enabled: process.env.AGENT_LISTING_INVENTORY_ENABLED
   };
@@ -308,6 +458,7 @@ test('shadow mode is the default and the cron remains disabled until explicitly 
     delete process.env.AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES;
     const config = readConfig({ dryRun: true });
     assert.equal(config.promoteOpenHouses, false);
+    assert.equal(config.oneKeyAgentDiscoveryEnabled, false);
 
     process.env.CRON_SECRET = 'expected-secret';
     delete process.env.AGENT_LISTING_INVENTORY_ENABLED;
@@ -325,6 +476,7 @@ test('shadow mode is the default and the cron remains disabled until explicitly 
     restore('SUPABASE_URL', previous.url);
     restore('SUPABASE_ANON_KEY', previous.anon);
     restore('AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES', previous.promote);
+    restore('AGENT_LISTING_INVENTORY_ONEKEY_AGENT_DISCOVERY_ENABLED', previous.oneKeyAgent);
     restore('CRON_SECRET', previous.secret);
     restore('AGENT_LISTING_INVENTORY_ENABLED', previous.enabled);
   }
