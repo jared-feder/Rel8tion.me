@@ -2,11 +2,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   inventoryPayload,
+  internalInventoryPayload,
+  inventorySemanticKey,
   matchProfiles,
+  mergeInventoryPayload,
   openHousePayload,
   profileIndexes,
   readConfig,
-  relationshipProfile
+  relationshipProfile,
+  sourceIdentityRecord
 } = require('../agent-listing-inventory-worker.cjs');
 const cronHandler = require('../api/cron/sync-agent-listing-inventory.js');
 
@@ -80,6 +84,33 @@ test('same-name records with conflicting brokerages are rejected', () => {
   assert.deepEqual(matchProfiles(oneKeyRecord(), [profile]), []);
 });
 
+test('a shared office phone cannot assign one agent listing to a different agent', () => {
+  const profiles = [
+    relationshipProfile({
+      id: 'agent-1',
+      name: 'Ruth Chalco',
+      brokerage: 'Example Realty',
+      phone: '516-555-0100'
+    }),
+    relationshipProfile({
+      id: 'agent-2',
+      name: 'Someone Else',
+      brokerage: 'Example Realty',
+      phone: '516-555-0100'
+    })
+  ];
+  const record = oneKeyRecord({
+    Listing: {
+      ...oneKeyRecord().Listing,
+      ListAgent: { FullName: 'Ruth Chalco', Phone: '516-555-0100' }
+    }
+  });
+  const matches = matchProfiles(record, profiles);
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].profile.agent_name, 'Ruth Chalco');
+});
+
 test('prebuilt profile indexes preserve ranked-agent matching without scanning every profile', () => {
   const profiles = [
     relationshipProfile({
@@ -128,6 +159,62 @@ test('inventory and upcoming open-house payloads use trusted relationship contac
   assert.equal(openHouse.agent_email, 'ruth@example.com');
   assert.equal(openHouse.agent_scraped, true);
   assert.equal(openHouse.agent_enriched, true);
+});
+
+test('verified website listings match ranked agents without enrichment', () => {
+  const profile = relationshipProfile({
+    agent_id: null,
+    agent_name: 'Ruth Chalco',
+    brokerage: 'Example Realty'
+  }, {
+    relationship_source: 'agent_rankings',
+    relationship_status: 'ranking_only'
+  });
+  const identity = sourceIdentityRecord('Ruth Chalco', '', '', 'Example Realty LLC');
+  const match = matchProfiles(identity, [profile])[0];
+  const payload = internalInventoryPayload({
+    id: 'website-row-1',
+    source_listing_id: 'MLS-123',
+    address: '12 Main Street, Huntington, NY 11743',
+    listing_status: 'Active',
+    price: 925000,
+    agent_name: 'Ruth Chalco',
+    brokerage: 'Example Realty LLC'
+  }, match, '2026-07-30T00:00:00.000Z', 'agent_website_listing');
+
+  assert.equal(match.match_reason, 'exact_name_brokerage');
+  assert.equal(payload.source_listing_id, 'MLS-123');
+  assert.equal(payload.relationship_status, 'ranking_only');
+  assert.equal(payload.listing_status, 'active');
+});
+
+test('an upcoming open house enriches a matching website listing instead of duplicating it', () => {
+  const base = {
+    relationship_key: 'phone:5165550100',
+    source: 'agent_website_listing',
+    source_listing_id: 'MLS-123',
+    address: '12 Main Street, Huntington, NY 11743',
+    image_url: 'https://images.example/listing.jpg',
+    listing_url: 'https://example.com/listing',
+    open_start: null,
+    open_end: null,
+    source_payload: { origin: 'agent_website_listing' }
+  };
+  const openHouse = {
+    relationship_key: 'phone:5165550100',
+    source: 'open_house',
+    source_listing_id: 'OH-123',
+    address: '12 Main Street, Huntington, NY 11743',
+    open_start: '2026-08-01T16:00:00Z',
+    open_end: '2026-08-01T18:00:00Z',
+    source_payload: { origin: 'open_house' }
+  };
+  const merged = mergeInventoryPayload(base, openHouse);
+
+  assert.equal(inventorySemanticKey(base), inventorySemanticKey(openHouse));
+  assert.equal(merged.source, 'agent_website_listing');
+  assert.equal(merged.open_start, '2026-08-01T16:00:00Z');
+  assert.equal(merged.source_payload.related_source, 'open_house');
 });
 
 test('the cron refuses requests when CRON_SECRET is missing or incorrect', async () => {

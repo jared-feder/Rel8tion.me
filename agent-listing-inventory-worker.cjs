@@ -94,6 +94,8 @@ function readConfig(options = {}) {
     url,
     key,
     dryRun,
+    oneKeyDiscoveryEnabled: options.oneKeyDiscoveryEnabled === true
+      || process.env.AGENT_LISTING_INVENTORY_ONEKEY_DISCOVERY_ENABLED === 'true',
     promoteOpenHouses: options.promoteOpenHouses === true
       || process.env.AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES === 'true',
     maxOffsets: positiveInt(
@@ -350,6 +352,9 @@ function matchProfiles(record, profiles = [], indexes = profileIndexes(profiles)
       const phoneMatch = phone && profile.phone_normalized && phone === profile.phone_normalized;
       const emailMatch = email && profile.email && email === profile.email;
       if (!phoneMatch && !emailMatch) continue;
+      if (normalizedName && profile.agent_name_normalized && normalizedName !== profile.agent_name_normalized) {
+        continue;
+      }
       matched.set(profile.relationship_key, {
         profile,
         candidate,
@@ -452,6 +457,144 @@ function inventoryPayload(record, match, nowIso) {
     inactive_at: null,
     source_payload: sourcePayload(record, match),
     updated_at: nowIso
+  };
+}
+
+function sourceIdentityRecord(agentName, phone, email, brokerage) {
+  return {
+    Listing: {
+      ListAgent: {
+        FullName: cleanText(agentName),
+        Phone: cleanText(phone),
+        Email: normalizeEmail(email)
+      },
+      AgentOffice: {
+        ListOffice: {
+          ListOfficeName: cleanText(brokerage)
+        }
+      }
+    }
+  };
+}
+
+function normalizeListingStatus(value, fallback = 'active') {
+  const status = cleanText(value).toLowerCase().replace(/\s+/g, '_');
+  if (status === 'coming_soon') return 'coming_soon';
+  if (status === 'pending') return 'pending';
+  if (status === 'active') return 'active';
+  return fallback;
+}
+
+function internalInventoryPayload(row, match, nowIso, source) {
+  const profile = match.profile;
+  const sourceListingId = String(row.source_listing_id || row.mls_id || row.id || '');
+  return {
+    relationship_key: profile.relationship_key,
+    relationship_source: profile.relationship_source,
+    relationship_status: profile.relationship_status,
+    source,
+    source_listing_id: sourceListingId,
+    agent_id: profile.agent_id ? String(profile.agent_id) : null,
+    queue_row_id: profile.queue_row_id || null,
+    agent_name: profile.agent_name,
+    agent_name_normalized: profile.agent_name_normalized,
+    brokerage: cleanText(row.brokerage) || profile.brokerage || null,
+    phone: profile.phone || cleanText(row.agent_phone) || null,
+    phone_normalized: profile.phone_normalized || normalizePhone(row.agent_phone) || null,
+    email: profile.email || normalizeEmail(row.agent_email) || null,
+    listing_status: normalizeListingStatus(row.listing_status),
+    address: cleanText(row.address || row.title),
+    city: cleanText(row.city) || null,
+    state: cleanText(row.state) || 'NY',
+    zip: cleanText(row.zip) || null,
+    price: numberOrNull(row.price),
+    beds: numberOrNull(row.beds),
+    baths: numberOrNull(row.baths),
+    sqft: numberOrNull(row.sqft),
+    property_type: cleanText(row.property_type) || null,
+    image_url: firstPresent(row.primary_image, row.image) || null,
+    listing_url: firstPresent(row.listing_url, row.link) || null,
+    open_start: row.open_house_start || row.open_start || null,
+    open_end: row.open_house_end || row.open_end || null,
+    lat: numberOrNull(row.lat),
+    lng: numberOrNull(row.lng),
+    is_current: true,
+    last_seen_at: nowIso,
+    source_checked_at: nowIso,
+    inactive_at: null,
+    source_payload: {
+      origin: source,
+      origin_row_id: String(row.id || ''),
+      source_agent_name: match.candidate.name || null,
+      source_agent_phone: match.candidate.phone || null,
+      source_agent_email: match.candidate.email || null,
+      match_score: match.match_score,
+      match_reason: match.match_reason,
+      checked_at: nowIso
+    },
+    updated_at: nowIso
+  };
+}
+
+function inventorySemanticKey(payload) {
+  const address = normalizeName(payload.address);
+  return `${payload.relationship_key}|${address || `${payload.source}:${payload.source_listing_id}`}`;
+}
+
+function mergeInventoryPayload(existing, candidate) {
+  if (!existing) return candidate;
+  const preferred = existing.source === 'agent_website_listing' ? existing : candidate;
+  const alternate = preferred === existing ? candidate : existing;
+  return {
+    ...alternate,
+    ...preferred,
+    open_start: preferred.open_start || alternate.open_start || null,
+    open_end: preferred.open_end || alternate.open_end || null,
+    image_url: preferred.image_url || alternate.image_url || null,
+    listing_url: preferred.listing_url || alternate.listing_url || null,
+    source_payload: {
+      ...(alternate.source_payload || {}),
+      ...(preferred.source_payload || {}),
+      related_source: alternate.source,
+      related_source_listing_id: alternate.source_listing_id
+    }
+  };
+}
+
+async function loadInternalListingSources(config, nowIso) {
+  const websites = await supabaseRequestAll(
+    config,
+    'agent_websites',
+    'select=id,name,brokerage,email,phone&order=id.asc',
+    config.relationshipLimit
+  );
+  const websiteListings = await supabaseRequestAll(
+    config,
+    'agent_website_listings',
+    'select=id,agent_website_id,source,source_listing_id,mls_id,title,address,city,state,zip,price,beds,baths,sqft,property_type,listing_status,primary_image,listing_url,brokerage,agent_name,agent_phone,agent_email,open_house_start,open_house_end,lat,lng&order=id.asc',
+    config.relationshipLimit
+  );
+  const futureFilter = encodeURIComponent(nowIso);
+  const [endingLater, startingLater] = await Promise.all([
+    supabaseRequestAll(
+      config,
+      'open_houses',
+      `open_end=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source&order=open_end.asc`,
+      config.relationshipLimit
+    ),
+    supabaseRequestAll(
+      config,
+      'open_houses',
+      `open_end=is.null&open_start=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source&order=open_start.asc`,
+      config.relationshipLimit
+    )
+  ]);
+  const openHouses = new Map();
+  for (const row of [...endingLater, ...startingLater]) openHouses.set(String(row.id), row);
+  return {
+    websites,
+    websiteListings,
+    openHouses: [...openHouses.values()]
   };
 }
 
@@ -560,12 +703,12 @@ async function upsertRows(config, table, rows, conflictColumns) {
   return written;
 }
 
-async function markStaleInventory(config, nowIso, scanComplete) {
+async function markStaleInventory(config, nowIso, scanComplete, sources = ['onekey']) {
   if (config.dryRun || !scanComplete) return { marked_inactive: 0, skipped: true };
   const cutoff = new Date(new Date(nowIso).getTime() - config.staleAfterHours * 60 * 60 * 1000).toISOString();
   const rows = await supabaseRequest(
     config,
-    `agent_listing_inventory?source=eq.onekey&is_current=eq.true&last_seen_at=lt.${encodeURIComponent(cutoff)}`,
+    `agent_listing_inventory?source=in.(${sources.join(',')})&is_current=eq.true&last_seen_at=lt.${encodeURIComponent(cutoff)}`,
     {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
@@ -583,18 +726,62 @@ async function run(options = {}) {
     return { ok: true, dryRun: config.dryRun, relationship_agents: 0, scanned: 0, matched_listings: 0 };
   }
 
-  const scan = await scanOneKey(config);
   const indexes = profileIndexes(profiles);
   const inventoryByKey = new Map();
   const openHousesById = new Map();
-  for (const record of scan.records) {
-    if (!currentListing(record)) continue;
-    for (const match of matchProfiles(record, profiles, indexes)) {
-      const payload = inventoryPayload(record, match, nowIso);
+
+  const internal = await loadInternalListingSources(config, nowIso);
+  const websitesById = new Map(internal.websites.map((row) => [String(row.id), row]));
+  for (const row of internal.websiteListings) {
+    if (!CURRENT_STATUSES.has(cleanText(row.listing_status).toLowerCase().replace(/_/g, ' '))) continue;
+    const website = websitesById.get(String(row.agent_website_id)) || {};
+    const identity = sourceIdentityRecord(
+      row.agent_name || website.name,
+      row.agent_phone || website.phone,
+      row.agent_email || website.email,
+      row.brokerage || website.brokerage
+    );
+    for (const match of matchProfiles(identity, profiles, indexes)) {
+      const payload = internalInventoryPayload({
+        ...row,
+        agent_name: row.agent_name || website.name,
+        agent_phone: row.agent_phone || website.phone,
+        agent_email: row.agent_email || website.email,
+        brokerage: row.brokerage || website.brokerage
+      }, match, nowIso, 'agent_website_listing');
       if (!payload.source_listing_id || !payload.address) continue;
-      inventoryByKey.set(`${payload.relationship_key}|${payload.source_listing_id}`, payload);
-      const openHouse = openHousePayload(record, match, nowIso);
-      if (openHouse?.id) openHousesById.set(openHouse.id, openHouse);
+      const key = inventorySemanticKey(payload);
+      inventoryByKey.set(key, mergeInventoryPayload(inventoryByKey.get(key), payload));
+    }
+  }
+
+  for (const row of internal.openHouses) {
+    const identity = sourceIdentityRecord(row.agent, row.agent_phone, row.agent_email, row.brokerage);
+    for (const match of matchProfiles(identity, profiles, indexes)) {
+      const payload = internalInventoryPayload({
+        ...row,
+        listing_status: 'active'
+      }, match, nowIso, 'open_house');
+      if (!payload.source_listing_id || !payload.address) continue;
+      const key = inventorySemanticKey(payload);
+      inventoryByKey.set(key, mergeInventoryPayload(inventoryByKey.get(key), payload));
+    }
+  }
+
+  const scan = config.oneKeyDiscoveryEnabled
+    ? await scanOneKey(config)
+    : { records: [], boxes: [], complete: false };
+  if (config.oneKeyDiscoveryEnabled) {
+    for (const record of scan.records) {
+      if (!currentListing(record)) continue;
+      for (const match of matchProfiles(record, profiles, indexes)) {
+        const payload = inventoryPayload(record, match, nowIso);
+        if (!payload.source_listing_id || !payload.address) continue;
+        const key = inventorySemanticKey(payload);
+        inventoryByKey.set(key, mergeInventoryPayload(inventoryByKey.get(key), payload));
+        const openHouse = openHousePayload(record, match, nowIso);
+        if (openHouse?.id) openHousesById.set(openHouse.id, openHouse);
+      }
     }
   }
 
@@ -609,21 +796,35 @@ async function run(options = {}) {
   const openHousesWritten = config.promoteOpenHouses
     ? await upsertRows(config, 'open_houses', openHouses, 'id')
     : 0;
-  const stale = await markStaleInventory(config, nowIso, scan.complete);
+  const stale = await markStaleInventory(
+    config,
+    nowIso,
+    true,
+    ['agent_website_listing', 'open_house']
+  );
+  const oneKeyStale = config.oneKeyDiscoveryEnabled
+    ? await markStaleInventory(config, nowIso, scan.complete, ['onekey'])
+    : { marked_inactive: 0, skipped: true };
 
   return {
     ok: true,
     dryRun: config.dryRun,
     relationship_agents: profiles.length,
     scanned: scan.records.length,
-    scan_complete: scan.complete,
+    scan_complete: config.oneKeyDiscoveryEnabled ? scan.complete : null,
+    onekey_discovery_enabled: config.oneKeyDiscoveryEnabled,
     boxes: scan.boxes,
+    website_listings_scanned: internal.websiteListings.length,
+    upcoming_open_houses_scanned: internal.openHouses.length,
     matched_listings: inventory.length,
     upcoming_open_houses: openHouses.length,
     inventory_written: inventoryWritten,
     open_house_promotion_enabled: config.promoteOpenHouses,
     open_houses_written: openHousesWritten,
-    ...stale
+    marked_inactive: stale.marked_inactive + oneKeyStale.marked_inactive,
+    stale_marking_skipped: stale.skipped,
+    onekey_stale_marking_skipped: oneKeyStale.skipped,
+    cutoff: stale.cutoff || null
   };
 }
 
@@ -632,6 +833,7 @@ function parseCliArgs(argv = []) {
   for (const arg of argv) {
     if (arg === '--dry-run') options.dryRun = true;
     if (arg === '--promote-open-houses') options.promoteOpenHouses = true;
+    if (arg === '--onekey-discovery') options.oneKeyDiscoveryEnabled = true;
     if (arg.startsWith('--max-offsets=')) options.maxOffsets = Number(arg.slice('--max-offsets='.length));
     if (arg.startsWith('--stale-hours=')) options.staleAfterHours = Number(arg.slice('--stale-hours='.length));
   }
@@ -652,6 +854,8 @@ module.exports = {
   POSITIVE_REVIEW_STATUSES,
   RANKING_RELATIONSHIP_STATUS,
   inventoryPayload,
+  internalInventoryPayload,
+  inventorySemanticKey,
   listingAgentCandidates,
   matchProfiles,
   normalizeBrokerage,
@@ -663,5 +867,7 @@ module.exports = {
   relationshipKey,
   relationshipProfile,
   run,
+  mergeInventoryPayload,
+  sourceIdentityRecord,
   similarBrokerage
 };
