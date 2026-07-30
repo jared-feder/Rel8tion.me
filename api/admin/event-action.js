@@ -32,6 +32,13 @@ async function loadEvent(eventId) {
   );
 }
 
+async function loadVisit(visitId) {
+  return one(
+    `field_demo_visits?id=eq.${enc(visitId)}&select=*`,
+    'Open house'
+  );
+}
+
 async function endLoanOfficerCoverage(eventId, now) {
   return supabaseRest(
     `event_loan_officer_sessions?open_house_event_id=eq.${enc(eventId)}&status=eq.live`,
@@ -114,6 +121,103 @@ async function endEvent(eventId) {
   return { event: updatedEvent || event, sign, signs, loan_officer_coverage, loan_officer_coverage_signs };
 }
 
+async function loadActiveEventIdsForVisit(visit) {
+  const ids = new Set();
+
+  if (visit.open_house_event_id) {
+    const directRows = await supabaseRest(
+      `open_house_events?id=eq.${enc(visit.open_house_event_id)}&status=eq.active&ended_at=is.null&select=id`
+    );
+    for (const row of Array.isArray(directRows) ? directRows : []) {
+      if (row.id) ids.add(row.id);
+    }
+  }
+
+  if (visit.open_house_id) {
+    const matchingRows = await supabaseRest(
+      `open_house_events?open_house_source_id=eq.${enc(visit.open_house_id)}&status=eq.active&ended_at=is.null&select=id`
+    );
+    for (const row of Array.isArray(matchingRows) ? matchingRows : []) {
+      if (row.id) ids.add(row.id);
+    }
+  }
+
+  return [...ids];
+}
+
+function cancellationNote(notes, now) {
+  const existing = String(notes || '').trim();
+  if (/Cancelled from REL8TION COMMAND/i.test(existing)) return existing;
+  return [existing, `Cancelled from REL8TION COMMAND on ${now}.`].filter(Boolean).join(' ');
+}
+
+async function cancelOpenHouse(visitId) {
+  const visit = await loadVisit(visitId);
+  const now = new Date().toISOString();
+  const activeEventIds = await loadActiveEventIdsForVisit(visit);
+  const ended_events = [];
+
+  for (const eventId of activeEventIds) {
+    ended_events.push(await endEvent(eventId));
+  }
+
+  const visitRows = await supabaseRest(`field_demo_visits?id=eq.${enc(visit.id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      status: 'cancelled',
+      notes: cancellationNote(visit.notes, now)
+    })
+  });
+  const cancelledVisit = Array.isArray(visitRows) ? visitRows[0] || visit : visit;
+
+  const participants = await supabaseRest(
+    `field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&status=neq.cancelled`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'cancelled',
+        is_primary: false
+      })
+    }
+  ).catch((error) => ({ warning: error.message || String(error) }));
+
+  const availability = await supabaseRest(
+    `field_coverage_availability?linked_visit_id=eq.${enc(visit.id)}&status=neq.cancelled`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'cancelled',
+        updated_at: now
+      })
+    }
+  ).catch((error) => ({ warning: error.message || String(error) }));
+
+  const outreach_queue = visit.outreach_queue_id
+    ? await supabaseRest(
+        `agent_outreach_queue?id=eq.${enc(visit.outreach_queue_id)}&review_status=in.(accepted_open_house,confirmed_open_house)`,
+        {
+          method: 'PATCH',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({
+            review_status: 'interested',
+            send_error: null
+          })
+        }
+      ).catch((error) => ({ warning: error.message || String(error) }))
+    : [];
+
+  return {
+    visit: cancelledVisit,
+    ended_events,
+    participants,
+    availability,
+    outreach_queue
+  };
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -131,6 +235,22 @@ module.exports = async function handler(req, res) {
 
     const body = parseBody(req);
     const action = String(body.action || '').trim();
+
+    if (action === 'cancel_open_house') {
+      if (!body.visit_id) {
+        sendJson(res, 400, { ok: false, error: 'Missing visit_id.' });
+        return;
+      }
+      if (String(body.confirmation || '').trim() !== 'CANCEL') {
+        sendJson(res, 400, { ok: false, error: 'Type CANCEL to cancel this open house.' });
+        return;
+      }
+
+      const result = await cancelOpenHouse(body.visit_id);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+
     if (action !== 'end_event') {
       sendJson(res, 400, { ok: false, error: 'Unsupported event action.' });
       return;

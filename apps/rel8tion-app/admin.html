@@ -1509,7 +1509,8 @@
       ['leads', 'Leads'],
       ['crm', 'Agent CRM'],
       ['buyerFinder', 'Buyer finder'],
-      ['signs', 'Signs and events'],
+      ['events', 'Open houses'],
+      ['signs', 'Signs'],
       ['lo', 'Loan officers'],
       ['payments', 'Payments'],
       ['reports', 'Reports']
@@ -2561,6 +2562,13 @@ ${rowsHtml}
       return context.address || context.property_address || context.listing_address || context.open_house_address || event?.open_house_source_id || event?.id || 'Open house';
     }
 
+    function visitAddress(visit) {
+      const direct = visit?.address || visit?.property_address || '';
+      if (direct) return direct;
+      const noteMatch = String(visit?.notes || '').match(/Open house:\s*([^\n]+?)(?:\.\s*Agent phone:|$)/i);
+      return noteMatch?.[1]?.trim() || visit?.open_house_id || visit?.id || 'Open house';
+    }
+
     function eventWindow(event) {
       return [fmtDate(event?.start_time), fmtDate(event?.end_time)].filter(Boolean).join(' - ');
     }
@@ -3184,6 +3192,44 @@ ${rowsHtml}
       } catch (error) {
         state.actionKey = '';
         showToast(error.message || 'Unable to reset Event Pass.');
+        render();
+      }
+    }
+
+    async function cancelOpenHouse(visitId) {
+      const visit = (state.command?.field_visits || []).find((row) => row.id === visitId);
+      if (!visit) {
+        showToast('Open house not found.');
+        return;
+      }
+      const address = visitAddress(visit);
+      const typed = window.prompt(
+        `Cancel the open house at ${address}?\n\nThis will remove it from upcoming coverage, release assigned loan officers and availability blocks, and end any linked live event. Buyer check-ins, disclosures, outreach history, and the reusable signs will stay saved.\n\nType CANCEL to continue.`
+      );
+      if (typed === null) return;
+      if (typed.trim() !== 'CANCEL') {
+        showToast('Open house cancellation stopped.');
+        return;
+      }
+
+      state.actionKey = `cancel_visit:${visitId}`;
+      render();
+      try {
+        const result = await api('/api/admin/event-action', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'cancel_open_house',
+            visit_id: visitId,
+            confirmation: typed.trim()
+          })
+        });
+        state.actionKey = '';
+        const endedCount = Array.isArray(result.ended_events) ? result.ended_events.length : 0;
+        showToast(endedCount ? 'Open house cancelled and its live event ended.' : 'Open house cancelled.');
+        await loadAll();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to cancel this open house.');
         render();
       }
     }
@@ -4053,6 +4099,9 @@ ${rowsHtml}
       document.querySelectorAll('[data-end-event]').forEach((button) => {
         button.addEventListener('click', () => endEvent(button.dataset.endEvent));
       });
+      document.querySelectorAll('[data-cancel-open-house]').forEach((button) => {
+        button.addEventListener('click', () => cancelOpenHouse(button.dataset.cancelOpenHouse));
+      });
       document.querySelectorAll('[data-detach-sign]').forEach((button) => {
         button.addEventListener('click', () => detachSign(button.dataset.detachSign));
       });
@@ -4121,9 +4170,9 @@ ${rowsHtml}
         { label: 'Auto ready', value: cronReady, icon: 'play-circle', tone: cronReady ? 'orange' : 'green', meter: cronReady ? Math.min(100, cronReady * 8) : 4, area: 'outreach', filter: 'all' },
         { label: 'Manual ready', value: manualReady, icon: 'hand', tone: manualReady ? 'orange' : 'green', meter: manualReady ? Math.min(100, manualReady * 8) : 4, area: 'outreach', filter: 'all' },
         { label: 'Inbound', value: inbound, icon: 'inbox', tone: 'sky', meter: inbound ? 78 : 10, area: 'outreach', filter: 'inbound' },
-        { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'reports' },
+        { label: 'Confirmed OH', value: o.confirmed_open_houses || 0, icon: 'badge-check', tone: 'green', meter: o.confirmed_open_houses ? 82 : 8, area: 'events' },
         { label: 'Active signs', value: o.active_signs || 0, icon: 'scan-line', tone: 'violet', meter: o.active_signs ? 82 : 8, area: 'signs' },
-        { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8, area: 'signs' },
+        { label: 'Open events', value: o.open_events || 0, icon: 'calendar-days', tone: 'green', meter: o.open_events ? 72 : 8, area: 'events' },
         { label: 'Needs LO', value: o.open_events_without_lo || 0, icon: 'user-plus', tone: o.open_events_without_lo ? 'rose' : 'green', meter: o.open_events ? ((o.open_events_without_lo || 0) / o.open_events) * 100 : 6, area: 'lo' },
         { label: 'Leads', value: o.leads || 0, icon: 'contact-round', tone: 'green', meter: o.leads ? 82 : 8, area: 'leads' },
         { label: 'Check-ins', value: o.checkins || 0, icon: 'badge-check', tone: 'sky', meter: o.checkins ? 86 : 12, area: 'leads' },
@@ -4150,6 +4199,7 @@ ${rowsHtml}
       if (state.area === 'leads') return renderLeads();
       if (state.area === 'crm') return renderCrm();
       if (state.area === 'buyerFinder') return renderBuyerFinder();
+      if (state.area === 'events') return renderEvents();
       if (state.area === 'signs') return renderSigns();
       if (state.area === 'lo') return renderLoanOfficers();
       if (state.area === 'payments') return renderPayments();
@@ -5001,9 +5051,105 @@ ${rowsHtml}
       return 'info';
     }
 
+    function isLiveEvent(row) {
+      return row?.status === 'active' && !row?.ended_at;
+    }
+
+    function adminEventTime(row) {
+      const value = isLiveEvent(row)
+        ? row.last_activity_at || row.start_time || row.created_at
+        : row.ended_at || row.end_time || row.updated_at || row.created_at;
+      const time = new Date(value || 0).getTime();
+      return Number.isFinite(time) ? time : 0;
+    }
+
+    function sortAdminEvents(rows) {
+      return [...rows].sort((a, b) => {
+        const liveDelta = Number(isLiveEvent(b)) - Number(isLiveEvent(a));
+        if (liveDelta) return liveDelta;
+        return adminEventTime(b) - adminEventTime(a);
+      });
+    }
+
+    function eventDashboardHref(row) {
+      const params = new URLSearchParams();
+      if (row?.host_agent_slug) params.set('agent', row.host_agent_slug);
+      if (row?.id) params.set('event', row.id);
+      return `/agent-dashboard?${params.toString()}`;
+    }
+
+    function renderAdminEventRow(row) {
+      const live = isLiveEvent(row);
+      const dashboardHref = eventDashboardHref(row);
+      return `
+        <div>
+          <div class="primary">${esc(eventAddress(row))}</div>
+          <div class="secondary">${esc([row.host_agent_slug || 'No host', eventWindow(row)].filter(Boolean).join(' | ') || row.id)}</div>
+        </div>
+        <div>${badge(live ? 'live' : row.status || 'ended', live ? 'ok' : 'info')}</div>
+        <div>${badge(`${row.checkin_count || 0} check-ins`, 'info')}</div>
+        <div>
+          ${badge(`${row.financing_need_count || 0} finance`, row.financing_need_count ? 'warn' : 'info')}
+          ${badge(`${row.live_loan_officer_count || 0} LO`, row.live_loan_officer_count ? 'ok' : 'info')}
+        </div>
+        <div class="row-actions">
+          ${row.host_agent_slug ? `<a class="btn ${live ? 'primary' : 'soft'}" href="${esc(dashboardHref)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>${live ? 'Open live event' : 'View event'}</span></a>` : badge('No host link', 'warn')}
+          ${live ? `<button class="btn bad" data-end-event="${esc(row.id)}" ${state.actionKey === `end_event:${row.id}` ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === `end_event:${row.id}` ? 'Ending...' : 'End event'}</span></button>` : ''}
+        </div>
+      `;
+    }
+
+    function renderAcceptedOpenHouseRow(row, profiles) {
+      const participants = Array.isArray(row.participants) ? row.participants : [];
+      const primary = participants.find((item) => item.is_primary) || participants[0] || null;
+      const participantNames = participants.map((item) => item.participant_name || item.participant_uid).filter(Boolean).join(', ');
+      const linkedEvent = (state.command?.events || []).find((event) => event.id === row.open_house_event_id) || null;
+      const linkedEventHost = linkedEvent?.host_agent_slug || row.agent_slug || '';
+      const cancelKey = `cancel_visit:${row.id}`;
+      return `
+        <div>
+          <div class="primary">${esc(visitAddress(row))}</div>
+          <div class="secondary">${esc([row.agent_name || row.agent_slug, row.brokerage].filter(Boolean).join(' | ') || row.notes || row.id)}</div>
+        </div>
+        <div>${badge(row.status || 'scheduled', row.status === 'confirmed' ? 'ok' : 'info')}</div>
+        <div>${badge(fmtDate(row.scheduled_start) || 'No time', 'info')}</div>
+        <div>${badge(participantNames || 'No LO assigned', participantNames ? 'ok' : 'warn')}</div>
+        <div class="row-actions">
+          <select id="visit_lo_${domId(row.id)}" class="select" ${profiles.length ? '' : 'disabled'}>
+            ${profiles.length ? profiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === (primary?.participant_uid || row.loan_officer_uid) ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
+          </select>
+          <button class="btn primary" data-assign-visit-lo="${esc(row.id)}" ${profiles.length && state.actionKey !== `assign_visit:${row.id}` && state.actionKey !== cancelKey ? '' : 'disabled'}><i data-lucide="user-check"></i><span>${state.actionKey === `assign_visit:${row.id}` ? 'Assigning...' : primary?.participant_uid ? 'Reassign LO' : 'Assign LO'}</span></button>
+          ${row.open_house_event_id && linkedEventHost ? `<a class="btn soft" href="${esc(eventDashboardHref({ id: row.open_house_event_id, host_agent_slug: linkedEventHost }))}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open event</span></a>` : ''}
+          ${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="user-round"></i><span>LO view</span></a>` : ''}
+          <button class="btn bad" data-cancel-open-house="${esc(row.id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : 'Cancel open house'}</span></button>
+        </div>
+      `;
+    }
+
+    function renderEvents() {
+      const events = sortAdminEvents(filterByQuery(state.command?.events || []));
+      const liveEvents = events.filter(isLiveEvent);
+      const recentEvents = events.filter((row) => !isLiveEvent(row)).slice(0, 40);
+      const profiles = activeLoanOfficers();
+      const visits = filterByQuery(state.command?.field_visits || [])
+        .filter((row) => !['cancelled', 'completed', 'converted'].includes(row.status || ''))
+        .sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
+
+      return `
+        <div class="section-head">
+          <div>
+            <h2>Open houses</h2>
+            <div class="sub">${liveEvents.length} live event${liveEvents.length === 1 ? '' : 's'} | ${visits.length} scheduled or confirmed | live events are always shown first</div>
+          </div>
+        </div>
+        ${renderRows('Live events', `${liveEvents.length} currently active`, liveEvents, renderAdminEventRow)}
+        ${renderRows('Scheduled open houses', `${visits.length} upcoming coverage appointments`, visits.slice(0, 100), (row) => renderAcceptedOpenHouseRow(row, profiles))}
+        ${renderRows('Recent event history', `${recentEvents.length} recently ended events`, recentEvents, renderAdminEventRow)}
+      `;
+    }
+
     function renderSigns() {
       const signs = filterByQuery(state.command?.signs || []);
-      const events = filterByQuery(state.command?.events || []);
       const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
       const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
       const freshened = state.eventPassFreshenerResult;
@@ -5111,19 +5257,6 @@ ${rowsHtml}
           </div>
           <div>${renderLoanOfficerCoverageSignActions(row)}</div>
         `)}
-        ${renderRows('Live and recent events', `${events.length} events`, events.slice(0, 80), (row) => `
-          <div>
-            <div class="primary">${esc(row.host_agent_slug || 'No host')}</div>
-            <div class="secondary">${esc(fmtDate(row.start_time) || row.id)}</div>
-          </div>
-          <div>${badge(row.status || 'unknown', row.status === 'active' ? 'ok' : 'info')}</div>
-          <div>${badge(`${row.checkin_count || 0} check-ins`, 'info')}</div>
-          <div>${badge(`${row.financing_need_count || 0} finance`, row.financing_need_count ? 'warn' : 'info')}</div>
-          <div class="row-actions">
-            ${badge(`${row.live_loan_officer_count || 0} LO`, row.live_loan_officer_count ? 'ok' : 'info')}
-            ${row.status === 'active' && !row.ended_at ? `<button class="btn bad" data-end-event="${esc(row.id)}" ${state.actionKey === `end_event:${row.id}` ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === `end_event:${row.id}` ? 'Ending...' : 'End'}</span></button>` : ''}
-          </div>
-        `)}
       `;
     }
 
@@ -5182,27 +5315,12 @@ ${rowsHtml}
         <div class="assignment-grid">
           ${events.length ? events.map((event) => renderLoanOfficerAssignment(event, activeProfiles)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No active open house events are ready for LO assignment.</div>'}
         </div>
-        ${renderRows('Accepted open houses', `${visits.length} scheduled field visits`, visits.slice(0, 80), (row) => {
-          const participants = Array.isArray(row.participants) ? row.participants : [];
-          const primary = participants.find((item) => item.is_primary) || participants[0] || null;
-          const participantNames = participants.map((item) => item.participant_name || item.participant_uid).filter(Boolean).join(', ');
-          return `
-            <div>
-              <div class="primary">${esc(row.agent_name || row.agent_slug || 'Accepted open house')}</div>
-              <div class="secondary">${esc([row.open_house_id, row.brokerage].filter(Boolean).join(' | ') || row.notes || row.id)}</div>
-            </div>
-            <div>${badge(row.status || 'scheduled', row.status === 'cancelled' ? 'bad' : row.status === 'confirmed' ? 'ok' : 'info')}</div>
-            <div>${badge(fmtDate(row.scheduled_start) || 'No time', 'info')}</div>
-            <div>${badge(participantNames || 'No LO assigned', participantNames ? 'ok' : 'warn')}</div>
-            <div class="row-actions">
-              <select id="visit_lo_${domId(row.id)}" class="select" ${activeProfiles.length ? '' : 'disabled'}>
-                ${activeProfiles.length ? activeProfiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === (primary?.participant_uid || row.loan_officer_uid) ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
-              </select>
-              <button class="btn primary" data-assign-visit-lo="${esc(row.id)}" ${activeProfiles.length && state.actionKey !== `assign_visit:${row.id}` ? '' : 'disabled'}><i data-lucide="user-check"></i><span>${state.actionKey === `assign_visit:${row.id}` ? 'Assigning...' : primary?.participant_uid ? 'Reassign LO' : 'Assign LO'}</span></button>
-              ${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>LO view</span></a>` : ''}
-            </div>
-          `;
-        })}
+        ${renderRows(
+          'Accepted open houses',
+          `${visits.filter((row) => row.status !== 'cancelled').length} scheduled field visits`,
+          visits.filter((row) => row.status !== 'cancelled').slice(0, 80),
+          (row) => renderAcceptedOpenHouseRow(row, activeProfiles)
+        )}
         ${renderRows('Loan officers', `${activeProfiles.length} active verified profiles${profiles.length > activeProfiles.length ? `, ${profiles.length - activeProfiles.length} removed` : ''}`, activeProfiles.slice(0, 80), (row) => {
           const removeKey = `remove_profile:${row.uid}`;
           return `
