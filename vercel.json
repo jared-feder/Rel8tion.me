@@ -1,10 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "functions": {
+    "api/admin/agent-ranking.js": {
+      "maxDuration": 300
+    },
+    "api/cron/sync-agent-listing-inventory.js": {
+      "maxDuration": 300
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/refresh-open-house-data",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-agent-listing-inventory",
+      "schedule": "23 */2 * * *"
     },
     {
       "path": "/api/cron/generate-agent-outreach",

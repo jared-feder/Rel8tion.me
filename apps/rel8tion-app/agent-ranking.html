@@ -1053,16 +1053,27 @@
       `;
     }
 
-    function renderListingMatches(row, details) {
+    function renderListingMatches(row, details, options = {}) {
+      const mode = options.mode || 'inventory';
+      const loadingLabel = mode === 'open_houses'
+        ? 'Loading upcoming open-house matches...'
+        : 'Loading current listing inventory...';
       if (state.profileDetailsLoading && state.profile?.id === row.id) {
-        return '<div class="empty" style="padding:18px;">Loading current listing and open-house matches...</div>';
+        return `<div class="empty" style="padding:18px;">${loadingLabel}</div>`;
       }
       if (state.profileDetailsError && state.profile?.id === row.id) {
         return `<div class="empty" style="padding:18px;">${esc(state.profileDetailsError)}</div>`;
       }
-      const rows = details?.open_houses || details?.current_listings || [];
+      if (mode === 'inventory' && details && details.listing_inventory_available === false) {
+        return '<div class="empty" style="padding:18px;">The protected listing inventory is not available in this environment yet.</div>';
+      }
+      const rows = mode === 'open_houses'
+        ? (details?.open_houses || [])
+        : (details?.current_listings || []);
       if (!rows.length) {
-        return '<div class="empty" style="padding:18px;">No current open-house/listing records are matched to this agent yet.</div>';
+        return mode === 'open_houses'
+          ? '<div class="empty" style="padding:18px;">No upcoming open-house records are matched to this agent right now.</div>'
+          : '<div class="empty" style="padding:18px;">No active or pending database listings are matched yet. Relationship listing sync runs automatically for REL8TION agents and agents marked interested or confirmed.</div>';
       }
       return `
         <div class="listing-list">
@@ -1080,15 +1091,22 @@
                   <div class="small">${openTime ? `Open house: ${esc(openTime)}` : `Updated: ${esc(fmtDateTime(item.updated_at) || 'N/A')}`}</div>
                   <div class="listing-meta">
                     ${facts.map((fact) => `<span>${esc(fact)}</span>`).join('')}
+                    ${item.listing_status ? `<span>${esc(item.listing_status.replace(/_/g, ' '))}</span>` : ''}
                     ${item.source ? `<span>${esc(item.source)}</span>` : ''}
                     ${item.match_score ? `<span>${num(item.match_score)}% match</span>` : ''}
+                    ${item.relationship_status ? `<span>${esc(item.relationship_status.replace(/_/g, ' '))}</span>` : ''}
                   </div>
                   <div class="small" style="margin-top:8px;">
                     ${esc([item.agent_name, item.brokerage].filter(Boolean).join(' | '))}
                     ${item.agent_phone ? ` | ${esc(formatPhone(item.agent_phone))}` : ''}
                     ${item.agent_email ? ` | ${esc(item.agent_email)}` : ''}
                   </div>
-                  ${item.listing_url ? `<div class="actions" style="justify-content:flex-start;margin-top:10px;"><a class="btn" href="${esc(item.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a></div>` : ''}
+                  ${(item.listing_url || (mode === 'open_houses' && item.marketing_eligible && details?.listing_inventory_outreach_enabled)) ? `
+                    <div class="actions" style="justify-content:flex-start;margin-top:10px;">
+                      ${item.listing_url ? `<a class="btn" href="${esc(item.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+                      ${mode === 'open_houses' && item.marketing_eligible && details?.listing_inventory_outreach_enabled ? `<button class="btn primary" data-market-listing="${esc(item.id)}" data-market-ranking="${esc(row.id)}"><i data-lucide="megaphone"></i><span>Queue this open house</span></button>` : ''}
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -1250,7 +1268,7 @@
       const comparison = details?.area_comparison || {};
       const rankByLabel = new Map((comparison.rankings?.metrics || []).map((metric) => [metric.label, metric]));
       const cards = [
-        ['Active listings', row.active_listing_count],
+        ['ListReports active snapshot', row.active_listing_count],
         ['Listing side 12m', row.listings_active_last_12_months],
         ['Buyside 12m', row.buyside_last_12_months],
         ['Days since last listing', row.listings_days_since_last]
@@ -1536,7 +1554,7 @@
       const s = state.data.summary || {};
       const cards = [
         ['Campaign-ready agents', num(s.total_agents_analyzed)],
-        ['Active listings', num(s.total_active_listings)],
+        ['Reported active (ListReports)', num(s.total_active_listings)],
         ['Listing side 12m', num(s.total_listings_active_last_12_months)],
         ['Buyside 90d', num(s.total_buyside_last_90_days)],
         ['Buyside 12m', num(s.total_buyside_last_12_months)],
@@ -1682,8 +1700,8 @@
               <label>Min weekend OH <input class="field" data-filter="minWeekendOpenHouseCount" value="${esc(f.minWeekendOpenHouseCount)}" inputmode="numeric"></label>
               <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
               <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
-              <label>Min active listings <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
-              <label>Max active listings <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
+              <label>Min reported active <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
+              <label>Max reported active <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
               <label>Max days since listing <input class="field" data-filter="daysMax" value="${esc(f.daysMax)}" inputmode="numeric"></label>
               <label>Min listing side 12m <input class="field" data-filter="listing12Min" value="${esc(f.listing12Min)}" inputmode="numeric"></label>
               <label>Max listing side 12m <input class="field" data-filter="listing12Max" value="${esc(f.listing12Max)}" inputmode="numeric"></label>
@@ -1700,7 +1718,7 @@
       const offset = rankOffset();
       return `
         <div class="table-wrap" id="targets">
-          <table style="min-width:1760px;">
+          <table style="min-width:1850px;">
             <thead>
               <tr>
                 <th>${sortHeader('Score', 'agent_rank_score')}</th>
@@ -1709,7 +1727,8 @@
                 <th>${sortHeader('Brokerage', 'brokerage')}</th>
                 <th>${sortHeader('County', 'primary_county')}</th>
                 <th>${sortHeader('Market', 'market_area')}</th>
-                <th>${sortHeader('Active Listings', 'active_listing_count')}</th>
+                <th>${sortHeader('Reported Active', 'active_listing_count')}</th>
+                <th>Database Listings</th>
                 <th>${sortHeader('Days Since Last', 'listings_days_since_last')}</th>
                 <th>${sortHeader('Listing Side 12m', 'listings_active_last_12_months')}</th>
                 <th>${sortHeader('Buyside 90d', 'buyside_last_90_days')}</th>
@@ -1733,7 +1752,8 @@
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
                   <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
-                  <td>${num(row.active_listing_count)}</td>
+                  <td>${num(row.active_listing_count)}<div class="small">ListReports snapshot</div></td>
+                  <td><strong>${num(row.database_current_listing_count)}</strong><div class="small">${num(row.database_upcoming_open_house_count)} upcoming OH</div></td>
                   <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
                   <td>${num(row.listings_active_last_12_months)}</td>
                   <td>${num(row.buyside_last_90_days)}</td>
@@ -1890,7 +1910,7 @@
                     </details>
                     <div class="table-wrap">
                       <table style="min-width:1120px;">
-                        <thead><tr><th>Agent</th><th>Company</th><th>Location</th><th>Phone</th><th>Active Total</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
+                        <thead><tr><th>Agent</th><th>Company</th><th>Location</th><th>Phone</th><th>Reported Active</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
                         <tbody>
                           ${(preview.preview_rows || []).map((row) => `
                             <tr>
@@ -1968,24 +1988,33 @@
                 <div class="profile-box">
                   <h3>ListReports Activity</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
-                    <div><div class="mini-title">Active listings</div><strong>${num(row.active_listing_count)}</strong></div>
+                    <div><div class="mini-title">Reported active</div><strong>${num(row.active_listing_count)}</strong></div>
                     <div><div class="mini-title">Days since last</div><strong>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : 'N/A'}</strong></div>
                     <div><div class="mini-title">Listing side 12m</div><strong>${num(row.listings_active_last_12_months)}</strong></div>
                     <div><div class="mini-title">Buyside 90d</div><strong>${num(row.buyside_last_90_days)}</strong></div>
                     <div><div class="mini-title">Buyside 12m</div><strong>${num(row.buyside_last_12_months)}</strong></div>
                     <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
                   </div>
+                  <p class="small" style="margin-top:12px;">Reported active is an imported ListReports activity snapshot. It is not the count of listing records currently stored in REL8TION.</p>
                   <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
                 </div>
                 ${renderAreaComparison(row, details)}
                 <div class="profile-box">
-                  <h3>Current Listings & Open Houses</h3>
+                  <h3>Current Listings in REL8TION</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
-                    <div><div class="mini-title">Imported active</div><strong>${num(detailSummary.active_listing_count ?? row.active_listing_count)}</strong></div>
-                    <div><div class="mini-title">Matched OH</div><strong>${num(detailSummary.matched_open_house_count ?? row.matched_open_house_count)}</strong></div>
-                    <div><div class="mini-title">Weekend OH</div><strong>${num(detailSummary.weekend_open_house_count ?? row.matched_weekend_open_house_count)}</strong></div>
+                    <div><div class="mini-title">Database current</div><strong>${num(detailSummary.database_current_listing_count ?? row.database_current_listing_count)}</strong></div>
+                    <div><div class="mini-title">Upcoming OH in inventory</div><strong>${num(detailSummary.database_upcoming_open_house_count ?? row.database_upcoming_open_house_count)}</strong></div>
+                    <div><div class="mini-title">ListReports reported</div><strong>${num(detailSummary.imported_active_listing_count ?? row.active_listing_count)}</strong></div>
                   </div>
-                  ${renderListingMatches(row, details)}
+                  ${renderListingMatches(row, details, { mode: 'inventory' })}
+                </div>
+                <div class="profile-box">
+                  <h3>Upcoming Open Houses</h3>
+                  <div class="profile-metrics" style="margin-top:12px;">
+                    <div><div class="mini-title">Matched OH records</div><strong>${num(detailSummary.matched_open_house_count ?? row.matched_open_house_count)}</strong></div>
+                    <div><div class="mini-title">This weekend</div><strong>${num(detailSummary.weekend_open_house_count ?? row.matched_weekend_open_house_count)}</strong></div>
+                  </div>
+                  ${renderListingMatches(row, details, { mode: 'open_houses' })}
                 </div>
                 <div class="profile-box">
                   <h3>Location Intelligence</h3>
@@ -2156,6 +2185,7 @@
                 ${state.loading ? badge('Loading', 'info') : badge('Live admin', 'ok')}
                 ${state.error ? badge(state.error, 'bad') : ''}
                 <button class="btn" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+                <button class="btn" id="syncListingsBtn" ${state.action ? 'disabled' : ''}><i data-lucide="building-2"></i><span>${state.action === 'sync_listing_inventory' ? 'Syncing Listings...' : 'Sync Listings'}</span></button>
                 <button class="btn" id="refreshMatchesBtn"><i data-lucide="radar"></i><span>Refresh Matches</span></button>
                 <button class="btn primary" data-open-upload><i data-lucide="upload-cloud"></i><span>Upload Production Report</span></button>
               </div>
@@ -2477,6 +2507,22 @@
       }
     }
 
+    async function syncListings() {
+      if (!window.confirm('Refresh current OneKey listing inventory now? This updates protected listing records only and does not send outreach.')) return;
+      state.action = 'sync_listing_inventory';
+      render();
+      try {
+        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'sync_listing_inventory' }) });
+        showToast(`Listing inventory refreshed: ${num(result.matched_listings || 0)} current listings matched.`);
+        await loadData();
+      } catch (error) {
+        showToast(error.message || 'Unable to sync current listing inventory.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
     async function generatePitch(id) {
       const row = findRanking(id) || (state.profile?.id === id ? state.profile : null) || state.pitchModal?.row;
       if (!row) return;
@@ -2514,6 +2560,28 @@
       }
     }
 
+    async function addListingToOutreach(rankingId, listingInventoryId) {
+      if (!window.confirm('Stage this upcoming open house in the manual outreach queue? Nothing will be sent automatically.')) return;
+      state.action = `listing-outreach:${listingInventoryId}`;
+      render();
+      try {
+        await api(API, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'add_listing_to_outreach',
+            ranking_id: rankingId,
+            listing_inventory_id: listingInventoryId
+          })
+        });
+        showToast('Upcoming open house staged in the manual outreach queue.');
+      } catch (error) {
+        showToast(error.message || 'Unable to stage this open house.');
+      } finally {
+        state.action = '';
+        render();
+      }
+    }
+
     async function markNotFit(id) {
       const reason = window.prompt('Optional reason for marking this agent not a fit:', '') || '';
       state.action = `not-fit:${id}`;
@@ -2538,6 +2606,7 @@
 
     function bind() {
       document.getElementById('refreshBtn')?.addEventListener('click', loadData);
+      document.getElementById('syncListingsBtn')?.addEventListener('click', syncListings);
       document.getElementById('refreshMatchesBtn')?.addEventListener('click', refreshMatches);
       document.getElementById('lockBtn')?.addEventListener('click', () => {
         window.localStorage.removeItem(ADMIN_UID_KEY);
@@ -2679,6 +2748,12 @@
       });
       document.querySelectorAll('[data-outreach]').forEach((button) => {
         button.addEventListener('click', () => addToOutreach(button.dataset.outreach));
+      });
+      document.querySelectorAll('[data-market-listing]').forEach((button) => {
+        button.addEventListener('click', () => addListingToOutreach(
+          button.dataset.marketRanking,
+          button.dataset.marketListing
+        ));
       });
       document.querySelectorAll('[data-prospect]').forEach((button) => {
         button.addEventListener('click', () => addToOutreach(button.dataset.prospect, 'Rel8tion prospect staged in outreach queue.'));

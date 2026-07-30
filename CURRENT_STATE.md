@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-30: Agent Ranking current-listing inventory
+
+- `[IMPLEMENTED]` Agent Ranking labels imported `active_listing_count` as the ListReports-reported snapshot and shows a separate REL8TION database-current count. Clicking an agent separates active/pending listing inventory from upcoming open houses.
+- `[IMPLEMENTED]` The protected `agent_listing_inventory` source and a two-hour `sync-agent-listing-inventory` cron match current OneKey listings to ranked agents, claimed agents, and outreach rows marked `interested`, `confirmed_open_house`, `accepted_open_house`, or `drip_scheduled` using contact identity or exact name plus brokerage. Ranked-only agents are included for visibility, while future listing marketing remains server-limited to claimed/worked-with or positive-interest relationships.
+- `[IMPLEMENTED]` The sync defaults to inventory-only shadow mode. Existing `open_houses` are unchanged unless `AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES=true`, listing outreach is unchanged unless `AGENT_LISTING_INVENTORY_OUTREACH_ENABLED=true`, and no automatic sending is introduced. An admin-only **Sync Listings** action can run the same inventory refresh on demand.
+- `[VERIFIED 2026-07-30]` The additive production migration was applied individually because the broader migration ledger is drifted. Production verification found RLS enabled, no anon/authenticated SELECT grant, service-role CRUD access, 38 columns, 5 indexes, and no advisor finding for the new table. Deployment, first shadow sync, and live Ruth Chalco profile result still require verification.
+
 ## 2026-07-29: Admin open-house controls
 
 - `[IMPLEMENTED]` REL8TION COMMAND now separates Open Houses from Signs. The Open Houses summary cards and workspace no longer route through or render sign inventory.
