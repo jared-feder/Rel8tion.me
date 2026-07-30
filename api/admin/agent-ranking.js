@@ -1529,8 +1529,10 @@ function rankingIdentity(row) {
 function displayDedupeKey(row) {
   const name = normalizeName(row.agent_name || [row.first_name, row.last_name].filter(Boolean).join(' '));
   const phone = normalizePhone(row.phone_normalized || row.phone);
+  const agentId = String(row.agent_id || '').trim();
   const brokerage = normalizeName(row.brokerage || '');
   if (!name || !phone) return '';
+  if (agentId) return `display:agent:${agentId}|${phone}`;
   return `display:${name}|${brokerage}|${phone}`;
 }
 
@@ -1556,6 +1558,36 @@ function strongerRanking(left, right) {
     if (a[index] !== b[index]) return a[index] > b[index] ? left : right;
   }
   return left;
+}
+
+function sourceSnapshotTimestamp(row = {}) {
+  const raw = row.raw_sources || {};
+  const values = [
+    raw.period_end,
+    raw.source_period_end,
+    raw.period_start,
+    raw.source_period_start,
+    row.created_at
+  ];
+  let latest = 0;
+  for (const value of values) {
+    const timestamp = new Date(value || 0).getTime();
+    if (Number.isFinite(timestamp)) latest = Math.max(latest, timestamp);
+  }
+  return latest;
+}
+
+function preferredDisplayRanking(left, right) {
+  const leftAgentId = String(left.agent_id || '').trim();
+  const rightAgentId = String(right.agent_id || '').trim();
+  const leftPhone = normalizePhone(left.phone_normalized || left.phone);
+  const rightPhone = normalizePhone(right.phone_normalized || right.phone);
+  if (leftAgentId && leftAgentId === rightAgentId && leftPhone && leftPhone === rightPhone) {
+    const leftTimestamp = sourceSnapshotTimestamp(left);
+    const rightTimestamp = sourceSnapshotTimestamp(right);
+    if (leftTimestamp !== rightTimestamp) return leftTimestamp > rightTimestamp ? left : right;
+  }
+  return strongerRanking(left, right);
 }
 
 function maxNumber(...values) {
@@ -1719,7 +1751,7 @@ function dedupeRankingsForDisplay(rankings) {
     }
     collapsed += 1;
     if (Number(existing.raw_sources?.display_duplicate_count || 1) === 1) groups += 1;
-    const strongest = strongerRanking(existing, ranking);
+    const strongest = preferredDisplayRanking(existing, ranking);
     const duplicate = strongest === existing ? ranking : existing;
     map.set(key, mergeDisplayDuplicateRanking(strongest, duplicate, key));
   }
@@ -2804,6 +2836,7 @@ module.exports = async function handler(req, res) {
 module.exports.__test = {
   areaComparisonForRanking,
   bestProfilePhotoCandidate,
+  dedupeRankingsForDisplay,
   historyDetailRow,
   inventoryCountsForRankings,
   openHouseReminderVariants

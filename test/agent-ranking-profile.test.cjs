@@ -101,3 +101,70 @@ test('ListReports activity is not described as verified current inventory', () =
   assert.ok(scored.labels.includes('ListReports Listing Signal'));
   assert.doesNotMatch(scored.recommended_pitch, /23 active listings/i);
 });
+
+test('display dedupe collapses brokerage aliases for the same linked agent and keeps the newer snapshot', () => {
+  const shared = {
+    agent_name: 'Elena Galluzzo',
+    phone_normalized: '6317743333',
+    agent_id: 'f2eba1bd-7502-444f-8e37-950257c081eb',
+    active_listing_count: 20,
+    listings_active_last_12_months: 58
+  };
+  const older = {
+    ...shared,
+    id: 'older-ranking',
+    brokerage: 'Compass',
+    listings_days_since_last: 26,
+    buyside_last_12_months: 5,
+    raw_sources: {
+      upload_id: 'older-upload',
+      period_end: '2026-06-26'
+    }
+  };
+  const newer = {
+    ...shared,
+    id: 'newer-ranking',
+    brokerage: 'Compass Greater NY LLC',
+    listings_days_since_last: 31,
+    buyside_last_12_months: 6,
+    raw_sources: {
+      upload_id: 'newer-upload',
+      period_end: '2026-07-03'
+    }
+  };
+
+  const result = agentRankingHandler.__test.dedupeRankingsForDisplay([older, newer]);
+
+  assert.equal(result.rankings.length, 1);
+  assert.equal(result.collapsed, 1);
+  assert.equal(result.groups, 1);
+  assert.equal(result.rankings[0].id, 'newer-ranking');
+  assert.equal(result.rankings[0].brokerage, 'Compass Greater NY LLC');
+  assert.equal(result.rankings[0].raw_sources.display_duplicate_count, 2);
+  assert.deepEqual(
+    new Set(result.rankings[0].raw_sources.display_duplicate_ranking_ids),
+    new Set(['older-ranking', 'newer-ranking'])
+  );
+});
+
+test('display dedupe does not merge different linked agents that share a phone', () => {
+  const result = agentRankingHandler.__test.dedupeRankingsForDisplay([
+    {
+      id: 'first-agent',
+      agent_name: 'First Agent',
+      brokerage: 'Compass',
+      phone_normalized: '6315550100',
+      agent_id: 'first-agent-id'
+    },
+    {
+      id: 'second-agent',
+      agent_name: 'Second Agent',
+      brokerage: 'Compass',
+      phone_normalized: '6315550100',
+      agent_id: 'second-agent-id'
+    }
+  ]);
+
+  assert.equal(result.rankings.length, 2);
+  assert.equal(result.collapsed, 0);
+});
