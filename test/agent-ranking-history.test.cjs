@@ -102,3 +102,28 @@ test('manual reminder copy uses the real address/date and says again only for pr
   assert.match(prior[0], /Reply STOP to opt out/);
   assert.doesNotMatch(newRelationship[0], /there again/);
 });
+
+test('history rows preserve the actual REL8TION event time over a stale source listing time', () => {
+  const rows = historyRowsForRanking(ranking, {
+    ...data,
+    events: [{
+      ...data.events[0],
+      start_time: '2026-07-19T16:00:00Z',
+      end_time: '2026-07-19T18:00:00Z',
+      ended_at: '2026-07-19T18:00:00Z'
+    }]
+  }, new Date('2026-07-30T12:00:00Z'));
+
+  assert.equal(rows[0].start, '2026-07-19T16:00:00Z');
+  assert.equal(rows[0].end, '2026-07-19T18:00:00Z');
+
+  const detail = agentRankingHandler.__test.historyDetailRow(rows[0], {
+    id: 'oh-1',
+    address: '12 Main Street',
+    open_start: '2026-06-28T16:00:00Z',
+    open_end: '2026-06-28T18:00:00Z'
+  }, ranking);
+  assert.equal(detail.address, '12 Main Street');
+  assert.equal(detail.open_start, '2026-07-19T16:00:00Z');
+  assert.equal(detail.open_end, '2026-07-19T18:00:00Z');
+});

@@ -517,33 +517,38 @@ function openHouseDetailRow(openHouse = {}, agents = [], ranking = {}) {
   };
 }
 
+function historyDetailRow(row = {}, source = {}, ranking = {}) {
+  return {
+    ...row,
+    source_listing_id: row.open_house_id || '',
+    address: source.address || source.location || '',
+    listing_url: source.link || '',
+    listing_photo_url: listingPhoto(source),
+    source: source.source || row.history_source || '',
+    price: source.price || null,
+    beds: source.beds || null,
+    baths: source.baths || null,
+    sqft: source.sqft || null,
+    open_start: row.start || source.open_start || null,
+    open_end: row.end || source.open_end || null,
+    updated_at: row.ended_at || source.updated_at || source.created_at || null,
+    agent_name: ranking.agent_name || '',
+    brokerage: ranking.brokerage || '',
+    agent_phone: ranking.phone || ranking.phone_normalized || '',
+    agent_email: ranking.email || ''
+  };
+}
+
 async function decoratedRel8tionHistory(ranking = {}, historyData = {}) {
   const history = historyRowsForRanking(ranking, historyData).slice(0, 50);
   const sourceIds = history.map((row) => row.open_house_id).filter(Boolean);
   const sources = await loadOpenHouseDetailsByIds(sourceIds);
   const sourceById = new Map((sources || []).map((row) => [String(row.id || ''), row]));
-  return history.map((row) => {
-    const source = sourceById.get(String(row.open_house_id || '')) || {};
-    return {
-      ...row,
-      source_listing_id: row.open_house_id || '',
-      address: source.address || source.location || '',
-      listing_url: source.link || '',
-      listing_photo_url: listingPhoto(source),
-      source: source.source || row.history_source || '',
-      price: source.price || null,
-      beds: source.beds || null,
-      baths: source.baths || null,
-      sqft: source.sqft || null,
-      open_start: source.open_start || row.start || null,
-      open_end: source.open_end || row.end || null,
-      updated_at: row.ended_at || source.updated_at || source.created_at || null,
-      agent_name: ranking.agent_name || '',
-      brokerage: ranking.brokerage || '',
-      agent_phone: ranking.phone || ranking.phone_normalized || '',
-      agent_email: ranking.email || ''
-    };
-  });
+  return history.map((row) => historyDetailRow(
+    row,
+    sourceById.get(String(row.open_house_id || '')) || {},
+    ranking
+  ));
 }
 
 function inventoryDetailRow(item = {}, ranking = {}) {
@@ -2529,6 +2534,7 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.__test = {
+  historyDetailRow,
   inventoryCountsForRankings,
   openHouseReminderVariants
 };
