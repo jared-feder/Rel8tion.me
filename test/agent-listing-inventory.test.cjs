@@ -191,6 +191,10 @@ test('verified website listings match ranked agents without enrichment', () => {
 test('an upcoming open house enriches a matching website listing instead of duplicating it', () => {
   const base = {
     relationship_key: 'phone:5165550100',
+    relationship_status: 'ranking_only',
+    relationship_source: 'agent_rankings',
+    agent_id: 'agent-1',
+    phone_normalized: '5165550100',
     source: 'agent_website_listing',
     source_listing_id: 'MLS-123',
     address: '12 Main Street, Huntington, NY 11743',
@@ -201,7 +205,11 @@ test('an upcoming open house enriches a matching website listing instead of dupl
     source_payload: { origin: 'agent_website_listing' }
   };
   const openHouse = {
-    relationship_key: 'phone:5165550100',
+    relationship_key: 'phone:7185550100',
+    relationship_status: 'worked_with',
+    relationship_source: 'agents',
+    agent_id: 'agent-1',
+    phone_normalized: '7185550100',
     source: 'open_house',
     source_listing_id: 'OH-123',
     address: '12 Main Street, Huntington, NY 11743',
@@ -213,6 +221,8 @@ test('an upcoming open house enriches a matching website listing instead of dupl
 
   assert.equal(inventorySemanticKey(base), inventorySemanticKey(openHouse));
   assert.equal(merged.source, 'agent_website_listing');
+  assert.equal(merged.relationship_key, 'phone:7185550100');
+  assert.equal(merged.relationship_status, 'worked_with');
   assert.equal(merged.open_start, '2026-08-01T16:00:00Z');
   assert.equal(merged.source_payload.related_source, 'open_house');
 });

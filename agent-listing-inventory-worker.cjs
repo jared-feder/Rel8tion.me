@@ -538,23 +538,37 @@ function internalInventoryPayload(row, match, nowIso, source) {
 
 function inventorySemanticKey(payload) {
   const address = normalizeName(payload.address);
-  return `${payload.relationship_key}|${address || `${payload.source}:${payload.source_listing_id}`}`;
+  const agent = payload.agent_id
+    ? `agent:${payload.agent_id}`
+    : `name:${payload.agent_name_normalized}|${normalizeBrokerage(payload.brokerage)}`;
+  return `${agent}|${address || `${payload.source}:${payload.source_listing_id}`}`;
 }
 
 function mergeInventoryPayload(existing, candidate) {
   if (!existing) return candidate;
-  const preferred = existing.source === 'agent_website_listing' ? existing : candidate;
-  const alternate = preferred === existing ? candidate : existing;
+  const listingPreferred = existing.source === 'agent_website_listing' ? existing : candidate;
+  const alternate = listingPreferred === existing ? candidate : existing;
+  const existingPriority = relationshipPriority(existing.relationship_status);
+  const candidatePriority = relationshipPriority(candidate.relationship_status);
+  const relationshipPreferred = candidatePriority > existingPriority ? candidate : existing;
   return {
     ...alternate,
-    ...preferred,
-    open_start: preferred.open_start || alternate.open_start || null,
-    open_end: preferred.open_end || alternate.open_end || null,
-    image_url: preferred.image_url || alternate.image_url || null,
-    listing_url: preferred.listing_url || alternate.listing_url || null,
+    ...listingPreferred,
+    relationship_key: relationshipPreferred.relationship_key,
+    relationship_source: relationshipPreferred.relationship_source,
+    relationship_status: relationshipPreferred.relationship_status,
+    agent_id: relationshipPreferred.agent_id || listingPreferred.agent_id || alternate.agent_id || null,
+    queue_row_id: relationshipPreferred.queue_row_id || null,
+    phone: relationshipPreferred.phone || listingPreferred.phone || alternate.phone || null,
+    phone_normalized: relationshipPreferred.phone_normalized || listingPreferred.phone_normalized || alternate.phone_normalized || null,
+    email: relationshipPreferred.email || listingPreferred.email || alternate.email || null,
+    open_start: listingPreferred.open_start || alternate.open_start || null,
+    open_end: listingPreferred.open_end || alternate.open_end || null,
+    image_url: listingPreferred.image_url || alternate.image_url || null,
+    listing_url: listingPreferred.listing_url || alternate.listing_url || null,
     source_payload: {
       ...(alternate.source_payload || {}),
-      ...(preferred.source_payload || {}),
+      ...(listingPreferred.source_payload || {}),
       related_source: alternate.source,
       related_source_listing_id: alternate.source_listing_id
     }
@@ -703,9 +717,11 @@ async function upsertRows(config, table, rows, conflictColumns) {
   return written;
 }
 
-async function markStaleInventory(config, nowIso, scanComplete, sources = ['onekey']) {
+async function markStaleInventory(config, nowIso, scanComplete, sources = ['onekey'], cutoffOverride = '') {
   if (config.dryRun || !scanComplete) return { marked_inactive: 0, skipped: true };
-  const cutoff = new Date(new Date(nowIso).getTime() - config.staleAfterHours * 60 * 60 * 1000).toISOString();
+  const cutoff = cutoffOverride || new Date(
+    new Date(nowIso).getTime() - config.staleAfterHours * 60 * 60 * 1000
+  ).toISOString();
   const rows = await supabaseRequest(
     config,
     `agent_listing_inventory?source=in.(${sources.join(',')})&is_current=eq.true&last_seen_at=lt.${encodeURIComponent(cutoff)}`,
@@ -800,7 +816,8 @@ async function run(options = {}) {
     config,
     nowIso,
     true,
-    ['agent_website_listing', 'open_house']
+    ['agent_website_listing', 'open_house'],
+    nowIso
   );
   const oneKeyStale = config.oneKeyDiscoveryEnabled
     ? await markStaleInventory(config, nowIso, scan.complete, ['onekey'])
