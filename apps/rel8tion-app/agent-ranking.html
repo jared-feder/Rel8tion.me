@@ -1645,7 +1645,7 @@
           <div class="panel-head">
             <div>
               <h2>Data Quality Gate</h2>
-              <div class="small">${num(q.visible_trusted_rows)} trusted ListReports agents shown. ${num(collapsed)} duplicate stored rows collapsed without deleting import history. ${num(hidden)} legacy or untrusted rows hidden.</div>
+              <div class="small">${num(q.visible_trusted_rows)} trusted ListReports agents plus ${num(q.relationship_only_rows)} real REL8TION relationship-only agents shown. ${num(collapsed)} duplicate stored rows collapsed without deleting import history. ${num(hidden)} legacy or untrusted rows hidden.</div>
             </div>
             ${hidden || collapsed ? badge('Filtered', 'warn') : badge('Clean', 'ok')}
           </div>
@@ -1654,6 +1654,7 @@
               <div class="metric" style="box-shadow:none;"><div class="label">Raw ranking rows</div><div class="value">${num(q.raw_ranking_rows)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Trusted rows before dedupe</div><div class="value">${num(q.trusted_rows_before_display_dedupe)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Visible trusted rows</div><div class="value">${num(q.visible_trusted_rows)}</div></div>
+              <div class="metric" style="box-shadow:none;"><div class="label">Relationship-only rows</div><div class="value">${num(q.relationship_only_rows)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Duplicates collapsed</div><div class="value">${num(q.collapsed_display_duplicates)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Duplicate groups</div><div class="value">${num(q.collapsed_display_duplicate_groups)}</div></div>
               <div class="metric" style="box-shadow:none;"><div class="label">Missing identity hidden</div><div class="value">${num(q.hidden_missing_identity)}</div></div>
@@ -1768,7 +1769,7 @@
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
                   <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
-                  <td>${num(row.active_listing_count)}<div class="small">ListReports snapshot</div></td>
+                  <td>${row.relationship_only ? '<strong>Not imported</strong><div class="small">REL8TION relationship</div>' : `${num(row.active_listing_count)}<div class="small">ListReports snapshot</div>`}</td>
                   <td><strong>${num(row.database_current_listing_count)}</strong><div class="small">${num(row.database_upcoming_open_house_count)} upcoming OH</div></td>
                   <td><strong>${num(row.rel8tion_open_house_history_count)}</strong><div class="small">${row.has_prior_rel8tion_open_house ? `Last ${esc(fmtDate(row.last_rel8tion_open_house_at) || 'recorded')}` : 'No completed event'}</div></td>
                   <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
@@ -1785,13 +1786,15 @@
                   <td>
                     <div class="row-actions">
                       <button class="btn" data-profile="${esc(row.id)}"><i data-lucide="user-round-search"></i><span>Profile</span></button>
-                      <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Report</span></button>
-                      <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
-                      <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
-                      <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
-                      <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Prospect</span></button>
-                      <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
-                      <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
+                      ${row.relationship_only ? badge('REL8TION relationship', 'ok') : `
+                        <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Report</span></button>
+                        <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
+                        <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
+                        <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
+                        <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Prospect</span></button>
+                        <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
+                        <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
+                      `}
                     </div>
                   </td>
                 </tr>
@@ -1996,26 +1999,35 @@
                     ${state.profileDetailsLoading && state.profile?.id === row.id ? `<div style="margin-top:10px;">${badge('Loading live listing matches', 'info')}</div>` : ''}
                   </div>
                   <div class="grade-card ${tierTone(row.recommended_tier)}">
-                    <div class="mini-title">Rel8tion grade</div>
+                    <div class="mini-title">${row.relationship_only ? 'Relationship priority' : 'Rel8tion grade'}</div>
                     <div class="grade-value">${esc(row.recommended_tier || '--')}</div>
-                    <div class="small">${num(row.agent_rank_score)} opportunity score</div>
+                    <div class="small">${num(row.agent_rank_score)} ${row.relationship_only ? 'relationship score' : 'opportunity score'}</div>
                   </div>
                 </div>
                 ${duplicateProfileNotice(row)}
                 <div class="profile-box">
-                  <h3>ListReports Activity</h3>
-                  <div class="profile-metrics" style="margin-top:12px;">
-                    <div><div class="mini-title">Reported active</div><strong>${num(row.active_listing_count)}</strong></div>
-                    <div><div class="mini-title">Days since last</div><strong>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : 'N/A'}</strong></div>
-                    <div><div class="mini-title">Listing side 12m</div><strong>${num(row.listings_active_last_12_months)}</strong></div>
-                    <div><div class="mini-title">Buyside 90d</div><strong>${num(row.buyside_last_90_days)}</strong></div>
-                    <div><div class="mini-title">Buyside 12m</div><strong>${num(row.buyside_last_12_months)}</strong></div>
-                    <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
-                  </div>
-                  <p class="small" style="margin-top:12px;">Reported active is an imported ListReports activity snapshot. It is not the count of listing records currently stored in REL8TION.</p>
-                  <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
+                  <h3>${row.relationship_only ? 'REL8TION Relationship Record' : 'ListReports Activity'}</h3>
+                  ${row.relationship_only ? `
+                    <div class="profile-metrics" style="margin-top:12px;">
+                      <div><div class="mini-title">Relationship</div><strong>${esc((row.relationship_status || 'worked_with').replace(/_/g, ' '))}</strong></div>
+                      <div><div class="mini-title">Source</div><strong>${esc((row.relationship_source || 'REL8TION').replace(/_/g, ' '))}</strong></div>
+                      <div><div class="mini-title">ListReports</div><strong>Not imported</strong></div>
+                    </div>
+                    <p class="small" style="margin-top:12px;">This agent appears because of real REL8TION history or positive relationship status. No production metrics were invented and enrichment is not required.</p>
+                  ` : `
+                    <div class="profile-metrics" style="margin-top:12px;">
+                      <div><div class="mini-title">Reported active</div><strong>${num(row.active_listing_count)}</strong></div>
+                      <div><div class="mini-title">Days since last</div><strong>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : 'N/A'}</strong></div>
+                      <div><div class="mini-title">Listing side 12m</div><strong>${num(row.listings_active_last_12_months)}</strong></div>
+                      <div><div class="mini-title">Buyside 90d</div><strong>${num(row.buyside_last_90_days)}</strong></div>
+                      <div><div class="mini-title">Buyside 12m</div><strong>${num(row.buyside_last_12_months)}</strong></div>
+                      <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
+                    </div>
+                    <p class="small" style="margin-top:12px;">Reported active is an imported ListReports activity snapshot. It is not the count of listing records currently stored in REL8TION.</p>
+                    <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
+                  `}
                 </div>
-                ${renderAreaComparison(row, details)}
+                ${row.relationship_only ? '' : renderAreaComparison(row, details)}
                 <div class="profile-box">
                   <h3>REL8TION Open House History</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
@@ -2031,7 +2043,7 @@
                   <div class="profile-metrics" style="margin-top:12px;">
                     <div><div class="mini-title">Database current</div><strong>${num(detailSummary.database_current_listing_count ?? row.database_current_listing_count)}</strong></div>
                     <div><div class="mini-title">Upcoming OH in inventory</div><strong>${num(detailSummary.database_upcoming_open_house_count ?? row.database_upcoming_open_house_count)}</strong></div>
-                    <div><div class="mini-title">ListReports reported</div><strong>${num(detailSummary.imported_active_listing_count ?? row.active_listing_count)}</strong></div>
+                    <div><div class="mini-title">ListReports reported</div><strong>${row.relationship_only ? 'Not imported' : num(detailSummary.imported_active_listing_count ?? row.active_listing_count)}</strong></div>
                   </div>
                   ${renderListingMatches(row, details, { mode: 'inventory' })}
                 </div>
@@ -2054,9 +2066,11 @@
                     <div><div class="mini-title">ZIP</div><strong>${esc(row.zip || 'N/A')}</strong></div>
                   </div>
                   <div style="margin-top:12px;">${locationBadges(row)}</div>
-                  <div class="actions" style="justify-content:flex-start;margin-top:12px;">
-                    <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
-                  </div>
+                  ${row.relationship_only ? '' : `
+                    <div class="actions" style="justify-content:flex-start;margin-top:12px;">
+                      <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
+                    </div>
+                  `}
                 </div>
                 <div class="profile-box">
                   <h3>Gap Analysis</h3>

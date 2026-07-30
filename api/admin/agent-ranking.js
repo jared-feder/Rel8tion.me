@@ -22,6 +22,7 @@ const {
   historyRowsForRanking,
   historySignalForRanking
 } = require('../../lib/agent-ranking-history');
+const { buildRelationshipOnlyRankings } = require('../../lib/agent-ranking-relationships');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 const { run: syncAgentListingInventory } = require('../../agent-listing-inventory-worker.cjs');
 
@@ -153,6 +154,49 @@ const REL8TION_HISTORY_EVENT_SELECT = [
   'end_time',
   'status',
   'ended_at'
+].join(',');
+
+const POSITIVE_RELATIONSHIP_QUEUE_SELECT = [
+  'id',
+  'agent_name',
+  'agent_phone',
+  'agent_phone_normalized',
+  'agent_email',
+  'brokerage',
+  'review_status',
+  'source',
+  'open_house_id',
+  'open_start',
+  'open_end',
+  'city',
+  'state',
+  'zip',
+  'updated_at',
+  'created_at'
+].join(',');
+
+const RELATIONSHIP_INVENTORY_SELECT = [
+  'agent_id',
+  'queue_row_id',
+  'relationship_key',
+  'relationship_source',
+  'relationship_status',
+  'source',
+  'source_listing_id',
+  'agent_name',
+  'agent_name_normalized',
+  'brokerage',
+  'phone',
+  'phone_normalized',
+  'email',
+  'address',
+  'city',
+  'state',
+  'zip',
+  'open_start',
+  'open_end',
+  'last_seen_at',
+  'updated_at'
 ].join(',');
 
 const AREA_COMPARE_SELECT = [
@@ -306,6 +350,35 @@ async function loadRel8tionHistoryData() {
     ).catch(() => [])
   ]);
   return { agents, visits, events };
+}
+
+async function loadPositiveRelationshipQueueRows() {
+  return supabaseRestAll(
+    `agent_outreach_queue?select=${POSITIVE_RELATIONSHIP_QUEUE_SELECT}&review_status=in.(interested,confirmed_open_house,accepted_open_house,drip_scheduled)&order=updated_at.desc.nullslast`,
+    { pageSize: 1000, maxRows: 20000 }
+  ).catch(() => []);
+}
+
+async function loadCurrentRelationshipInventory() {
+  const freshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  return supabaseRestAll(
+    `agent_listing_inventory?select=${RELATIONSHIP_INVENTORY_SELECT}&is_current=eq.true&last_seen_at=gte.${enc(freshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
+    { maxRows: 20000 }
+  ).catch(() => []);
+}
+
+async function loadRelationshipOnlyRankings(existingRankings = []) {
+  const [historyData, inventory, queueRows] = await Promise.all([
+    loadRel8tionHistoryData(),
+    loadCurrentRelationshipInventory(),
+    loadPositiveRelationshipQueueRows()
+  ]);
+  return buildRelationshipOnlyRankings({
+    existingRankings,
+    historyData,
+    inventory,
+    queueRows
+  });
 }
 
 function weekendRange(now = new Date()) {
@@ -2096,19 +2169,27 @@ async function handleList(req) {
   const pageSize = clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 1000);
   const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
   const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
-  const inventoryFreshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [rankings, uploads, inventory, historyData] = await Promise.all([
+  const [rankings, uploads, inventory, historyData, queueRows] = await Promise.all([
     supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => []),
-    supabaseRestAll(
-      `agent_listing_inventory?select=agent_id,relationship_key,source,source_listing_id,agent_name,agent_name_normalized,open_start,open_end&is_current=eq.true&last_seen_at=gte.${enc(inventoryFreshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
-      { maxRows: 20000 }
-    ).catch(() => []),
-    loadRel8tionHistoryData()
+    loadCurrentRelationshipInventory(),
+    loadRel8tionHistoryData(),
+    loadPositiveRelationshipQueueRows()
   ]);
   const trustedView = trustedRankingView(rankings || [], uploads || []);
+  const trustedRankings = annotateRankingsWithHistory(
+    trustedView.rankings.map(withFreshPitch),
+    historyData
+  );
+  const relationshipOnlyRankings = buildRelationshipOnlyRankings({
+    existingRankings: trustedRankings,
+    historyData,
+    inventory: inventory || [],
+    queueRows: queueRows || []
+  });
+  trustedView.data_quality.relationship_only_rows = relationshipOnlyRankings.length;
   const visibleRankings = inventoryCountsForRankings(
-    annotateRankingsWithHistory(trustedView.rankings.map(withFreshPitch), historyData),
+    [...trustedRankings, ...relationshipOnlyRankings],
     inventory || []
   );
   const filtered = applyRankingFilters(visibleRankings, filters);
@@ -2131,6 +2212,14 @@ async function handleList(req) {
 }
 
 async function findRanking(id) {
+  if (String(id || '').startsWith('relationship:')) {
+    const relationshipRows = await loadRelationshipOnlyRankings();
+    const relationship = relationshipRows.find((row) => row.id === id);
+    if (relationship) return relationship;
+    const error = new Error('REL8TION relationship agent was not found.');
+    error.status = 404;
+    throw error;
+  }
   const ranking = one(await supabaseRest(`agent_rankings?id=eq.${enc(id)}&select=*&limit=1`));
   if (!ranking) {
     const error = new Error('Agent ranking not found.');
