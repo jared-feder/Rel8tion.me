@@ -13,6 +13,7 @@ const {
   sourceIdentityRecord
 } = require('../agent-listing-inventory-worker.cjs');
 const cronHandler = require('../api/cron/sync-agent-listing-inventory.js');
+const agentRankingHandler = require('../api/admin/agent-ranking.js');
 
 function oneKeyRecord(overrides = {}) {
   return {
@@ -225,6 +226,26 @@ test('an upcoming open house enriches a matching website listing instead of dupl
   assert.equal(merged.relationship_status, 'worked_with');
   assert.equal(merged.open_start, '2026-08-01T16:00:00Z');
   assert.equal(merged.source_payload.related_source, 'open_house');
+});
+
+test('dashboard inventory counts follow canonical agent id when a phone changes', () => {
+  const rankings = [{
+    agent_id: 'agent-1',
+    agent_name: 'Fidel Lloyd',
+    phone_normalized: '7183416987'
+  }];
+  const inventory = [{
+    agent_id: 'agent-1',
+    relationship_key: 'phone:5165880919',
+    source: 'agent_website_listing',
+    source_listing_id: 'MLS-123',
+    agent_name: 'Fidel Lloyd',
+    open_start: null,
+    open_end: null
+  }];
+  const [result] = agentRankingHandler.__test.inventoryCountsForRankings(rankings, inventory);
+
+  assert.equal(result.database_current_listing_count, 1);
 });
 
 test('the cron refuses requests when CRON_SECRET is missing or incorrect', async () => {

@@ -2508,7 +2508,7 @@
     }
 
     async function syncListings() {
-      if (!window.confirm('Refresh current OneKey listing inventory now? This updates protected listing records only and does not send outreach.')) return;
+      if (!window.confirm('Refresh verified current listing inventory now? This updates protected listing records only and does not send outreach.')) return;
       state.action = 'sync_listing_inventory';
       render();
       try {

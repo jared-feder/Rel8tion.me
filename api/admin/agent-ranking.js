@@ -489,12 +489,14 @@ function inventoryDetailRow(item = {}, ranking = {}) {
 }
 
 async function loadListingInventoryForRanking(ranking = {}) {
+  const agentId = String(ranking.agent_id || '').trim();
   const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
   const email = normalizeEmail(ranking.email);
   const name = normalizeName(ranking.agent_name);
   const tries = [];
   const freshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const base = `select=${AGENT_LISTING_INVENTORY_SELECT}&is_current=eq.true&last_seen_at=gte.${enc(freshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=last_seen_at.desc&limit=250`;
+  if (agentId) tries.push(`agent_listing_inventory?agent_id=eq.${enc(agentId)}&${base}`);
   if (phone) tries.push(`agent_listing_inventory?phone_normalized=eq.${enc(phone)}&${base}`);
   if (email) tries.push(`agent_listing_inventory?email=eq.${enc(email)}&${base}`);
   if (name) tries.push(`agent_listing_inventory?agent_name_normalized=eq.${enc(name)}&${base}`);
@@ -507,11 +509,12 @@ async function loadListingInventoryForRanking(ranking = {}) {
   const rankingBrokerage = normalizeName(ranking.brokerage);
   const seen = new Set();
   const deduped = rows.filter((item) => {
+    const agentIdMatch = agentId && item.agent_id && String(item.agent_id) === agentId;
     const itemPhone = normalizePhone(item.phone_normalized || item.phone);
     const itemEmail = normalizeEmail(item.email);
     const phoneMatch = phone && itemPhone && phone === itemPhone;
     const emailMatch = email && itemEmail && email === itemEmail;
-    if (!phoneMatch && !emailMatch) {
+    if (!agentIdMatch && !phoneMatch && !emailMatch) {
       if (normalizeName(item.agent_name_normalized || item.agent_name) !== name) return false;
       const itemBrokerage = normalizeName(item.brokerage);
       if (rankingBrokerage && itemBrokerage && tokenSimilarity(rankingBrokerage, itemBrokerage) < 0.35) return false;
@@ -565,6 +568,7 @@ function mergeUpcomingOpenHouses(openHouses = [], inventoryRows = [], now = new 
 }
 
 function inventoryCountsForRankings(rankings = [], inventory = []) {
+  const byAgentId = new Map();
   const byRelationship = new Map();
   const byName = new Map();
   const add = (map, key, listingId, hasUpcoming) => {
@@ -582,14 +586,17 @@ function inventoryCountsForRankings(rankings = [], inventory = []) {
       (end && Number.isFinite(end.getTime()) && end >= now)
       || (!end && start && Number.isFinite(start.getTime()) && start >= now)
     );
+    add(byAgentId, String(item.agent_id || ''), listingId, hasUpcoming);
     add(byRelationship, item.relationship_key, listingId, hasUpcoming);
     add(byName, normalizeName(item.agent_name_normalized || item.agent_name), listingId, hasUpcoming);
   }
 
   return (rankings || []).map((ranking) => {
+    const agentId = String(ranking.agent_id || '');
     const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
     const email = normalizeEmail(ranking.email);
-    const direct = (phone && byRelationship.get(`phone:${phone}`))
+    const direct = (agentId && byAgentId.get(agentId))
+      || (phone && byRelationship.get(`phone:${phone}`))
       || (email && byRelationship.get(`email:${email}`))
       || ((!phone && !email) ? byName.get(normalizeName(ranking.agent_name)) : null);
     return {
@@ -1976,7 +1983,7 @@ async function handleList(req) {
     supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => []),
     supabaseRestAll(
-      `agent_listing_inventory?select=relationship_key,source,source_listing_id,agent_name,agent_name_normalized,open_start,open_end&is_current=eq.true&last_seen_at=gte.${enc(inventoryFreshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
+      `agent_listing_inventory?select=agent_id,relationship_key,source,source_listing_id,agent_name,agent_name_normalized,open_start,open_end&is_current=eq.true&last_seen_at=gte.${enc(inventoryFreshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
       { maxRows: 20000 }
     ).catch(() => [])
   ]);
@@ -2337,4 +2344,8 @@ module.exports = async function handler(req, res) {
       details: error.payload || null
     });
   }
+};
+
+module.exports.__test = {
+  inventoryCountsForRankings
 };
