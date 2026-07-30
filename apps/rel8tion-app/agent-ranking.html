@@ -1151,7 +1151,7 @@
     function renderStatusReport(comparison) {
       const report = comparison?.status_report;
       if (!report) return '';
-      const metrics = (comparison.metrics || []).filter((metric) => ['Active listings', 'Listing side 12m', 'Buyside 12m'].includes(metric.label));
+      const metrics = (comparison.metrics || []).filter((metric) => ['Imported listing signal', 'Listing side 12m', 'Buyside 12m'].includes(metric.label));
       return `
         <div class="status-report ${esc(report.tone || '')}">
           <div class="status-badge-shell" aria-label="${esc(report.level || 'Status')} status badge">
@@ -1240,7 +1240,7 @@
       const buy90 = Number(row.buyside_last_90_days || 0);
       const buy12 = Number(row.buyside_last_12_months || 0);
       const days = Number(row.listings_days_since_last || 0);
-      if (active > 0) points.push(`${num(active)} active listing${active === 1 ? '' : 's'}`);
+      if (active > 0) points.push(`${num(active)} ListReports listing signal`);
       if (listing12 > 0) points.push(`${num(listing12)} listing-side 12m`);
       if (buy90 > 0) points.push(`${num(buy90)} buyside 90d`);
       if (buy12 > 0) points.push(`${num(buy12)} buyside 12m`);
@@ -1280,7 +1280,7 @@
       const comparison = details?.area_comparison || {};
       const rankByLabel = new Map((comparison.rankings?.metrics || []).map((metric) => [metric.label, metric]));
       const cards = [
-        ['ListReports active snapshot', row.active_listing_count],
+        ['Imported listing signal', row.active_listing_count],
         ['Listing side 12m', row.listings_active_last_12_months],
         ['Buyside 12m', row.buyside_last_12_months],
         ['Days since last listing', row.listings_days_since_last]
@@ -1567,7 +1567,7 @@
       const s = state.data.summary || {};
       const cards = [
         ['Campaign-ready agents', num(s.total_agents_analyzed)],
-        ['Reported active (ListReports)', num(s.total_active_listings)],
+        ['Imported listing signal', num(s.total_active_listings)],
         ['Listing side 12m', num(s.total_listings_active_last_12_months)],
         ['Buyside 90d', num(s.total_buyside_last_90_days)],
         ['Buyside 12m', num(s.total_buyside_last_12_months)],
@@ -1587,7 +1587,7 @@
       return `
         <div class="info-card">
           <h3>Import ListReports exports</h3>
-          <p>Import active-listing, recency, and buyside activity from ListReports and turn it into ranked outreach opportunities.</p>
+          <p>Import listing, recency, and buyside signals from ListReports for prospecting. REL8TION-verified current listings and upcoming open houses are shown separately.</p>
         </div>
         <div class="info-card" id="gaps">
           <h3>Location intelligence</h3>
@@ -1716,8 +1716,8 @@
               <label>Min weekend OH <input class="field" data-filter="minWeekendOpenHouseCount" value="${esc(f.minWeekendOpenHouseCount)}" inputmode="numeric"></label>
               <label>Has phone <select class="select" data-filter="phone"><option value="all">All</option><option value="true"${f.phone === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.phone === 'false' ? ' selected' : ''}>No</option></select></label>
               <label>Has email <select class="select" data-filter="email"><option value="all">All</option><option value="true"${f.email === 'true' ? ' selected' : ''}>Yes</option><option value="false"${f.email === 'false' ? ' selected' : ''}>No</option></select></label>
-              <label>Min reported active <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
-              <label>Max reported active <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
+              <label>Min imported listing signal <input class="field" data-filter="activeMin" value="${esc(f.activeMin)}" inputmode="numeric"></label>
+              <label>Max imported listing signal <input class="field" data-filter="activeMax" value="${esc(f.activeMax)}" inputmode="numeric"></label>
               <label>Max days since listing <input class="field" data-filter="daysMax" value="${esc(f.daysMax)}" inputmode="numeric"></label>
               <label>Min listing side 12m <input class="field" data-filter="listing12Min" value="${esc(f.listing12Min)}" inputmode="numeric"></label>
               <label>Max listing side 12m <input class="field" data-filter="listing12Max" value="${esc(f.listing12Max)}" inputmode="numeric"></label>
@@ -1743,8 +1743,8 @@
                 <th>${sortHeader('Brokerage', 'brokerage')}</th>
                 <th>${sortHeader('County', 'primary_county')}</th>
                 <th>${sortHeader('Market', 'market_area')}</th>
-                <th>${sortHeader('Reported Active', 'active_listing_count')}</th>
-                <th>Database Listings</th>
+                <th>${sortHeader('Imported Listing Signal', 'active_listing_count')}</th>
+                <th>Verified Current Listings</th>
                 <th>${sortHeader('REL8TION History', 'rel8tion_open_house_history_count')}</th>
                 <th>${sortHeader('Days Since Last', 'listings_days_since_last')}</th>
                 <th>${sortHeader('Listing Side 12m', 'listings_active_last_12_months')}</th>
@@ -1764,13 +1764,13 @@
               ${rows.map((row, index) => `
                 <tr>
                   <td><strong>${num(row.agent_rank_score)}</strong><div class="small">#${offset + index + 1} in current view</div></td>
-                  <td><button class="agent-link" data-profile="${esc(row.id)}"><strong>${esc(row.agent_name || 'Unknown agent')}</strong></button><div class="small">${esc(row.raw_sources?.labels?.slice?.(0, 2)?.join(' | ') || '')}</div>${duplicateRowNote(row)}</td>
+                  <td><button class="agent-link" data-profile="${esc(row.id)}"><strong>${esc(row.agent_name || 'Unknown agent')}</strong></button><div class="small">${esc((row.raw_sources?.labels || []).slice(0, 2).map((label) => label === 'Active Listing Inventory' ? 'ListReports Listing Signal' : label).join(' | '))}</div>${duplicateRowNote(row)}</td>
                   <td><strong>${esc(formatPhone(phoneForRow(row)))}</strong><div class="small">${row.phone_normalized ? esc(row.phone_normalized) : ''}</div></td>
                   <td>${esc(row.brokerage || '')}</td>
                   <td><strong>${esc(row.primary_county || row.county || '')}</strong><div style="margin-top:6px;">${locationBadges(row)}</div></td>
                   <td>${esc(row.market_area || '')}<div class="small">${esc([row.city, row.state, row.zip].filter(Boolean).join(', '))}</div></td>
-                  <td>${row.relationship_only ? '<strong>Not imported</strong><div class="small">REL8TION relationship</div>' : `${num(row.active_listing_count)}<div class="small">ListReports snapshot</div>`}</td>
-                  <td><strong>${num(row.database_current_listing_count)}</strong><div class="small">${num(row.database_upcoming_open_house_count)} upcoming OH</div></td>
+                  <td>${row.relationship_only ? '<strong>Not imported</strong><div class="small">REL8TION relationship</div>' : `${num(row.active_listing_count)}<div class="small">unverified ListReports import</div>`}</td>
+                  <td><strong>${num(row.database_current_listing_count)}</strong><div class="small">${num(row.database_upcoming_open_house_count)} verified upcoming OH</div></td>
                   <td><strong>${num(row.rel8tion_open_house_history_count)}</strong><div class="small">${row.has_prior_rel8tion_open_house ? `Last ${esc(fmtDate(row.last_rel8tion_open_house_at) || 'recorded')}` : 'No completed event'}</div></td>
                   <td>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : ''}</td>
                   <td>${num(row.listings_active_last_12_months)}</td>
@@ -1930,7 +1930,7 @@
                     </details>
                     <div class="table-wrap">
                       <table style="min-width:1120px;">
-                        <thead><tr><th>Agent</th><th>Company</th><th>Location</th><th>Phone</th><th>Reported Active</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
+                        <thead><tr><th>Agent</th><th>Company</th><th>Location</th><th>Phone</th><th>Imported Listing Signal</th><th>Days Since Last</th><th>Listing 12m</th><th>Buyside 90d</th><th>Buyside 12m</th><th>Match</th></tr></thead>
                         <tbody>
                           ${(preview.preview_rows || []).map((row) => `
                             <tr>
@@ -2016,15 +2016,15 @@
                     <p class="small" style="margin-top:12px;">This agent appears because of real REL8TION history or positive relationship status. No production metrics were invented and enrichment is not required.</p>
                   ` : `
                     <div class="profile-metrics" style="margin-top:12px;">
-                      <div><div class="mini-title">Reported active</div><strong>${num(row.active_listing_count)}</strong></div>
+                      <div><div class="mini-title">Imported listing signal</div><strong>${num(row.active_listing_count)}</strong></div>
                       <div><div class="mini-title">Days since last</div><strong>${Number(row.listings_days_since_last || 0) ? `${num(row.listings_days_since_last)} days` : 'N/A'}</strong></div>
                       <div><div class="mini-title">Listing side 12m</div><strong>${num(row.listings_active_last_12_months)}</strong></div>
                       <div><div class="mini-title">Buyside 90d</div><strong>${num(row.buyside_last_90_days)}</strong></div>
                       <div><div class="mini-title">Buyside 12m</div><strong>${num(row.buyside_last_12_months)}</strong></div>
                       <div><div class="mini-title">Open houses</div><strong>${num(row.open_house_count)}</strong></div>
                     </div>
-                    <p class="small" style="margin-top:12px;">Reported active is an imported ListReports activity snapshot. It is not the count of listing records currently stored in REL8TION.</p>
-                    <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
+                    <p class="small" style="margin-top:12px;">The imported listing signal is prospecting intelligence from the ListReports snapshot. It is not a verified count of listings that are active today. Use the separate REL8TION current-listing and upcoming-open-house sections for live database truth.</p>
+                    <div style="margin-top:12px;">${labels.length ? labels.map((label) => badge(label === 'Active Listing Inventory' ? 'ListReports Listing Signal' : label, 'info')).join(' ') : badge('Market comparison pending', 'info')}</div>
                   `}
                 </div>
                 ${row.relationship_only ? '' : renderAreaComparison(row, details)}
@@ -2041,9 +2041,9 @@
                 <div class="profile-box">
                   <h3>Current Listings in REL8TION</h3>
                   <div class="profile-metrics" style="margin-top:12px;">
-                    <div><div class="mini-title">Database current</div><strong>${num(detailSummary.database_current_listing_count ?? row.database_current_listing_count)}</strong></div>
-                    <div><div class="mini-title">Upcoming OH in inventory</div><strong>${num(detailSummary.database_upcoming_open_house_count ?? row.database_upcoming_open_house_count)}</strong></div>
-                    <div><div class="mini-title">ListReports reported</div><strong>${row.relationship_only ? 'Not imported' : num(detailSummary.imported_active_listing_count ?? row.active_listing_count)}</strong></div>
+                    <div><div class="mini-title">Verified database current</div><strong>${num(detailSummary.database_current_listing_count ?? row.database_current_listing_count)}</strong></div>
+                    <div><div class="mini-title">Verified upcoming OH</div><strong>${num(detailSummary.database_upcoming_open_house_count ?? row.database_upcoming_open_house_count)}</strong></div>
+                    <div><div class="mini-title">Unverified import signal</div><strong>${row.relationship_only ? 'Not imported' : num(detailSummary.imported_active_listing_count ?? row.active_listing_count)}</strong></div>
                   </div>
                   ${renderListingMatches(row, details, { mode: 'inventory' })}
                 </div>

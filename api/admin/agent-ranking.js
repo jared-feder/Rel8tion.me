@@ -175,6 +175,40 @@ const POSITIVE_RELATIONSHIP_QUEUE_SELECT = [
   'created_at'
 ].join(',');
 
+const AGENT_PROFILE_PHOTO_SELECT = [
+  'id',
+  'name',
+  'phone',
+  'phone_normalized',
+  'email',
+  'brokerage',
+  'slug',
+  'image_url'
+].join(',');
+
+const AGENT_WEBSITE_PHOTO_SELECT = [
+  'id',
+  'name',
+  'phone',
+  'email',
+  'brokerage',
+  'slug',
+  'photo_url',
+  'updated_at'
+].join(',');
+
+const OUTREACH_AGENT_PHOTO_SELECT = [
+  'id',
+  'agent_name',
+  'agent_phone',
+  'agent_phone_normalized',
+  'agent_email',
+  'brokerage',
+  'agent_photo_url',
+  'updated_at',
+  'created_at'
+].join(',');
+
 const RELATIONSHIP_INVENTORY_SELECT = [
   'agent_id',
   'queue_row_id',
@@ -510,6 +544,122 @@ function listingAgentPhoto(agent = {}) {
   return firstPresent(agent.primary_photo_url, agent.directory_photo_url, agent.image_url, agent.photo_url);
 }
 
+function normalizedProfilePhotoCandidate(candidate = {}, source = '') {
+  candidate = candidate || {};
+  return {
+    ...candidate,
+    name: firstPresent(candidate.name, candidate.agent_name),
+    phone: firstPresent(candidate.phone, candidate.phone_normalized, candidate.agent_phone, candidate.agent_phone_normalized),
+    phone_normalized: normalizePhone(firstPresent(
+      candidate.phone_normalized,
+      candidate.agent_phone_normalized,
+      candidate.phone,
+      candidate.agent_phone
+    )),
+    email: firstPresent(candidate.email, candidate.agent_email),
+    photo_url: firstPresent(
+      candidate.image_url,
+      candidate.photo_url,
+      candidate.agent_photo_url,
+      candidate.primary_photo_url,
+      candidate.directory_photo_url
+    ),
+    profile_photo_source: source || candidate.profile_photo_source || ''
+  };
+}
+
+function bestProfilePhotoCandidate(ranking = {}, candidateGroups = []) {
+  const candidates = [];
+  const rankingPhone = normalizePhone(ranking.phone_normalized || ranking.phone);
+  const rankingEmail = normalizeEmail(ranking.email);
+  const rankingName = normalizeName(ranking.agent_name);
+  const rankingBrokerage = normalizeName(ranking.brokerage);
+  for (const group of candidateGroups || []) {
+    const rows = Array.isArray(group?.rows) ? group.rows : [];
+    for (const row of rows) {
+      const candidate = normalizedProfilePhotoCandidate(row, group?.source || '');
+      if (!candidate.photo_url) continue;
+      const candidatePhone = normalizePhone(candidate.phone_normalized || candidate.phone);
+      const candidateEmail = normalizeEmail(candidate.email);
+      const candidateName = normalizeName(candidate.name);
+      const candidateBrokerage = normalizeName(candidate.brokerage);
+      if (rankingPhone && candidatePhone && rankingPhone !== candidatePhone) continue;
+      if (!rankingPhone && rankingEmail && candidateEmail && rankingEmail !== candidateEmail) continue;
+      const phoneMatch = Boolean(rankingPhone && candidatePhone && rankingPhone === candidatePhone);
+      const emailMatch = Boolean(rankingEmail && candidateEmail && rankingEmail === candidateEmail);
+      if (!phoneMatch && !emailMatch) {
+        if (!rankingName || candidateName !== rankingName) continue;
+        if (!rankingBrokerage || !candidateBrokerage || tokenSimilarity(rankingBrokerage, candidateBrokerage) < 0.35) continue;
+      }
+      const matchScore = listingAgentFitScore(ranking, candidate);
+      if (matchScore < 70) continue;
+      candidates.push({ ...candidate, match_score: matchScore });
+    }
+  }
+  return candidates.sort((left, right) => {
+    const scoreDelta = Number(right.match_score || 0) - Number(left.match_score || 0);
+    if (scoreDelta) return scoreDelta;
+    const sourcePriority = {
+      agents: 4,
+      agent_websites: 3,
+      agent_outreach_queue: 2,
+      listing_agents: 1
+    };
+    const priorityDelta = Number(sourcePriority[right.profile_photo_source] || 0)
+      - Number(sourcePriority[left.profile_photo_source] || 0);
+    if (priorityDelta) return priorityDelta;
+    return new Date(right.updated_at || right.created_at || 0) - new Date(left.updated_at || left.created_at || 0);
+  })[0] || null;
+}
+
+async function loadIdentityPhotoCandidates(ranking = {}) {
+  const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
+  const email = normalizeEmail(ranking.email);
+  const name = String(ranking.agent_name || '').trim();
+  const phoneValues = phone ? [...new Set([phone, `1${phone}`])] : [];
+  const candidateGroups = [];
+
+  const agentPaths = [];
+  if (phone) agentPaths.push(`agents?phone_normalized=eq.${enc(phone)}&select=${AGENT_PROFILE_PHOTO_SELECT}&limit=20`);
+  if (email) agentPaths.push(`agents?email=eq.${enc(email)}&select=${AGENT_PROFILE_PHOTO_SELECT}&limit=20`);
+  if (name.length >= 3) agentPaths.push(`agents?name=ilike.${enc(name)}&select=${AGENT_PROFILE_PHOTO_SELECT}&limit=20`);
+  if (agentPaths.length) {
+    const agentRows = await Promise.all(agentPaths.map((path) => supabaseRest(path).catch(() => [])));
+    candidateGroups.push({ source: 'agents', rows: dedupeListingAgents(agentRows.flat()) });
+  }
+
+  const websitePaths = [];
+  if (email) websitePaths.push(`agent_websites?email=eq.${enc(email)}&select=${AGENT_WEBSITE_PHOTO_SELECT}&limit=20`);
+  if (name.length >= 3) websitePaths.push(`agent_websites?name=ilike.${enc(name)}&select=${AGENT_WEBSITE_PHOTO_SELECT}&limit=20`);
+  if (websitePaths.length) {
+    const websiteRows = await Promise.all(websitePaths.map((path) => supabaseRest(path).catch(() => [])));
+    candidateGroups.push({ source: 'agent_websites', rows: dedupeListingAgents(websiteRows.flat()) });
+  }
+
+  const outreachPaths = [];
+  if (phoneValues.length) {
+    outreachPaths.push(
+      `agent_outreach_queue?agent_phone_normalized=in.${inFilter(phoneValues)}&select=${OUTREACH_AGENT_PHOTO_SELECT}&order=updated_at.desc.nullslast&limit=20`
+    );
+  }
+  if (email) {
+    outreachPaths.push(
+      `agent_outreach_queue?agent_email=eq.${enc(email)}&select=${OUTREACH_AGENT_PHOTO_SELECT}&order=updated_at.desc.nullslast&limit=20`
+    );
+  }
+  if (name.length >= 3) {
+    outreachPaths.push(
+      `agent_outreach_queue?agent_name=ilike.${enc(name)}&select=${OUTREACH_AGENT_PHOTO_SELECT}&order=updated_at.desc.nullslast&limit=20`
+    );
+  }
+  if (outreachPaths.length) {
+    const outreachRows = await Promise.all(outreachPaths.map((path) => supabaseRest(path).catch(() => [])));
+    candidateGroups.push({ source: 'agent_outreach_queue', rows: dedupeListingAgents(outreachRows.flat()) });
+  }
+
+  return candidateGroups;
+}
+
 function listingAgentFitScore(ranking = {}, agent = {}) {
   ranking = ranking || {};
   agent = agent || {};
@@ -835,7 +985,7 @@ function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') 
   const listingSide12 = Number(ranking.listings_active_last_12_months || 0);
   const buySide12 = Number(ranking.buyside_last_12_months || 0);
   const daysSince = Number(ranking.listings_days_since_last || 0);
-  const activeMultiple = metricMultiple(metrics, 'Active listings');
+  const activeMultiple = metricMultiple(metrics, 'Imported listing signal');
   const listingMultiple = metricMultiple(metrics, 'Listing side 12m');
   const buyMultiple = metricMultiple(metrics, 'Buyside 12m');
   const listingEngineScore = Math.max(activeMultiple, listingMultiple, buyMultiple);
@@ -888,7 +1038,7 @@ function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') 
       tone: 'shooting',
       initials: 'SS',
       summary: `${ranking.agent_name || 'This agent'} has enough current activity to turn small leaks into meaningful lost opportunity. Rel8tion should be framed as the system that keeps momentum from slipping through follow-up gaps.`,
-      system_gap: 'The pitch is about converting active listing traffic into visible buyer relationships before momentum cools off.',
+      system_gap: 'The pitch is about converting recent listing activity into visible buyer relationships before momentum cools off.',
       score_label: 'Momentum',
       score_value: 3
     };
@@ -909,8 +1059,8 @@ function productionStatusForRanking(ranking = {}, metrics = [], label = 'area') 
   const proofPoints = [];
   if (activeListings > 0) {
     proofPoints.push(activeMultiple >= 3
-      ? `${activeListings} active ${plural(activeListings, 'listing')} is ${roundMetric(activeMultiple, 1)}x the ${label} peer average.`
-      : `${activeListings} active ${plural(activeListings, 'listing')} shows current listing traffic.`);
+      ? `ListReports imported a ${activeListings} listing-activity signal, ${roundMetric(activeMultiple, 1)}x the ${label} peer import average. REL8TION verifies current inventory separately.`
+      : `ListReports imported a ${activeListings} listing-activity signal. REL8TION verifies current inventory separately.`);
   }
   if (listingSide12 > 0) {
     proofPoints.push(listingMultiple >= 3
@@ -986,7 +1136,7 @@ function areaRankingsForRanking(ranking = {}, peerContext = {}, label = 'area') 
   const population = rankPopulationForArea(ranking, peerContext.rows || []);
   const overall = rankRecordForMetric(ranking, population, 'agent_rank_score', 'Rel8tion opportunity score', { requirePositive: false });
   const metrics = [
-    rankRecordForMetric(ranking, population, 'active_listing_count', 'Active listings'),
+    rankRecordForMetric(ranking, population, 'active_listing_count', 'Imported listing signal'),
     rankRecordForMetric(ranking, population, 'listings_active_last_12_months', 'Listing side 12m'),
     rankRecordForMetric(ranking, population, 'buyside_last_12_months', 'Buyside 12m'),
     rankRecordForMetric(ranking, population, 'listings_days_since_last', 'Recency', { unit: 'days', lowerIsBetter: true })
@@ -1016,15 +1166,13 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
   const hasFreshListing = daysSince > 0 && (!avgDays || daysSince <= Math.min(45, avgDays));
   const hasListingTraffic = activeListings > 0 || listingSide12 > 0;
   const buysideGap = avgBuySide > 0 && buyside12 < avgBuySide;
-  const matchedShare = activeListings > 0 ? roundMetric((matchedOpenHouses / activeListings) * 100, 1) : 0;
-
   if (status.level === 'Rock Star') {
     return {
       status,
       headline: `${agent} is in ${status.level} territory, far beyond the ${label} average.`,
       opportunity: `${status.hook} This is a prestige conversation: ${agent} has a production engine big enough that the relationship system has to match it. Use Rel8tion as the luxury capture layer for listings, open houses, buyer conversations, and team follow-up.`,
       capture: activeListings > 0
-        ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected against ${activeListings} active ${plural(activeListings, 'listing')} (${matchedShare}% visible capture coverage). That is the gap to press.`
+        ? `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected. ListReports imported a ${activeListings} listing-activity signal, but that number is not verified current inventory.`
         : `${matchedOpenHouses} matched Rel8tion open-house ${plural(matchedOpenHouses, 'record')} ${beVerb(matchedOpenHouses)} connected. The next move is making every listing and open-house touchpoint visible.`
     };
   }
@@ -1042,7 +1190,7 @@ function areaOpportunityStory(ranking = {}, metrics = [], label = 'area') {
 
   if (hasListingTraffic && buysideGap) {
     const activeText = activeListings > 0
-      ? `${activeListings} active ${plural(activeListings, 'listing')}`
+      ? `a ${activeListings} ListReports listing-activity signal`
       : `${listingSide12} listing-side ${plural(listingSide12, 'transaction')} in the last 12 months`;
     const recencyText = hasFreshListing ? ` and a listing ${daysSince} days ago` : '';
     return {
@@ -1113,7 +1261,7 @@ function areaComparisonForRanking(ranking = {}, peerContext = {}) {
   const averages = marketAverages(rows.length ? rows : peerContext.rows || []);
   const label = peerContext.label || ranking.primary_county || ranking.county || ranking.market_area || 'Area';
   const metrics = [
-    comparisonMetric('Active listings', ranking.active_listing_count, averages.average_active_listings, { digits: 1 }),
+    comparisonMetric('Imported listing signal', ranking.active_listing_count, averages.average_active_listings, { digits: 1 }),
     comparisonMetric('Listing side 12m', ranking.listings_active_last_12_months, averages.average_listing_side_12_months, { digits: 1 }),
     comparisonMetric('Buyside 12m', ranking.buyside_last_12_months, averages.average_buyside_12_months, { digits: 1 }),
     comparisonMetric('Days since last listing', ranking.listings_days_since_last, averages.average_days_since_last_listing, { digits: 0, unit: 'days', lowerIsBetter: true })
@@ -1144,10 +1292,11 @@ async function profileDetailsForRanking(ranking) {
   let openHouses = await loadOpenHouseDetailsByIds(ids);
   let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
   let photoCandidates = [];
-  const [peerContext, inventoryResult, historyData] = await Promise.all([
+  const [peerContext, inventoryResult, historyData, identityPhotoCandidates] = await Promise.all([
     loadAreaPeerRows(ranking),
     loadListingInventoryForRanking(ranking),
-    loadRel8tionHistoryData()
+    loadRel8tionHistoryData(),
+    loadIdentityPhotoCandidates(ranking)
   ]);
   const historySignal = historySignalForRanking(ranking, historyData);
   const annotatedRanking = { ...ranking, ...historySignal };
@@ -1196,11 +1345,26 @@ async function profileDetailsForRanking(ranking) {
     .sort((left, right) => new Date(right.open_start || right.updated_at || 0) - new Date(left.open_start || left.updated_at || 0));
   const bestAgent = bestListingAgentForRanking(ranking, allListingAgents || []);
   const bestAgentPhoto = listingAgentPhoto(bestAgent);
+  const resolvedProfilePhoto = bestProfilePhotoCandidate(ranking, [
+    ...(identityPhotoCandidates || []),
+    { source: 'listing_agents', rows: allListingAgents || [] }
+  ]);
+  const profilePhotoUrl = firstPresent(
+    ranking.agent_photo_url,
+    ranking.image_url,
+    resolvedProfilePhoto?.photo_url,
+    bestAgentPhoto
+  );
+  const profileRanking = {
+    ...annotatedRanking,
+    agent_photo_url: profilePhotoUrl || annotatedRanking.agent_photo_url || null
+  };
   const upcomingOpenHouses = mergeUpcomingOpenHouses(rows, currentListings);
   const openHouseHistory = await openHouseHistoryPromise;
   return {
-    ranking: annotatedRanking,
-    profile_photo_url: firstPresent(ranking.agent_photo_url, ranking.image_url, bestAgentPhoto),
+    ranking: profileRanking,
+    profile_photo_url: profilePhotoUrl,
+    profile_photo_source: resolvedProfilePhoto?.profile_photo_source || (bestAgentPhoto ? 'listing_agents' : ''),
     profile_url: bestAgent?.profile_url || '',
     area_comparison: areaComparisonForRanking(annotatedRanking, peerContext),
     current_listings: currentListings,
@@ -1691,15 +1855,30 @@ function hasRankingIdentity(row) {
 
 function normalizeListReportsRanking(row) {
   const marketArea = canonicalMarketArea(row.market_area, row);
+  const importedListingSignal = Number(row.active_listing_count || 0);
+  const matchedOpenHouses = Number(row.matched_open_house_count || row.open_house_count || 0);
+  const matchedWeekend = Number(row.matched_weekend_open_house_count || 0);
+  const safeGapSummary = matchedWeekend > 0
+    ? 'This agent has a verified matched REL8TION open house this weekend.'
+    : matchedOpenHouses > 0
+      ? 'This agent has a verified matched REL8TION open house. Use that real event for outreach.'
+      : importedListingSignal > 0
+        ? `ListReports imported a listing-activity signal of ${importedListingSignal}. Verify current inventory in REL8TION before treating it as a live listing or open-house opportunity.`
+        : row.gap_summary;
+  const labels = arrayValue(row.raw_sources?.labels).map((label) => (
+    label === 'Active Listing Inventory' ? 'ListReports Listing Signal' : label
+  ));
   return {
     ...row,
     market_area: marketArea || null,
+    gap_summary: safeGapSummary,
     production_volume: 0,
     transaction_count: 0,
     sold_listing_count: 0,
     average_price: 0,
     raw_sources: {
       ...(row.raw_sources || {}),
+      labels,
       trusted_listreports_display: true,
       original_market_area: row.market_area && row.market_area !== marketArea ? row.market_area : row.raw_sources?.original_market_area,
       display_metric_note: 'ListReports import does not provide production volume, transaction count, sold listings, or average price.'
@@ -2623,6 +2802,8 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.__test = {
+  areaComparisonForRanking,
+  bestProfilePhotoCandidate,
   historyDetailRow,
   inventoryCountsForRankings,
   openHouseReminderVariants
