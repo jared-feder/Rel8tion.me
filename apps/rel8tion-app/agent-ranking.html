@@ -1079,7 +1079,11 @@
         <div class="listing-list">
           ${rows.map((item) => {
             const facts = propertyFacts(item);
-            const openTime = [fmtDateTime(item.open_start), fmtDateTime(item.open_end)].filter(Boolean).join(' - ');
+            const openBoundary = new Date(item.open_end || item.open_start || 0);
+            const hasUpcomingOpenHouse = Number.isFinite(openBoundary.getTime()) && openBoundary >= new Date();
+            const openTime = hasUpcomingOpenHouse
+              ? [fmtDateTime(item.open_start), fmtDateTime(item.open_end)].filter(Boolean).join(' - ')
+              : '';
             const photo = item.listing_photo_url || '';
             return `
               <div class="listing-row">
