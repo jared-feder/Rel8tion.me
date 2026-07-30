@@ -17,6 +17,11 @@ const {
   tokenSimilarity
 } = require('../../lib/agent-ranking');
 const { buildOpenHouseRows, isWeekendOpenHouse, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
+const {
+  annotateRankingsWithHistory,
+  historyRowsForRanking,
+  historySignalForRanking
+} = require('../../lib/agent-ranking-history');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 const { run: syncAgentListingInventory } = require('../../agent-listing-inventory-worker.cjs');
 
@@ -108,6 +113,46 @@ const AGENT_LISTING_INVENTORY_SELECT = [
   'source_checked_at',
   'updated_at',
   'source_payload'
+].join(',');
+
+const REL8TION_HISTORY_AGENT_SELECT = [
+  'id',
+  'name',
+  'phone',
+  'phone_normalized',
+  'email',
+  'brokerage',
+  'slug'
+].join(',');
+
+const REL8TION_HISTORY_VISIT_SELECT = [
+  'id',
+  'open_house_id',
+  'open_house_event_id',
+  'agent_slug',
+  'agent_name',
+  'agent_phone',
+  'agent_email',
+  'brokerage',
+  'scheduled_start',
+  'scheduled_end',
+  'status',
+  'confirmed_at',
+  'arrived_at',
+  'live_started_at',
+  'completed_at'
+].join(',');
+
+const REL8TION_HISTORY_EVENT_SELECT = [
+  'id',
+  'host_agent_id',
+  'host_agent_slug',
+  'open_house_source_id',
+  'event_date',
+  'start_time',
+  'end_time',
+  'status',
+  'ended_at'
 ].join(',');
 
 const AREA_COMPARE_SELECT = [
@@ -243,6 +288,24 @@ function assertCsvUpload(body) {
 async function loadAgents() {
   return supabaseRest('agents?select=id,name,brokerage,phone,phone_normalized,email&order=name.asc&limit=5000')
     .catch(() => []);
+}
+
+async function loadRel8tionHistoryData() {
+  const [agents, visits, events] = await Promise.all([
+    supabaseRestAll(
+      `agents?select=${REL8TION_HISTORY_AGENT_SELECT}&order=id.asc`,
+      { pageSize: 1000, maxRows: 10000 }
+    ).catch(() => []),
+    supabaseRestAll(
+      `field_demo_visits?select=${REL8TION_HISTORY_VISIT_SELECT}&status=in.(confirmed,live,completed)&order=scheduled_start.desc.nullslast`,
+      { pageSize: 1000, maxRows: 5000 }
+    ).catch(() => []),
+    supabaseRestAll(
+      `open_house_events?select=${REL8TION_HISTORY_EVENT_SELECT}&status=eq.ended&order=ended_at.desc.nullslast`,
+      { pageSize: 1000, maxRows: 5000 }
+    ).catch(() => [])
+  ]);
+  return { agents, visits, events };
 }
 
 function weekendRange(now = new Date()) {
@@ -452,6 +515,35 @@ function openHouseDetailRow(openHouse = {}, agents = [], ranking = {}) {
     match_score: bestAgent ? listingAgentFitScore(ranking, bestAgent) : 0,
     listing_agents: agents.map((agent) => publicListingAgent(agent, ranking))
   };
+}
+
+async function decoratedRel8tionHistory(ranking = {}, historyData = {}) {
+  const history = historyRowsForRanking(ranking, historyData).slice(0, 50);
+  const sourceIds = history.map((row) => row.open_house_id).filter(Boolean);
+  const sources = await loadOpenHouseDetailsByIds(sourceIds);
+  const sourceById = new Map((sources || []).map((row) => [String(row.id || ''), row]));
+  return history.map((row) => {
+    const source = sourceById.get(String(row.open_house_id || '')) || {};
+    return {
+      ...row,
+      source_listing_id: row.open_house_id || '',
+      address: source.address || source.location || '',
+      listing_url: source.link || '',
+      listing_photo_url: listingPhoto(source),
+      source: source.source || row.history_source || '',
+      price: source.price || null,
+      beds: source.beds || null,
+      baths: source.baths || null,
+      sqft: source.sqft || null,
+      open_start: source.open_start || row.start || null,
+      open_end: source.open_end || row.end || null,
+      updated_at: row.ended_at || source.updated_at || source.created_at || null,
+      agent_name: ranking.agent_name || '',
+      brokerage: ranking.brokerage || '',
+      agent_phone: ranking.phone || ranking.phone_normalized || '',
+      agent_email: ranking.email || ''
+    };
+  });
 }
 
 function inventoryDetailRow(item = {}, ranking = {}) {
@@ -974,10 +1066,18 @@ async function profileDetailsForRanking(ranking) {
   let openHouses = await loadOpenHouseDetailsByIds(ids);
   let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
   let photoCandidates = [];
-  const [peerContext, inventoryResult] = await Promise.all([
+  const [peerContext, inventoryResult, historyData] = await Promise.all([
     loadAreaPeerRows(ranking),
-    loadListingInventoryForRanking(ranking)
+    loadListingInventoryForRanking(ranking),
+    loadRel8tionHistoryData()
   ]);
+  const historySignal = historySignalForRanking(ranking, historyData);
+  const annotatedRanking = { ...ranking, ...historySignal };
+  const currentListings = inventoryResult.rows.map((item) => ({
+    ...item,
+    marketing_eligible: Boolean(item.marketing_eligible || historySignal.has_prior_rel8tion_open_house)
+  }));
+  const openHouseHistoryPromise = decoratedRel8tionHistory(ranking, historyData);
 
   if (!openHouses.length && Number(ranking.matched_open_house_count || 0) > 0) {
     const openHouseRows = await loadOpenHouseRows();
@@ -1018,14 +1118,16 @@ async function profileDetailsForRanking(ranking) {
     .sort((left, right) => new Date(right.open_start || right.updated_at || 0) - new Date(left.open_start || left.updated_at || 0));
   const bestAgent = bestListingAgentForRanking(ranking, allListingAgents || []);
   const bestAgentPhoto = listingAgentPhoto(bestAgent);
-  const upcomingOpenHouses = mergeUpcomingOpenHouses(rows, inventoryResult.rows);
+  const upcomingOpenHouses = mergeUpcomingOpenHouses(rows, currentListings);
+  const openHouseHistory = await openHouseHistoryPromise;
   return {
-    ranking,
+    ranking: annotatedRanking,
     profile_photo_url: firstPresent(ranking.agent_photo_url, ranking.image_url, bestAgentPhoto),
     profile_url: bestAgent?.profile_url || '',
-    area_comparison: areaComparisonForRanking(ranking, peerContext),
-    current_listings: inventoryResult.rows,
+    area_comparison: areaComparisonForRanking(annotatedRanking, peerContext),
+    current_listings: currentListings,
     open_houses: upcomingOpenHouses,
+    open_house_history: openHouseHistory,
     listing_inventory_available: inventoryResult.available,
     listing_inventory_outreach_enabled: listingInventoryOutreachEnabled(),
     listing_agents: allListingAgents.map((agent) => publicListingAgent(agent, ranking)),
@@ -1036,7 +1138,9 @@ async function profileDetailsForRanking(ranking) {
       database_current_listing_count: inventoryResult.rows.length,
       database_upcoming_open_house_count: upcomingInventoryCount(inventoryResult.rows),
       matched_active_listing_count: Number(ranking.matched_active_listing_count || 0),
-      weekend_open_house_count: upcomingOpenHouses.filter((row) => isWeekendOpenHouse(row.open_start)).length
+      weekend_open_house_count: upcomingOpenHouses.filter((row) => isWeekendOpenHouse(row.open_start)).length,
+      rel8tion_open_house_history_count: historySignal.rel8tion_open_house_history_count,
+      last_rel8tion_open_house_at: historySignal.last_rel8tion_open_house_at
     }
   };
 }
@@ -1611,6 +1715,11 @@ function summarizeRankings(rankings) {
     agents_with_open_houses_this_weekend: rankings.filter((row) => row.has_open_house_this_weekend).length,
     agents_with_matched_open_houses: rankings.filter((row) => Number(row.matched_open_house_count || 0) > 0).length,
     agents_with_weekend_open_houses: rankings.filter((row) => Number(row.matched_weekend_open_house_count || 0) > 0).length,
+    agents_worked_with_before: rankings.filter((row) => row.has_prior_rel8tion_open_house).length,
+    prior_rel8tion_open_house_total: rankings.reduce(
+      (sum, row) => sum + Number(row.rel8tion_open_house_history_count || 0),
+      0
+    ),
     matched_open_house_total: matchedOpenHouseTotal,
     matched_weekend_open_house_total: matchedWeekendTotal,
     located_agents: rankings.filter((row) => row.primary_county || row.county || row.city || row.zip).length,
@@ -1675,6 +1784,7 @@ function parseRankingFilters(req) {
     period_start: plainValue(queryOrFilter(req, filters, 'period_start', ['periodStart'])),
     period_end: plainValue(queryOrFilter(req, filters, 'period_end', ['periodEnd'])),
     has_location: boolValue(queryOrFilter(req, filters, 'has_location', ['hasLocation'])),
+    worked_with_before: boolValue(queryOrFilter(req, filters, 'worked_with_before', ['workedWithBefore'])),
     has_matched_open_house: boolValue(queryOrFilter(req, filters, 'has_matched_open_house', ['matchedOpenHouse'])),
     has_weekend_open_house: boolValue(queryOrFilter(req, filters, 'has_weekend_open_house', ['weekendOpenHouse', 'weekend'])),
     has_phone: boolValue(queryOrFilter(req, filters, 'has_phone', ['phone'])),
@@ -1755,6 +1865,7 @@ function applyRankingFilters(rankings, filters) {
     if (filters.upload && uploadIdForRanking(row) !== filters.upload) return false;
     if (!overlapsPeriod(row, filters)) return false;
     if (filters.has_location !== null && hasLocation(row) !== filters.has_location) return false;
+    if (filters.worked_with_before !== null && Boolean(row.has_prior_rel8tion_open_house) !== filters.worked_with_before) return false;
     if (filters.has_matched_open_house !== null && (Number(row.matched_open_house_count || 0) > 0) !== filters.has_matched_open_house) return false;
     if (filters.has_weekend_open_house !== null && (Number(row.matched_weekend_open_house_count || 0) > 0 || Boolean(row.has_open_house_this_weekend)) !== filters.has_weekend_open_house) return false;
     if (filters.has_phone !== null && Boolean(row.has_phone || row.phone_normalized || row.phone) !== filters.has_phone) return false;
@@ -1802,6 +1913,7 @@ const SORT_ALIASES = {
   days_since_last: 'listings_days_since_last',
   open_houses: 'matched_open_house_count',
   weekend_open_houses: 'matched_weekend_open_house_count',
+  worked_together: 'rel8tion_open_house_history_count',
   opportunity_gap: 'opportunity_gap_score',
   tier: 'recommended_tier',
   phone: 'phone_normalized',
@@ -1827,6 +1939,7 @@ const SORT_FIELDS = new Set([
   'matched_open_house_count',
   'matched_weekend_open_house_count',
   'matched_active_listing_count',
+  'rel8tion_open_house_history_count',
   'opportunity_gap_score',
   'recommended_tier',
   'phone_normalized',
@@ -1979,17 +2092,18 @@ async function handleList(req) {
   const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
   const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
   const inventoryFreshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [rankings, uploads, inventory] = await Promise.all([
+  const [rankings, uploads, inventory, historyData] = await Promise.all([
     supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []),
     supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => []),
     supabaseRestAll(
       `agent_listing_inventory?select=agent_id,relationship_key,source,source_listing_id,agent_name,agent_name_normalized,open_start,open_end&is_current=eq.true&last_seen_at=gte.${enc(inventoryFreshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
       { maxRows: 20000 }
-    ).catch(() => [])
+    ).catch(() => []),
+    loadRel8tionHistoryData()
   ]);
   const trustedView = trustedRankingView(rankings || [], uploads || []);
   const visibleRankings = inventoryCountsForRankings(
-    trustedView.rankings.map(withFreshPitch),
+    annotateRankingsWithHistory(trustedView.rankings.map(withFreshPitch), historyData),
     inventory || []
   );
   const filtered = applyRankingFilters(visibleRankings, filters);
@@ -2162,6 +2276,36 @@ async function handleAddToOutreach(body) {
   return { ranking, queue, variants: buildPitchVariants(ranking) };
 }
 
+function formatReminderOpenHouseTime(value) {
+  const date = new Date(value || 0);
+  if (!Number.isFinite(date.getTime())) return '';
+  const day = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(date);
+  return `${day} at ${time}`;
+}
+
+function openHouseReminderVariants(ranking = {}, listing = {}, workedTogether = false) {
+  const first = String(ranking.first_name || ranking.agent_name || 'there').trim().split(/\s+/)[0] || 'there';
+  const address = String(listing.address || '').trim();
+  const when = formatReminderOpenHouseTime(listing.open_start);
+  const event = [address, when].filter(Boolean).join(' on ');
+  const again = workedTogether ? ' again' : '';
+  return [
+    `Hi ${first}, it's Jared with Rel8tion. I saw your open house${event ? ` at ${event}` : ''}. I'd love to support you there${again} with the Event Pass and buyer follow-up. Want me there? Reply STOP to opt out.`,
+    `Hi ${first}, Jared from Rel8tion here. You have an open house${event ? ` at ${event}` : ''}. Can I support you there${again} with the Event Pass? Nothing for you to set up. Reply STOP to opt out.`,
+    `${first}, I saw your upcoming open house${event ? ` at ${event}` : ''}. I'd be glad to be there${again} with the Rel8tion Event Pass so buyer check-in and follow-up are covered. Interested? Reply STOP to opt out.`
+  ];
+}
+
 async function handleAddListingToOutreach(body) {
   if (!listingInventoryOutreachEnabled()) {
     const error = new Error('Manual listing-inventory outreach is not enabled yet.');
@@ -2182,20 +2326,39 @@ async function handleAddListingToOutreach(body) {
     error.status = 400;
     throw error;
   }
-  if (!listing.marketing_eligible) {
+  const openBoundary = new Date(listing.open_end || listing.open_start);
+  if (!Number.isFinite(openBoundary.getTime()) || openBoundary < new Date()) {
+    const error = new Error('This open house is no longer upcoming.');
+    error.status = 409;
+    throw error;
+  }
+  const historyData = await loadRel8tionHistoryData();
+  const historySignal = historySignalForRanking(ranking, historyData);
+  if (!listing.marketing_eligible && !historySignal.has_prior_rel8tion_open_house) {
     const error = new Error('Marketing is limited to agents you have worked with or who are marked interested or confirmed.');
     error.status = 409;
     throw error;
   }
+  const phone = normalizePhone(listing.agent_phone || ranking.phone_normalized || ranking.phone);
+  if (!phone) {
+    const error = new Error('This agent does not have a verified phone number for a reminder draft.');
+    error.status = 409;
+    throw error;
+  }
+  const reminderVariants = openHouseReminderVariants(
+    ranking,
+    listing,
+    historySignal.has_prior_rel8tion_open_house
+  );
 
   const payload = {
     ...outreachPayloadFromRanking(ranking),
     source: 'agent_listing_inventory',
-    template_key: 'agent_listing_open_house',
+    template_key: 'agent_listing_open_house_reminder',
     open_house_id: listing.source_listing_id || null,
     agent_name: listing.agent_name || ranking.agent_name || '',
     agent_phone: listing.agent_phone || ranking.phone || '',
-    agent_phone_normalized: normalizePhone(listing.agent_phone || ranking.phone_normalized || ranking.phone),
+    agent_phone_normalized: phone,
     agent_email: listing.agent_email || ranking.email || '',
     brokerage: listing.brokerage || ranking.brokerage || '',
     address: listing.address || '',
@@ -2208,10 +2371,24 @@ async function handleAddListingToOutreach(body) {
     open_start: listing.open_start,
     open_end: listing.open_end || null,
     listing_photo_url: listing.listing_photo_url || null,
+    sms_variant_1: reminderVariants[0],
+    sms_variant_2: reminderVariants[1],
+    sms_variant_3: reminderVariants[2],
+    selected_sms: reminderVariants[0],
+    review_status: 'manual_review',
+    generation_status: 'generated',
+    send_mode: 'manual',
+    approved_for_send: false,
+    initial_send_status: 'not_queued',
+    initial_block_reason: 'manual_review_required',
+    followup_send_status: 'not_scheduled',
+    followup_block_reason: 'followups_disabled',
     report_note: [
-      `Relationship listing inventory: ${listing.address || listing.source_listing_id}.`,
+      `Manual "have me there" reminder for ${listing.address || listing.source_listing_id}.`,
       `Upcoming open house: ${listing.open_start}${listing.open_end ? ` through ${listing.open_end}` : ''}.`,
       `Relationship status: ${listing.relationship_status || 'worked_with'}.`,
+      `Prior completed or confirmed REL8TION open houses: ${historySignal.rel8tion_open_house_history_count}.`,
+      'Manual review is required. This row is not approved or queued for automatic sending.',
       outreachPayloadFromRanking(ranking).report_note
     ].filter(Boolean).join('\n')
   };
@@ -2230,7 +2407,12 @@ async function handleAddListingToOutreach(body) {
         headers: { Prefer: 'return=representation' },
         body: JSON.stringify(payload)
       }));
-  return { ranking, listing, queue };
+  return {
+    ranking: { ...ranking, ...historySignal },
+    listing,
+    queue,
+    reminder_variants: reminderVariants
+  };
 }
 
 async function handleGeneratePitch(body) {
@@ -2347,5 +2529,6 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.__test = {
-  inventoryCountsForRankings
+  inventoryCountsForRankings,
+  openHouseReminderVariants
 };

@@ -46,7 +46,11 @@ async function verify() {
     }
     if (request === '../../lib/agent-ranking') return require('../lib/agent-ranking');
     if (request === '../../lib/agent-ranking-open-house') return require('../lib/agent-ranking-open-house');
+    if (request === '../../lib/agent-ranking-history') return require('../lib/agent-ranking-history');
     if (request === '../../lib/location-intelligence') return require('../lib/location-intelligence');
+    if (request === '../../agent-listing-inventory-worker.cjs') {
+      return { run: async () => ({ ok: true, dry_run: true }) };
+    }
     throw new Error(`Unexpected module request: ${request}`);
   };
   new Function('require', 'module', 'exports', apiSource)(customRequire, apiModule, apiModule.exports);
