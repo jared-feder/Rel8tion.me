@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { buildAgentPerformance } = require('../../lib/admin-agent-performance');
 
 const OUTREACH_FOLLOWUPS_DISABLED = true;
 
@@ -46,7 +47,7 @@ function mergeRows(...groups) {
 }
 
 async function loadDashboardInbox(warnings) {
-  const select = 'thread_key,queue_row_id,last_reply_at,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,brokerage,address,review_status';
+  const select = 'thread_key,queue_row_id,open_house_id,last_reply_at,reply_count,latest_reply_body,latest_reply_opt_out,any_opt_out,direction,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,address,review_status';
   const [inboundRows, recentRows] = await Promise.all([
     safeRest(`agent_outreach_inbox?select=${select}&direction=neq.outbound&order=last_reply_at.desc&limit=250`, [], warnings, 'agent_outreach_inbox_inbound'),
     safeRest(`agent_outreach_inbox?select=${select}&order=last_reply_at.desc&limit=250`, [], warnings, 'agent_outreach_inbox')
@@ -650,6 +651,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const upcomingFloor = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
     const [
       agents,
       keys,
@@ -669,6 +671,10 @@ module.exports = async function handler(req, res) {
       outreach,
       confirmedOutreach,
       inbox,
+      rankings,
+      listingInventory,
+      listingAgents,
+      upcomingOpenHouses,
       kitOrders,
       agentWebsites,
       eventPassRequests
@@ -691,6 +697,10 @@ module.exports = async function handler(req, res) {
       safeRest(`agent_outreach_queue?select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc&limit=1000`, [], warnings, 'agent_outreach_queue'),
       safeRestAll(`agent_outreach_queue?or=(review_status.eq.confirmed_open_house,review_status.eq.accepted_open_house)&select=${OUTREACH_QUEUE_SELECT}&order=created_at.desc`, [], warnings, 'confirmed_open_house_queue_history'),
       loadDashboardInbox(warnings),
+      safeRest('agent_rankings?select=id,agent_id,agent_name,brokerage,phone,phone_normalized,email,open_house_count,agent_rank_score,recommended_tier,last_activity_at,updated_at&order=agent_rank_score.desc.nullslast,agent_name.asc&limit=3000', [], warnings, 'agent_rankings'),
+      safeRest('agent_listing_inventory?is_current=eq.true&select=id,source_listing_id,agent_id,queue_row_id,agent_name,brokerage,phone,phone_normalized,email,listing_status,address,city,state,zip,price,image_url,listing_url,open_start,open_end,last_seen_at,updated_at&order=open_start.asc.nullslast,last_seen_at.desc&limit=3000', [], warnings, 'agent_listing_inventory'),
+      safeRest('listing_agents?select=id,open_house_id,name,phone,phone_normalized,email,brokerage,primary_photo_url,directory_photo_url,profile_url,created_at,scraped_at&order=created_at.desc&limit=3000', [], warnings, 'listing_agents'),
+      safeRest(`open_houses?open_start=gte.${enc(upcomingFloor)}&select=id,address,agent,brokerage,agent_phone,agent_email,open_start,open_end,link,image,price,created_at,updated_at&order=open_start.asc.nullslast&limit=1000`, [], warnings, 'upcoming_open_houses'),
       safeRest('open_house_kit_orders?select=id,stripe_checkout_session_id,stripe_subscription_id,status,fulfillment_status,plan,product,source,flow,uid,agent_id,agent_slug,agent_name,brokerage,email,phone,phone_normalized,shipping_name,address_summary,event_label,sign_id,sponsor_profile_id,sponsor_name,sponsor_company,amount_total,currency,payment_status,paid_at,created_at,updated_at,logo_choice_status,selected_logo_name,custom_logo_url,welcome_email_status,welcome_email_sent_at,welcome_email_error,welcome_sms_status,welcome_sms_sent_at,welcome_sms_error,dashboard_secured_at&order=created_at.desc&limit=250', [], warnings, 'open_house_kit_orders'),
       safeRest('agent_websites?select=id,name,slug,title,brokerage,email,phone,bio,photo_url,hero_image_url,about_image_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,license_type,brokerage_address,brokerage_phone,brokerage_website_url,standardized_operating_procedure_url,listing_sync_enabled,listing_sync_status,listing_sync_last_run_at,listing_sync_last_error,updated_at&order=updated_at.desc&limit=250', [], warnings, 'agent_websites'),
       safeRest('event_pass_requests?select=*&order=created_at.desc&limit=250', [], warnings, 'event_pass_requests')
@@ -728,7 +738,17 @@ module.exports = async function handler(req, res) {
     ]);
 
     const outreachOperator = await loadOutreachOperatorMode(warnings);
-    const crmRows = buildCrm({ agents, keys, outreach, inbox, leads });
+    const crmRows = buildAgentPerformance({
+      agents,
+      keys,
+      outreach,
+      inbox,
+      leads,
+      rankings,
+      listingInventory,
+      listingAgents,
+      openHouses: upcomingOpenHouses
+    });
     const signRows = buildSigns({ signs, inventory, events });
     const eventPassRows = buildEventPasses({ inventory, signs, events, keys, verifiedProfiles, coverageConsents });
     const sponsoredEventPassRows = buildSponsoredEventPasses({ eventPasses: eventPassRows });
