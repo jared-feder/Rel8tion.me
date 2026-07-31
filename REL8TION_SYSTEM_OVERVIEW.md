@@ -29,6 +29,7 @@ The current product connects:
 - `[IMPLEMENTED]` Live open house event records, buyer check-ins, disclosures, and optional financing-help routing.
 - `[IMPLEMENTED]` Shared open-house coverage supports two carried Event Passes plus one stationary Smart Sign or Loan Officer Coverage Sign, all pointing to one event and dashboard with a three-device cap.
 - `[PARTIAL]` REL8TION COMMAND admin operations.
+- `[IMPLEMENTED]` REL8TION COMMAND's additive Agent Performance board centralizes each agent's identity, outreach/conversation history, upcoming open houses, known listings, leads, keychains, and ranking link without removing the original source workspaces.
 - `[PARTIAL]` Agent Ranking / Production Intelligence for admin-only production-report imports, opportunity scoring, and manual outreach staging.
 - `[PARTIAL]` Agent outreach, enrichment, and SMS follow-up.
 - `[IMPLEMENTED]` OneKey headshot enrichment uses compatible exact-name candidates plus exact phone verification, copies accepted photos into REL8TION storage, previews locally by default, never replaces an existing agent photo, and runs in bounded six-hour cron batches for upcoming outreach.
@@ -53,6 +54,7 @@ REL8TION is deliberately lightweight:
 - `[IMPLEMENTED]` Static Vercel pages in `apps/rel8tion-app`.
 - `[IMPLEMENTED]` Root static wrappers and public pages such as `a.html` and `b.html`. On the role-aware feature branch, the obsolete root `index.html` smoke test and `admin.html` forwarding alias are removed so Vercel's static filesystem cannot shadow the universal `/` rewrite or bypass the server-authorized `/admin` entry.
 - `[IMPLEMENTED]` Root Vercel serverless API routes under `api/`.
+- `[IMPLEMENTED]` The admin dashboard API exposes a unified, read-only Agent Performance projection assembled from existing Supabase sources. Missing optional listing inventory degrades to warnings instead of blocking the rest of COMMAND.
 - `[IMPLEMENTED]` A private server-to-server Rel8tionOS API under `api/rel8tionos/` exposes scoped outreach conversation, reply, Open House acceptance, and loan-officer assignment operations. Outreach thread projections include `agent.photo_url` from the queue's current enriched agent photo. It authenticates with a dedicated server-only shared key and returns no-store, versioned JSON responses.
 - `[IMPLEMENTED]` The private relationship schedule feed reads confirmed field visits for a requested time range and collapses duplicate visit rows by open-house identity, scheduled window, and agent identity without altering source records.
 - `[IMPLEMENTED]` Supabase REST/RPC calls from browser code where allowed by anon policies.

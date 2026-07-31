@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-07-31: Unified Agent Performance board
+
+- `[IMPLEMENTED]` REL8TION COMMAND Agent Performance now builds one additive agent-level read model across canonical agents, claimed keychains, rankings, outreach, inbound replies, leads, listing inventory, listing contacts, and upcoming open houses. Agents remain visible even when they have no messages or listings.
+- `[IMPLEMENTED]` Each Agent Board profile retains full expandable outreach/conversation, upcoming-open-house, and known-listing detail while preserving the existing Outreach, Open Houses, Agent Ranking, and Agent Websites workspaces.
+- `[IMPLEMENTED]` Agent links throughout COMMAND open a focused in-dashboard profile instead of looping through the `/admin` launcher. The focused profile opens its source-detail sections and provides a Back to all agents control.
+- `[IMPLEMENTED]` Open Houses includes the Agent Board's future events sorted soonest first. Past open houses remain excluded from the upcoming list.
+- `[IMPLEMENTED]` This release adds read queries and UI only. It does not apply a migration, enable a scraper/cron, alter production records, or send outreach.
+
 ## 2026-07-30: Agent Ranking current-listing inventory
 
 - `[IMPLEMENTED]` Agent Ranking profile portraits now resolve through one identity-verified fallback chain: the canonical `agents.image_url`, agent-website `photo_url`, enriched `agent_outreach_queue.agent_photo_url`, then listing-agent directory photos. Exact phone or email wins; contact-less fallback requires exact normalized name plus compatible brokerage. The selected portrait is returned on the profile ranking so the profile and Marketing Report use the same image.

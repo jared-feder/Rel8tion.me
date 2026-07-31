@@ -1507,7 +1507,7 @@
     const AREAS = [
       ['outreach', 'Outreach command'],
       ['leads', 'Leads'],
-      ['crm', 'Agent CRM'],
+      ['crm', 'Agent Performance'],
       ['buyerFinder', 'Buyer finder'],
       ['events', 'Open houses'],
       ['signs', 'Signs'],
@@ -1526,6 +1526,7 @@
       error: '',
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       query: '',
+      agentFocus: '',
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
@@ -1582,8 +1583,18 @@
     const params = new URLSearchParams(window.location.search);
     const uidParam = params.get('uid') || params.get('admin_uid') || '';
     const tokenParam = params.get('token') || params.get('admin_token') || '';
+    const areaParam = params.get('area') || '';
+    const eventParam = params.get('event') || '';
+    const agentParam = params.get('agent') || params.get('q') || '';
     if (uidParam) window.localStorage.setItem(ADMIN_UID_KEY, uidParam);
     if (tokenParam) window.localStorage.setItem(ADMIN_TOKEN_KEY, tokenParam);
+    if (AREAS.some(([key]) => key === areaParam)) {
+      state.area = areaParam;
+      window.localStorage.setItem(AREA_KEY, areaParam);
+    }
+    if (eventParam && state.area === 'events') state.query = eventParam;
+    if (agentParam && (state.area === 'crm' || state.area === 'outreach')) state.query = agentParam;
+    if (agentParam && state.area === 'crm') state.agentFocus = agentParam;
 
     function credential() {
       return {
@@ -4133,6 +4144,7 @@ ${rowsHtml}
       });
       document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
       document.getElementById('globalSearch')?.addEventListener('input', (event) => {
+        state.agentFocus = '';
         state.query = event.target.value;
         window.clearTimeout(renderShell.searchTimer);
         renderShell.searchTimer = window.setTimeout(() => {
@@ -4156,6 +4168,22 @@ ${rowsHtml}
     }
 
     function bindAreaActions() {
+      document.querySelectorAll('a[href^="/admin?"]').forEach((link) => {
+        let target;
+        try {
+          target = new URL(link.getAttribute('href'), window.location.origin);
+        } catch (_) {
+          return;
+        }
+        const agent = target.searchParams.get('agent') || '';
+        if (target.pathname !== '/admin' || target.searchParams.get('area') !== 'crm' || !agent) return;
+        link.addEventListener('click', (event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          openAgentProfile(agent);
+        });
+      });
+      document.querySelector('[data-clear-agent-profile]')?.addEventListener('click', clearAgentProfile);
       document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
       document.getElementById('replayAndroidInbox')?.addEventListener('click', replayAndroidInbox);
       document.querySelectorAll('[data-draft-key]').forEach((textarea) => {
@@ -4413,7 +4441,7 @@ ${rowsHtml}
             </div>
             <div>
               <div class="mini-title">Listing contact</div>
-              <div class="primary">${esc(row.agent_name || 'No agent loaded')}</div>
+              <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'No agent loaded')}</a>
               <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | ') || 'No contact fields loaded')}</div>
             </div>
             ${agents.length ? `
@@ -4604,7 +4632,7 @@ ${rowsHtml}
       return `
         <div class="data-row">
           <div>
-            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
             <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
           </div>
           <div>
@@ -4700,7 +4728,7 @@ ${rowsHtml}
             ${rows.length ? rows.map((thread) => `
               <div class="data-row">
                 <div>
-                  <div class="primary">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown agent')}</div>
+                  <a class="primary" href="${esc(adminAgentHref(thread))}">${esc(thread.agent_name || fmtPhone(thread.from_phone) || 'Unknown agent')}</a>
                   <div class="secondary">${esc([thread.brokerage, fmtPhone(thread.agent_phone || thread.from_phone)].filter(Boolean).join(' | '))}</div>
                 </div>
                 <div>
@@ -4734,7 +4762,7 @@ ${rowsHtml}
         const key = thread.thread_key;
         return `
           <div>
-            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
             <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone)].filter(Boolean).join(' | '))}</div>
           </div>
           <div>
@@ -4799,7 +4827,7 @@ ${rowsHtml}
               <div class="agent-strip">
                 ${thread.agent_photo_url ? `<img class="avatar" src="${esc(thread.agent_photo_url)}" alt="${esc(thread.agent_name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(thread.agent_name))}</div>`}
                 <div>
-                  <div class="agent-name">${esc(thread.agent_name || 'Unknown agent')}</div>
+                  <a class="agent-name" href="${esc(adminAgentHref(thread))}">${esc(thread.agent_name || 'Unknown agent')}</a>
                   <div class="agent-meta">${esc(thread.brokerage || 'No brokerage')}</div>
                 </div>
               </div>
@@ -4993,21 +5021,113 @@ ${rowsHtml}
       `);
     }
 
+    function renderAgentBoardCard(row, focused = false) {
+      const upcoming = Array.isArray(row.upcoming_open_houses) ? row.upcoming_open_houses : [];
+      const listings = Array.isArray(row.listings) ? row.listings : [];
+      const threads = Array.isArray(row.outreach_threads) ? row.outreach_threads : [];
+      const nextOpenHouse = upcoming[0] || null;
+      const profileHref = rankingProfileHref(row);
+      return `
+        <article${focused ? ' id="agent-profile"' : ''} class="glass-card" style="padding:18px;display:grid;gap:16px;${focused ? 'outline:2px solid rgba(56,189,248,.72);box-shadow:0 24px 70px rgba(14,116,144,.2);' : ''}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+              ${row.image_url ? `<img class="avatar" src="${esc(row.image_url)}" alt="${esc(row.name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(row.name))}</div>`}
+              <div style="min-width:0;">
+                <a class="primary" style="font-size:18px;" href="${esc(adminAgentHref(row))}">${esc(row.name || 'Unknown agent')}</a>
+                <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+                <div class="badges" style="margin-top:7px;">${(row.sources || []).map((source) => badge(source, 'info')).join('')}</div>
+              </div>
+            </div>
+            <div class="row-actions">
+              <a class="btn primary" href="${esc(adminAgentHref(row, 'outreach'))}"><i data-lucide="messages-square"></i><span>Conversation</span></a>
+              ${profileHref ? `<a class="btn soft" href="${esc(profileHref)}"><i data-lucide="chart-no-axes-combined"></i><span>Performance profile</span></a>` : ''}
+              ${row.website ? `<a class="btn soft" href="${esc(row.website)}" target="_blank" rel="noopener"><i data-lucide="globe-2"></i><span>Website</span></a>` : ''}
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+            <div class="mini-panel"><div class="mini-title">Outreach</div><strong>${esc(row.outreach_count || 0)}</strong></div>
+            <div class="mini-panel"><div class="mini-title">Messages</div><strong>${esc(row.reply_count || 0)}</strong></div>
+            <div class="mini-panel"><div class="mini-title">Listings</div><strong>${esc(row.listing_count || 0)}</strong></div>
+            <div class="mini-panel"><div class="mini-title">Upcoming OH</div><strong>${esc(row.upcoming_open_house_count || 0)}</strong></div>
+            <div class="mini-panel"><div class="mini-title">Leads</div><strong>${esc(row.lead_count || 0)}</strong></div>
+            <div class="mini-panel"><div class="mini-title">Keychains</div><strong>${esc(row.keychain_count || 0)}</strong></div>
+          </div>
+
+          <div class="coverage-form-grid">
+            <div class="mini-panel">
+              <div class="mini-title">Next open house</div>
+              <div class="primary" style="margin-top:6px;">${esc(nextOpenHouse?.address || 'No future event currently tagged')}</div>
+              <div class="secondary">${nextOpenHouse ? esc(fmtDate(nextOpenHouse.open_start)) : 'Upcoming events will appear here automatically.'}</div>
+            </div>
+            <div class="mini-panel">
+              <div class="mini-title">Latest outreach or reply</div>
+              <div class="copy-body">${esc(row.latest_outreach?.latest_reply_body || row.latest_outreach?.body || 'No outreach conversation yet.')}</div>
+            </div>
+          </div>
+
+          <div class="coverage-form-grid">
+            <details class="mini-panel"${focused ? ' open' : ''}>
+              <summary class="primary">All outreach and conversation threads (${threads.length})</summary>
+              <div class="rows" style="margin-top:10px;">
+                ${threads.length ? threads.map((thread) => `
+                  <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
+                    <div class="primary">${esc(thread.address || 'General agent conversation')}</div>
+                    <div class="secondary">${esc([thread.review_status, fmtDate(thread.latest_reply_at || thread.sent_at), thread.reply_count ? `${thread.reply_count} messages` : ''].filter(Boolean).join(' | '))}</div>
+                    <div class="copy-body">${esc(thread.latest_reply_body || thread.body || 'No stored message preview.')}</div>
+                  </div>
+                `).join('') : '<div class="secondary" style="margin-top:8px;">No outreach threads.</div>'}
+              </div>
+            </details>
+            <details class="mini-panel"${upcoming.length || focused ? ' open' : ''}>
+              <summary class="primary">All upcoming open houses (${upcoming.length})</summary>
+              <div class="rows" style="margin-top:10px;">
+                ${upcoming.length ? upcoming.map((openHouse) => `
+                  <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
+                    <div class="primary">${esc(openHouse.address || 'Upcoming open house')}</div>
+                    <div class="secondary">${esc([fmtDate(openHouse.open_start), openHouse.price ? money(openHouse.price) : '', openHouse.source].filter(Boolean).join(' | '))}</div>
+                    ${openHouse.listing_url ? `<a class="btn soft" style="margin-top:8px;" href="${esc(openHouse.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+                  </div>
+                `).join('') : '<div class="secondary" style="margin-top:8px;">No upcoming open houses.</div>'}
+              </div>
+            </details>
+            <details class="mini-panel"${focused ? ' open' : ''}>
+              <summary class="primary">All known listings (${listings.length})</summary>
+              <div class="rows" style="margin-top:10px;">
+                ${listings.length ? listings.map((listing) => `
+                  <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
+                    <div class="primary">${esc(listing.address || 'Listing')}</div>
+                    <div class="secondary">${esc([listing.status, listing.price ? money(listing.price) : '', fmtDate(listing.last_seen_at)].filter(Boolean).join(' | '))}</div>
+                    ${listing.listing_url ? `<a class="btn soft" style="margin-top:8px;" href="${esc(listing.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+                  </div>
+                `).join('') : '<div class="secondary" style="margin-top:8px;">No known listings.</div>'}
+              </div>
+            </details>
+          </div>
+        </article>
+      `;
+    }
+
     function renderCrm() {
-      const rows = filterByQuery(state.command?.crm || []);
+      const allAgents = state.command?.crm || [];
+      const focusedAgent = state.agentFocus ? findAgentByLookup(state.agentFocus, allAgents) : null;
+      const rows = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
       const websites = filterByQuery(state.command?.agent_websites || []);
       return `
-        ${renderAgentWebsiteEditor(websites)}
-        ${renderRows('Agent CRM', `${rows.length} agent records and outreach contacts`, rows.slice(0, 80), (row) => `
-        <div>
-          <div class="primary">${esc(row.name || 'Unknown agent')}</div>
-          <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
+        <div class="section-head">
+          <div>
+            <h2>${focusedAgent ? esc(focusedAgent.name || 'Agent profile') : 'Agent Board'}</h2>
+            <div class="sub">${focusedAgent ? 'Unified agent profile with outreach, open houses, listings, leads, keychains, and performance context.' : `${rows.length} unified agents. Source workspaces and their features remain available; this board centralizes their agent-level context.`}</div>
+          </div>
+          <div class="row-actions">
+            ${focusedAgent ? '<button class="btn primary" type="button" data-clear-agent-profile><i data-lucide="arrow-left"></i><span>Back to all agents</span></button>' : ''}
+            <a class="btn soft" href="/admin?area=outreach"><i data-lucide="messages-square"></i><span>Outreach workspace</span></a>
+            <a class="btn soft" href="/admin?area=events"><i data-lucide="calendar-days"></i><span>Open Houses</span></a>
+            <a class="btn soft" href="/admin/agent-ranking"><i data-lucide="chart-no-axes-combined"></i><span>Agent Rankings</span></a>
+          </div>
         </div>
-        <div>${badge(`${row.keychain_count || 0} keys`, 'info')}</div>
-        <div>${badge(`${row.outreach_count || 0} outreach`, 'info')}</div>
-        <div>${badge(`${row.reply_count || 0} replies`, row.reply_count ? 'warn' : 'info')}</div>
-        <div>${badge(`${row.lead_count || 0} leads`, row.lead_count ? 'ok' : 'info')}</div>
-        `)}
+        <div class="rows">${rows.length ? rows.map((row) => renderAgentBoardCard(row, Boolean(focusedAgent))).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No matching agent record loaded.</div>'}</div>
+        ${renderAgentWebsiteEditor(websites)}
       `;
     }
 
@@ -5230,6 +5350,91 @@ ${rowsHtml}
       });
     }
 
+    function agentLookupValue(row) {
+      return row?.phone_normalized
+        || row?.agent_phone_normalized
+        || row?.phone
+        || row?.agent_phone
+        || row?.email
+        || row?.agent_email
+        || row?.name
+        || row?.agent_name
+        || '';
+    }
+
+    function normalizedAgentValue(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function normalizedAgentPhone(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    }
+
+    function findAgentByLookup(lookup, rows = state.command?.crm || []) {
+      const wanted = normalizedAgentValue(lookup);
+      const wantedPhone = normalizedAgentPhone(lookup);
+      if (!wanted) return null;
+      return (rows || []).find((row) => {
+        const values = [
+          row.id,
+          row.agent_id,
+          row.ranking_id,
+          row.slug,
+          row.agent_slug,
+          row.identity_key,
+          row.phone_normalized,
+          row.agent_phone_normalized,
+          row.phone,
+          row.agent_phone,
+          row.email,
+          row.agent_email,
+          row.name,
+          row.agent_name
+        ].filter(Boolean);
+        if (values.some((value) => normalizedAgentValue(value) === wanted)) return true;
+        return Boolean(wantedPhone && values.some((value) => normalizedAgentPhone(value) === wantedPhone));
+      }) || null;
+    }
+
+    function updateAgentProfileUrl(agent = '') {
+      const query = new URLSearchParams({ area: 'crm' });
+      if (agent) query.set('agent', agent);
+      window.history.pushState({}, '', `/admin?${query.toString()}${agent ? '#agent-profile' : ''}`);
+    }
+
+    function openAgentProfile(agent) {
+      if (!agent) return;
+      state.area = 'crm';
+      state.agentFocus = agent;
+      state.query = agent;
+      window.localStorage.setItem(AREA_KEY, 'crm');
+      updateAgentProfileUrl(agent);
+      renderShell();
+      window.requestAnimationFrame(() => {
+        document.getElementById('agent-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+
+    function clearAgentProfile() {
+      state.agentFocus = '';
+      state.query = '';
+      updateAgentProfileUrl();
+      renderShell();
+    }
+
+    function adminAgentHref(row, area = 'crm') {
+      const query = new URLSearchParams({ area });
+      const agent = agentLookupValue(row);
+      if (agent) query.set('agent', agent);
+      return `/admin?${query.toString()}${area === 'crm' && agent ? '#agent-profile' : ''}`;
+    }
+
+    function rankingProfileHref(row) {
+      if (!row?.ranking_id) return '';
+      const query = new URLSearchParams({ profile: row.ranking_id });
+      return `/admin/agent-ranking?${query.toString()}`;
+    }
     function eventDashboardHref(row) {
       const params = new URLSearchParams();
       if (row?.host_agent_slug) params.set('agent', row.host_agent_slug);
@@ -5293,15 +5498,48 @@ ${rowsHtml}
       const visits = filterByQuery(state.command?.field_visits || [])
         .filter((row) => !['cancelled', 'completed', 'converted'].includes(row.status || ''))
         .sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
+      const relationshipUpcomingMap = new Map();
+      for (const agent of state.command?.crm || []) {
+        for (const openHouse of agent.upcoming_open_houses || []) {
+          const key = openHouse.id || `${openHouse.address || ''}|${openHouse.open_start || ''}`;
+          if (!key || relationshipUpcomingMap.has(key)) continue;
+          relationshipUpcomingMap.set(key, {
+            ...openHouse,
+            agent_name: agent.name,
+            agent_phone: agent.phone,
+            agent_phone_normalized: agent.phone_normalized,
+            agent_email: agent.email,
+            brokerage: agent.brokerage
+          });
+        }
+      }
+      const relationshipUpcoming = filterByQuery([...relationshipUpcomingMap.values()])
+        .sort((left, right) => new Date(left.open_start || 0) - new Date(right.open_start || 0));
 
       return `
         <div class="section-head">
           <div>
             <h2>Open houses</h2>
-            <div class="sub">${liveEvents.length} live event${liveEvents.length === 1 ? '' : 's'} | ${visits.length} scheduled or confirmed | live events are always shown first</div>
+            <div class="sub">${liveEvents.length} live | ${relationshipUpcoming.length} upcoming from Agent Board | ${visits.length} scheduled or confirmed | future events appear before history</div>
           </div>
         </div>
         ${renderRows('Live events', `${liveEvents.length} currently active`, liveEvents, renderAdminEventRow)}
+        ${renderRows('Upcoming from Agent Board', `${relationshipUpcoming.length} scraped, listing-inventory, and outreach open houses sorted soonest first`, relationshipUpcoming, (row) => `
+          <div>
+            <div class="primary">${esc(row.address || 'Upcoming open house')}</div>
+            <div class="secondary">${esc(fmtDate(row.open_start) || 'Time pending')}</div>
+          </div>
+          <div>
+            <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
+            <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
+          </div>
+          <div>${badge(row.source || 'relationship feed', 'info')}</div>
+          <div>${row.price ? badge(money(row.price), 'ok') : badge('Price unavailable', 'info')}</div>
+          <div class="row-actions">
+            <a class="btn primary" href="${esc(adminAgentHref(row, 'outreach'))}"><i data-lucide="messages-square"></i><span>Conversation</span></a>
+            ${row.listing_url ? `<a class="btn soft" href="${esc(row.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Listing</span></a>` : ''}
+          </div>
+        `)}
         ${renderRows('Scheduled open houses', `${visits.length} upcoming coverage appointments`, visits.slice(0, 100), (row) => renderAcceptedOpenHouseRow(row, profiles))}
         ${renderRows('Recent event history', `${recentEvents.length} recently ended events`, recentEvents, renderAdminEventRow)}
       `;
@@ -5592,7 +5830,7 @@ ${rowsHtml}
         }
         return `
           <div>
-            <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+            <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
             <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone)].filter(Boolean).join(' | '))}</div>
           </div>
           <div>${badge(row.payment_status || 'unknown', 'warn')}</div>
@@ -5952,7 +6190,7 @@ ${rowsHtml}
             <div class="report-detail-grid">
               <div class="report-detail">
                 <div class="mini-title">Agent</div>
-                <div class="primary">${esc(row.agent_name || 'Unknown agent')}</div>
+                <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
                 <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
               </div>
               <div class="report-detail">

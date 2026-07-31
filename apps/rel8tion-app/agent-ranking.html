@@ -772,6 +772,7 @@
     ];
 
     const params = new URLSearchParams(window.location.search);
+    const requestedProfileId = params.get('profile') || '';
     if (params.get('uid') || params.get('admin_uid')) window.localStorage.setItem(ADMIN_UID_KEY, params.get('uid') || params.get('admin_uid'));
     if (params.get('token') || params.get('admin_token')) window.localStorage.setItem(ADMIN_TOKEN_KEY, params.get('token') || params.get('admin_token'));
 
@@ -836,6 +837,7 @@
       profileDetailsLoading: false,
       profileDetailsError: '',
       profileDetailsSeq: 0,
+      requestedProfileHandled: false,
       reportModal: null,
       reportSeq: 0,
       pitchModal: null
@@ -1501,6 +1503,10 @@
         if (requestSeq === state.requestSeq) {
           state.loading = false;
           render();
+          if (!state.error && requestedProfileId && !state.requestedProfileHandled) {
+            state.requestedProfileHandled = true;
+            openProfile(requestedProfileId);
+          }
         }
       }
     }
@@ -2369,8 +2375,7 @@
     }
 
     function openProfile(id) {
-      const row = findRanking(id);
-      if (!row) return;
+      const row = findRanking(id) || { id, agent_name: 'Loading agent profile' };
       state.profile = row;
       state.profileDetails = null;
       state.profileDetailsError = '';
