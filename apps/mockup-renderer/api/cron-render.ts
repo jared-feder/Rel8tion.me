@@ -23,7 +23,7 @@ export default async function handler(req: any, res: any) {
         "x-cron-secret": process.env.CRON_SHARED_SECRET,
         "Authorization": `Bearer ${process.env.CRON_SECRET}`
       },
-      body: JSON.stringify({ limit: 10 })
+      body: JSON.stringify({ limit: 40 })
     });
 
     const text = await r.text();
