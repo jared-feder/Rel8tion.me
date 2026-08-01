@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: Relationship-prioritized future open houses
+
+- `[IMPLEMENTED]` REL8TION COMMAND's future Agent Board open houses can be searched by agent, brokerage, phone, email, or property address and filtered by relationship, date range, and local start-time range.
+- `[IMPLEMENTED]` Future events and Agent Performance profiles rank relationship history in this order: accepted/worked with, interested, prior sent outreach, then new agents; event date breaks ties within a relationship group.
+- `[IMPLEMENTED]` Accepted/confirmed field visits and hosted REL8TION events count as real relationship history. Unsent prepared outreach rows do not count as prior outreach.
+
 ## 2026-08-01: Durable buyer property experience
 
 - `[VERIFIED]` Buyer property media and the post-check-in **Explore This Property** action open `/l/:open_house_id` with the current event id preserved for return navigation.

@@ -1530,6 +1530,14 @@
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
+      futureOpenHouseFilters: {
+        agent: '',
+        relationship: 'all',
+        dateFrom: '',
+        dateTo: '',
+        timeFrom: '',
+        timeTo: ''
+      },
       buyerFinder: {
         loading: false,
         error: '',
@@ -2147,6 +2155,76 @@
       return findMatch(({ relationshipName, relationshipBrokerage }) => (
         name && name === relationshipName && (!brokerage || !relationshipBrokerage || brokerage === relationshipBrokerage)
       ));
+    }
+
+    function agentRelationshipGroup(row) {
+      const relationship = agentRelationship(row);
+      const serverCategory = String(row?.relationship_category || '');
+      const threads = Array.isArray(row?.outreach_threads) ? row.outreach_threads : [];
+      const statuses = new Set(threads.map((thread) => String(thread.review_status || '').trim().toLowerCase()));
+      const accepted = serverCategory === 'accepted_worked'
+        || relationship?.worked_with_agent
+        || relationship?.historical_open_house_agent
+        || Number(relationship?.confirmed_open_houses || 0) > 0
+        || ['accepted_open_house', 'confirmed_open_house', 'worked_with'].some((status) => statuses.has(status));
+      const interested = serverCategory === 'interested'
+        || ['interested', 'drip_scheduled'].some((status) => statuses.has(status));
+      const priorOutreach = row?.has_prior_outreach === true
+        || threads.some((thread) => thread.has_sent_outreach === true || thread.latest_reply_at);
+      if (accepted) return { category: 'accepted_worked', label: 'Accepted / worked with', priority: 0, tone: 'ok' };
+      if (interested) return { category: 'interested', label: 'Interested', priority: 1, tone: 'warn' };
+      if (priorOutreach) return { category: 'prior_outreach', label: 'Prior outreach', priority: 2, tone: 'info' };
+      return { category: 'new', label: 'New agent', priority: 3, tone: 'info' };
+    }
+
+    function compareAgentRelationships(left, right) {
+      const relationshipDelta = agentRelationshipGroup(left).priority - agentRelationshipGroup(right).priority;
+      if (relationshipDelta) return relationshipDelta;
+      const upcomingDelta = Number((right.upcoming_open_house_count || 0) > 0) - Number((left.upcoming_open_house_count || 0) > 0);
+      if (upcomingDelta) return upcomingDelta;
+      const startDelta = new Date(left.upcoming_open_houses?.[0]?.open_start || 0) - new Date(right.upcoming_open_houses?.[0]?.open_start || 0);
+      if (startDelta) return startDelta;
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    }
+
+    function localDateValue(value) {
+      const date = new Date(value || 0);
+      if (!Number.isFinite(date.getTime())) return '';
+      const pad = (part) => String(part).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function timeMinutes(value) {
+      const [hours, minutes] = String(value || '').split(':').map(Number);
+      return Number.isFinite(hours) && Number.isFinite(minutes) ? (hours * 60) + minutes : null;
+    }
+
+    function futureOpenHouseMatches(row) {
+      const filters = state.futureOpenHouseFilters;
+      const search = String(filters.agent || '').trim().toLowerCase();
+      const haystack = [
+        row.agent_name,
+        row.brokerage,
+        row.agent_phone,
+        row.agent_email,
+        row.address,
+        row.source,
+        fmtDate(row.open_start)
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (search && !haystack.includes(search)) return false;
+      if (filters.relationship !== 'all' && row.relationship_category !== filters.relationship) return false;
+
+      const localDate = localDateValue(row.open_start);
+      if (filters.dateFrom && localDate < filters.dateFrom) return false;
+      if (filters.dateTo && localDate > filters.dateTo) return false;
+
+      const startsAt = new Date(row.open_start || 0);
+      const rowMinutes = Number.isFinite(startsAt.getTime()) ? (startsAt.getHours() * 60) + startsAt.getMinutes() : null;
+      const fromMinutes = timeMinutes(filters.timeFrom);
+      const toMinutes = timeMinutes(filters.timeTo);
+      if (fromMinutes !== null && rowMinutes !== null && rowMinutes < fromMinutes) return false;
+      if (toMinutes !== null && rowMinutes !== null && rowMinutes > toMinutes) return false;
+      return true;
     }
 
     function agentIsPinned(row) {
@@ -4185,6 +4263,30 @@ ${rowsHtml}
       });
       document.querySelector('[data-clear-agent-profile]')?.addEventListener('click', clearAgentProfile);
       document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
+      document.getElementById('futureOpenHouseAgent')?.addEventListener('input', (event) => {
+        state.futureOpenHouseFilters.agent = event.target.value;
+        window.clearTimeout(bindAreaActions.futureOpenHouseTimer);
+        bindAreaActions.futureOpenHouseTimer = window.setTimeout(refreshAreaContent, 220);
+      });
+      document.getElementById('futureOpenHouseRelationship')?.addEventListener('change', (event) => {
+        state.futureOpenHouseFilters.relationship = event.target.value;
+        refreshAreaContent();
+      });
+      for (const [id, key] of [
+        ['futureOpenHouseDateFrom', 'dateFrom'],
+        ['futureOpenHouseDateTo', 'dateTo'],
+        ['futureOpenHouseTimeFrom', 'timeFrom'],
+        ['futureOpenHouseTimeTo', 'timeTo']
+      ]) {
+        document.getElementById(id)?.addEventListener('change', (event) => {
+          state.futureOpenHouseFilters[key] = event.target.value;
+          refreshAreaContent();
+        });
+      }
+      document.getElementById('futureOpenHouseReset')?.addEventListener('click', () => {
+        state.futureOpenHouseFilters = { agent: '', relationship: 'all', dateFrom: '', dateTo: '', timeFrom: '', timeTo: '' };
+        refreshAreaContent();
+      });
       document.getElementById('replayAndroidInbox')?.addEventListener('click', replayAndroidInbox);
       document.querySelectorAll('[data-draft-key]').forEach((textarea) => {
         textarea.addEventListener('input', () => updateDraft(textarea.dataset.draftKey, textarea.value));
@@ -5027,6 +5129,7 @@ ${rowsHtml}
       const threads = Array.isArray(row.outreach_threads) ? row.outreach_threads : [];
       const nextOpenHouse = upcoming[0] || null;
       const profileHref = rankingProfileHref(row);
+      const relationshipGroup = agentRelationshipGroup(row);
       return `
         <article${focused ? ' id="agent-profile"' : ''} class="glass-card" style="padding:18px;display:grid;gap:16px;${focused ? 'outline:2px solid rgba(56,189,248,.72);box-shadow:0 24px 70px rgba(14,116,144,.2);' : ''}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
@@ -5035,7 +5138,7 @@ ${rowsHtml}
               <div style="min-width:0;">
                 <a class="primary" style="font-size:18px;" href="${esc(adminAgentHref(row))}">${esc(row.name || 'Unknown agent')}</a>
                 <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
-                <div class="badges" style="margin-top:7px;">${(row.sources || []).map((source) => badge(source, 'info')).join('')}</div>
+                <div class="badges" style="margin-top:7px;">${badge(relationshipGroup.label, relationshipGroup.tone)}${(row.sources || []).map((source) => badge(source, 'info')).join('')}</div>
               </div>
             </div>
             <div class="row-actions">
@@ -5109,7 +5212,7 @@ ${rowsHtml}
     }
 
     function renderCrm() {
-      const allAgents = state.command?.crm || [];
+      const allAgents = [...(state.command?.crm || [])].sort(compareAgentRelationships);
       const focusedAgent = state.agentFocus ? findAgentByLookup(state.agentFocus, allAgents) : null;
       const rows = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
       const websites = filterByQuery(state.command?.agent_websites || []);
@@ -5500,6 +5603,7 @@ ${rowsHtml}
         .sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
       const relationshipUpcomingMap = new Map();
       for (const agent of state.command?.crm || []) {
+        const relationshipGroup = agentRelationshipGroup(agent);
         for (const openHouse of agent.upcoming_open_houses || []) {
           const key = openHouse.id || `${openHouse.address || ''}|${openHouse.open_start || ''}`;
           if (!key || relationshipUpcomingMap.has(key)) continue;
@@ -5509,22 +5613,59 @@ ${rowsHtml}
             agent_phone: agent.phone,
             agent_phone_normalized: agent.phone_normalized,
             agent_email: agent.email,
-            brokerage: agent.brokerage
+            brokerage: agent.brokerage,
+            relationship_category: relationshipGroup.category,
+            relationship_label: relationshipGroup.label,
+            relationship_priority: relationshipGroup.priority,
+            relationship_tone: relationshipGroup.tone
           });
         }
       }
-      const relationshipUpcoming = filterByQuery([...relationshipUpcomingMap.values()])
-        .sort((left, right) => new Date(left.open_start || 0) - new Date(right.open_start || 0));
+      const allRelationshipUpcoming = filterByQuery([...relationshipUpcomingMap.values()]);
+      const relationshipUpcoming = allRelationshipUpcoming
+        .filter(futureOpenHouseMatches)
+        .sort((left, right) => {
+          const relationshipDelta = left.relationship_priority - right.relationship_priority;
+          if (relationshipDelta) return relationshipDelta;
+          const dateDelta = new Date(left.open_start || 0) - new Date(right.open_start || 0);
+          if (dateDelta) return dateDelta;
+          return String(left.agent_name || '').localeCompare(String(right.agent_name || ''));
+        });
+      const openHouseFilters = state.futureOpenHouseFilters;
 
       return `
         <div class="section-head">
           <div>
             <h2>Open houses</h2>
-            <div class="sub">${liveEvents.length} live | ${relationshipUpcoming.length} upcoming from Agent Board | ${visits.length} scheduled or confirmed | future events appear before history</div>
+            <div class="sub">${liveEvents.length} live | ${allRelationshipUpcoming.length} upcoming from Agent Board | ${visits.length} scheduled or confirmed | relationship-priority events appear first</div>
           </div>
         </div>
         ${renderRows('Live events', `${liveEvents.length} currently active`, liveEvents, renderAdminEventRow)}
-        ${renderRows('Upcoming from Agent Board', `${relationshipUpcoming.length} scraped, listing-inventory, and outreach open houses sorted soonest first`, relationshipUpcoming, (row) => `
+        <div class="glass-card" style="padding:18px;margin-bottom:18px;display:grid;gap:14px;">
+          <div>
+            <div class="primary">Find future open houses</div>
+            <div class="secondary">Search agents or properties, then narrow by relationship, date, and start time. Accepted/worked-with agents rank first by default, followed by interested, prior outreach, and new agents.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;">
+            <label class="small" style="display:grid;gap:6px;"><strong>Agent or property</strong><input id="futureOpenHouseAgent" class="field" value="${esc(openHouseFilters.agent)}" autocomplete="off" placeholder="Name, brokerage, phone, address"></label>
+            <label class="small" style="display:grid;gap:6px;"><strong>Relationship</strong><select id="futureOpenHouseRelationship" class="select">
+              <option value="all"${openHouseFilters.relationship === 'all' ? ' selected' : ''}>All relationships</option>
+              <option value="accepted_worked"${openHouseFilters.relationship === 'accepted_worked' ? ' selected' : ''}>Accepted / worked with</option>
+              <option value="interested"${openHouseFilters.relationship === 'interested' ? ' selected' : ''}>Interested</option>
+              <option value="prior_outreach"${openHouseFilters.relationship === 'prior_outreach' ? ' selected' : ''}>Prior outreach</option>
+              <option value="new"${openHouseFilters.relationship === 'new' ? ' selected' : ''}>New agents</option>
+            </select></label>
+            <label class="small" style="display:grid;gap:6px;"><strong>From date</strong><input id="futureOpenHouseDateFrom" class="field" type="date" value="${esc(openHouseFilters.dateFrom)}"></label>
+            <label class="small" style="display:grid;gap:6px;"><strong>Through date</strong><input id="futureOpenHouseDateTo" class="field" type="date" value="${esc(openHouseFilters.dateTo)}"></label>
+            <label class="small" style="display:grid;gap:6px;"><strong>Starts after</strong><input id="futureOpenHouseTimeFrom" class="field" type="time" value="${esc(openHouseFilters.timeFrom)}"></label>
+            <label class="small" style="display:grid;gap:6px;"><strong>Starts before</strong><input id="futureOpenHouseTimeTo" class="field" type="time" value="${esc(openHouseFilters.timeTo)}"></label>
+          </div>
+          <div class="row-actions">
+            ${badge(`${relationshipUpcoming.length} matching`, relationshipUpcoming.length ? 'ok' : 'warn')}
+            <button class="btn soft" type="button" id="futureOpenHouseReset"><i data-lucide="rotate-ccw"></i><span>Clear filters</span></button>
+          </div>
+        </div>
+        ${renderRows('Upcoming from Agent Board', `${relationshipUpcoming.length} of ${allRelationshipUpcoming.length} future open houses, ranked by relationship and then date`, relationshipUpcoming, (row) => `
           <div>
             <div class="primary">${esc(row.address || 'Upcoming open house')}</div>
             <div class="secondary">${esc(fmtDate(row.open_start) || 'Time pending')}</div>
@@ -5533,7 +5674,7 @@ ${rowsHtml}
             <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
             <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
           </div>
-          <div>${badge(row.source || 'relationship feed', 'info')}</div>
+          <div>${badge(row.relationship_label, row.relationship_tone)}${badge(row.source || 'relationship feed', 'info')}</div>
           <div>${row.price ? badge(money(row.price), 'ok') : badge('Price unavailable', 'info')}</div>
           <div class="row-actions">
             <a class="btn primary" href="${esc(adminAgentHref(row, 'outreach'))}"><i data-lucide="messages-square"></i><span>Conversation</span></a>

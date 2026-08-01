@@ -747,7 +747,9 @@ module.exports = async function handler(req, res) {
       rankings,
       listingInventory,
       listingAgents,
-      openHouses: upcomingOpenHouses
+      openHouses: upcomingOpenHouses,
+      fieldVisits,
+      events
     });
     const signRows = buildSigns({ signs, inventory, events });
     const eventPassRows = buildEventPasses({ inventory, signs, events, keys, verifiedProfiles, coverageConsents });

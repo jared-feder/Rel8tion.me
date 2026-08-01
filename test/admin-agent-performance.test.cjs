@@ -82,9 +82,12 @@ test('Agent Board merges sources and keeps agents without messages or listings',
   assert.equal(rows[0].outreach_threads.length, 1);
   assert.equal(rows[0].outreach_threads[0].latest_reply_body, '');
   assert.equal(rows[0].upcoming_open_houses.length, 1);
+  assert.equal(rows[0].relationship_category, 'prior_outreach');
+  assert.equal(rows[0].has_prior_outreach, true);
   assert.equal(rows[1].name, 'Agent Two');
   assert.equal(rows[1].outreach_count, 0);
   assert.equal(rows[1].listing_count, 0);
+  assert.equal(rows[1].relationship_category, 'new');
 });
 
 test('Agent Board keeps past events out of the upcoming list', () => {
@@ -102,4 +105,73 @@ test('Agent Board keeps past events out of the upcoming list', () => {
 
   assert.equal(rows.length, 1);
   assert.equal(rows[0].upcoming_open_house_count, 0);
+});
+
+test('Agent Board ranks future open houses by accepted, interested, prior outreach, then new', () => {
+  const upcoming = (id, name, phone, hour) => ({
+    id,
+    open_house_id: `open-${id}`,
+    agent_name: name,
+    agent_phone_normalized: phone,
+    address: `${id} Future Ln`,
+    open_start: `2099-08-02T${hour}:00:00Z`,
+    open_end: `2099-08-02T${String(Number(hour) + 1).padStart(2, '0')}:00:00Z`
+  });
+  const rows = buildAgentPerformance({
+    outreach: [
+      { ...upcoming('accepted', 'Accepted Agent', '5165551001', '19'), review_status: 'accepted_open_house' },
+      { ...upcoming('interested', 'Interested Agent', '5165551002', '18'), review_status: 'interested' },
+      { ...upcoming('sent', 'Sent Agent', '5165551003', '17'), initial_sent_at: '2099-07-30T12:00:00Z' },
+      { ...upcoming('new', 'New Agent', '5165551004', '16'), created_at: '2099-07-30T12:00:00Z' }
+    ]
+  });
+
+  assert.deepEqual(rows.map((row) => row.relationship_category), [
+    'accepted_worked',
+    'interested',
+    'prior_outreach',
+    'new'
+  ]);
+  assert.equal(rows.find((row) => row.name === 'New Agent').has_prior_outreach, false);
+});
+
+test('Agent Board uses real accepted visits and hosted events as worked-with signals', () => {
+  const rows = buildAgentPerformance({
+    agents: [{ id: 'agent-visit', slug: 'visit-agent', name: 'Visit Agent', phone_normalized: '5165552001' }],
+    listingInventory: [{
+      id: 'listing-visit',
+      agent_id: 'agent-visit',
+      agent_name: 'Visit Agent',
+      phone_normalized: '5165552001',
+      address: '8 Visit Ave',
+      open_start: '2099-08-03T17:00:00Z',
+      open_end: '2099-08-03T19:00:00Z'
+    }],
+    fieldVisits: [{
+      id: 'visit-1',
+      agent_name: 'Visit Agent',
+      agent_phone_normalized: '5165552001',
+      status: 'confirmed',
+      scheduled_start: '2099-08-03T17:00:00Z'
+    }, {
+      id: 'visit-cancelled',
+      agent_name: 'Visit Agent',
+      agent_phone_normalized: '5165552001',
+      status: 'cancelled'
+    }],
+    events: [{
+      id: 'event-1',
+      host_agent_slug: 'visit-agent',
+      status: 'ended',
+      ended_at: '2099-07-20T19:00:00Z'
+    }, {
+      id: 'event-draft',
+      host_agent_slug: 'visit-agent',
+      status: 'draft'
+    }]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].relationship_category, 'accepted_worked');
+  assert.equal(rows[0].accepted_open_house_count, 2);
 });

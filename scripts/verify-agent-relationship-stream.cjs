@@ -40,7 +40,15 @@ for (const required of [
   'Pin to top',
   'Pinned to top',
   'Mark follow-up',
-  'Follow-up marked'
+  'Follow-up marked',
+  'futureOpenHouseAgent',
+  'futureOpenHouseRelationship',
+  'futureOpenHouseDateFrom',
+  'futureOpenHouseDateTo',
+  'futureOpenHouseTimeFrom',
+  'futureOpenHouseTimeTo',
+  'Accepted / worked with',
+  'Prior outreach'
 ]) {
   if (!adminSource.includes(required)) {
     throw new Error(`REL8TION admin UI is missing: ${required}`);
