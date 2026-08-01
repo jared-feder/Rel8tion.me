@@ -10,7 +10,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Browser history is synchronized with in-place navigation, so Back/Forward restores the selected COMMAND area and focused agent without a page reload.
 - `[IMPLEMENTED]` Agent ordering and future-open-house projections are indexed when data arrives rather than rebuilt on every click. The recurring foreground refresh updates outreach, health, and relationship data only; the multi-source dashboard snapshot is reserved for initial load, explicit Refresh, and completed mutations.
 - `[IMPLEMENTED]` Hidden COMMAND tabs no longer poll. This prevents several open tabs from multiplying the expensive dashboard requests and DOM work.
-- `[NEEDS VERIFICATION]` Production deployment and live browser navigation timing remain to be verified.
+- `[VERIFIED]` Production release `8e05d3c` is live through deployment `dpl_EJpLA289FYfz5SZQiFLL5hFtSnTU`. The served 307 KB COMMAND page contains the lightweight refresh, cached indexes, and Back/Forward handler; the former 45-second full-dashboard polling call is absent. Production route verification passed.
 
 ## 2026-08-01: Property-specific outreach photos in COMMAND
 
