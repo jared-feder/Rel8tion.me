@@ -557,10 +557,25 @@ function buildLeads({ leads, checkins, events }) {
   return recent([...eventLeads, ...profileLeads], 'created_at', 200);
 }
 
-function buildFieldVisits({ visits, participants }) {
+function buildFieldVisits({ visits, participants, outreach = [], openHouses = [] }) {
+  const queueById = new Map(outreach.map((row) => [row.id, row]));
+  const openHouseById = new Map(openHouses.map((row) => [row.id, row]));
   const grouped = new Map();
   for (const visit of visits || []) {
-    grouped.set(visit.id, { ...visit, participants: [] });
+    const queue = visit.outreach_queue_id ? queueById.get(visit.outreach_queue_id) || {} : {};
+    const openHouseId = firstPresent(visit.open_house_id, queue.open_house_id);
+    const openHouse = openHouseId ? openHouseById.get(openHouseId) || {} : {};
+    grouped.set(visit.id, {
+      ...visit,
+      open_house_id: openHouseId || visit.open_house_id || null,
+      agent_name: firstPresent(visit.agent_name, queue.agent_name, openHouse.agent),
+      agent_phone: firstPresent(visit.agent_phone, queue.agent_phone, openHouse.agent_phone),
+      agent_phone_normalized: firstPresent(visit.agent_phone_normalized, queue.agent_phone_normalized, phoneDigits(queue.agent_phone || openHouse.agent_phone)),
+      agent_email: firstPresent(visit.agent_email, queue.agent_email, openHouse.agent_email),
+      brokerage: firstPresent(visit.brokerage, queue.brokerage, openHouse.brokerage),
+      property_address: firstPresent(visit.property_address, queue.address, openHouse.address),
+      participants: []
+    });
   }
   for (const participant of participants || []) {
     const visit = grouped.get(participant.field_demo_visit_id);
@@ -741,7 +756,7 @@ module.exports = async function handler(req, res) {
     const crmRows = buildAgentPerformance({
       agents,
       keys,
-      outreach,
+      outreach: reportOutreach,
       inbox,
       leads,
       rankings,
@@ -763,7 +778,12 @@ module.exports = async function handler(req, res) {
     });
     const eventRows = buildEvents({ events, checkins, loanSessions });
     const leadRows = buildLeads({ leads, checkins, events });
-    const fieldVisitRows = buildFieldVisits({ visits: fieldVisits, participants: fieldParticipants });
+    const fieldVisitRows = buildFieldVisits({
+      visits: fieldVisits,
+      participants: fieldParticipants,
+      outreach: reportOutreach,
+      openHouses: mergeRowsById(confirmedOpenHouses, upcomingOpenHouses)
+    });
     const paymentRows = buildPayments({ crmRows, signs, kitOrders });
     const confirmedOpenHouseRows = buildConfirmedOpenHouses({
       outreach: reportOutreach,

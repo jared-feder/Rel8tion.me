@@ -1527,6 +1527,9 @@
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       query: '',
       agentFocus: '',
+      openHouseFocus: '',
+      agentBoardLimit: 60,
+      futureOpenHouseLimit: 60,
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
@@ -1594,6 +1597,7 @@
     const areaParam = params.get('area') || '';
     const eventParam = params.get('event') || '';
     const agentParam = params.get('agent') || params.get('q') || '';
+    const openHouseParam = params.get('open_house') || '';
     if (uidParam) window.localStorage.setItem(ADMIN_UID_KEY, uidParam);
     if (tokenParam) window.localStorage.setItem(ADMIN_TOKEN_KEY, tokenParam);
     if (AREAS.some(([key]) => key === areaParam)) {
@@ -1603,6 +1607,7 @@
     if (eventParam && state.area === 'events') state.query = eventParam;
     if (agentParam && (state.area === 'crm' || state.area === 'outreach')) state.query = agentParam;
     if (agentParam && state.area === 'crm') state.agentFocus = agentParam;
+    if (openHouseParam && state.area === 'crm') state.openHouseFocus = openHouseParam;
 
     function credential() {
       return {
@@ -2677,7 +2682,7 @@ ${rowsHtml}
     }
 
     async function sendReply(key) {
-      const thread = state.inbox.find((item) => item.thread_key === key);
+      const thread = findThread(key);
       const textarea = document.getElementById(`reply_${domId(key)}`);
       const messageBody = textarea?.value?.trim() || '';
 
@@ -2841,6 +2846,28 @@ ${rowsHtml}
       if (inboxThread) return inboxThread;
 
       const queueId = String(key || '').replace(/^queue:/, '');
+      for (const profile of state.command?.crm || []) {
+        const profileThread = (profile.outreach_threads || []).find((item) => String(item.id) === queueId);
+        if (!profileThread) continue;
+        return {
+          ...profileThread,
+          id: profileThread.id,
+          thread_key: queueThreadKey({ id: profileThread.id }),
+          queue_row_id: profileThread.id,
+          agent_name: profile.name,
+          agent_phone: profile.phone,
+          agent_phone_normalized: profile.phone_normalized,
+          agent_email: profile.email,
+          agent_photo_url: profile.image_url,
+          brokerage: profile.brokerage,
+          selected_sms: profileThread.body || '',
+          any_opt_out: profileThread.opted_out === true,
+          latest_reply_opt_out: profileThread.opted_out === true,
+          direction: profileThread.latest_reply_direction || (profileThread.has_sent_outreach ? 'outbound' : 'queued'),
+          messages: []
+        };
+      }
+
       const searchRow = (state.outreachSearch?.rows || []).find((item) => item.id === queueId);
       if (searchRow) return queueRowToThread(searchRow);
 
@@ -4223,6 +4250,9 @@ ${rowsHtml}
       document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
       document.getElementById('globalSearch')?.addEventListener('input', (event) => {
         state.agentFocus = '';
+        state.openHouseFocus = '';
+        state.agentBoardLimit = 60;
+        state.futureOpenHouseLimit = 60;
         state.query = event.target.value;
         window.clearTimeout(renderShell.searchTimer);
         renderShell.searchTimer = window.setTimeout(() => {
@@ -4254,22 +4284,33 @@ ${rowsHtml}
           return;
         }
         const agent = target.searchParams.get('agent') || '';
+        const openHouse = target.searchParams.get('open_house') || '';
         if (target.pathname !== '/admin' || target.searchParams.get('area') !== 'crm' || !agent) return;
         link.addEventListener('click', (event) => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
-          openAgentProfile(agent);
+          openAgentProfile(agent, openHouse);
         });
       });
       document.querySelector('[data-clear-agent-profile]')?.addEventListener('click', clearAgentProfile);
+      document.getElementById('agentBoardShowMore')?.addEventListener('click', () => {
+        state.agentBoardLimit += 60;
+        refreshAreaContent();
+      });
+      document.getElementById('futureOpenHouseShowMore')?.addEventListener('click', () => {
+        state.futureOpenHouseLimit += 60;
+        refreshAreaContent();
+      });
       document.getElementById('outreachFilter')?.addEventListener('change', (event) => setOutreachFilter(event.target.value));
       document.getElementById('futureOpenHouseAgent')?.addEventListener('input', (event) => {
         state.futureOpenHouseFilters.agent = event.target.value;
+        state.futureOpenHouseLimit = 60;
         window.clearTimeout(bindAreaActions.futureOpenHouseTimer);
         bindAreaActions.futureOpenHouseTimer = window.setTimeout(refreshAreaContent, 220);
       });
       document.getElementById('futureOpenHouseRelationship')?.addEventListener('change', (event) => {
         state.futureOpenHouseFilters.relationship = event.target.value;
+        state.futureOpenHouseLimit = 60;
         refreshAreaContent();
       });
       for (const [id, key] of [
@@ -4280,11 +4321,13 @@ ${rowsHtml}
       ]) {
         document.getElementById(id)?.addEventListener('change', (event) => {
           state.futureOpenHouseFilters[key] = event.target.value;
+          state.futureOpenHouseLimit = 60;
           refreshAreaContent();
         });
       }
       document.getElementById('futureOpenHouseReset')?.addEventListener('click', () => {
         state.futureOpenHouseFilters = { agent: '', relationship: 'all', dateFrom: '', dateTo: '', timeFrom: '', timeTo: '' };
+        state.futureOpenHouseLimit = 60;
         refreshAreaContent();
       });
       document.getElementById('replayAndroidInbox')?.addEventListener('click', replayAndroidInbox);
@@ -5123,11 +5166,97 @@ ${rowsHtml}
       `);
     }
 
+    function agentConversationThread(row, openHouse = null) {
+      const threads = Array.isArray(row?.outreach_threads) ? row.outreach_threads : [];
+      const wantedQueueId = String(openHouse?.queue_row_id || '');
+      const source = threads.find((thread) => wantedQueueId && String(thread.id) === wantedQueueId) || threads[0] || null;
+      if (!source?.id) return null;
+      return findThread(queueThreadKey({ id: source.id })) || {
+        ...source,
+        thread_key: queueThreadKey({ id: source.id }),
+        queue_row_id: source.id,
+        agent_name: row.name,
+        agent_phone: row.phone,
+        agent_phone_normalized: row.phone_normalized,
+        agent_email: row.email,
+        agent_photo_url: row.image_url,
+        brokerage: row.brokerage,
+        selected_sms: source.body || '',
+        messages: []
+      };
+    }
+
+    function renderUnifiedAgentMessage(row, openHouse = null) {
+      const thread = agentConversationThread(row, openHouse);
+      const key = thread?.thread_key || '';
+      const draft = key ? state.drafts[key] || '' : '';
+      const optedOut = thread ? isOptOutThread(thread) : false;
+      const canSend = Boolean(thread?.queue_row_id && row.phone && !optedOut && state.sendingKey !== key);
+      const smsPhone = String(row.phone || '').replace(/[^0-9+]/g, '');
+      const preview = thread?.latest_reply_body || thread?.body || thread?.selected_sms || '';
+      return `
+        <section id="agent-message" class="glass-card" style="padding:18px;display:grid;gap:14px;outline:2px solid rgba(56,189,248,.38);">
+          <div class="reply-footer">
+            <div>
+              <div class="mini-title">Reach ${esc(row.name || 'this agent')}</div>
+              <div class="primary" style="margin-top:5px;">${esc(openHouse?.address || 'Agent conversation')}</div>
+              <div class="secondary">${esc([openHouse ? fmtDate(openHouse.open_start) : '', fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>
+            </div>
+            <div class="row-actions">
+              ${row.phone ? `<a class="btn soft" href="tel:${esc(smsPhone)}"><i data-lucide="phone"></i><span>Call</span></a>` : ''}
+              ${row.phone ? `<a class="btn soft" href="sms:${esc(smsPhone)}"><i data-lucide="message-circle"></i><span>Open phone text</span></a>` : ''}
+              ${row.email ? `<a class="btn soft" href="mailto:${esc(row.email)}"><i data-lucide="mail"></i><span>Email</span></a>` : ''}
+            </div>
+          </div>
+          <div class="mini-panel">
+            <div class="mini-title">Stored REL8TION conversation</div>
+            <div class="copy-body">${esc(preview || 'No previous message preview is stored for this agent.')}</div>
+            <div class="badges" style="margin-top:8px;">
+              ${thread ? statusBadge(thread) : badge('No linked outreach thread', 'warn')}
+              ${thread?.sent_at ? badge(`Last activity ${fmtDate(thread.latest_reply_at || thread.sent_at)}`, 'info') : ''}
+            </div>
+          </div>
+          ${thread?.queue_row_id ? `
+            <div class="mini-panel reply-box">
+              <div class="mini-title">Send SMS through REL8TION</div>
+              <textarea id="reply_${domId(key)}" data-draft-key="${esc(key)}" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${optedOut ? 'This agent opted out' : 'Write a message to this agent'}">${esc(draft)}</textarea>
+              <div class="reply-footer">
+                <button class="btn primary" data-send-key="${esc(key)}" ${canSend ? '' : 'disabled'}>
+                  <i data-lucide="send"></i><span>${state.sendingKey === key ? 'Sending...' : 'Review + send SMS'}</span>
+                </button>
+                <span id="count_${domId(key)}" class="small">${draft.length} characters</span>
+                ${optedOut ? badge('Opted out — sending blocked', 'bad') : ''}
+              </div>
+            </div>
+          ` : `<div class="secondary">REL8TION has no outreach row to reply through yet. Use Call, Open phone text, or Email above.</div>`}
+        </section>
+      `;
+    }
+
+    function renderAgentBoardSummaryCard(row) {
+      const upcoming = Array.isArray(row.upcoming_open_houses) ? row.upcoming_open_houses : [];
+      const nextOpenHouse = upcoming[0] || null;
+      const relationshipGroup = agentRelationshipGroup(row);
+      return `
+        <article class="glass-card" style="padding:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+            ${row.image_url ? `<img class="avatar" src="${esc(row.image_url)}" alt="${esc(row.name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(row.name))}</div>`}
+            <div style="min-width:0;">
+              <a class="primary" href="${esc(adminAgentHref(row, 'crm', nextOpenHouse?.id || nextOpenHouse?.source_listing_id || ''))}">${esc(row.name || 'Unknown agent')}</a>
+              <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), nextOpenHouse?.address, nextOpenHouse ? fmtDate(nextOpenHouse.open_start) : ''].filter(Boolean).join(' | '))}</div>
+              <div class="badges" style="margin-top:6px;">${badge(relationshipGroup.label, relationshipGroup.tone)}${badge(`${row.upcoming_open_house_count || 0} upcoming`, 'info')}</div>
+            </div>
+          </div>
+          <a class="btn primary" href="${esc(adminAgentHref(row, 'crm', nextOpenHouse?.id || nextOpenHouse?.source_listing_id || ''))}"><i data-lucide="message-square-text"></i><span>Open agent + message</span></a>
+        </article>
+      `;
+    }
+
     function renderAgentBoardCard(row, focused = false) {
       const upcoming = Array.isArray(row.upcoming_open_houses) ? row.upcoming_open_houses : [];
       const listings = Array.isArray(row.listings) ? row.listings : [];
       const threads = Array.isArray(row.outreach_threads) ? row.outreach_threads : [];
-      const nextOpenHouse = upcoming[0] || null;
+      const nextOpenHouse = upcoming.find((openHouse) => [openHouse.id, openHouse.source_listing_id].filter(Boolean).includes(state.openHouseFocus)) || upcoming[0] || null;
       const profileHref = rankingProfileHref(row);
       const relationshipGroup = agentRelationshipGroup(row);
       return `
@@ -5142,7 +5271,8 @@ ${rowsHtml}
               </div>
             </div>
             <div class="row-actions">
-              <a class="btn primary" href="${esc(adminAgentHref(row, 'outreach'))}"><i data-lucide="messages-square"></i><span>Conversation</span></a>
+              <a class="btn primary" href="#agent-message"><i data-lucide="messages-square"></i><span>Message agent</span></a>
+              ${row.phone ? `<a class="btn soft" href="tel:${esc(String(row.phone).replace(/[^0-9+]/g, ''))}"><i data-lucide="phone"></i><span>Call</span></a>` : ''}
               ${profileHref ? `<a class="btn soft" href="${esc(profileHref)}"><i data-lucide="chart-no-axes-combined"></i><span>Performance profile</span></a>` : ''}
               ${row.website ? `<a class="btn soft" href="${esc(row.website)}" target="_blank" rel="noopener"><i data-lucide="globe-2"></i><span>Website</span></a>` : ''}
             </div>
@@ -5156,6 +5286,8 @@ ${rowsHtml}
             <div class="mini-panel"><div class="mini-title">Leads</div><strong>${esc(row.lead_count || 0)}</strong></div>
             <div class="mini-panel"><div class="mini-title">Keychains</div><strong>${esc(row.keychain_count || 0)}</strong></div>
           </div>
+
+          ${renderUnifiedAgentMessage(row, nextOpenHouse)}
 
           <div class="coverage-form-grid">
             <div class="mini-panel">
@@ -5214,13 +5346,14 @@ ${rowsHtml}
     function renderCrm() {
       const allAgents = [...(state.command?.crm || [])].sort(compareAgentRelationships);
       const focusedAgent = state.agentFocus ? findAgentByLookup(state.agentFocus, allAgents) : null;
-      const rows = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
+      const matchingAgents = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
+      const rows = focusedAgent ? matchingAgents : matchingAgents.slice(0, state.agentBoardLimit);
       const websites = filterByQuery(state.command?.agent_websites || []);
       return `
         <div class="section-head">
           <div>
             <h2>${focusedAgent ? esc(focusedAgent.name || 'Agent profile') : 'Agent Board'}</h2>
-            <div class="sub">${focusedAgent ? 'Unified agent profile with outreach, open houses, listings, leads, keychains, and performance context.' : `${rows.length} unified agents. Source workspaces and their features remain available; this board centralizes their agent-level context.`}</div>
+            <div class="sub">${focusedAgent ? 'One agent, current open house, contact actions, REL8TION SMS, conversation, listings, and performance context.' : `${matchingAgents.length} matching unified agents. Showing ${rows.length} lightweight results so the board stays fast.`}</div>
           </div>
           <div class="row-actions">
             ${focusedAgent ? '<button class="btn primary" type="button" data-clear-agent-profile><i data-lucide="arrow-left"></i><span>Back to all agents</span></button>' : ''}
@@ -5229,8 +5362,9 @@ ${rowsHtml}
             <a class="btn soft" href="/admin/agent-ranking"><i data-lucide="chart-no-axes-combined"></i><span>Agent Rankings</span></a>
           </div>
         </div>
-        <div class="rows">${rows.length ? rows.map((row) => renderAgentBoardCard(row, Boolean(focusedAgent))).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No matching agent record loaded.</div>'}</div>
-        ${renderAgentWebsiteEditor(websites)}
+        <div class="rows">${rows.length ? rows.map((row) => focusedAgent ? renderAgentBoardCard(row, true) : renderAgentBoardSummaryCard(row)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No matching agent record loaded.</div>'}</div>
+        ${!focusedAgent && rows.length < matchingAgents.length ? `<div class="row-actions" style="margin:16px 0 24px;"><button class="btn soft" id="agentBoardShowMore"><i data-lucide="chevrons-down"></i><span>Show 60 more agents</span></button>${badge(`${rows.length} of ${matchingAgents.length}`, 'info')}</div>` : ''}
+        ${focusedAgent && websites.length ? renderAgentWebsiteEditor(websites) : ''}
       `;
     }
 
@@ -5500,19 +5634,21 @@ ${rowsHtml}
       }) || null;
     }
 
-    function updateAgentProfileUrl(agent = '') {
+    function updateAgentProfileUrl(agent = '', openHouse = '') {
       const query = new URLSearchParams({ area: 'crm' });
       if (agent) query.set('agent', agent);
+      if (openHouse) query.set('open_house', openHouse);
       window.history.pushState({}, '', `/admin?${query.toString()}${agent ? '#agent-profile' : ''}`);
     }
 
-    function openAgentProfile(agent) {
+    function openAgentProfile(agent, openHouse = '') {
       if (!agent) return;
       state.area = 'crm';
       state.agentFocus = agent;
+      state.openHouseFocus = openHouse;
       state.query = agent;
       window.localStorage.setItem(AREA_KEY, 'crm');
-      updateAgentProfileUrl(agent);
+      updateAgentProfileUrl(agent, openHouse);
       renderShell();
       window.requestAnimationFrame(() => {
         document.getElementById('agent-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5521,15 +5657,17 @@ ${rowsHtml}
 
     function clearAgentProfile() {
       state.agentFocus = '';
+      state.openHouseFocus = '';
       state.query = '';
       updateAgentProfileUrl();
       renderShell();
     }
 
-    function adminAgentHref(row, area = 'crm') {
+    function adminAgentHref(row, area = 'crm', openHouse = '') {
       const query = new URLSearchParams({ area });
       const agent = agentLookupValue(row);
       if (agent) query.set('agent', agent);
+      if (area === 'crm' && openHouse) query.set('open_house', openHouse);
       return `/admin?${query.toString()}${area === 'crm' && agent ? '#agent-profile' : ''}`;
     }
 
@@ -5573,6 +5711,7 @@ ${rowsHtml}
       const linkedEvent = (state.command?.events || []).find((event) => event.id === row.open_house_event_id) || null;
       const linkedEventHost = linkedEvent?.host_agent_slug || row.agent_slug || '';
       const cancelKey = `cancel_visit:${row.id}`;
+      const agentHref = adminAgentHref(row, 'crm', row.open_house_id || '');
       return `
         <div>
           <div class="primary">${esc(visitAddress(row))}</div>
@@ -5582,6 +5721,7 @@ ${rowsHtml}
         <div>${badge(fmtDate(row.scheduled_start) || 'No time', 'info')}</div>
         <div>${badge(participantNames || 'No LO assigned', participantNames ? 'ok' : 'warn')}</div>
         <div class="row-actions">
+          ${agentLookupValue(row) ? `<a class="btn primary" href="${esc(agentHref)}"><i data-lucide="message-square-text"></i><span>Agent + message</span></a>` : ''}
           <select id="visit_lo_${domId(row.id)}" class="select" ${profiles.length ? '' : 'disabled'}>
             ${profiles.length ? profiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === (primary?.participant_uid || row.loan_officer_uid) ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
           </select>
@@ -5600,6 +5740,10 @@ ${rowsHtml}
       const profiles = activeLoanOfficers();
       const visits = filterByQuery(state.command?.field_visits || [])
         .filter((row) => !['cancelled', 'completed', 'converted'].includes(row.status || ''))
+        .filter((row) => {
+          const end = new Date(row.scheduled_end || row.scheduled_start || 0).getTime();
+          return Number.isFinite(end) && end >= Date.now();
+        })
         .sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
       const relationshipUpcomingMap = new Map();
       for (const agent of state.command?.crm || []) {
@@ -5632,6 +5776,7 @@ ${rowsHtml}
           return String(left.agent_name || '').localeCompare(String(right.agent_name || ''));
         });
       const openHouseFilters = state.futureOpenHouseFilters;
+      const visibleRelationshipUpcoming = relationshipUpcoming.slice(0, state.futureOpenHouseLimit);
 
       return `
         <div class="section-head">
@@ -5641,6 +5786,7 @@ ${rowsHtml}
           </div>
         </div>
         ${renderRows('Live events', `${liveEvents.length} currently active`, liveEvents, renderAdminEventRow)}
+        ${renderRows('Accepted open houses', `${visits.length} upcoming accepted or confirmed appointments — these are the authoritative scheduled visits`, visits, (row) => renderAcceptedOpenHouseRow(row, profiles))}
         <div class="glass-card" style="padding:18px;margin-bottom:18px;display:grid;gap:14px;">
           <div>
             <div class="primary">Find future open houses</div>
@@ -5665,23 +5811,23 @@ ${rowsHtml}
             <button class="btn soft" type="button" id="futureOpenHouseReset"><i data-lucide="rotate-ccw"></i><span>Clear filters</span></button>
           </div>
         </div>
-        ${renderRows('Upcoming from Agent Board', `${relationshipUpcoming.length} of ${allRelationshipUpcoming.length} future open houses, ranked by relationship and then date`, relationshipUpcoming, (row) => `
+        ${renderRows('Upcoming opportunities', `${relationshipUpcoming.length} of ${allRelationshipUpcoming.length} future listings match; showing ${visibleRelationshipUpcoming.length} for speed`, visibleRelationshipUpcoming, (row) => `
           <div>
             <div class="primary">${esc(row.address || 'Upcoming open house')}</div>
             <div class="secondary">${esc(fmtDate(row.open_start) || 'Time pending')}</div>
           </div>
           <div>
-            <a class="primary" href="${esc(adminAgentHref(row))}">${esc(row.agent_name || 'Unknown agent')}</a>
+            <a class="primary" href="${esc(adminAgentHref(row, 'crm', row.id || row.source_listing_id || ''))}">${esc(row.agent_name || 'Unknown agent')}</a>
             <div class="secondary">${esc([row.brokerage, fmtPhone(row.agent_phone), row.agent_email].filter(Boolean).join(' | '))}</div>
           </div>
           <div>${badge(row.relationship_label, row.relationship_tone)}${badge(row.source || 'relationship feed', 'info')}</div>
           <div>${row.price ? badge(money(row.price), 'ok') : badge('Price unavailable', 'info')}</div>
           <div class="row-actions">
-            <a class="btn primary" href="${esc(adminAgentHref(row, 'outreach'))}"><i data-lucide="messages-square"></i><span>Conversation</span></a>
+            <a class="btn primary" href="${esc(adminAgentHref(row, 'crm', row.id || row.source_listing_id || ''))}"><i data-lucide="message-square-text"></i><span>Agent + message</span></a>
             ${row.listing_url ? `<a class="btn soft" href="${esc(row.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Listing</span></a>` : ''}
           </div>
         `)}
-        ${renderRows('Scheduled open houses', `${visits.length} upcoming coverage appointments`, visits.slice(0, 100), (row) => renderAcceptedOpenHouseRow(row, profiles))}
+        ${visibleRelationshipUpcoming.length < relationshipUpcoming.length ? `<div class="row-actions" style="margin:16px 0 24px;"><button class="btn soft" id="futureOpenHouseShowMore"><i data-lucide="chevrons-down"></i><span>Show 60 more opportunities</span></button>${badge(`${visibleRelationshipUpcoming.length} of ${relationshipUpcoming.length}`, 'info')}</div>` : ''}
         ${renderRows('Recent event history', `${recentEvents.length} recently ended events`, recentEvents, renderAdminEventRow)}
       `;
     }

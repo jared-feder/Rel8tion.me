@@ -48,7 +48,12 @@ for (const required of [
   'futureOpenHouseTimeFrom',
   'futureOpenHouseTimeTo',
   'Accepted / worked with',
-  'Prior outreach'
+  'Prior outreach',
+  'Accepted open houses',
+  'Agent + message',
+  'Send SMS through REL8TION',
+  'futureOpenHouseShowMore',
+  'agentBoardShowMore'
 ]) {
   if (!adminSource.includes(required)) {
     throw new Error(`REL8TION admin UI is missing: ${required}`);

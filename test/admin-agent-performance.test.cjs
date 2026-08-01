@@ -58,6 +58,7 @@ test('Agent Board merges sources and keeps agents without messages or listings',
     listingInventory: [{
       id: 'inventory-1',
       source_listing_id: 'listing-1',
+      queue_row_id: 'queue-1',
       agent_id: 'agent-1',
       agent_name: 'Agent One',
       phone_normalized: '5165550100',
@@ -82,6 +83,7 @@ test('Agent Board merges sources and keeps agents without messages or listings',
   assert.equal(rows[0].outreach_threads.length, 1);
   assert.equal(rows[0].outreach_threads[0].latest_reply_body, '');
   assert.equal(rows[0].upcoming_open_houses.length, 1);
+  assert.equal(rows[0].upcoming_open_houses[0].queue_row_id, 'queue-1');
   assert.equal(rows[0].relationship_category, 'prior_outreach');
   assert.equal(rows[0].has_prior_outreach, true);
   assert.equal(rows[1].name, 'Agent Two');

@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: Unified open-house agent workflow and performance repair
+
+- `[IMPLEMENTED]` REL8TION COMMAND now places authoritative upcoming accepted/confirmed field visits directly below Live Events, ahead of general future opportunities.
+- `[IMPLEMENTED]` Clicking an agent or **Agent + message** from a future open house stays inside one focused Agent Performance profile with the selected property context, direct call/text/email actions, stored outreach context, and an in-profile REL8TION SMS composer when a queue thread exists.
+- `[IMPLEMENTED]` The unified profile includes complete confirmed outreach history in addition to the newest general outreach slice, restoring older verified agent photos and reply-capable queue rows such as Lovelee M. Vetri's.
+- `[IMPLEMENTED]` Open-house opportunities and the unfocused Agent Board render in bounded 60-row increments, and the full website editor is deferred until an individual agent is open. This avoids building hundreds or thousands of heavy cards in one browser frame.
+
 ## 2026-08-01: Relationship-prioritized future open houses
 
 - `[IMPLEMENTED]` REL8TION COMMAND's future Agent Board open houses can be searched by agent, brokerage, phone, email, or property address and filtered by relationship, date range, and local start-time range.
