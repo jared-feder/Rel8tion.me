@@ -22,6 +22,20 @@ type QueueRow = {
   created_at: string | null;
 };
 
+type ListingInventoryRow = {
+  id: string;
+  agent_name: string | null;
+  brokerage: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  open_start: string | null;
+  open_end: string | null;
+  image_url: string | null;
+  outreach_image_status: string | null;
+};
+
 function restHeaders() {
   return {
     "Content-Type": "application/json",
@@ -69,11 +83,11 @@ function parseIds(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function buildStoragePath(id: string): string {
+function buildStoragePath(id: string, collection = "agent-outreach"): string {
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `agent-outreach/${yyyy}/${mm}/${id}.jpg`;
+  return `${collection}/${yyyy}/${mm}/${id}.jpg`;
 }
 
 function publicObjectUrl(bucket: string, path: string): string {
@@ -98,6 +112,55 @@ async function patchQueueRow(id: string, payload: Record<string, unknown>) {
   }
 }
 
+async function patchListingInventoryRow(id: string, payload: Record<string, unknown>) {
+  const url = `${env.supabaseUrl}/rest/v1/agent_listing_inventory?id=eq.${encodeURIComponent(id)}`;
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      ...restHeaders(),
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const raw = await response.text().catch(() => "");
+    throw new Error(raw || `Failed updating listing inventory row ${id}`);
+  }
+}
+
+async function selectListingInventoryRows(limit: number): Promise<ListingInventoryRow[]> {
+  if (limit <= 0) return [];
+  const select = [
+    "id",
+    "agent_name",
+    "brokerage",
+    "address",
+    "city",
+    "state",
+    "zip",
+    "open_start",
+    "open_end",
+    "image_url",
+    "outreach_image_status"
+  ].join(",");
+  const now = encodeURIComponent(new Date().toISOString());
+  const url =
+    `${env.supabaseUrl}/rest/v1/agent_listing_inventory` +
+    `?select=${encodeURIComponent(select)}` +
+    `&is_current=eq.true` +
+    `&image_url=not.is.null` +
+    `&outreach_image_status=eq.pending` +
+    `&or=(open_end.gte.${now},and(open_end.is.null,open_start.gte.${now}))` +
+    `&order=open_start.asc.nullslast` +
+    `&limit=${limit}`;
+  const response = await fetch(url, { method: "GET", headers: restHeaders() });
+  const raw = await response.text();
+  if (!response.ok) throw new Error(raw || "Failed selecting listing inventory images");
+  return raw ? JSON.parse(raw) : [];
+}
+
 async function uploadMockup(bucket: string, path: string, bytes: Uint8Array) {
   const url = `${env.supabaseUrl}/storage/v1/object/${bucket}/${path}`;
 
@@ -109,7 +172,7 @@ async function uploadMockup(bucket: string, path: string, bytes: Uint8Array) {
       Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       "x-upsert": "true"
     },
-    body: bytes
+    body: bytes as any
   });
 
   if (!response.ok) {
@@ -154,6 +217,8 @@ export default async function handler(req: any, res: any) {
     const limit = parseLimit(req?.body?.limit);
     const force = Boolean(req?.body?.force);
     const ids = parseIds(req?.body?.ids);
+    const inventoryLimit = ids.length > 0 ? 0 : Math.max(1, Math.floor(limit * 0.75));
+    const queueLimit = ids.length > 0 ? limit : Math.max(1, limit - inventoryLimit);
 
     const select = [
       "id",
@@ -183,7 +248,7 @@ export default async function handler(req: any, res: any) {
       `&generation_status=eq.generated` +
       `&send_status=eq.not_sent` +
       `&order=created_at.asc` +
-      `&limit=${limit}`;
+      `&limit=${queueLimit}`;
 
     if (!force) {
       url += `&mockup_image_url=is.null`;
@@ -221,7 +286,18 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    if (!rows.length) {
+    let inventoryRows: ListingInventoryRow[] = [];
+    try {
+      inventoryRows = await selectListingInventoryRows(inventoryLimit);
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        stage: "select_listing_inventory_rows",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    if (!rows.length && !inventoryRows.length) {
       return res.status(200).json({
         ok: true,
         stage: "no_rows",
@@ -258,7 +334,65 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const results: Array<{ id: string; ok: boolean; mockup_image_url?: string; error?: string }> = [];
+    const results: Array<{
+      id: string;
+      source: "listing_inventory" | "outreach_queue";
+      ok: boolean;
+      mockup_image_url?: string;
+      outreach_image_url?: string;
+      error?: string;
+    }> = [];
+
+    for (const row of inventoryRows) {
+      try {
+        const jpg: Buffer = await renderMockupJpg({
+          agentName: row.agent_name,
+          brokerage: row.brokerage,
+          address: row.address,
+          cityStateZip: [row.city, row.state, row.zip].filter(Boolean).join(", "),
+          openStart: row.open_start,
+          openEnd: row.open_end,
+          propertyImageUrl: row.image_url,
+          agentPhotoUrl: null,
+          rel8tionUrl: `${baseUrl}/`
+        });
+
+        const path = buildStoragePath(row.id, "open-house-outreach");
+        await uploadMockup(bucket, path, jpg);
+        const publicUrl = publicObjectUrl(bucket, path);
+        const renderedAt = new Date().toISOString();
+        await patchListingInventoryRow(row.id, {
+          outreach_image_url: publicUrl,
+          outreach_image_status: "rendered",
+          outreach_image_rendered_at: renderedAt,
+          outreach_image_attempted_at: renderedAt,
+          outreach_image_error: null,
+          updated_at: renderedAt
+        });
+        results.push({
+          id: row.id,
+          source: "listing_inventory",
+          ok: true,
+          outreach_image_url: publicUrl
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown render error";
+        try {
+          await patchListingInventoryRow(row.id, {
+            outreach_image_status: "failed",
+            outreach_image_attempted_at: new Date().toISOString(),
+            outreach_image_error: message,
+            updated_at: new Date().toISOString()
+          });
+        } catch {}
+        results.push({
+          id: row.id,
+          source: "listing_inventory",
+          ok: false,
+          error: message
+        });
+      }
+    }
 
     for (const row of rows) {
       try {
@@ -291,6 +425,7 @@ export default async function handler(req: any, res: any) {
 
         results.push({
           id: row.id,
+          source: "outreach_queue",
           ok: true,
           mockup_image_url: publicUrl
         });
@@ -331,6 +466,7 @@ export default async function handler(req: any, res: any) {
 
         results.push({
           id: row.id,
+          source: "outreach_queue",
           ok: false,
           error: message
         });
@@ -341,6 +477,8 @@ export default async function handler(req: any, res: any) {
       ok: true,
       stage: "render_pipeline",
       processed: results.length,
+      listing_inventory_processed: inventoryRows.length,
+      outreach_queue_processed: rows.length,
       results
     });
   } catch (error) {

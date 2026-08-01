@@ -17,6 +17,30 @@ function normalizePhone(phone: string | null): string {
   return digits;
 }
 
+function normalizeIdentity(value: unknown): string {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function validOutreachMediaUrl(value: unknown, supabaseUrl: string): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const expected = new URL(supabaseUrl);
+    const allowedPath = "/storage/v1/object/public/agent-mockups/";
+    return url.protocol === "https:" && url.origin === expected.origin && url.pathname.startsWith(allowedPath)
+      ? url.toString()
+      : "";
+  } catch {
+    return "";
+  }
+}
+
 function toE164(phone: string | null): string {
   const normalized = normalizePhone(phone);
   if (!normalized) return "";
@@ -133,7 +157,9 @@ serve(async (req) => {
         agent_phone_normalized,
         brokerage,
         review_status,
-        send_mode
+        send_mode,
+        mockup_image_url,
+        mockup_status
       `)
       .eq("id", rowId)
       .maybeSingle();
@@ -151,6 +177,67 @@ serve(async (req) => {
         JSON.stringify({ ok: false, error: "Cannot send manual reply to opted-out contact" }, null, 2),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    const mediaSource = String(body.media_source || "").trim().toLowerCase();
+    const mediaId = String(body.media_id || "").trim();
+    let mediaUrl = "";
+
+    if (mediaSource || mediaId) {
+      if (!mediaSource || !mediaId) {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Both media source and media id are required" }, null, 2),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (mediaSource === "outreach_queue") {
+        if (mediaId !== row.id || row.mockup_status !== "rendered") {
+          return new Response(
+            JSON.stringify({ ok: false, error: "The selected queue image is not available for this conversation" }, null, 2),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        mediaUrl = validOutreachMediaUrl(row.mockup_image_url, supabaseUrl);
+      } else if (mediaSource === "listing_inventory") {
+        const { data: listing, error: listingError } = await supabase
+          .from("agent_listing_inventory")
+          .select("id,agent_name,brokerage,phone,phone_normalized,is_current,outreach_image_url,outreach_image_status")
+          .eq("id", mediaId)
+          .maybeSingle();
+        if (listingError) throw listingError;
+
+        const queuePhone = normalizePhone(row.agent_phone_normalized || row.agent_phone || "");
+        const listingPhone = normalizePhone(listing?.phone_normalized || listing?.phone || "");
+        const samePhone = Boolean(queuePhone && listingPhone && queuePhone === listingPhone);
+        const sameIdentity = normalizeIdentity(listing?.agent_name) === normalizeIdentity(row.agent_name)
+          && normalizeIdentity(listing?.brokerage) === normalizeIdentity(row.brokerage);
+        if (!listing?.is_current || listing.outreach_image_status !== "rendered" || (!samePhone && !sameIdentity)) {
+          return new Response(
+            JSON.stringify({ ok: false, error: "The selected property image is not available for this agent" }, null, 2),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        mediaUrl = validOutreachMediaUrl(listing.outreach_image_url, supabaseUrl);
+      } else {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Unsupported outreach image source" }, null, 2),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (!mediaUrl) {
+        return new Response(
+          JSON.stringify({ ok: false, error: "The selected outreach image URL is invalid" }, null, 2),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (providerOverrideRequested === "android_gateway") {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Photo messages require the Twilio outreach sender" }, null, 2),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     const { data: latestInbound, error: latestInboundError } = await supabase
@@ -177,13 +264,14 @@ serve(async (req) => {
       );
     }
 
-    const providerOverride = providerOverrideRequested || outreachProviderOverrideForRow(row);
+    const providerOverride = mediaUrl ? "twilio" : (providerOverrideRequested || outreachProviderOverrideForRow(row));
     const smsRes = await sendSMS({
       supabase,
       to,
       body: messageBody,
       category: "manual_outreach",
       providerOverride: providerOverride || undefined,
+      mediaUrls: mediaUrl ? [mediaUrl] : undefined,
       statusCallback: buildStatusCallbackUrl(supabaseUrl, row.id),
       metadata: {
         queue_row_id: row.id,
@@ -194,6 +282,9 @@ serve(async (req) => {
         step: "manual_reply",
         reply_to_recent_inbound: replyToRecentInbound,
         last_inbound_at: lastInboundAt,
+        media_source: mediaSource || null,
+        media_id: mediaId || null,
+        media_url: mediaUrl || null,
       },
     });
 
@@ -254,6 +345,8 @@ serve(async (req) => {
           agent_name: row.agent_name,
           sid: smsRes.externalId || smsRes.sid || null,
           provider: smsRes.provider,
+          media_attached: Boolean(mediaUrl),
+          media_url: mediaUrl || null,
           sent_at: sentAt,
         },
         null,

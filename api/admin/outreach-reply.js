@@ -29,6 +29,8 @@ module.exports = async function handler(req, res) {
     const body = readJsonBody(req);
     const id = String(body.id || '').trim();
     const messageBody = String(body.body || '').trim();
+    const mediaSource = String(body.media_source || '').trim().toLowerCase();
+    const mediaId = String(body.media_id || '').trim();
 
     if (!id) {
       sendJson(res, 400, { ok: false, error: 'Missing queue row id.' });
@@ -40,11 +42,18 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if ((mediaSource || mediaId) && (!['listing_inventory', 'outreach_queue'].includes(mediaSource) || !mediaId)) {
+      sendJson(res, 400, { ok: false, error: 'A valid outreach photo source and id are required.' });
+      return;
+    }
+
     const payload = await callSupabaseFunction('send-agent-manual-reply', {
       id,
       body: messageBody,
       provider_override: body.provider_override || body.provider || undefined,
-      campaign: body.campaign || undefined
+      campaign: body.campaign || undefined,
+      media_source: mediaSource || undefined,
+      media_id: mediaId || undefined
     });
 
     sendJson(res, 200, {

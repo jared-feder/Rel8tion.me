@@ -1575,6 +1575,7 @@
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
       drafts: readDrafts(),
+      replyPhotos: {},
       eventPassFreshenerResult: null,
       qrBatchType: 'agent'
     };
@@ -2681,10 +2682,27 @@ ${rowsHtml}
       if (count) count.textContent = `${value.length} characters`;
     }
 
-    async function sendReply(key) {
+    function toggleReplyPhoto(key, source, id) {
+      if (!key || !source || !id) return;
+      const current = state.replyPhotos[key];
+      if (current?.source === source && current?.id === id) {
+        delete state.replyPhotos[key];
+      } else {
+        state.replyPhotos[key] = { source, id };
+      }
+      render();
+    }
+
+    async function sendReply(key, displayedMediaSource = '', displayedMediaId = '') {
       const thread = findThread(key);
       const textarea = document.getElementById(`reply_${domId(key)}`);
       const messageBody = textarea?.value?.trim() || '';
+      const selectedPhoto = state.replyPhotos[key];
+      const includePhoto = Boolean(
+        selectedPhoto?.source && selectedPhoto?.id
+        && selectedPhoto.source === displayedMediaSource
+        && selectedPhoto.id === displayedMediaId
+      );
 
       if (!thread?.queue_row_id) {
         showToast('No queue row is linked to this thread.');
@@ -2698,7 +2716,7 @@ ${rowsHtml}
         showToast('Write the reply first.');
         return;
       }
-      if (!window.confirm(`Send this SMS to ${thread.agent_name || fmtPhone(thread.agent_phone) || 'this contact'}?`)) {
+      if (!window.confirm(`Send this ${includePhoto ? 'photo message' : 'SMS'} to ${thread.agent_name || fmtPhone(thread.agent_phone) || 'this contact'}?`)) {
         return;
       }
 
@@ -2711,13 +2729,16 @@ ${rowsHtml}
           method: 'POST',
           body: JSON.stringify({
             id: thread.queue_row_id,
-            body: messageBody
+            body: messageBody,
+            media_source: includePhoto ? selectedPhoto.source : undefined,
+            media_id: includePhoto ? selectedPhoto.id : undefined
           })
         });
         delete state.drafts[key];
+        delete state.replyPhotos[key];
         saveDrafts();
         state.sendingKey = '';
-        showToast('Reply sent.');
+        showToast(includePhoto ? 'Photo message sent.' : 'Reply sent.');
         await loadAll();
       } catch (error) {
         state.sendingKey = '';
@@ -4335,7 +4356,18 @@ ${rowsHtml}
         textarea.addEventListener('input', () => updateDraft(textarea.dataset.draftKey, textarea.value));
       });
       document.querySelectorAll('[data-send-key]').forEach((button) => {
-        button.addEventListener('click', () => sendReply(button.dataset.sendKey));
+        button.addEventListener('click', () => sendReply(
+          button.dataset.sendKey,
+          button.dataset.sendMediaSource || '',
+          button.dataset.sendMediaId || ''
+        ));
+      });
+      document.querySelectorAll('[data-toggle-reply-photo]').forEach((button) => {
+        button.addEventListener('click', () => toggleReplyPhoto(
+          button.dataset.toggleReplyPhoto,
+          button.dataset.mediaSource || '',
+          button.dataset.mediaId || ''
+        ));
       });
       document.querySelectorAll('[data-save-report-note]').forEach((button) => {
         button.addEventListener('click', () => saveReportNote(button.dataset.saveReportNote));
@@ -5194,6 +5226,12 @@ ${rowsHtml}
       const canSend = Boolean(thread?.queue_row_id && row.phone && !optedOut && state.sendingKey !== key);
       const smsPhone = String(row.phone || '').replace(/[^0-9+]/g, '');
       const preview = thread?.latest_reply_body || thread?.body || thread?.selected_sms || '';
+      const mediaSource = openHouse?.outreach_image_source || '';
+      const mediaId = String(openHouse?.outreach_image_id || '');
+      const mediaUrl = openHouse?.outreach_image_url || '';
+      const mediaReady = Boolean(mediaSource && mediaId && mediaUrl && openHouse?.outreach_image_status === 'rendered');
+      const selectedPhoto = state.replyPhotos[key];
+      const includePhoto = Boolean(mediaReady && selectedPhoto?.source === mediaSource && selectedPhoto?.id === mediaId);
       return `
         <section id="agent-message" class="glass-card" style="padding:18px;display:grid;gap:14px;outline:2px solid rgba(56,189,248,.38);">
           <div class="reply-footer">
@@ -5220,9 +5258,13 @@ ${rowsHtml}
             <div class="mini-panel reply-box">
               <div class="mini-title">Send SMS through REL8TION</div>
               <textarea id="reply_${domId(key)}" data-draft-key="${esc(key)}" ${canSend ? '' : 'disabled'} maxlength="1200" placeholder="${optedOut ? 'This agent opted out' : 'Write a message to this agent'}">${esc(draft)}</textarea>
+              ${includePhoto ? `<div style="display:flex;align-items:center;gap:10px;"><img src="${esc(mediaUrl)}" alt="Outreach photo for ${esc(openHouse?.address || 'this property')}" style="width:72px;height:72px;border-radius:12px;object-fit:cover;"><span class="secondary">This property photo will be attached as MMS.</span></div>` : ''}
               <div class="reply-footer">
-                <button class="btn primary" data-send-key="${esc(key)}" ${canSend ? '' : 'disabled'}>
+                <button class="btn primary" data-send-key="${esc(key)}" data-send-media-source="${esc(mediaSource)}" data-send-media-id="${esc(mediaId)}" ${canSend ? '' : 'disabled'}>
                   <i data-lucide="send"></i><span>${state.sendingKey === key ? 'Sending...' : 'Review + send SMS'}</span>
+                </button>
+                <button class="btn ${includePhoto ? 'primary' : 'soft'}" data-toggle-reply-photo="${esc(key)}" data-media-source="${esc(mediaSource)}" data-media-id="${esc(mediaId)}" ${canSend && mediaReady ? '' : 'disabled'}>
+                  <i data-lucide="image-plus"></i><span>${includePhoto ? 'Photo included' : (mediaReady ? 'Include photo' : 'Photo generating')}</span>
                 </button>
                 <span id="count_${domId(key)}" class="small">${draft.length} characters</span>
                 ${optedOut ? badge('Opted out — sending blocked', 'bad') : ''}

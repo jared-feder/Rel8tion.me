@@ -64,6 +64,8 @@ test('Agent Board merges sources and keeps agents without messages or listings',
       phone_normalized: '5165550100',
       brokerage: 'Example Realty',
       address: '12 Main St',
+      outreach_image_url: 'https://images.example.test/outreach-listing-1.jpg',
+      outreach_image_status: 'rendered',
       open_start: '2099-08-02T16:00:00Z',
       open_end: '2099-08-02T18:00:00Z',
       last_seen_at: '2099-07-31T12:30:00Z'
@@ -84,6 +86,9 @@ test('Agent Board merges sources and keeps agents without messages or listings',
   assert.equal(rows[0].outreach_threads[0].latest_reply_body, '');
   assert.equal(rows[0].upcoming_open_houses.length, 1);
   assert.equal(rows[0].upcoming_open_houses[0].queue_row_id, 'queue-1');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_url, 'https://images.example.test/outreach-listing-1.jpg');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_source, 'listing_inventory');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_id, 'inventory-1');
   assert.equal(rows[0].relationship_category, 'prior_outreach');
   assert.equal(rows[0].has_prior_outreach, true);
   assert.equal(rows[1].name, 'Agent Two');

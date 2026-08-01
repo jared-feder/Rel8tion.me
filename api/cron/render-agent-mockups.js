@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
     if (!sharedSecret) throw new Error('Missing CRON_SHARED_SECRET or CRON_SECRET.');
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
-    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 10), 50));
+    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 24), 50));
     const base = (process.env.RENDERER_BASE_URL || 'https://mockup-renderer-psi.vercel.app').replace(/\/$/, '');
     const response = await fetch(`${base}/api/render-agent-mockup`, {
       method: 'POST',

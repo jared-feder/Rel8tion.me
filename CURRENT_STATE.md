@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: Property-specific outreach photos in COMMAND
+
+- `[IMPLEMENTED]` Future `agent_listing_inventory` rows now carry their own generated outreach-image URL and render state. The existing mockup cron spends most of each batch on missing future-listing images while preserving capacity for the original outreach queue renderer.
+- `[IMPLEMENTED]` Listing photo, address, or open-house time changes reset that listing's image to pending so a prior property's graphic cannot be reused for a newer event. Failed renders are visible as failed instead of falling back to a generic or unrelated image.
+- `[IMPLEMENTED]` The focused Agent Performance SMS composer shows an opt-in **Include photo** control beside **Review + send SMS**. It is off by default, displays the selected property image before sending, and still requires the existing confirmation.
+- `[IMPLEMENTED]` Manual photo messages use the registered Twilio outreach route because Android Gateway is text-only. The server resolves the stored image by its source row, verifies that it belongs to the conversation agent, restricts media to REL8TION's public `agent-mockups` storage bucket, and retains suppression, STOP, and quiet-hour enforcement. Generating an image never queues, approves, or sends outreach.
+
 ## 2026-08-01: Unified open-house agent workflow and performance repair
 
 - `[IMPLEMENTED]` REL8TION COMMAND now places authoritative upcoming accepted/confirmed field visits directly below Live Events, ahead of general future opportunities.
