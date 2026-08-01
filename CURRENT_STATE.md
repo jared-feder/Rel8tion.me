@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: Durable buyer property experience
+
+- `[VERIFIED]` Buyer property media and the post-check-in **Explore This Property** action open `/l/:open_house_id` with the current event id preserved for return navigation.
+- `[VERIFIED]` The property page renders an expandable gallery plus stored description, property facts, features, host context, and verified listing access when available.
+- `[VERIFIED]` Production table `open_house_property_profiles` stores the durable sanitized property profile and private source snapshot. RLS is enabled; `anon` and `authenticated` have no direct table privileges, while the server-side service role manages refreshes.
+- `[VERIFIED]` Missing or stale OneKey-backed profiles are refreshed and upserted server-side, with safe fallback to `open_houses`. Production deployment `dpl_DjjJbPvob8vkJsyDh7SZZqPCnhaf` was verified against 23 3rd Ave, Farmingdale on 2026-08-01.
+
 ## 2026-07-31: Unified Agent Performance board
 
 - `[IMPLEMENTED]` REL8TION COMMAND Agent Performance now builds one additive agent-level read model across canonical agents, claimed keychains, rankings, outreach, inbound replies, leads, listing inventory, listing contacts, and upcoming open houses. Agents remain visible even when they have no messages or listings.
@@ -36,7 +43,6 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` REL8TION COMMAND now separates Open Houses from Signs. The Open Houses summary cards and workspace no longer route through or render sign inventory.
 - `[IMPLEMENTED]` The Open Houses workspace shows live events first, provides direct event-dashboard links, keeps recent ended events in a separate history section, and lists scheduled/confirmed coverage appointments with loan-officer assignment controls.
 - `[IMPLEMENTED]` Admins can cancel a scheduled open house after typing `CANCEL`. Cancellation preserves buyer, event, and outreach history; releases visit participants and linked availability blocks; returns accepted outreach to interested status; and ends any matching live event through the existing sign and loan-officer cleanup path.
-
 ## 2026-07-28: Read-only REL8TION Agent Ranking API token
 
 - `[IMPLEMENTED]` The Agent Ranking GET endpoint accepts a dedicated server-only `REL8TION_RANKING_TOKEN` through `x-rel8tion-ranking-token`, allowing REL8TION OS to read ranking records without receiving the broad reset/admin credential.

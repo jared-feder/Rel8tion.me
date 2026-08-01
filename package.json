@@ -6,6 +6,7 @@
     "test": "node tests/app-auth.test.cjs",
     "verify:app": "node scripts/verify-app-architecture.cjs",
     "verify:routes": "node scripts/verify-route-map.cjs",
+    "verify:property-experience": "node test/open-house-link.test.cjs",
     "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
     "verify:chip-qr-conversion": "node scripts/verify-chip-qr-conversion.cjs",
     "verify:agent-ranking-identity": "node scripts/verify-agent-ranking-identity.cjs",
