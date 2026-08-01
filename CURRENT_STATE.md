@@ -10,6 +10,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Listing photo, address, or open-house time changes reset that listing's image to pending so a prior property's graphic cannot be reused for a newer event. Failed renders are visible as failed instead of falling back to a generic or unrelated image.
 - `[IMPLEMENTED]` The focused Agent Performance SMS composer shows an opt-in **Include photo** control beside **Review + send SMS**. It is off by default, displays the selected property image before sending, and still requires the existing confirmation.
 - `[IMPLEMENTED]` Manual photo messages use the registered Twilio outreach route because Android Gateway is text-only. The server resolves the stored image by its source row, verifies that it belongs to the conversation agent, restricts media to REL8TION's public `agent-mockups` storage bucket, and retains suppression, STOP, and quiet-hour enforcement. Generating an image never queues, approves, or sends outreach.
+- `[VERIFIED]` Production main release `06129f7`, renderer deployment `dpl_FP4x2mYQGSUx5nFR2X8NwTjEJBU2`, and `send-agent-manual-reply` version 57 are live. The first two scheduled passes rendered 55 future-listing JPGs with zero failures; Lovelee M. Vetri's 806 Mount Ave listing received its own 200/`image/jpeg` asset. COMMAND loaded without a browser error overlay or console errors and contained the deployed photo-control/payload code. No SMS was sent during verification.
 
 ## 2026-08-01: Unified open-house agent workflow and performance repair
 
