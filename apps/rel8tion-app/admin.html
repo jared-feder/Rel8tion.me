@@ -3569,6 +3569,18 @@ ${rowsHtml}
       }
     }
 
+    function cancelAcceptedOutreachOpenHouse(queueRowId) {
+      const key = queueThreadKey({ id: queueRowId });
+      const thread = findThread(key);
+      if (!thread?.queue_row_id) {
+        showToast('The accepted outreach record was not found.');
+        return;
+      }
+      const address = thread.address || thread.property_address || 'this open house';
+      if (!window.confirm(`Cancel the accepted open house at ${address}?\n\nThis removes the accepted/confirmed status from your schedule. The listing and conversation history stay saved, and no message is sent.`)) return;
+      runOutreachAction(key, 'mark_interested', {}, 'Accepted open house cancelled. Listing and conversation history were preserved.');
+    }
+
     function setEventPassScannerStatus(message, tone = '') {
       const status = document.getElementById('eventPassScannerStatus');
       if (!status) return;
@@ -4533,6 +4545,9 @@ ${rowsHtml}
       });
       document.querySelectorAll('[data-cancel-open-house]').forEach((button) => {
         button.addEventListener('click', () => cancelOpenHouse(button.dataset.cancelOpenHouse));
+      });
+      document.querySelectorAll('[data-cancel-accepted-outreach]').forEach((button) => {
+        button.addEventListener('click', () => cancelAcceptedOutreachOpenHouse(button.dataset.cancelAcceptedOutreach));
       });
       document.querySelectorAll('[data-detach-sign]').forEach((button) => {
         button.addEventListener('click', () => detachSign(button.dataset.detachSign));
@@ -5883,11 +5898,44 @@ ${rowsHtml}
       }) || null;
     }
 
+    function acceptedOutreachForOpenHouse(row) {
+      if (!row) return null;
+      const acceptedStatuses = new Set(['accepted_open_house', 'confirmed_open_house']);
+      const openHouseIds = new Set([
+        row.open_house_id,
+        row.id,
+        row.source_listing_id
+      ].filter(Boolean).map(String));
+      const queueIds = new Set([
+        row.outreach_queue_id,
+        row.queue_row_id,
+        acceptedStatuses.has(row.review_status) ? row.id : ''
+      ].filter(Boolean).map(String));
+      const directQueueId = row.queue_row_id || row.outreach_queue_id || (acceptedStatuses.has(row.review_status) ? row.id : '');
+      const directEnd = new Date(row.open_end || row.scheduled_end || row.confirmed_coverage_end || row.listed_open_end || row.open_start || 0).getTime();
+      if (directQueueId && acceptedStatuses.has(row.review_status) && (!Number.isFinite(directEnd) || directEnd >= Date.now())) {
+        return { ...row, queue_row_id: directQueueId };
+      }
+      return (state.command?.confirmed_open_houses || []).find((report) => {
+        if (!acceptedStatuses.has(report.review_status)) return false;
+        const reportEnd = new Date(report.confirmed_coverage_end || report.scheduled_end || report.listed_open_end || report.confirmed_coverage_start || report.scheduled_start || report.listed_open_start || 0).getTime();
+        if (Number.isFinite(reportEnd) && reportEnd < Date.now()) return false;
+        if (report.queue_row_id && queueIds.has(String(report.queue_row_id))) return true;
+        return Boolean(report.open_house_id && openHouseIds.has(String(report.open_house_id)));
+      }) || null;
+    }
+
     function renderCancelOpenHouseButton(row, label = 'Cancel open house') {
       const visit = activeVisitForOpenHouse(row);
-      if (!visit?.id) return '';
-      const cancelKey = `cancel_visit:${visit.id}`;
-      return `<button class="btn bad" data-cancel-open-house="${esc(visit.id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : esc(label)}</span></button>`;
+      if (visit?.id) {
+        const cancelKey = `cancel_visit:${visit.id}`;
+        return `<button class="btn bad" data-cancel-open-house="${esc(visit.id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : esc(label)}</span></button>`;
+      }
+      const outreach = acceptedOutreachForOpenHouse(row);
+      if (!outreach?.queue_row_id) return '';
+      const key = queueThreadKey({ id: outreach.queue_row_id });
+      const cancelKey = actionId('mark_interested', key);
+      return `<button class="btn bad" data-cancel-accepted-outreach="${esc(outreach.queue_row_id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : esc(label)}</span></button>`;
     }
 
     function renderAcceptedOpenHouseRow(row, profiles) {

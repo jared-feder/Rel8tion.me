@@ -62,6 +62,9 @@ test('accepted open houses expose cancellation in focused and opportunity views'
   assert.match(functionSource('renderAgentBoardCard'), /renderCancelOpenHouseButton\(nextOpenHouse/);
   assert.match(functionSource('renderEvents'), /renderCancelOpenHouseButton\(row, 'Cancel accepted open house'\)/);
   assert.match(functionSource('renderCancelOpenHouseButton'), /data-cancel-open-house/);
+  assert.match(functionSource('renderCancelOpenHouseButton'), /data-cancel-accepted-outreach/);
+  assert.match(functionSource('acceptedOutreachForOpenHouse'), /state\.command\?\.confirmed_open_houses/);
+  assert.match(functionSource('cancelAcceptedOutreachOpenHouse'), /'mark_interested'/);
 });
 
 test('agent and future-open-house indexes are built once per data refresh', () => {
