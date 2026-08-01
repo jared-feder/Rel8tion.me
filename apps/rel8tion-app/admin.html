@@ -1522,6 +1522,7 @@
       lockStep: 'credentials',
       loading: false,
       liveRefreshing: false,
+      relationshipsLoading: false,
       sendingKey: '',
       actionKey: '',
       error: '',
@@ -1531,6 +1532,7 @@
       openHouseFocus: '',
       agentBoardLimit: 60,
       futureOpenHouseLimit: 60,
+      agentDetailLimits: { threads: 20, upcoming: 20, listings: 20 },
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
@@ -2437,23 +2439,22 @@
         restoreUiState(uiSnapshot);
       }
       try {
-        const [dashboard, inbox, health, relationships] = await Promise.all([
+        const [dashboard, inbox, health] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
           api('/api/admin/outreach-inbox?limit=600'),
-          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
-          api('/api/admin/agent-relationships?limit=1000').catch((error) => ({ ok: false, error: error.message, agents: [] }))
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
         ]);
         state.command = dashboard.ok === false ? null : dashboard;
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
-        state.relationships = relationships.agents || [];
         rebuildCommandIndexes();
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
         render();
         restoreUiState(restoreSnapshot);
+        refreshRelationshipsInBackground().catch(() => null);
       } catch (error) {
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -2463,23 +2464,34 @@
       }
     }
 
+    async function refreshRelationshipsInBackground() {
+      if (!state.verified || state.relationshipsLoading) return;
+      state.relationshipsLoading = true;
+      try {
+        const relationships = await api('/api/admin/agent-relationships?view=summary&limit=1000');
+        state.relationships = relationships.agents || state.relationships;
+        rebuildCommandIndexes();
+      } catch (_) {
+        // The dashboard projection remains usable while relationship details retry on explicit Refresh.
+      } finally {
+        state.relationshipsLoading = false;
+      }
+    }
+
     async function refreshLiveData() {
       if (!state.verified || state.loading || state.liveRefreshing || document.visibilityState !== 'visible') return;
       if (state.sendingKey || state.actionKey || state.coveragePickerKey || isCommandEditing()) return;
       state.liveRefreshing = true;
       try {
-        const [inbox, health, relationships] = await Promise.all([
+        const [inbox, health] = await Promise.all([
           api('/api/admin/outreach-inbox?limit=600'),
-          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
-          api('/api/admin/agent-relationships?limit=1000').catch((error) => ({ ok: false, error: error.message, agents: [] }))
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
         ]);
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
-        state.relationships = relationships.agents || state.relationships;
         state.loadedAt = inbox.loaded_at || new Date().toISOString();
-        rebuildCommandIndexes();
-        if (['outreach', 'crm', 'events'].includes(state.area)) refreshAreaContent();
+        if (state.area === 'outreach') refreshAreaContent();
       } catch (_) {
         // Keep the last good dashboard snapshot; the manual Refresh button remains available.
       } finally {
@@ -4395,6 +4407,14 @@ ${rowsHtml}
         state.agentBoardLimit += 60;
         refreshAreaContent();
       });
+      document.querySelectorAll('[data-agent-detail-more]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const section = button.dataset.agentDetailMore;
+          if (!Object.prototype.hasOwnProperty.call(state.agentDetailLimits, section)) return;
+          state.agentDetailLimits[section] += 20;
+          refreshAreaContent();
+        });
+      });
       document.getElementById('futureOpenHouseShowMore')?.addEventListener('click', () => {
         state.futureOpenHouseLimit += 60;
         refreshAreaContent();
@@ -5232,6 +5252,7 @@ ${rowsHtml}
             <button class="btn primary" data-accept-open-house="${esc(key)}" ${acceptDisabled ? 'disabled' : ''}>
               <i data-lucide="calendar-check"></i><span>${acceptBusy ? 'Saving...' : accepted ? (profiles.length ? 'Reassign LO' : 'Accepted OH') : profiles.length ? 'Accept + assign LO' : 'Accept open house'}</span>
             </button>
+            ${renderCancelOpenHouseButton(thread, 'Cancel accepted open house')}
           </div>
           <div class="drip-grid">
             <textarea id="drip_${domId(key)}" ${dripDisabled ? 'disabled' : ''} maxlength="1200">${esc(dripText)}</textarea>
@@ -5375,6 +5396,9 @@ ${rowsHtml}
       const upcoming = Array.isArray(row.upcoming_open_houses) ? row.upcoming_open_houses : [];
       const listings = Array.isArray(row.listings) ? row.listings : [];
       const threads = Array.isArray(row.outreach_threads) ? row.outreach_threads : [];
+      const visibleThreads = focused ? threads.slice(0, state.agentDetailLimits.threads) : threads;
+      const visibleUpcoming = focused ? upcoming.slice(0, state.agentDetailLimits.upcoming) : upcoming;
+      const visibleListings = focused ? listings.slice(0, state.agentDetailLimits.listings) : listings;
       const nextOpenHouse = upcoming.find((openHouse) => [openHouse.id, openHouse.source_listing_id].filter(Boolean).includes(state.openHouseFocus)) || upcoming[0] || null;
       const profileHref = rankingProfileHref(row);
       const relationshipGroup = agentRelationshipGroup(row);
@@ -5413,6 +5437,7 @@ ${rowsHtml}
               <div class="mini-title">Next open house</div>
               <div class="primary" style="margin-top:6px;">${esc(nextOpenHouse?.address || 'No future event currently tagged')}</div>
               <div class="secondary">${nextOpenHouse ? esc(fmtDate(nextOpenHouse.open_start)) : 'Upcoming events will appear here automatically.'}</div>
+              ${nextOpenHouse ? `<div class="row-actions" style="margin-top:10px;">${renderCancelOpenHouseButton(nextOpenHouse, 'Cancel accepted open house')}</div>` : ''}
             </div>
             <div class="mini-panel">
               <div class="mini-title">Latest outreach or reply</div>
@@ -5424,37 +5449,43 @@ ${rowsHtml}
             <details class="mini-panel"${focused ? ' open' : ''}>
               <summary class="primary">All outreach and conversation threads (${threads.length})</summary>
               <div class="rows" style="margin-top:10px;">
-                ${threads.length ? threads.map((thread) => `
+                ${visibleThreads.length ? visibleThreads.map((thread) => `
                   <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
                     <div class="primary">${esc(thread.address || 'General agent conversation')}</div>
                     <div class="secondary">${esc([thread.review_status, fmtDate(thread.latest_reply_at || thread.sent_at), thread.reply_count ? `${thread.reply_count} messages` : ''].filter(Boolean).join(' | '))}</div>
                     <div class="copy-body">${esc(thread.latest_reply_body || thread.body || 'No stored message preview.')}</div>
                   </div>
                 `).join('') : '<div class="secondary" style="margin-top:8px;">No outreach threads.</div>'}
+                ${focused && visibleThreads.length < threads.length ? `<button class="btn soft" type="button" data-agent-detail-more="threads"><i data-lucide="chevrons-down"></i><span>Show 20 more conversations</span></button>` : ''}
               </div>
             </details>
             <details class="mini-panel"${upcoming.length || focused ? ' open' : ''}>
               <summary class="primary">All upcoming open houses (${upcoming.length})</summary>
               <div class="rows" style="margin-top:10px;">
-                ${upcoming.length ? upcoming.map((openHouse) => `
+                ${visibleUpcoming.length ? visibleUpcoming.map((openHouse) => `
                   <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
                     <div class="primary">${esc(openHouse.address || 'Upcoming open house')}</div>
                     <div class="secondary">${esc([fmtDate(openHouse.open_start), openHouse.price ? money(openHouse.price) : '', openHouse.source].filter(Boolean).join(' | '))}</div>
-                    ${openHouse.listing_url ? `<a class="btn soft" style="margin-top:8px;" href="${esc(openHouse.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+                    <div class="row-actions" style="margin-top:8px;">
+                      ${openHouse.listing_url ? `<a class="btn soft" href="${esc(openHouse.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
+                      ${renderCancelOpenHouseButton(openHouse, 'Cancel accepted open house')}
+                    </div>
                   </div>
                 `).join('') : '<div class="secondary" style="margin-top:8px;">No upcoming open houses.</div>'}
+                ${focused && visibleUpcoming.length < upcoming.length ? `<button class="btn soft" type="button" data-agent-detail-more="upcoming"><i data-lucide="chevrons-down"></i><span>Show 20 more open houses</span></button>` : ''}
               </div>
             </details>
             <details class="mini-panel"${focused ? ' open' : ''}>
               <summary class="primary">All known listings (${listings.length})</summary>
               <div class="rows" style="margin-top:10px;">
-                ${listings.length ? listings.map((listing) => `
+                ${visibleListings.length ? visibleListings.map((listing) => `
                   <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);">
                     <div class="primary">${esc(listing.address || 'Listing')}</div>
                     <div class="secondary">${esc([listing.status, listing.price ? money(listing.price) : '', fmtDate(listing.last_seen_at)].filter(Boolean).join(' | '))}</div>
                     ${listing.listing_url ? `<a class="btn soft" style="margin-top:8px;" href="${esc(listing.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open listing</span></a>` : ''}
                   </div>
                 `).join('') : '<div class="secondary" style="margin-top:8px;">No known listings.</div>'}
+                ${focused && visibleListings.length < listings.length ? `<button class="btn soft" type="button" data-agent-detail-more="listings"><i data-lucide="chevrons-down"></i><span>Show 20 more listings</span></button>` : ''}
               </div>
             </details>
           </div>
@@ -5770,6 +5801,7 @@ ${rowsHtml}
       state.area = 'crm';
       state.agentFocus = agent;
       state.openHouseFocus = openHouse;
+      state.agentDetailLimits = { threads: 20, upcoming: 20, listings: 20 };
       state.query = agent;
       window.localStorage.setItem(AREA_KEY, 'crm');
       updateAgentProfileUrl(agent, openHouse);
@@ -5830,6 +5862,34 @@ ${rowsHtml}
       `;
     }
 
+    function activeVisitForOpenHouse(row) {
+      if (!row) return null;
+      const openHouseIds = new Set([
+        row.open_house_id,
+        row.id,
+        row.source_listing_id
+      ].filter(Boolean).map(String));
+      const queueIds = new Set([
+        row.outreach_queue_id,
+        row.queue_row_id
+      ].filter(Boolean).map(String));
+      return (state.command?.field_visits || []).find((visit) => {
+        if (['cancelled', 'completed', 'converted'].includes(visit.status || '')) return false;
+        const visitEnd = new Date(visit.scheduled_end || visit.scheduled_start || 0).getTime();
+        if (Number.isFinite(visitEnd) && visitEnd < Date.now()) return false;
+        if (String(visit.id || '') === String(row.id || '')) return true;
+        if (visit.open_house_id && openHouseIds.has(String(visit.open_house_id))) return true;
+        return Boolean(visit.outreach_queue_id && queueIds.has(String(visit.outreach_queue_id)));
+      }) || null;
+    }
+
+    function renderCancelOpenHouseButton(row, label = 'Cancel open house') {
+      const visit = activeVisitForOpenHouse(row);
+      if (!visit?.id) return '';
+      const cancelKey = `cancel_visit:${visit.id}`;
+      return `<button class="btn bad" data-cancel-open-house="${esc(visit.id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : esc(label)}</span></button>`;
+    }
+
     function renderAcceptedOpenHouseRow(row, profiles) {
       const participants = Array.isArray(row.participants) ? row.participants : [];
       const primary = participants.find((item) => item.is_primary) || participants[0] || null;
@@ -5854,7 +5914,7 @@ ${rowsHtml}
           <button class="btn primary" data-assign-visit-lo="${esc(row.id)}" ${profiles.length && state.actionKey !== `assign_visit:${row.id}` && state.actionKey !== cancelKey ? '' : 'disabled'}><i data-lucide="user-check"></i><span>${state.actionKey === `assign_visit:${row.id}` ? 'Assigning...' : primary?.participant_uid ? 'Reassign LO' : 'Assign LO'}</span></button>
           ${row.open_house_event_id && linkedEventHost ? `<a class="btn soft" href="${esc(eventDashboardHref({ id: row.open_house_event_id, host_agent_slug: linkedEventHost }))}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Open event</span></a>` : ''}
           ${primary?.participant_uid ? `<a class="btn soft" href="/lo-field-dashboard?uid=${esc(primary.participant_uid)}" target="_blank" rel="noopener"><i data-lucide="user-round"></i><span>LO view</span></a>` : ''}
-          <button class="btn bad" data-cancel-open-house="${esc(row.id)}" ${state.actionKey === cancelKey ? 'disabled' : ''}><i data-lucide="calendar-x"></i><span>${state.actionKey === cancelKey ? 'Cancelling...' : 'Cancel open house'}</span></button>
+          ${renderCancelOpenHouseButton(row)}
         </div>
       `;
     }
@@ -5931,6 +5991,7 @@ ${rowsHtml}
           <div class="row-actions">
             <a class="btn primary" href="${esc(adminAgentHref(row, 'crm', row.id || row.source_listing_id || ''))}"><i data-lucide="message-square-text"></i><span>Agent + message</span></a>
             ${row.listing_url ? `<a class="btn soft" href="${esc(row.listing_url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Listing</span></a>` : ''}
+            ${renderCancelOpenHouseButton(row, 'Cancel accepted open house')}
           </div>
         `)}
         ${visibleRelationshipUpcoming.length < relationshipUpcoming.length ? `<div class="row-actions" style="margin:16px 0 24px;"><button class="btn soft" id="futureOpenHouseShowMore"><i data-lucide="chevrons-down"></i><span>Show 60 more opportunities</span></button>${badge(`${visibleRelationshipUpcoming.length} of ${relationshipUpcoming.length}`, 'info')}</div>` : ''}

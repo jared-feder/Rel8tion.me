@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'apps', 'rel8tion-app', 'admin.html'), 'utf8');
+const relationshipApiSource = fs.readFileSync(path.join(__dirname, '..', 'api', 'admin', 'agent-relationships.js'), 'utf8');
 
 function functionSource(name) {
   const syncStart = source.indexOf(`    function ${name}(`);
@@ -35,10 +36,32 @@ test('background refresh avoids the multi-megabyte dashboard bundle', () => {
   const body = functionSource('refreshLiveData');
   assert.match(body, /outreach-inbox/);
   assert.match(body, /outreach-health/);
-  assert.match(body, /agent-relationships/);
+  assert.doesNotMatch(body, /agent-relationships/);
   assert.doesNotMatch(body, /api\('\/api\/admin\/dashboard/);
   assert.match(body, /document\.visibilityState !== 'visible'/);
   assert.match(source, /window\.setInterval\(\(\) => \{\s*refreshLiveData\(\)/);
+});
+
+test('relationship hydration is deferred and uses the summary projection', () => {
+  const body = functionSource('refreshRelationshipsInBackground');
+  assert.match(body, /agent-relationships\?view=summary&limit=1000/);
+  assert.doesNotMatch(functionSource('loadAll'), /agent-relationships/);
+  assert.match(relationshipApiSource, /summaryOnly \? boardRows : attachFollowUpConversations\(boardRows\)/);
+  assert.match(relationshipApiSource, /agent_board_v1_summary/);
+});
+
+test('focused agent details are bounded and can be expanded incrementally', () => {
+  const body = functionSource('renderAgentBoardCard');
+  assert.match(body, /threads\.slice\(0, state\.agentDetailLimits\.threads\)/);
+  assert.match(body, /upcoming\.slice\(0, state\.agentDetailLimits\.upcoming\)/);
+  assert.match(body, /listings\.slice\(0, state\.agentDetailLimits\.listings\)/);
+  assert.match(source, /data-agent-detail-more/);
+});
+
+test('accepted open houses expose cancellation in focused and opportunity views', () => {
+  assert.match(functionSource('renderAgentBoardCard'), /renderCancelOpenHouseButton\(nextOpenHouse/);
+  assert.match(functionSource('renderEvents'), /renderCancelOpenHouseButton\(row, 'Cancel accepted open house'\)/);
+  assert.match(functionSource('renderCancelOpenHouseButton'), /data-cancel-open-house/);
 });
 
 test('agent and future-open-house indexes are built once per data refresh', () => {

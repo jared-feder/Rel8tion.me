@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: COMMAND focused-profile speed and visible cancellation
+
+- `[IMPLEMENTED]` Focused Agent Performance profiles initially render at most 20 conversations, upcoming open houses, and listings per section, with incremental **Show 20 more** controls. This prevents high-volume agents from constructing their complete history on the click that opens the profile.
+- `[IMPLEMENTED]` Initial COMMAND loading no longer waits for the 1,000-agent relationship board. Relationship hydration runs after first paint through a summary projection, and recurring live refresh updates only the Outreach inbox and health data instead of reloading relationships or repainting Agent Performance/Open Houses.
+- `[VERIFIED]` The production `agent_board_v1` schema supports the summary projection. Across 1,000 current rows its database JSON size is about 450 KB versus 885 KB for the full projection before the summary path also skips follow-up conversation expansion.
+- `[IMPLEMENTED]` A linked active `field_demo_visits` appointment now exposes **Cancel accepted open house** from the focused agent page, the agent's upcoming-open-house list, the outreach workflow, and the future-opportunity card, while the authoritative Accepted Open Houses row keeps its existing control. Raw MLS/open-house feed records without a REL8TION visit are not made destructive.
+- `[NEEDS VERIFICATION]` Production deployment and live authenticated COMMAND behavior remain to be verified.
+
 ## 2026-08-01: REL8TION COMMAND navigation performance repair
 
 - `[IMPLEMENTED]` COMMAND area changes, Agent Performance drill-down, Open House agent links, and **Back to all agents** now update only the active workspace instead of rebuilding the full dashboard shell or requesting `/admin` again.

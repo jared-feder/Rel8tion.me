@@ -302,14 +302,18 @@ async function attachFollowUpConversations(rows) {
   });
 }
 
-async function loadBoard(limitValue) {
+async function loadBoard(limitValue, options = {}) {
   const requestedLimit = Math.max(1, Math.min(Number(limitValue) || 1000, 5000));
   const fetchLimit = 5000;
   const pageSize = 1000;
+  const summaryOnly = options.summary === true;
+  const boardSelect = summaryOnly
+    ? 'id,canonical_key,agent_source_id,agent_slug,name,phone,phone_normalized,email,company,pinned,priority_rank,confirmed_open_houses,worked_with_agent,relationship_sources'
+    : '*';
   const rows = [];
   while (rows.length < fetchLimit) {
     const page = await supabaseRest(
-      `agent_board_v1?select=*&order=pinned.desc,priority_rank.asc.nullslast,confirmed_open_houses.desc,last_contact_at.desc.nullslast,name.asc&limit=${pageSize}&offset=${rows.length}`
+      `agent_board_v1?select=${boardSelect}&order=pinned.desc,priority_rank.asc.nullslast,confirmed_open_houses.desc,last_contact_at.desc.nullslast,name.asc&limit=${pageSize}&offset=${rows.length}`
     );
     if (!Array.isArray(page) || page.length === 0) break;
     rows.push(...page);
@@ -366,7 +370,7 @@ async function loadBoard(limitValue) {
     || Number(Boolean(right.follow_up_marked)) - Number(Boolean(left.follow_up_marked))
     || left._source_order - right._source_order
   )).slice(0, requestedLimit).map(({ _source_order, ...row }) => row);
-  return attachFollowUpConversations(boardRows);
+  return summaryOnly ? boardRows : attachFollowUpConversations(boardRows);
 }
 
 async function loadScheduledOpenHouses(fromValue, toValue) {
@@ -605,10 +609,11 @@ module.exports = async function handler(req, res) {
         });
         return;
       }
-      const agents = await loadBoard(req.query?.limit);
+      const summaryOnly = clean(req.query?.view, 40).toLowerCase() === 'summary';
+      const agents = await loadBoard(req.query?.limit, { summary: summaryOnly });
       sendJson(res, 200, {
         ok: true,
-        source: 'agent_board_v1',
+        source: summaryOnly ? 'agent_board_v1_summary' : 'agent_board_v1',
         agents,
         updated_at: new Date().toISOString()
       });
