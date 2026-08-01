@@ -7,6 +7,9 @@
     },
     "api/cron/sync-agent-listing-inventory.js": {
       "maxDuration": 300
+    },
+    "api/cron/enrich-property-profiles.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -37,6 +40,10 @@
     {
       "path": "/api/cron/enrich-agent-headshots",
       "schedule": "17 */6 * * *"
+    },
+    {
+      "path": "/api/cron/enrich-property-profiles",
+      "schedule": "41 */3 * * *"
     },
     {
       "path": "/api/cron/weekly-production-report",

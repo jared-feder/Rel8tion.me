@@ -2,7 +2,7 @@ const { sendJson, supabaseRest } = require('../lib/admin-auth');
 
 const ONEKEY_PROPERTY_IMAGES_URL = 'https://www.onekeymls.com/api/property-images';
 const ONEKEY_SEARCH_URL = 'https://www.onekeymls.com/api/search';
-const MAX_PROPERTY_IMAGES = 40;
+const MAX_PROPERTY_IMAGES = 50;
 const PROPERTY_PROFILE_STALE_MS = 6 * 60 * 60 * 1000;
 
 function first(rows) {
@@ -72,6 +72,47 @@ function uniqueExternalUrls(values) {
       return true;
     })
     .slice(0, MAX_PROPERTY_IMAGES);
+}
+
+function collectDeepValues(value, keyPattern, depth = 0, output = []) {
+  if (depth > 8 || value == null || output.length >= 80) return output;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectDeepValues(item, keyPattern, depth + 1, output));
+    return output;
+  }
+  if (typeof value !== 'object') return output;
+  for (const [key, child] of Object.entries(value)) {
+    if (keyPattern.test(key)) {
+      if (Array.isArray(child)) output.push(...child.filter((item) => typeof item === 'string'));
+      else if (typeof child === 'string' || typeof child === 'number') output.push(String(child));
+    }
+    collectDeepValues(child, keyPattern, depth + 1, output);
+  }
+  return output;
+}
+
+function oneKeyImageIdentifiers(house, record = null) {
+  const recordIds = collectDeepValues(
+    record,
+    /^(?:uniqueListingId|listingId|listingKey|listingKeyNumeric|bupi|businessPropertyId|universalPropertyId|propertyId)$/i
+  );
+  const imagePathId = String(house?.image || '').match(/\/property\/([^/]+)\//i)?.[1] || '';
+  return [...new Set([
+    house?.id,
+    record?.UniqueListingId,
+    record?.Listing?.ListingId,
+    record?.Listing?.ListingKey,
+    imagePathId,
+    ...recordIds
+  ].map((value) => String(value || '').trim()).filter((value) => /^[a-z0-9_.:-]{3,160}$/i.test(value)))].slice(0, 12);
+}
+
+function collectDeepImageUrls(value) {
+  const candidates = collectDeepValues(
+    value,
+    /(?:mediaurl|imageurl|photo(?:url)?|thumbnail(?:url)?|images?(?:hero)?)/i
+  );
+  return uniqueExternalUrls(candidates.filter((url) => /\.(?:avif|gif|jpe?g|png|webp)(?:\?|$)/i.test(String(url))));
 }
 
 function numberOrNull(value) {
@@ -166,32 +207,37 @@ function propertyImages(house, enrichedImages = []) {
   ]);
 }
 
-async function loadOneKeyPropertyImages(house) {
-  const listingId = String(house?.id || '').trim();
-  if (!oneKeyListing(house) || !/^[a-z0-9_.:-]+$/i.test(listingId)) return [];
+async function loadOneKeyPropertyImages(house, record = null) {
+  const listingIds = oneKeyImageIdentifiers(house, record);
+  if (!oneKeyListing(house) || !listingIds.length) return collectDeepImageUrls(record);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4500);
+  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
-    const response = await fetch(`${ONEKEY_PROPERTY_IMAGES_URL}?uniqueListingId=${encodeURIComponent(listingId)}`, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; Rel8tionPropertyExperience/1.0)'
-      },
-      signal: controller.signal
-    });
-    if (!response.ok) return [];
-    const payload = await response.json().catch(() => null);
-    return uniqueExternalUrls(payload?.Results?.[listingId]?.Images || []);
+    const payloads = await Promise.all(listingIds.map(async (listingId) => {
+      const response = await fetch(`${ONEKEY_PROPERTY_IMAGES_URL}?uniqueListingId=${encodeURIComponent(listingId)}`, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; Rel8tionPropertyExperience/1.1)'
+        },
+        signal: controller.signal
+      });
+      if (!response.ok) return null;
+      return response.json().catch(() => null);
+    }));
+    return uniqueExternalUrls([
+      ...collectDeepImageUrls(record),
+      ...payloads.flatMap((payload) => Object.values(payload?.Results || {}).flatMap((result) => result?.Images || []))
+    ]);
   } catch {
-    return [];
+    return collectDeepImageUrls(record);
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function loadPropertyImages(house) {
-  const enriched = await loadOneKeyPropertyImages(house);
+async function loadPropertyImages(house, record = null) {
+  const enriched = await loadOneKeyPropertyImages(house, record);
   return propertyImages(house, enriched);
 }
 
@@ -226,7 +272,7 @@ async function loadOneKeyRecord(house) {
   let addressMatch = null;
 
   try {
-    for (const offset of [0, 100, 200, 300, 400]) {
+    for (const offset of [0, 300, 600, 900, 1200]) {
       const url = `${ONEKEY_SEARCH_URL}?topLeft=${encodeURIComponent(topLeft)}&bottomRight=${encodeURIComponent(bottomRight)}&propertySaleType=Sale&StateOrProvince=NY&offset=${offset}`;
       const response = await fetch(url, {
         headers: {
@@ -334,17 +380,15 @@ async function savePropertyProfile(profile) {
   return first(rows) || profile;
 }
 
-async function loadPropertyProfile({ house, event, targetUrl }) {
+async function loadPropertyProfile({ house, event, targetUrl, forceRefresh = false }) {
   if (!house?.id) return null;
   const stored = await loadStoredPropertyProfile(house.id).catch(() => null);
-  if (propertyProfileIsFresh(stored)) {
+  if (!forceRefresh && propertyProfileIsFresh(stored)) {
     return buildPropertyProfile({ house, event, stored, targetUrl });
   }
 
-  const [oneKeyRecord, oneKeyImages] = await Promise.all([
-    loadOneKeyRecord(house).catch(() => null),
-    loadOneKeyPropertyImages(house).catch(() => [])
-  ]);
+  const oneKeyRecord = await loadOneKeyRecord(house).catch(() => null);
+  const oneKeyImages = await loadOneKeyPropertyImages(house, oneKeyRecord).catch(() => collectDeepImageUrls(oneKeyRecord));
   const profile = buildPropertyProfile({ house, event, stored, oneKeyRecord, oneKeyImages, targetUrl });
   await savePropertyProfile(profile).catch(() => null);
   return profile;
@@ -767,9 +811,12 @@ module.exports = async function handler(req, res) {
 
 module.exports.__test = {
   buildPropertyProfile,
+  collectDeepImageUrls,
   loadOneKeyPropertyImages,
   loadOneKeyRecord,
   loadPropertyImages,
+  loadPropertyProfile,
+  oneKeyImageIdentifiers,
   propertyProfileIsFresh,
   propertyImages,
   renderListingPage,

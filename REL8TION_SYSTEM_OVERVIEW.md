@@ -28,6 +28,7 @@ The current product connects:
 - `[IMPLEMENTED]` Loan Officer Coverage Signs that stay with the loan officer and route through `/lo-sign`.
 - `[IMPLEMENTED]` Live open house event records, buyer check-ins, disclosures, and optional financing-help routing.
 - `[IMPLEMENTED]` After check-in, buyers can open a dedicated `/l/:open_house_id` property experience with an expandable stored photo gallery, richer property facts and features, host context, and a return link to the same event. Server-managed `open_house_property_profiles` rows preserve the experience between upstream listing requests without exposing raw source payloads directly to buyers.
+- `[IMPLEMENTED]` A secured production cron refreshes active events and confirmed/scheduled upcoming property profiles every three hours, prioritizing missing/single-photo galleries and trying the OneKey unique listing id, listing key, BUPI, and embedded public media before preserving the existing gallery fallback.
 - `[IMPLEMENTED]` Shared open-house coverage supports two carried Event Passes plus one stationary Smart Sign or Loan Officer Coverage Sign, all pointing to one event and dashboard with a three-device cap.
 - `[PARTIAL]` REL8TION COMMAND admin operations.
 - `[IMPLEMENTED]` REL8TION COMMAND's additive Agent Performance board centralizes each agent's identity, outreach/conversation history, upcoming open houses, known listings, leads, keychains, and ranking link without removing the original source workspaces.

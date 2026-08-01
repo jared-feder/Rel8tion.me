@@ -3,7 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { buildPropertyProfile, renderListingPage } = require('../api/open-house-link.js').__test;
+const {
+  buildPropertyProfile,
+  collectDeepImageUrls,
+  oneKeyImageIdentifiers,
+  renderListingPage
+} = require('../api/open-house-link.js').__test;
+const { selectPropertyCandidates } = require('../api/cron/enrich-property-profiles.js').__test;
 
 test('rich property profile stores source gallery and facts', () => {
   const profile = buildPropertyProfile({
@@ -55,4 +61,50 @@ test('property profile migration keeps the raw profile server-managed', () => {
   );
   assert.match(migration, /enable row level security/);
   assert.match(migration, /revoke all on table public\.open_house_property_profiles from anon, authenticated/);
+});
+
+test('gallery enrichment tries alternate OneKey identifiers and nested media', () => {
+  const record = {
+    UniqueListingId: 'M00000489-1023777',
+    BUPI: 'BUPI-123',
+    Listing: { ListingKey: 'LISTING-KEY-456' },
+    Media: [
+      { MediaURL: 'https://images.example/front.webp' },
+      { MediaURL: 'https://images.example/kitchen.jpg' }
+    ]
+  };
+  const identifiers = oneKeyImageIdentifiers({
+    id: 'M00000489-1023777',
+    image: 'https://brokerdata-b.b-cdn.net/mlsgrid/onekey/property/M00000489-1023777/photo.webp'
+  }, record);
+
+  assert.ok(identifiers.includes('M00000489-1023777'));
+  assert.ok(identifiers.includes('BUPI-123'));
+  assert.ok(identifiers.includes('LISTING-KEY-456'));
+  assert.deepEqual(collectDeepImageUrls(record), [
+    'https://images.example/front.webp',
+    'https://images.example/kitchen.jpg'
+  ]);
+});
+
+test('cron prioritizes missing and single-photo profiles before richer recent galleries', () => {
+  const houses = [{ id: 'one' }, { id: 'two' }, { id: 'three' }];
+  const profiles = [
+    { open_house_id: 'one', images: ['one.jpg', 'two.jpg'], images_checked_at: '2026-08-01T00:00:00Z' },
+    { open_house_id: 'two', images: ['one.jpg'], images_checked_at: '2026-08-01T05:00:00Z' }
+  ];
+  assert.deepEqual(
+    selectPropertyCandidates(houses, profiles, 2).map((candidate) => candidate.house.id),
+    ['three', 'two']
+  );
+});
+
+test('Vercel registers the secured property enrichment cron', () => {
+  const root = path.join(__dirname, '..');
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+  const cron = config.crons.find((entry) => entry.path === '/api/cron/enrich-property-profiles');
+  const source = fs.readFileSync(path.join(root, 'api/cron/enrich-property-profiles.js'), 'utf8');
+  assert.equal(cron?.schedule, '41 */3 * * *');
+  assert.match(source, /process\.env\.CRON_SECRET/);
+  assert.match(source, /Bearer \$\{secret\}/);
 });

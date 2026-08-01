@@ -10,6 +10,7 @@ Last cleaned: 2026-06-04.
 - `[VERIFIED]` The property page renders an expandable gallery plus stored description, property facts, features, host context, and verified listing access when available.
 - `[VERIFIED]` Production table `open_house_property_profiles` stores the durable sanitized property profile and private source snapshot. RLS is enabled; `anon` and `authenticated` have no direct table privileges, while the server-side service role manages refreshes.
 - `[VERIFIED]` Missing or stale OneKey-backed profiles are refreshed and upserted server-side, with safe fallback to `open_houses`. Production deployment `dpl_DjjJbPvob8vkJsyDh7SZZqPCnhaf` was verified against 23 3rd Ave, Farmingdale on 2026-08-01.
+- `[IMPLEMENTED]` `/api/cron/enrich-property-profiles` proactively refreshes active events and confirmed/scheduled REL8TION open houses every three hours. It prioritizes missing and single-photo galleries, checks alternate OneKey listing identifiers plus nested record media, deduplicates up to 50 public property images, and requires Vercel's `CRON_SECRET` bearer authorization.
 
 ## 2026-07-31: Unified Agent Performance board
 
