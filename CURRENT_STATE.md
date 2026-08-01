@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-01: REL8TION COMMAND navigation performance repair
+
+- `[IMPLEMENTED]` COMMAND area changes, Agent Performance drill-down, Open House agent links, and **Back to all agents** now update only the active workspace instead of rebuilding the full dashboard shell or requesting `/admin` again.
+- `[IMPLEMENTED]` Browser history is synchronized with in-place navigation, so Back/Forward restores the selected COMMAND area and focused agent without a page reload.
+- `[IMPLEMENTED]` Agent ordering and future-open-house projections are indexed when data arrives rather than rebuilt on every click. The recurring foreground refresh updates outreach, health, and relationship data only; the multi-source dashboard snapshot is reserved for initial load, explicit Refresh, and completed mutations.
+- `[IMPLEMENTED]` Hidden COMMAND tabs no longer poll. This prevents several open tabs from multiplying the expensive dashboard requests and DOM work.
+- `[NEEDS VERIFICATION]` Production deployment and live browser navigation timing remain to be verified.
+
 ## 2026-08-01: Property-specific outreach photos in COMMAND
 
 - `[IMPLEMENTED]` Future `agent_listing_inventory` rows now carry their own generated outreach-image URL and render state. The existing mockup cron spends most of each batch on missing future-listing images while preserving capacity for the original outreach queue renderer.

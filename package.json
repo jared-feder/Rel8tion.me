@@ -17,6 +17,7 @@
     "verify:agent-relationships": "node scripts/verify-agent-relationship-stream.cjs",
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:command-search": "node scripts/verify-command-search.cjs",
+    "verify:command-performance": "node test/admin-command-performance.test.cjs",
     "verify:agent-listing-inventory": "node test/agent-listing-inventory.test.cjs && node test/agent-ranking-history.test.cjs && node test/agent-ranking-relationships.test.cjs && node test/agent-ranking-profile.test.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",
     "enrich:headshots": "node scripts/enrich-onekey-headshots.cjs",

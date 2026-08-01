@@ -1521,6 +1521,7 @@
       credentialVerified: false,
       lockStep: 'credentials',
       loading: false,
+      liveRefreshing: false,
       sendingKey: '',
       actionKey: '',
       error: '',
@@ -1570,6 +1571,10 @@
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
+      commandIndexes: {
+        crmSorted: [],
+        futureOpenHouses: []
+      },
       health: null,
       relationships: [],
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
@@ -2365,6 +2370,34 @@
       }
     }
 
+    function rebuildCommandIndexes() {
+      const crmSorted = [...(state.command?.crm || [])].sort(compareAgentRelationships);
+      const futureOpenHouseMap = new Map();
+      for (const agent of crmSorted) {
+        const relationshipGroup = agentRelationshipGroup(agent);
+        for (const openHouse of agent.upcoming_open_houses || []) {
+          const key = openHouse.id || `${openHouse.address || ''}|${openHouse.open_start || ''}`;
+          if (!key || futureOpenHouseMap.has(key)) continue;
+          futureOpenHouseMap.set(key, {
+            ...openHouse,
+            agent_name: agent.name,
+            agent_phone: agent.phone,
+            agent_phone_normalized: agent.phone_normalized,
+            agent_email: agent.email,
+            brokerage: agent.brokerage,
+            relationship_category: relationshipGroup.category,
+            relationship_label: relationshipGroup.label,
+            relationship_priority: relationshipGroup.priority,
+            relationship_tone: relationshipGroup.tone
+          });
+        }
+      }
+      state.commandIndexes = {
+        crmSorted,
+        futureOpenHouses: [...futureOpenHouseMap.values()]
+      };
+    }
+
     async function verify() {
       const cred = credential();
       if (!cred.uid && !cred.token) {
@@ -2415,6 +2448,7 @@
         state.counts = inbox.counts || state.counts;
         state.health = health;
         state.relationships = relationships.agents || [];
+        rebuildCommandIndexes();
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -2426,6 +2460,30 @@
         state.error = error.message || 'Unable to load command data.';
         render();
         restoreUiState(restoreSnapshot);
+      }
+    }
+
+    async function refreshLiveData() {
+      if (!state.verified || state.loading || state.liveRefreshing || document.visibilityState !== 'visible') return;
+      if (state.sendingKey || state.actionKey || state.coveragePickerKey || isCommandEditing()) return;
+      state.liveRefreshing = true;
+      try {
+        const [inbox, health, relationships] = await Promise.all([
+          api('/api/admin/outreach-inbox?limit=600'),
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
+          api('/api/admin/agent-relationships?limit=1000').catch((error) => ({ ok: false, error: error.message, agents: [] }))
+        ]);
+        state.inbox = inbox.inbox || [];
+        state.counts = inbox.counts || state.counts;
+        state.health = health;
+        state.relationships = relationships.agents || state.relationships;
+        state.loadedAt = inbox.loaded_at || new Date().toISOString();
+        rebuildCommandIndexes();
+        if (['outreach', 'crm', 'events'].includes(state.area)) refreshAreaContent();
+      } catch (_) {
+        // Keep the last good dashboard snapshot; the manual Refresh button remains available.
+      } finally {
+        state.liveRefreshing = false;
       }
     }
 
@@ -2651,11 +2709,18 @@ ${rowsHtml}
       showToast(`Opened buyer report for ${rows.length} matches.`);
     }
 
-    function setArea(area) {
+    function setArea(area, options = {}) {
       if (area !== 'signs') stopEventPassScanner({ silent: true });
+      if (state.agentFocus && area !== 'crm') {
+        state.agentFocus = '';
+        state.openHouseFocus = '';
+        state.query = '';
+      }
       state.area = area;
       window.localStorage.setItem(AREA_KEY, area);
-      render();
+      if (options.updateHistory !== false) updateCommandAreaUrl(area);
+      syncCommandNavigation();
+      refreshAreaContent();
       if (area === 'outreach' && state.query.trim().length >= 2) loadOutreachSearch().catch(() => null);
       if (area === 'buyerFinder' && !state.buyerFinder.loaded && !state.buyerFinder.loading) {
         loadBuyerHomeFinder({ showLoading: true }).catch(() => null);
@@ -2664,15 +2729,12 @@ ${rowsHtml}
 
     function setOutreachFilter(filter) {
       state.outreachFilter = filter;
-      render();
+      refreshAreaContent();
     }
 
     function openStatCard(area, filter = '') {
-      if (!area) return;
-      state.area = area;
       if (filter) state.outreachFilter = filter;
-      window.localStorage.setItem(AREA_KEY, area);
-      render();
+      if (area) setArea(area);
     }
 
     function updateDraft(key, value) {
@@ -2690,7 +2752,7 @@ ${rowsHtml}
       } else {
         state.replyPhotos[key] = { source, id };
       }
-      render();
+      refreshAreaContent();
     }
 
     async function sendReply(key, displayedMediaSource = '', displayedMediaId = '') {
@@ -2723,7 +2785,7 @@ ${rowsHtml}
       state.drafts[key] = messageBody;
       saveDrafts();
       state.sendingKey = key;
-      render();
+      refreshAreaContent();
       try {
         await api('/api/admin/outreach-reply', {
           method: 'POST',
@@ -2743,7 +2805,7 @@ ${rowsHtml}
       } catch (error) {
         state.sendingKey = '';
         showToast(error.message || 'Unable to send reply.');
-        render();
+        refreshAreaContent();
       }
     }
 
@@ -4217,7 +4279,7 @@ ${rowsHtml}
                 </select>
                 <div class="header-actions">
                   ${state.loading ? badge('Refreshing', 'info') : badge('Live', 'ok')}
-                  ${state.error ? badge(state.error, 'bad') : badge(areaLabel, 'info')}
+                  <span id="currentAreaBadge">${state.error ? badge(state.error, 'bad') : badge(areaLabel, 'info')}</span>
                   <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
                 </div>
               </header>
@@ -4285,6 +4347,19 @@ ${rowsHtml}
       window.lucide?.createIcons();
     }
 
+    function syncCommandNavigation() {
+      document.querySelectorAll('[data-area-nav]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.areaNav === state.area);
+      });
+      const areaSelect = document.getElementById('areaSelect');
+      if (areaSelect) areaSelect.value = state.area;
+      const globalSearch = document.getElementById('globalSearch');
+      if (globalSearch && globalSearch.value !== state.query) globalSearch.value = state.query;
+      const currentAreaBadge = document.getElementById('currentAreaBadge');
+      const areaLabel = AREAS.find(([key]) => key === state.area)?.[1] || 'Outreach command';
+      if (currentAreaBadge && !state.error) currentAreaBadge.innerHTML = badge(areaLabel, 'info');
+    }
+
     function refreshAreaContent() {
       const main = document.querySelector('.main-grid');
       if (!main) {
@@ -4304,13 +4379,15 @@ ${rowsHtml}
         } catch (_) {
           return;
         }
+        const area = target.searchParams.get('area') || '';
         const agent = target.searchParams.get('agent') || '';
         const openHouse = target.searchParams.get('open_house') || '';
-        if (target.pathname !== '/admin' || target.searchParams.get('area') !== 'crm' || !agent) return;
+        if (target.pathname !== '/admin' || !AREAS.some(([key]) => key === area)) return;
         link.addEventListener('click', (event) => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
-          openAgentProfile(agent, openHouse);
+          if (area === 'crm' && agent) openAgentProfile(agent, openHouse);
+          else setArea(area);
         });
       });
       document.querySelector('[data-clear-agent-profile]')?.addEventListener('click', clearAgentProfile);
@@ -5386,7 +5463,7 @@ ${rowsHtml}
     }
 
     function renderCrm() {
-      const allAgents = [...(state.command?.crm || [])].sort(compareAgentRelationships);
+      const allAgents = state.commandIndexes.crmSorted || [];
       const focusedAgent = state.agentFocus ? findAgentByLookup(state.agentFocus, allAgents) : null;
       const matchingAgents = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
       const rows = focusedAgent ? matchingAgents : matchingAgents.slice(0, state.agentBoardLimit);
@@ -5676,6 +5753,11 @@ ${rowsHtml}
       }) || null;
     }
 
+    function updateCommandAreaUrl(area) {
+      const query = new URLSearchParams({ area: area || 'outreach' });
+      window.history.pushState({}, '', `/admin?${query.toString()}`);
+    }
+
     function updateAgentProfileUrl(agent = '', openHouse = '') {
       const query = new URLSearchParams({ area: 'crm' });
       if (agent) query.set('agent', agent);
@@ -5691,9 +5773,10 @@ ${rowsHtml}
       state.query = agent;
       window.localStorage.setItem(AREA_KEY, 'crm');
       updateAgentProfileUrl(agent, openHouse);
-      renderShell();
+      syncCommandNavigation();
+      refreshAreaContent();
       window.requestAnimationFrame(() => {
-        document.getElementById('agent-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('agent-profile')?.scrollIntoView({ behavior: 'auto', block: 'start' });
       });
     }
 
@@ -5702,7 +5785,8 @@ ${rowsHtml}
       state.openHouseFocus = '';
       state.query = '';
       updateAgentProfileUrl();
-      renderShell();
+      syncCommandNavigation();
+      refreshAreaContent();
     }
 
     function adminAgentHref(row, area = 'crm', openHouse = '') {
@@ -5787,27 +5871,7 @@ ${rowsHtml}
           return Number.isFinite(end) && end >= Date.now();
         })
         .sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
-      const relationshipUpcomingMap = new Map();
-      for (const agent of state.command?.crm || []) {
-        const relationshipGroup = agentRelationshipGroup(agent);
-        for (const openHouse of agent.upcoming_open_houses || []) {
-          const key = openHouse.id || `${openHouse.address || ''}|${openHouse.open_start || ''}`;
-          if (!key || relationshipUpcomingMap.has(key)) continue;
-          relationshipUpcomingMap.set(key, {
-            ...openHouse,
-            agent_name: agent.name,
-            agent_phone: agent.phone,
-            agent_phone_normalized: agent.phone_normalized,
-            agent_email: agent.email,
-            brokerage: agent.brokerage,
-            relationship_category: relationshipGroup.category,
-            relationship_label: relationshipGroup.label,
-            relationship_priority: relationshipGroup.priority,
-            relationship_tone: relationshipGroup.tone
-          });
-        }
-      }
-      const allRelationshipUpcoming = filterByQuery([...relationshipUpcomingMap.values()]);
+      const allRelationshipUpcoming = filterByQuery(state.commandIndexes.futureOpenHouses || []);
       const relationshipUpcoming = allRelationshipUpcoming
         .filter(futureOpenHouseMatches)
         .sort((left, right) => {
@@ -6647,11 +6711,24 @@ ${rowsHtml}
     }
 
     verify();
+    window.addEventListener('popstate', () => {
+      if (!state.verified) return;
+      const locationParams = new URLSearchParams(window.location.search);
+      const nextArea = locationParams.get('area') || 'outreach';
+      state.area = AREAS.some(([key]) => key === nextArea) ? nextArea : 'outreach';
+      state.agentFocus = locationParams.get('agent') || '';
+      state.openHouseFocus = locationParams.get('open_house') || '';
+      state.query = state.agentFocus;
+      window.localStorage.setItem(AREA_KEY, state.area);
+      syncCommandNavigation();
+      refreshAreaContent();
+    });
     window.setInterval(() => {
-      if (state.verified && !state.loading && !state.sendingKey && !state.actionKey && !state.coveragePickerKey && !isCommandEditing()) {
-        loadAll({ showLoading: false }).catch(() => null);
-      }
-    }, 45000);
+      refreshLiveData().catch(() => null);
+    }, 60000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refreshLiveData().catch(() => null);
+    });
   </script>
 </body>
 </html>
