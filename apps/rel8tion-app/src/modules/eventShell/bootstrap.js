@@ -321,6 +321,18 @@ function listingShortUrl() {
   return `${window.location.origin}/l/${encodeURIComponent(redirectId)}`;
 }
 
+function propertyExperienceUrl() {
+  const shortUrl = listingShortUrl();
+  if (!shortUrl) return '';
+  try {
+    const url = new URL(shortUrl, window.location.origin);
+    if (pageState.eventRow?.id) url.searchParams.set('event', pageState.eventRow.id);
+    return url.toString();
+  } catch {
+    return shortUrl;
+  }
+}
+
 async function resolveListingSmsLink() {
   const openHouseId = firstPresent(pageState.eventRow?.open_house_source_id, pageState.house?.id);
   const redirectId = openHouseId || pageState.eventRow?.id || '';
@@ -380,13 +392,21 @@ async function syncBuyerFromCheckin(checkinId) {
 function renderPropertyImage(house, classes = 'h-24 w-24') {
   const image = propertyImageUrl(house);
   if (image) {
-    return `<img src="${esc(image)}" onerror="this.style.display='none';" alt="${esc(house?.address || 'Open house property')}" class="${classes} rounded-[24px] border border-white/80 bg-white object-cover shadow-sm">`;
+    const propertyHref = propertyExperienceUrl();
+    const propertyImage = `<img src="${esc(image)}" onerror="this.style.display='none';" alt="${esc(house?.address || 'Open house property')}" class="${classes} rounded-[24px] border border-white/80 bg-white object-cover shadow-sm">`;
+    return propertyHref
+      ? `<a href="${esc(propertyHref)}" class="group relative shrink-0 rounded-[24px] focus:outline-none focus:ring-4 focus:ring-sky-300/60" aria-label="Open the full property gallery and details">${propertyImage}<span class="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-slate-950/75 px-2 py-1 text-center text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 transition group-hover:opacity-100 group-focus:opacity-100">View home</span></a>`
+      : propertyImage;
   }
-  return `
+  const propertyHref = propertyExperienceUrl();
+  const fallback = `
     <div class="${classes} rounded-[24px] border border-white/80 bg-white/70 shadow-sm flex items-center justify-center text-center px-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
       Property
     </div>
   `;
+  return propertyHref
+    ? `<a href="${esc(propertyHref)}" class="shrink-0 rounded-[24px] focus:outline-none focus:ring-4 focus:ring-sky-300/60" aria-label="Open the full property details">${fallback}</a>`
+    : fallback;
 }
 
 function renderAgentImage(agent, classes = 'h-16 w-16') {
@@ -1178,6 +1198,7 @@ function nextStepCards() {
   };
   const agent = pageState.agent;
   const subjectAddress = house?.address || 'this property';
+  const propertyHref = propertyExperienceUrl();
   const contactHref = vcardHref(agent);
   const neighborhoodBody = `Hi${agent?.name ? ` ${agent.name}` : ''}, I just checked in through Rel8tion for ${subjectAddress}. Can you tell me more about the neighborhood and nearby open houses?`;
   const liveLoanOfficer = pageState.loanOfficer;
@@ -1192,11 +1213,12 @@ function nextStepCards() {
     <section class="grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-5 mb-5">
       <article class="rounded-[28px] border border-white/70 bg-white/78 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-4">Property Snapshot</h2>
-        <div class="mb-4 overflow-hidden rounded-[24px] border border-white/80 bg-slate-100">
+        <a href="${esc(propertyHref || '#')}" class="group relative mb-4 block overflow-hidden rounded-[24px] border border-white/80 bg-slate-100 ${propertyHref ? '' : 'pointer-events-none'}" aria-label="Explore all property photos and details">
           ${propertyImageUrl(house)
-            ? `<img src="${esc(propertyImageUrl(house))}" alt="${esc(house?.address || 'Open house property')}" class="aspect-[16/10] w-full object-cover">`
+            ? `<img src="${esc(propertyImageUrl(house))}" alt="${esc(house?.address || 'Open house property')}" class="aspect-[16/10] w-full object-cover transition duration-200 group-hover:scale-[1.015]">`
             : `<div class="flex aspect-[16/10] w-full items-center justify-center text-sm font-black uppercase tracking-[0.16em] text-slate-400">Property Media</div>`}
-        </div>
+          <span class="absolute bottom-3 right-3 rounded-full bg-slate-950/78 px-4 py-2 text-xs font-black text-white shadow-lg">View all photos + details</span>
+        </a>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="rounded-[20px] bg-slate-50 border border-slate-100 p-4">
             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">Address</div>
@@ -1215,6 +1237,9 @@ function nextStepCards() {
             <div class="text-slate-900 font-bold">${textOrDash(house?.brokerage)}</div>
           </div>
         </div>
+        <a href="${esc(propertyHref || '#')}" class="mt-4 inline-flex w-full items-center justify-center rounded-full px-5 py-4 text-sm font-black text-white shadow-[0_18px_40px_rgba(59,130,246,0.20)] ${propertyHref ? '' : 'pointer-events-none opacity-60'}" style="background:var(--event-gradient);">
+          Explore This Property
+        </a>
         <a href="${esc(smsHref(agent?.phone || '', neighborhoodBody))}" class="mt-4 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white/82 px-5 py-4 text-sm font-black text-slate-700 ${agent?.phone ? '' : 'pointer-events-none opacity-60'}">
           Ask About The Neighborhood
         </a>
