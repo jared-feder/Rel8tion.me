@@ -123,6 +123,8 @@ async function run() {
   assert.match(pricingPage, /book-a-call\?type=broker_team/);
   assert.match(pricingPage, /flow:\s*'payment_first'/);
   assert.match(pricingPage, /checkout\/open-house-kit/);
+  assert.match(pricingPage, /cameFromRel8tionWordPress/);
+  assert.match(pricingPage, /document\.referrer/);
   assert.doesNotMatch(pricingPage, /id="system-checkout"[^>]+href="\/kit-intake/);
   assert.doesNotMatch(pricingPage, /id="seat-price"|id="pass-standard-price"|id="pass-seat-price"/);
   const wordpressPricing = read('wordpress/pricing-section.html');
