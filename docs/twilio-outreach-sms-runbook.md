@@ -16,7 +16,7 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
-- Automatic outreach is live with `rel8tion_runtime_settings.outreach_send_paused.paused=false` and reason `toll_free_outreach_verified`. Recovery remains hard-capped at 5/run, 10/hour, and 25/day; old manual backlog rows must remain held.
+- `rel8tion_runtime_settings.outreach_send_paused.paused=false` still permits diagnostics and manual operation. As of 2026-07-22, operator mode is Live/manual, all unsent future automatic rows were moved to manual, and the sender diagnostic reports zero automatic candidates. If automatic outreach is later re-enabled, it is hard-capped at 5/run, 20/hour, and 150 per rolling 24 hours, while the corrected 1% rolling opt-out health gate can independently block sending. Old manual backlog rows must remain held.
 
 ## Dedicated Toll-Free Outreach Target
 
@@ -121,7 +121,7 @@ Inbound reply test:
 - Inbound webhook returns `401`: Twilio is pointed directly at `twilio-inbound-reply` instead of `twilio-inbound-router`, or the router was deployed with JWT verification enabled.
 - Inbound saves but does not match a queue row: check `agent_phone_normalized` values. The router/reply handler now searches both 10-digit and 11-digit forms.
 - Delivery status callback fails: use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>` with `POST`; do not use the inbound router.
-- Outreach volume risk: the historical owner-approved ceilings were 7 per run, 20 per hour, and 150 per day. Recovery code now enforces stricter hard caps of `OUTREACH_SEND_MAX_PER_RUN=5`, `OUTREACH_SEND_MAX_PER_HOUR=5`, and `OUTREACH_SEND_MAX_PER_DAY=5`, regardless of older higher secret values. Review every reply before expanding and do not raise the recovery caps without explicit owner approval and provider health review.
+- Outreach volume risk: current owner-approved hard caps are `OUTREACH_SEND_MAX_PER_RUN=5`, `OUTREACH_SEND_MAX_PER_HOUR=20`, and `OUTREACH_SEND_MAX_PER_DAY=150`. `OUTREACH_MAX_OPT_OUT_RATE=0.01` means 1%; using `1` would mean 100% and effectively disable the intended health threshold. Review every reply before expanding and do not raise the caps or health threshold without explicit owner approval and provider health review.
 - Missed-open-house outreach older than 7 days is skipped by default (`OUTREACH_MISSED_OPEN_HOUSE_MAX_AGE_DAYS`) so unpausing cannot drain an old backlog.
 - Emergency pause: set `rel8tion_runtime_settings.key='outreach_send_paused'` to a truthy JSON value such as `{ "paused": true }`, or set `OUTREACH_SEND_PAUSED=true`. The send cron can still fire, but `send-agent-outreach` will return `paused=true` and send nothing.
 - Recovery/manual generation: while that pause is truthy, `generate-agent-outreach` stages newly generated rows as `send_mode=manual`, `review_status=manual_ready`, so new outreach is available for cell sending instead of automatic sender pickup.
