@@ -1,20 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <title>Rel8tion | Show Up, Tap Once, Everything Goes Live.</title>
 <style>
-    html, body {
+    #rel8tion-home {
         margin: 0 !important;
         padding: 0 !important;
-        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        position: relative;
+        isolation: isolate;
+        box-sizing: border-box;
         background-color: #f0f7ff;
     }
 
-    .rel8tion-wrapper {
+    #rel8tion-home *,
+    #rel8tion-home *::before,
+    #rel8tion-home *::after {
+        box-sizing: border-box;
+    }
+
+    #rel8tion-home a,
+    #rel8tion-home button {
+        pointer-events: auto;
+    }
+
+    #rel8tion-home .rel8tion-wrapper {
         font-family: 'Inter', sans-serif;
         color: #1f2a5a;
         background: linear-gradient(180deg, #38bdf8 0%, #f0f7ff 60%, #f0f7ff 100%);
@@ -24,7 +37,7 @@
         position: relative;
     }
 
-    .moving-clouds {
+    #rel8tion-home .moving-clouds {
         position: fixed;
         top: 0;
         left: 0;
@@ -35,15 +48,15 @@
         background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjxwYXRoIGQ9Ik0zMCwxODAgQzEwLDE4MCAwLDE3MCAwLDE1NSBDMCwxNDAgMTUsMTMwIDMwLDEzMCBDMzUsMTE1IDUwLDEwNSA3MCwxMDUgQzk1LDEwNSAxMTAsMTIwIDExNSwxMzUgQzEzMCwxMzUgMTQ1LDE0NSAxNDUsMTYwIEMxNDUsMTYwIDEzMCwxODAgMTE1LDE4MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjYiLz48L3N2Zz4=");
         background-repeat: repeat-x;
         background-size: 800px auto;
-        animation: driftClouds 120s linear infinite;
+        animation: rel8tionDriftClouds 120s linear infinite;
     }
 
-    @keyframes driftClouds {
+    @keyframes rel8tionDriftClouds {
         from { transform: translateX(0); }
         to { transform: translateX(-50%); }
     }
 
-    .scene-stage {
+    #rel8tion-home .scene-stage {
         position: fixed;
         top: 60%;
         left: 50%;
@@ -54,14 +67,14 @@
         pointer-events: none;
     }
 
-    .house-img {
+    #rel8tion-home .house-img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         filter: saturate(1.1);
     }
 
-    .fade-overlay {
+    #rel8tion-home .fade-overlay {
         position: fixed;
         inset: 0;
         width: 100vw;
@@ -71,50 +84,160 @@
         background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 20%, rgba(240,247,255,0.95) 100%);
     }
 
-    .agent-cutout {
+    #rel8tion-home .agent-cutout {
         position: absolute;
-        width: 3.5%;
+        width: 5.5%;
         height: auto;
         z-index: 10;
         opacity: 0;
         animation-fill-mode: both !important;
     }
 
-    @keyframes walk1 { 0% { left: 50%; top: 70%; opacity: 0; } 10% { opacity: 1; } 100% { left:25%; top: 56%; opacity: 0; } }
-    @keyframes walk2 { 0% { left: 47%; top: 52%; opacity: 0; } 10% { opacity: 1; } 100% { left: 15%; top: 79%; opacity: 0; } }
-    @keyframes walk3 { 0% { left: 77%; top: 57%; opacity: 0; } 10% { opacity: 1; } 100% { left: 50%; top: 75%; opacity: 0; } }
-    @keyframes walk4 { 0% { left: 25%; top: 55%; opacity: 0; } 10% { opacity: 1; } 100% { left: 75%; top: 88%; opacity: 0; } }
-    @keyframes walk5 { 0% { left: 33%; top: 44%; opacity: 0; } 10% { opacity: 1; } 100% { left: 78%; top: 89%; opacity: 0; } }
+    @keyframes rel8tionWalk1 { 0% { left: 50%; top: 78%; opacity: 0; } 10% { opacity: 1; } 100% { left:29%; top: 69%; opacity: 1; } }
+    @keyframes rel8tionWalk2 { 0% { left: 51%; top: 48%; opacity: 0; } 10% { opacity: 1; } 100% { left: 17%; top: 61%; opacity: 1; } }
+    @keyframes rel8tionWalk3 { 0% { left: 49%; top: 47%; opacity: 0; } 10% { opacity: 1; } 100% { left:15%; top: 68%; opacity: 1; } }
+    @keyframes rel8tionWalk4 { 0% { left: 18%; top: 60%; opacity: 0; } 10% { opacity: 1; } 100% { left: 75%; top: 88%; opacity: 1; } }
+    @keyframes rel8tionWalk5 { 0% { left: 20%; top: 42%; opacity: 0; } 10% { opacity: 1; } 100% { left: 69%; top: 80%; opacity: 1; } }
+     @keyframes rel8tionWalk6 { 0% { left: 70%; top: 60%; opacity: 0; } 10% { opacity: 1; } 100% { left: 37%; top: 88%; opacity: 1; } }
 
-    .agent-1 { animation: walk1 37s infinite linear; }
-    .agent-2 { animation: walk2 33s infinite linear; animation-delay: 5s; }
-    .agent-3 { animation: walk3 24s infinite linear; animation-delay: 2s; }
-    .agent-4 { animation: walk4 30s infinite linear; animation-delay: 6s; }
-    .agent-5 { animation: walk5 50s infinite linear; animation-delay: 3s; }
+    #rel8tion-home .agent-1 { animation: rel8tionWalk1 50s infinite linear; }
+    #rel8tion-home .agent-2 { animation: rel8tionWalk2 28s infinite linear; animation-delay: 3s; }
+    #rel8tion-home .agent-3 { animation: rel8tionWalk3 24s infinite linear; animation-delay: 1s; }
+    #rel8tion-home .agent-4 { animation: rel8tionWalk4 50s infinite linear; animation-delay: 1s; }
+    #rel8tion-home .agent-5 { animation: rel8tionWalk5 55s infinite linear; animation-delay: 3s; }
+     #rel8tion-home .agent-6 { animation: rel8tionWalk6 30s infinite linear; animation-delay: 0s; }
 
     @media (max-width: 1024px) {
-        .scene-stage {
+        #rel8tion-home .scene-stage {
             width: 180vw;
             top: 70%;
         }
     }
 
     @media (max-width: 768px) {
-        .scene-stage {
+        #rel8tion-home .scene-stage {
             width: 280vw;
             top: 45%;
         }
     }
 
-    .glass-card {
-        background: rgba(255, 255, 255, 0.15) !important;
-        backdrop-filter: blur(5px) saturate(160%);
-        -webkit-backdrop-filter: blur(5px) saturate(160%);
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
-        box-shadow: 0 25px 50px rgba(31, 42, 90, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+    /* Full-width sections use a light glass wash: readable, but not over-frosted. */
+    #rel8tion-home .glass-card {
+        background: rgba(255, 255, 255, 0.22) !important;
+        backdrop-filter: blur(3px) saturate(135%) !important;
+        -webkit-backdrop-filter: blur(3px) saturate(135%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.42) !important;
+        box-shadow: 0 18px 46px rgba(31, 42, 90, 0.07), inset 0 1px 1px rgba(255, 255, 255, 0.20) !important;
     }
 
-    .brand-button {
+    /* Smaller cards use one consistent frosted treatment for better contrast over the background art. */
+    #rel8tion-home .rel8tion-mini-card,
+    #rel8tion-home .rel8tion-proof-card {
+        background: rgba(255, 255, 255, 0.68) !important;
+        backdrop-filter: blur(12px) saturate(170%) !important;
+        -webkit-backdrop-filter: blur(12px) saturate(170%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.86) !important;
+        box-shadow: 0 18px 42px rgba(31, 42, 90, 0.10), inset 0 1px 1px rgba(255, 255, 255, 0.48) !important;
+    }
+
+    #rel8tion-home .rel8tion-mini-card h2,
+    #rel8tion-home .rel8tion-mini-card h3,
+    #rel8tion-home .rel8tion-proof-card h2,
+    #rel8tion-home .rel8tion-proof-card h3 {
+        color: #0f172a !important;
+    }
+
+    #rel8tion-home .rel8tion-mini-card p,
+    #rel8tion-home .rel8tion-proof-card p,
+    #rel8tion-home .rel8tion-mini-card .text-slate-700,
+    #rel8tion-home .rel8tion-proof-card .text-slate-700 {
+        color: #24354f !important;
+    }
+
+    #rel8tion-home {
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    #rel8tion-home h1,
+    #rel8tion-home h2,
+    #rel8tion-home h3 {
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        letter-spacing: -0.045em;
+    }
+
+    #rel8tion-home p {
+        line-height: 1.64;
+    }
+
+    #rel8tion-home .text-slate-700 {
+        color: #263a59 !important;
+    }
+
+    #rel8tion-home .text-slate-600 {
+        color: #334155 !important;
+    }
+
+    #rel8tion-home .bg-white\/25,
+    #rel8tion-home .bg-white\/30,
+    #rel8tion-home .bg-white\/35,
+    #rel8tion-home .bg-white\/38,
+    #rel8tion-home .bg-white\/40,
+    #rel8tion-home .bg-white\/42,
+    #rel8tion-home .bg-white\/45 {
+        background-color: rgba(255, 255, 255, 0.58) !important;
+    }
+
+    #rel8tion-home .bg-white\/55 {
+        background-color: rgba(255, 255, 255, 0.74) !important;
+    }
+
+
+
+    /* Subtle Rel8tion-blue text lift for text sitting directly on the lighter glass/full-width sections. */
+    #rel8tion-home .glass-card h1,
+    #rel8tion-home .glass-card h2,
+    #rel8tion-home .glass-card h3,
+    #rel8tion-home .glass-card p,
+    #rel8tion-home .glass-card li,
+    #rel8tion-home .glass-card .text-slate-900,
+    #rel8tion-home .glass-card .text-slate-800,
+    #rel8tion-home .glass-card .text-slate-700,
+    #rel8tion-home .glass-card .text-slate-600 {
+        text-shadow: 0 1px 2px rgba(31, 42, 90, 0.16), 0 8px 20px rgba(31, 42, 90, 0.08);
+    }
+
+    /* Keep text inside frosted inner cards and buttons crisp. */
+    #rel8tion-home .rel8tion-mini-card h1,
+    #rel8tion-home .rel8tion-mini-card h2,
+    #rel8tion-home .rel8tion-mini-card h3,
+    #rel8tion-home .rel8tion-mini-card p,
+    #rel8tion-home .rel8tion-mini-card li,
+    #rel8tion-home .rel8tion-mini-card .text-slate-900,
+    #rel8tion-home .rel8tion-mini-card .text-slate-800,
+    #rel8tion-home .rel8tion-mini-card .text-slate-700,
+    #rel8tion-home .rel8tion-mini-card .text-slate-600,
+    #rel8tion-home .rel8tion-proof-card h1,
+    #rel8tion-home .rel8tion-proof-card h2,
+    #rel8tion-home .rel8tion-proof-card h3,
+    #rel8tion-home .rel8tion-proof-card p,
+    #rel8tion-home .rel8tion-proof-card li,
+    #rel8tion-home .rel8tion-proof-card .text-slate-900,
+    #rel8tion-home .rel8tion-proof-card .text-slate-800,
+    #rel8tion-home .rel8tion-proof-card .text-slate-700,
+    #rel8tion-home .rel8tion-proof-card .text-slate-600,
+    #rel8tion-home .brand-button,
+    #rel8tion-home .brand-button *,
+    #rel8tion-home .secondary-button,
+    #rel8tion-home .secondary-button *,
+    #rel8tion-home .rel8tion-comparison-modal,
+    #rel8tion-home .rel8tion-comparison-modal *,
+    #rel8tion-home .rel8tion-modal-backdrop,
+    #rel8tion-home .rel8tion-modal-backdrop * {
+        text-shadow: none !important;
+    }
+
+    #rel8tion-home .brand-button {
         background-color: #1f2a5a !important;
         color: #ffffff !important;
         transition: all 0.3s ease;
@@ -128,201 +251,1004 @@
         justify-content: center;
     }
 
-    .brand-button:hover {
+    #rel8tion-home .brand-button:hover {
         background-color: #161e40 !important;
         transform: translateY(-2px);
         box-shadow: 0 15px 30px rgba(31, 42, 90, 0.3) !important;
     }
 
-    .secondary-button {
-        background: rgba(255,255,255,0.38);
-        color: #1f2a5a !important;
-        border: 1px solid rgba(255,255,255,0.7);
-        box-shadow: 0 8px 20px rgba(31, 42, 90, 0.08);
+    #rel8tion-home .secondary-button {
+        background: linear-gradient(135deg, #0b8fe8 0%, #006dcb 100%) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255,255,255,0.5) !important;
+        box-shadow: 0 12px 28px rgba(0, 109, 203, 0.24) !important;
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
     }
 
-    .secondary-button:hover {
-        background: rgba(255,255,255,0.62);
+    #rel8tion-home .secondary-button:hover {
+        background: linear-gradient(135deg, #057fd4 0%, #005aaa 100%) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 16px 34px rgba(0, 109, 203, 0.32) !important;
     }
+
+
+    #rel8tion-home .rel8tion-proof-card {
+        border-radius: 28px;
+        padding: 26px;
+    }
+
+    #rel8tion-home .rel8tion-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(15, 23, 42, 0.72);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    #rel8tion-home .rel8tion-modal-backdrop.is-open {
+        display: flex;
+    }
+
+    #rel8tion-home .rel8tion-comparison-modal {
+        position: relative;
+        width: min(1180px, 96vw);
+        max-height: 92vh;
+        overflow: auto;
+        border-radius: 30px;
+        background: rgba(255,255,255,0.96);
+        border: 1px solid rgba(255,255,255,0.75);
+        box-shadow: 0 34px 90px rgba(0,0,0,0.28);
+        padding: 14px;
+    }
+
+    #rel8tion-home .rel8tion-comparison-modal img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 22px;
+    }
+
+    #rel8tion-home .rel8tion-modal-close {
+        position: sticky;
+        top: 10px;
+        float: right;
+        z-index: 2;
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border: 1px solid rgba(15,23,42,0.12);
+        background: rgba(255,255,255,0.94);
+        color: #0f172a;
+        font-size: 26px;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+        box-shadow: 0 12px 30px rgba(15,23,42,0.14);
+    }
+
+    #rel8tion-home .rel8tion-compare-button {
+        cursor: pointer;
+    }
+
+
+    #rel8tion-home .rel8tion-sponsor-modal {
+        position: relative;
+        width: min(920px, 96vw);
+        max-height: 92vh;
+        overflow: auto;
+        border-radius: 34px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,247,255,0.96));
+        border: 1px solid rgba(255,255,255,0.78);
+        box-shadow: 0 34px 90px rgba(0,0,0,0.28);
+        padding: 26px;
+    }
+
+    #rel8tion-home .rel8tion-sponsor-field,
+    #rel8tion-home .rel8tion-sponsor-select,
+    #rel8tion-home .rel8tion-sponsor-textarea {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid rgba(31, 42, 90, 0.14);
+        background: rgba(255,255,255,0.88);
+        color: #1f2a5a;
+        padding: 14px 16px;
+        font-size: 15px;
+        font-weight: 700;
+        outline: none;
+        box-shadow: 0 8px 20px rgba(31,42,90,0.05);
+    }
+
+    #rel8tion-home .rel8tion-sponsor-textarea {
+        min-height: 116px;
+        resize: vertical;
+    }
+
+    #rel8tion-home .rel8tion-sponsor-field:focus,
+    #rel8tion-home .rel8tion-sponsor-select:focus,
+    #rel8tion-home .rel8tion-sponsor-textarea:focus {
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+    }
+
+    #rel8tion-home .rel8tion-sponsor-label {
+        display: block;
+        margin-bottom: 7px;
+        color: #1f2a5a;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    #rel8tion-home .rel8tion-event-pass-nudge {
+        position: fixed; right: 22px; bottom: 22px; z-index: 999990;
+        width: min(430px, calc(100vw - 28px)); padding: 22px; border-radius: 28px;
+        border: 1px solid rgba(255,255,255,.9);
+        background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(224,242,254,.97));
+        box-shadow: 0 28px 70px rgba(15,23,42,.25);
+        transform: translateY(135%); opacity: 0; pointer-events: none;
+        transition: transform .45s ease, opacity .35s ease;
+    }
+    #rel8tion-home .rel8tion-event-pass-nudge.is-visible { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    #rel8tion-home .rel8tion-event-pass-nudge-close {
+        position: absolute; top: 10px; right: 12px; width: 34px; height: 34px;
+        border: 0; border-radius: 999px; background: rgba(255,255,255,.82);
+        color: #334155; font-size: 22px; font-weight: 900; cursor: pointer;
+    }
+    @media (max-width: 767px) {
+        #rel8tion-home .rel8tion-event-pass-nudge { right: 14px; bottom: 14px; padding: 20px 18px; border-radius: 24px; }
+    }
+
+
+    /* Mobile polish pass: keeps one responsive file, but makes phone layouts feel intentional. */
+    #rel8tion-home .rel8tion-mobile-modal-hint {
+        display: none;
+    }
+
+    @media (max-width: 767px) {
+        #rel8tion-home .rel8tion-wrapper {
+            background-attachment: scroll !important;
+            overflow-x: hidden !important;
+        }
+
+        #rel8tion-home header {
+            padding: 12px 14px !important;
+            align-items: center !important;
+        }
+
+        #rel8tion-home header img[alt="Rel8tion Logo"] {
+            height: 34px !important;
+            width: auto !important;
+            max-width: 128px !important;
+            object-fit: contain !important;
+        }
+
+        #rel8tion-home header .brand-button {
+            min-height: 40px !important;
+            width: auto !important;
+            max-width: none !important;
+            padding: 10px 14px !important;
+            font-size: 10px !important;
+            letter-spacing: 0.12em !important;
+            white-space: nowrap !important;
+        }
+
+        #rel8tion-home main {
+            padding-top: 104px !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            padding-bottom: 28px !important;
+        }
+
+        #rel8tion-home main > div.max-w-6xl {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 44px !important;
+        }
+
+        #rel8tion-home .moving-clouds {
+            height: 340px !important;
+            opacity: 0.72 !important;
+        }
+
+        #rel8tion-home .scene-stage {
+            width: 238vw !important;
+            top: 55% !important;
+            opacity: 0.58 !important;
+        }
+
+        #rel8tion-home .fade-overlay {
+            background:
+                linear-gradient(180deg, rgba(240,247,255,0.08) 0%, rgba(240,247,255,0.46) 34%, rgba(240,247,255,0.78) 100%),
+                radial-gradient(circle at 50% 42%, rgba(255,255,255,0.10) 0%, rgba(240,247,255,0.92) 100%) !important;
+        }
+
+        #rel8tion-home .glass-card {
+            border-radius: 30px !important;
+            padding: 24px 18px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section {
+            padding: 30px 18px 26px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section > p.inline-flex {
+            margin-bottom: 16px !important;
+            padding: 7px 12px !important;
+            font-size: 9px !important;
+            line-height: 1.35 !important;
+            letter-spacing: 0.14em !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section h1 {
+            margin-bottom: 16px !important;
+            font-size: clamp(38px, 11.5vw, 48px) !important;
+            line-height: 0.96 !important;
+            letter-spacing: -0.055em !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section > p.text-slate-700 {
+            max-width: 23rem !important;
+            margin-bottom: 20px !important;
+            font-size: 16px !important;
+            line-height: 1.48 !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-points {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+            max-width: 360px !important;
+            margin-bottom: 24px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-points .rel8tion-mini-card {
+            display: grid !important;
+            grid-template-columns: 34px 1fr !important;
+            align-items: center !important;
+            gap: 0 10px !important;
+            padding: 12px 14px !important;
+            border-radius: 20px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-points .text-2xl {
+            grid-row: span 2 !important;
+            margin: 0 !important;
+            font-size: 22px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-points .text-base {
+            font-size: 14px !important;
+            line-height: 1.15 !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-points .text-sm {
+            margin-top: 2px !important;
+            font-size: 12px !important;
+            line-height: 1.22 !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section .brand-button {
+            max-width: 360px !important;
+            min-height: 50px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section a[href="#event-pass"] {
+            max-width: 320px !important;
+            font-size: 12px !important;
+            line-height: 1.35 !important;
+            letter-spacing: 0.11em !important;
+        }
+
+        #rel8tion-home h2 {
+            font-size: clamp(28px, 8vw, 38px) !important;
+            line-height: 1.04 !important;
+        }
+
+        #rel8tion-home h3 {
+            line-height: 1.12 !important;
+        }
+
+        #rel8tion-home p,
+        #rel8tion-home li {
+            line-height: 1.54 !important;
+        }
+
+        #rel8tion-home .rel8tion-mini-card,
+        #rel8tion-home .rel8tion-proof-card {
+            border-radius: 24px !important;
+            padding: 20px !important;
+        }
+
+        #rel8tion-home .rel8tion-proof-card {
+            padding: 20px !important;
+        }
+
+        #rel8tion-home .text-lg {
+            font-size: 16px !important;
+        }
+
+        #rel8tion-home .text-xl {
+            font-size: 18px !important;
+        }
+
+        #rel8tion-home .text-2xl {
+            font-size: 21px !important;
+        }
+
+        #rel8tion-home .text-3xl {
+            font-size: 26px !important;
+        }
+
+        #rel8tion-home .text-4xl {
+            font-size: 30px !important;
+        }
+
+        #rel8tion-home .text-5xl {
+            margin-bottom: 16px !important;
+            font-size: 38px !important;
+        }
+
+        #rel8tion-home .grid {
+            gap: 16px !important;
+        }
+
+        #rel8tion-home .brand-button,
+        #rel8tion-home .secondary-button {
+            min-height: 48px !important;
+            max-width: 360px !important;
+            padding: 14px 18px !important;
+            font-size: 14px !important;
+            letter-spacing: 0.08em !important;
+        }
+
+        #rel8tion-home #open-house-kit .grid,
+        #rel8tion-home #event-pass .grid {
+            gap: 18px !important;
+        }
+
+        #rel8tion-home #open-house-kit aside img {
+            max-width: 280px !important;
+        }
+
+        #rel8tion-home #open-house-kit aside .text-[46px] {
+            font-size: 44px !important;
+        }
+
+        #rel8tion-home .rel8tion-comparison-modal {
+            width: 95vw !important;
+            max-height: 88vh !important;
+            border-radius: 24px !important;
+            padding: 10px !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        #rel8tion-home .rel8tion-comparison-modal img {
+            width: auto !important;
+            max-width: none !important;
+            min-width: 980px !important;
+            border-radius: 18px !important;
+        }
+
+        #rel8tion-home .rel8tion-mobile-modal-hint {
+            display: block !important;
+            position: sticky !important;
+            left: 0 !important;
+            top: 0 !important;
+            z-index: 1 !important;
+            margin: 0 54px 10px 0 !important;
+            padding: 10px 12px !important;
+            border-radius: 16px !important;
+            background: rgba(239,247,255,0.96) !important;
+            color: #1f2a5a !important;
+            font-size: 12px !important;
+            font-weight: 900 !important;
+            line-height: 1.3 !important;
+            box-shadow: 0 10px 24px rgba(31,42,90,0.12) !important;
+        }
+
+        #rel8tion-home .rel8tion-sponsor-modal {
+            width: 95vw !important;
+            max-height: 88vh !important;
+            border-radius: 26px !important;
+            padding: 16px !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        #rel8tion-home .rel8tion-sponsor-modal h2 {
+            font-size: clamp(28px, 8vw, 38px) !important;
+        }
+
+        #rel8tion-home .rel8tion-sponsor-field,
+        #rel8tion-home .rel8tion-sponsor-select,
+        #rel8tion-home .rel8tion-sponsor-textarea {
+            min-height: 48px !important;
+            font-size: 16px !important;
+        }
+
+        #rel8tion-home .rel8tion-modal-close {
+            width: 40px !important;
+            height: 40px !important;
+            top: 6px !important;
+            font-size: 24px !important;
+        }
+
+        #rel8tion-home footer {
+            margin-top: 40px !important;
+            padding: 36px 18px !important;
+        }
+
+        #rel8tion-home footer img[alt="Rel8tion Logo"] {
+            height: 34px !important;
+            margin-bottom: 18px !important;
+        }
+
+        #rel8tion-home footer p {
+            font-size: 13px !important;
+        }
+    }
+
+    @media (max-width: 390px) {
+        #rel8tion-home header .brand-button {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+            font-size: 9px !important;
+        }
+
+        #rel8tion-home .rel8tion-hero-section h1 {
+            font-size: 36px !important;
+        }
+
+        #rel8tion-home .brand-button,
+        #rel8tion-home .secondary-button {
+            font-size: 13px !important;
+        }
+    }
+
 </style>
-</head>
-<body>
+<div id="rel8tion-home">
 <div class="rel8tion-wrapper">
     <div class="moving-clouds"></div>
 
     <div class="scene-stage">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/trythisbackround.png" class="house-img" alt="House Background">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Moving Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/websitehouse.png" class="house-img" alt="House Background">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent1A.png" class="agent-cutout agent-1" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent2A.png" class="agent-cutout agent-2" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent3a.png" class="agent-cutout agent-3" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent4A.png" class="agent-cutout agent-4" alt="Agent">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent5a.png" class="agent-cutout agent-5" alt="Agent">
+         <img src="https://rel8tion.me/wp-content/uploads/2026/04/agent6.png" class="agent-cutout agent-6" alt="Agent">
     </div>
 
     <div class="fade-overlay"></div>
 
     <header class="w-full absolute top-0 left-0 z-50 px-4 pt-0 flex justify-between items-center bg-transparent md:px-8 md:py-6">
-        <img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-4 w-auto md:h-10">
+        <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-4 w-auto md:h-10">
 
-        <nav class="hidden sm:flex gap-8 font-bold text-[11px] md:text-sm text-[#1f2a5a] uppercase tracking-widest">
-            <a href="https://rel8tion.info/howitworks" class="hover:text-blue-600 transition">How It Works</a>
-            <a href="https://rel8tion.info/features" class="hover:text-blue-600 transition">Features</a>
-            <a href="https://rel8tion.info/agents" class="hover:text-blue-600 transition">Agents</a>
-            <a href="https://rel8tion.info/contact" class="hover:text-blue-600 transition">Contact</a>
+        <nav class="hidden sm:flex gap-6 font-bold text-[11px] md:text-sm text-[#1f2a5a] uppercase tracking-widest">
+            <a href="#open-house-kit" class="hover:text-blue-600 transition">Open House Kit</a>
+            <a href="#event-pass" class="hover:text-blue-600 transition">Event Pass</a>
+            <a href="https://my.rel8tion.me" class="hover:text-blue-600 transition">Website Builder</a>
+            <button type="button" data-open-rel8tion-comparison class="rel8tion-compare-button hover:text-blue-600 transition uppercase tracking-widest font-bold bg-transparent border-0 p-0">Compare</button>
+            <a href="https://rel8tion.me/contact" class="hover:text-blue-600 transition">Contact</a>
         </nav>
 
-        <a href="https://rel8tion.info/demo" class="brand-button px-5 py-2 md:px-8 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider">
-            Request a Demo
+        <a href="https://getrel8tion.com" class="brand-button px-5 py-2 md:px-8 md:py-3 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-wider">
+            Get the Kit
         </a>
     </header>
 
     <main class="relative z-20 w-full px-4 md:px-6 pt-36 pb-10 md:pt-40">
         <div class="max-w-6xl mx-auto space-y-16 md:space-y-24">
-            <section class="glass-card rounded-[44px] px-6 py-16 md:p-20 text-center">
-                <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/40 border border-white/50 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500 mb-6 shadow-sm">
-                    Built for Modern Real Estate Professionals
-                </div>
+            <section class="glass-card rel8tion-hero-section rounded-[44px] px-6 py-14 md:p-20 text-center">
+                <p class="inline-flex items-center justify-center rounded-full bg-white/20 border border-white/35 px-5 py-2 text-[10px] md:text-xs font-black uppercase tracking-[0.24em] text-[#1f2a5a]/75 mb-6 shadow-sm">
+                    Physical-First Open House Technology
+                </p>
 
-                <h1 class="font-['Plus_Jakarta_Sans'] text-[40px] md:text-[72px] leading-[1.0] font-extrabold tracking-tighter text-slate-900 mb-6">
+                <h1 class="font-['Plus_Jakarta_Sans'] text-[42px] md:text-[82px] leading-[0.94] font-extrabold tracking-tighter text-slate-900 mb-6">
                     Show Up. Tap Once. Everything Goes Live.
                 </h1>
 
-                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-10 leading-normal">
-                    Rel8tion helps agents activate open houses instantly, prove representation, simplify compliance, automate follow-up, and keep more deals alive from first tap to closing.
+                <p class="text-slate-700 text-lg md:text-2xl font-semibold max-w-4xl mx-auto mb-8 leading-normal">
+                    Rel8tion is a branded physical open-house system that turns the real-world moment at the door into the ultimate digital open-house experience, backed by a professional website builder for your brand, listings, and leads.
                 </p>
 
-                <div class="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="https://rel8tion.info/howitworks" class="brand-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
-                        See It In Action
+                <div class="rel8tion-hero-points grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-4xl mx-auto mb-9 text-left">
+                    <div class="rel8tion-mini-card rounded-[24px] px-5 py-4">
+                        <div class="text-2xl mb-2">⚡</div>
+                        <div class="text-slate-900 font-black text-base">About 20 seconds</div>
+                        <div class="text-slate-600 font-bold text-sm">Tap, confirm, go live.</div>
+                    </div>
+                    <div class="rel8tion-mini-card rounded-[24px] px-5 py-4">
+                        <div class="text-2xl mb-2">🚫</div>
+                        <div class="text-slate-900 font-black text-base">No app or iPad</div>
+                        <div class="text-slate-600 font-bold text-sm">No tablet handoff at the door.</div>
+                    </div>
+                    <div class="rel8tion-mini-card rounded-[24px] px-5 py-4">
+                        <div class="text-2xl mb-2">📍</div>
+                        <div class="text-slate-900 font-black text-base">No listing search</div>
+                        <div class="text-slate-600 font-bold text-sm">Physical context routes the event.</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center justify-center gap-4">
+                    <a href="https://getrel8tion.com" class="brand-button w-full sm:w-auto px-11 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        Get the Open House Kit
                     </a>
-                    <a href="https://rel8tion.info/demo" class="secondary-button w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide inline-flex justify-center">
-                        Request a Demo
+                    <a href="#event-pass" class="text-[#1f2a5a] font-black text-sm md:text-base uppercase tracking-[0.16em] hover:text-blue-600 transition">
+                        Already have an Event Pass? Start here →
                     </a>
                 </div>
             </section>
 
-            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <article class="glass-card rounded-[38px] p-10 text-left">
-                    <div class="text-5xl mb-8">📱</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Smart Sign Auto-Setup</h2>
-                    <p class="text-slate-700 text-lg leading-relaxed font-medium">Arrive at the open house, tap the sign, and Rel8tion sets everything up automatically — no extra steps, no manual programming, no wasted time.</p>
+            <section class="glass-card rounded-[44px] p-7 md:p-12">
+                <div class="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] gap-7 items-stretch">
+                    <div class="rel8tion-mini-card rounded-[34px] p-7 md:p-9">
+                        <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-4">
+                            Not another check-in app
+                        </p>
+                        <h2 class="text-[30px] md:text-[48px] font-extrabold text-slate-900 mb-5 leading-tight">
+                            Most tools start digital. Rel8tion starts physical.
+                        </h2>
+                        <p class="text-slate-700 text-base md:text-xl font-semibold leading-relaxed mb-6">
+                            Traditional tools create a form, QR code, flyer, or tablet workflow. Rel8tion starts with the real open-house environment — the property, GPS/location, branded keychain, Smart Sign, and Event Pass — then routes everything into the correct digital workflow.
+                        </p>
+                        <div class="flex justify-center">
+                            <button type="button" data-open-rel8tion-comparison class="brand-button rel8tion-compare-button px-9 py-4 rounded-full font-bold text-sm md:text-base uppercase tracking-wide">
+                                See How We Compare
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="rel8tion-proof-card rel8tion-mini-card">
+                            <h3 class="text-xl md:text-2xl font-extrabold text-slate-900 mb-5">Digital-first apps usually require:</h3>
+                            <div class="space-y-3 text-slate-700 text-sm md:text-base font-bold">
+                                <div>✗ Open an app or dashboard</div>
+                                <div>✗ Use an iPad or tablet</div>
+                                <div>✗ Create and display a QR code</div>
+                                <div>✗ Search for the listing</div>
+                                <div>✗ Manually set up the event</div>
+                            </div>
+                        </div>
+                        <div class="rel8tion-proof-card rel8tion-mini-card">
+                            <h3 class="text-xl md:text-2xl font-extrabold text-slate-900 mb-5">Rel8tion lets the agent:</h3>
+                            <div class="space-y-3 text-slate-700 text-sm md:text-base font-bold">
+                                <div>✓ Show up</div>
+                                <div>✓ Tap once</div>
+                                <div>✓ Activate the event</div>
+                                <div>✓ Capture check-ins and disclosures</div>
+                                <div>✓ See buyer activity in real time</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <article class="glass-card rel8tion-mini-card rounded-[34px] p-8 text-left">
+                    <div class="text-4xl mb-5">🔑</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-3">Branded agent hardware</h2>
+                    <p class="text-slate-700 text-base md:text-lg leading-relaxed font-semibold">
+                        A company-branded Rel8tionChip and Smart Sign make the system feel like the agent's own premium open-house tool — not a disposable QR printout.
+                    </p>
                 </article>
-                <article class="glass-card rounded-[38px] p-10 text-left">
-                    <div class="text-5xl mb-8">🛡️</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Buyer Relationship Protection</h2>
-                    <p class="text-slate-700 text-lg leading-relaxed font-medium">Give buyer’s agents proof of relationship before or at the open house, helping protect represented buyers and reduce the risk of clients being steered away.</p>
+                <article class="glass-card rel8tion-mini-card rounded-[34px] p-8 text-left">
+                    <div class="text-4xl mb-5">📄</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-3">Cleaner buyer capture</h2>
+                    <p class="text-slate-700 text-base md:text-lg leading-relaxed font-semibold">
+                        Buyers check in without downloading anything. Rel8tion can collect event records, disclosures, property interest, and follow-up signals in one flow.
+                    </p>
                 </article>
+                <article class="glass-card rel8tion-mini-card rounded-[34px] p-8 text-left">
+                    <div class="text-4xl mb-5">💰</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-3">Smarter financing conversations</h2>
+                    <p class="text-slate-700 text-base md:text-lg leading-relaxed font-semibold">
+                        Buyer financing help stays private and optional, while Buyer Affordability Guidance helps agents test property scenarios against loan officer guidance.
+                    </p>
+                </article>
+            </section>
+
+            <section class="glass-card rounded-[44px] p-8 md:p-14 text-center">
+                <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                    The simple difference
+                </p>
+                <h2 class="text-[30px] md:text-[50px] font-extrabold text-slate-900 mb-6 leading-tight">
+                    Open houses happen physically. Rel8tion was built for that.
+                </h2>
+                <p class="text-slate-700 text-base md:text-xl font-semibold max-w-5xl mx-auto leading-relaxed">
+                    Agents, buyers, properties, and signs are not floating around inside an app — they are at the property. Rel8tion uses that physical context to launch the ultimate digital open-house experience with check-in, disclosures, dashboard visibility, event recap, and optional support when a buyer asks for help.
+                </p>
+            </section>
+
+            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <article class="glass-card rel8tion-mini-card rounded-[38px] p-10 text-left">
+                    <div class="text-5xl mb-8">🏡</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Open House Kit</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">
+                        A permanent custom-branded Smart Sign, base, and Rel8tionChip system for agents, teams, and brokerages that want every open house organized from the first tap.
+                    </p>
+                </article>
+                <article class="glass-card rel8tion-mini-card rounded-[38px] p-10 text-left">
+                    <div class="text-5xl mb-8">🎟️</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Event Pass</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">
+                        A Rel8tion-branded physical QR/NFC pass that can be sponsored by a loan officer or trusted industry professional so agents can try Rel8tion without purchasing the full kit upfront.
+                    </p>
+                </article>
+                <article class="glass-card rel8tion-mini-card rounded-[38px] p-10 text-left">
+                    <div class="text-5xl mb-8">📊</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Live Dashboard</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">
+                        Agents see check-ins, disclosure status, financing-help requests, event recap details, and follow-up actions in one place.
+                    </p>
+                </article>
+                <article class="glass-card rel8tion-mini-card rounded-[38px] p-10 text-left">
+                    <div class="text-5xl mb-8">💰</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Buyer Affordability Guidance</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium">
+                        Loan officers can enter limited guidance after their normal review outside Rel8tion, so agents can test property scenarios without replacing a real pre-approval or credit decision.
+                    </p>
+                </article>
+                <article class="glass-card rel8tion-mini-card rounded-[38px] p-10 text-left">
+                    <div class="text-5xl mb-8">🌐</div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Agent Website Builder</h2>
+                    <p class="text-slate-700 text-lg leading-relaxed font-medium mb-6">
+                        Build and manage a polished, compliant real estate website that showcases your brand and listings while giving prospects a clear path to connect.
+                    </p>
+                    <a href="https://my.rel8tion.me" class="font-black text-[#1f2a5a] hover:text-blue-600 transition">Open the Website Builder →</a>
+                </article>
+            </section>
+
+            <section class="glass-card rounded-[44px] p-10 md:p-16 text-center">
+                <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                    Custom-Branded Open House Kit
+                </p>
+                <h2 class="text-[32px] md:text-[52px] font-extrabold text-slate-900 mb-6 leading-tight">
+                    Your brand on the table. Rel8tion powering the event.
+                </h2>
+                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-5xl mx-auto leading-relaxed mb-8">
+                    The Event Pass is Rel8tion-branded, but the full Open House Kit is built to feel like the agent's own premium open-house system: company-branded Rel8tionChips, a branded Smart Sign, a matching branded base, and custom branding options when you want it tailored to your team, brokerage, or company. It is not a disposable QR sheet — it is reusable physical open-house infrastructure.
+                </p>
+                <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-left text-slate-700 text-base md:text-lg font-bold">
+                    <div>✓ Two company-branded Rel8tionChips</div>
+                    <div>✓ Branded Smart Sign</div>
+                    <div>✓ Matching branded sign base</div>
+                    <div>✓ Custom branding available</div>
+                </div>
             </section>
 
             <section class="glass-card rounded-[44px] p-10 md:p-16">
                 <div class="text-center mb-10">
-                    <h2 class="text-[32px] md:text-[48px] font-extrabold text-slate-900">How Rel8tion Works</h2>
+                    <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                        How It Works
+                    </p>
+                    <h2 class="text-[32px] md:text-[52px] font-extrabold text-slate-900 leading-tight">Built for the live open-house floor.</h2>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
+                    <article class="rel8tion-mini-card rounded-[32px] p-7">
                         <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 1</div>
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Tap to Activate</h3>
-                        <p class="text-slate-700 font-medium">Arrive on-site and tap your smart sign or Rel8tion device.</p>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-3">Tap to Activate</h3>
+                        <p class="text-slate-700 font-medium">The agent arrives, scans or taps, confirms the detected listing when needed, and launches the event in about 20 seconds.</p>
                     </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                    <article class="rel8tion-mini-card rounded-[32px] p-7">
                         <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 2</div>
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Launch the Right Flow</h3>
-                        <p class="text-slate-700 font-medium">Rel8tion loads the property, event, and buyer journey automatically.</p>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-3">Check In Buyers</h3>
+                        <p class="text-slate-700 font-medium">Visitors check in from the Smart Sign or Event Pass. No app, no password, no account, no required email, and no clipboard.</p>
                     </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                    <article class="rel8tion-mini-card rounded-[32px] p-7">
                         <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 3</div>
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Capture and Protect Relationships</h3>
-                        <p class="text-slate-700 font-medium">Buyers, buyer’s agents, and listing agents move through the correct workflow with cleaner records and better protection.</p>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-3">Sign and Store</h3>
+                        <p class="text-slate-700 font-medium">Rel8tion guides required acknowledgements, captures verifiable e-signed disclosure records, and keeps the event paperless.</p>
                     </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
+                    <article class="rel8tion-mini-card rounded-[32px] p-7">
                         <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 4</div>
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Keep the Deal Moving</h3>
-                        <p class="text-slate-700 font-medium">Automated follow-up, compliance support, pre-approvals, and deal-saver tools help keep the process alive through closing.</p>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-3">Work the Dashboard</h3>
+                        <p class="text-slate-700 font-medium">The agent sees check-ins, disclosures, event recap, and next-step actions.</p>
+                    </article>
+                    <article class="rel8tion-mini-card rounded-[32px] p-7">
+                        <div class="text-xs font-black uppercase tracking-widest text-[#1f2a5a] mb-3">Step 5</div>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-3">Route Help</h3>
+                        <p class="text-slate-700 font-medium">When a buyer asks for financing help, the request can route privately to available loan officer support.</p>
                     </article>
                 </div>
             </section>
 
-            <section class="glass-card rounded-[44px] p-10 md:p-16">
-                <div class="text-center mb-10">
-                    <h2 class="text-[32px] md:text-[48px] font-extrabold text-slate-900">Built for the Moments That Matter Most</h2>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">The Open House Setup That Handles Itself</h3>
-                        <p class="text-slate-700 font-medium">Rel8tion’s smart sign activates on-site and launches the right event flow automatically, so agents can focus on people instead of setup.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Cleaner Cooperation. Better Negotiation.</h3>
-                        <p class="text-slate-700 font-medium">Rel8tion creates a structured workflow between buyers, buyer’s agents, and listing agents so communication is cleaner, cooperation is easier, and deals move with less friction.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Protect the Buyer-Agent Relationship</h3>
-                        <p class="text-slate-700 font-medium">Create proof of relationship before or at the open house so agents can document representation and reduce the risk of clients being steered away.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Paperless Compliance, Signed Digitally</h3>
-                        <p class="text-slate-700 font-medium">Handle compliance forms digitally so nothing gets lost, delayed, or held up by paper-based workflows.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Stay Front and Center for the Full Home Search</h3>
-                        <p class="text-slate-700 font-medium">Rel8tion keeps agents in front of buyers with automated nurturing that stays active throughout the full home search, not just the first interaction.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Built for Broker Oversight</h3>
-                        <p class="text-slate-700 font-medium">Give brokerages cleaner records, better visibility, and more control over compliance-sensitive interactions.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Instant Pre-Approvals That Keep Deals Moving</h3>
-                        <p class="text-slate-700 font-medium">Get buyers financing-ready faster so agents can stay focused on the properties, conversations, and closings that matter.</p>
-                    </article>
-                    <article class="bg-white/35 rounded-[32px] p-8 border border-white/50">
-                        <h3 class="text-2xl font-extrabold text-slate-900 mb-3">Save the Deals That Are Hard to Close</h3>
-                        <p class="text-slate-700 font-medium">When deals get messy, Rel8tion gives agents access to support designed to help resolve issues and keep transactions alive.</p>
-                    </article>
-                </div>
-            </section>
-
-            <section class="glass-card rounded-[44px] p-12 md:p-20 text-center">
-                <h2 class="text-[34px] md:text-[56px] font-extrabold text-slate-900 mb-8">Real Estate Moves Fast. Relationships Break Faster.</h2>
-                <p class="text-slate-700 text-xl md:text-2xl font-medium max-w-5xl mx-auto leading-relaxed">
-                    Rel8tion was built for the moments where real estate deals are won, lost, protected, or saved — from open houses and buyer representation to compliance, financing readiness, and long-term follow-up.
+            <section class="glass-card rounded-[44px] p-8 md:p-14 text-center">
+                <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                    Still thinking this is just QR check-in?
                 </p>
+                <h2 class="text-[30px] md:text-[48px] font-extrabold text-slate-900 mb-5 leading-tight">
+                    See the side-by-side comparison.
+                </h2>
+                <p class="text-slate-700 text-base md:text-xl font-semibold max-w-4xl mx-auto leading-relaxed mb-8">
+                    Most services give agents a digital sign-in sheet. Rel8tion gives agents a physical-first open-house system with branded hardware, fast activation, live event records, disclosures, and affordability workflow support.
+                </p>
+                <button type="button" data-open-rel8tion-comparison class="brand-button rel8tion-compare-button px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                    Open Comparison Graphic
+                </button>
+            </section>
+
+            <section id="open-house-kit" class="glass-card rounded-[44px] p-10 md:p-16">
+                <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_.85fr] gap-8 items-stretch">
+                    <div class="rel8tion-mini-card rounded-[36px] p-8 md:p-10">
+                        <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                            The Rel8tion Open House Kit
+                        </p>
+                        <h2 class="text-[32px] md:text-[54px] font-extrabold text-slate-900 mb-6 leading-tight">
+                            A physical smart open-house system agents can use again and again.
+                        </h2>
+                        <p class="text-slate-700 text-base md:text-lg font-semibold leading-relaxed mb-8">
+                            The kit is a reusable open-house operating system: custom-branded hardware, fast activation, buyer check-in, instant lead alerts, e-signed disclosure records, property information, financing-interest tracking, organized SMS follow-up, event reporting, and dashboard access without another app. Use the same kit at every open house. The Event Pass stays Rel8tion-branded, while the Open House Kit can feature the agent, team, brokerage, or company.
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-slate-700 font-bold text-base md:text-lg">
+                            <div>✓ 1 custom-branded Smart Sign</div>
+                            <div>✓ 1 branded sign base</div>
+                            <div>✓ 2 company-branded Rel8tionChips</div>
+                            <div>✓ Custom branding option</div>
+                            <div>✓ Agent dashboard</div>
+                            <div>✓ Buyer check-in</div>
+                            <div>✓ Disclosure workflow</div>
+                            <div>✓ Event recap</div>
+                            <div>✓ QR public profile path</div>
+                            <div>✓ NFC owner access</div>
+                            <div>✓ No-app buyer check-in</div>
+                            <div>✓ Real-time agent alerts</div>
+                            <div>✓ Financing-help request tracking</div>
+                            <div>✓ Organized SMS follow-up</div>
+                            <div>✓ Reusable at every open house</div>
+                            <div>✓ Property and event reporting</div>
+                        </div>
+                    </div>
+
+                    <aside class="rel8tion-mini-card rounded-[36px] p-8 md:p-10 flex flex-col justify-between">
+                        <div>
+                            <div class="text-xs font-black uppercase tracking-[0.22em] text-blue-700 mb-4">Limited Summer 2026 Offer · Ends September 22</div>
+                            <h3 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3">Choose the plan that fits your business.</h3>
+                            <div class="my-6 flex justify-center rounded-[28px] bg-white/70 border border-white/80 p-4">
+                                <img src="https://rel8tion.me/wp-content/uploads/2026/05/kitmockup.png" alt="Rel8tion Open House Kit with Smart Sign and two Rel8tionChips" class="block w-full max-w-[460px] mx-auto object-contain drop-shadow-[0_24px_50px_rgba(31,42,90,0.22)]" loading="eager">
+                            </div>
+                            <div class="my-8 rounded-[28px] bg-white/70 border border-white/80 p-6">
+                                <div class="text-sm font-black uppercase tracking-widest text-slate-500 mb-2">Start Simple</div>
+                                <div id="homeMonthlyPrice" class="text-[46px] md:text-[58px] font-extrabold text-slate-900 leading-none">$199 today</div>
+                                <div id="homeMonthlyDetail" class="text-slate-600 font-bold mt-3">Complete reusable Open House Kit with 31 days of service included, then $29/month.</div>
+                                <div class="text-blue-900 font-black mt-4">SMS follow-up · dashboard access · buyer and event records</div>
+                            </div>
+                            <div class="rel8tion-mini-card rounded-[28px] p-6 mb-6 border-2 border-blue-200">
+                                <div class="text-sm font-black uppercase tracking-widest text-blue-700 mb-2">Summer Best Value</div>
+                                <div id="homeAnnualPrice" class="text-3xl md:text-4xl font-extrabold text-slate-900">$499 total</div>
+                                <div id="homeAnnualDetail" class="text-slate-600 font-bold mt-3">Open House Kit + 12 months of platform service + custom REL8TION agent website.</div>
+                                <div class="text-blue-900 font-black mt-4">Renews at $300/year at the locked promotional rate</div>
+                                <div class="mt-5 rounded-[20px] bg-emerald-50 border border-emerald-200 p-4">
+                                    <div class="text-2xl font-extrabold text-emerald-800">Save $487 the first year</div>
+                                    <div class="mt-2 text-sm font-bold leading-relaxed text-emerald-950">Purchased separately: REL8TION is $199 + $29/month ($547 first year) and the Website Builder is $199 + $20/month ($439 first year)—$986 total. Get both for $499.</div>
+                                </div>
+                            </div>
+                            <p class="text-slate-600 font-semibold leading-relaxed mb-6">
+                                Both plans include one Smart Sign, two Rel8tionChip keychains, custom company branding, QR/NFC activation, no-app buyer check-in, instant alerts, disclosure records, financing-interest signals, event reports, dashboard tools, and follow-up organization. Promotional subscribers keep their selected rate while the subscription remains active and receive future REL8TION platform upgrades at no added subscription charge. Replacement hardware and third-party services are excluded.
+                            </p>
+
+                            <div class="rounded-[24px] bg-blue-50/80 border border-blue-100 p-5 mb-7">
+                                <div class="font-black text-blue-950 mb-2">Included with the annual Summer bundle</div>
+                                <div class="text-slate-700 font-bold leading-relaxed">A custom agent website with listings, galleries, testimonials, contact capture, domain-ready public pages, plus access to REL8TION website and AI marketing tools such as headshot concepts, staging concepts, and listing AutoReels.</div>
+                            </div>
+
+                        </div>
+                        <a href="https://getrel8tion.com" class="brand-button w-full px-8 py-4 rounded-full font-bold text-base uppercase tracking-wide">
+                            Get the Open House Kit
+                        </a>
+                    </aside>
+                </div>
+            </section>
+
+            <section id="event-pass" class="glass-card rounded-[44px] p-10 md:p-16">
+                <div class="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-8 items-center">
+                    <div>
+                        <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-5">
+                            Request an Event Pass
+                        </p>
+                        <h2 class="text-[32px] md:text-[52px] font-extrabold text-slate-900 mb-6 leading-tight">
+                            Try Rel8tion at a real open house without the full kit commitment.
+                        </h2>
+                        <p class="text-slate-700 text-base md:text-lg font-semibold leading-relaxed mb-6">
+                            A loan officer or trusted industry professional can sponsor a Rel8tion-branded physical Event Pass to help an agent get started and experience the system at a live open house before purchasing the full custom-branded Open House Kit.
+                        </p>
+                        <p class="text-slate-700 text-base md:text-lg font-semibold leading-relaxed mb-6">
+                            We offer this because Rel8tion is built to create lasting professional rel8tionships that mutually benefit everyone involved. The agent gets a cleaner open-house experience, the sponsor earns meaningful placement and relationship-building opportunity, and buyers get a simpler, more professional path when they choose to ask for help.
+                        </p>
+                        <p class="text-slate-700 text-base md:text-lg font-semibold leading-relaxed mb-8">
+                            If you already have an Event Pass, scan the printed QR or tap the NFC chip on the pass to continue setup. Event Passes stay Rel8tion-branded for sponsorship consistency; the full Open House Kit is where agents, teams, brokerages, and companies can add custom branding.
+                        </p>
+                        <div class="flex justify-center">
+                            <button type="button" data-open-rel8tion-sponsor class="secondary-button justify-center px-9 py-4 rounded-full font-bold text-sm md:text-base uppercase tracking-wide">
+                                    Request My Event Pass
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="rel8tion-mini-card rounded-[36px] p-8">
+                        <h3 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-5">What the sponsored Event Pass unlocks</h3>
+                        <div class="space-y-4 text-slate-700 text-base md:text-lg font-bold leading-relaxed">
+                            <div>✓ A physical QR/NFC Event Pass the agent can use at the open house</div>
+                            <div>✓ Paperless buyer check-in with no app download</div>
+                            <div>✓ E-signed disclosure workflow and event records</div>
+                            <div>✓ Property information and follow-up signals in one flow</div>
+                            <div>✓ Sponsor visibility tied to professional support, not another disposable QR sheet</div>
+                        </div>
+                        <div class="mt-7 rounded-[28px] bg-blue-50/80 border border-blue-100 p-6">
+                            <p class="text-blue-950 font-black leading-relaxed">
+                                The goal is simple: help agents experience Rel8tion, create better open-house conversations, and build professional relationships that can keep growing after the event ends.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section class="glass-card rounded-[44px] px-6 py-12 md:p-24 text-center">
-                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">Protect More Relationships. Save More Deals. Close More Business.</h2>
-                <p class="text-slate-700 text-lg md:text-2xl font-medium max-w-4xl mx-auto mb-10">
-                    From instant open-house setup to compliance, nurturing, pre-approvals, and deal rescue, Rel8tion helps agents stay organized, protected, and positioned to close more business.
+                <h2 class="text-[32px] sm:text-[40px] md:text-[68px] font-extrabold text-slate-900 mb-8 leading-tight">
+                    One open house can become the beginning of every relationship.
+                </h2>
+                <p class="text-slate-700 text-base md:text-xl font-semibold max-w-4xl mx-auto mb-10 leading-relaxed">
+                    Stop treating open houses like one-day events. Turn them into a seamless paperless experience with organized buyer records, verifiable e-signed disclosures, real-time agent information, professional support when requested, and repeatable relationship growth.
                 </p>
                 <div class="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="https://rel8tion.info/howitworks" class="brand-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
-                        See It In Action
+                    <a href="https://getrel8tion.com" class="brand-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        Get the Open House Kit
                     </a>
-                    <a href="https://rel8tion.info/demo" class="secondary-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
-                        Request a Demo
+                    <a href="https://rel8tion.me/contact" class="secondary-button inline-flex justify-center items-center w-full md:w-auto px-10 py-4 rounded-full font-bold text-base md:text-lg uppercase tracking-wide">
+                        Talk to Rel8tion
                     </a>
                 </div>
             </section>
         </div>
     </main>
 
+    <div id="rel8tionComparisonModal" class="rel8tion-modal-backdrop" aria-hidden="true">
+        <div class="rel8tion-comparison-modal" role="dialog" aria-modal="true" aria-label="Rel8tion competitor comparison">
+            <button type="button" id="closeRel8tionComparison" class="rel8tion-modal-close" aria-label="Close comparison">×</button>
+            <div class="rel8tion-mobile-modal-hint">Swipe left/right or pinch-zoom to view the full comparison.</div>
+            <img src="https://rel8tion.me/wp-content/uploads/2026/05/competitorcomparison.png" alt="Rel8tion competitor comparison infographic">
+        </div>
+    </div>
+
+    <aside id="rel8tionEventPassNudge" class="rel8tion-event-pass-nudge" aria-live="polite" aria-label="Try a free Rel8tion Event Pass">
+        <button id="closeRel8tionEventPassNudge" type="button" class="rel8tion-event-pass-nudge-close" aria-label="Close Event Pass offer">×</button>
+        <div class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700 mb-2">Wait—Try It Free</div>
+        <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 pr-8 mb-3">Let us send you an Event Pass.</h2>
+        <p class="text-slate-700 font-semibold leading-relaxed mb-4">Run the REL8TION experience at a real open house before buying the full kit. Request a physical QR/NFC Event Pass and tell us whether your current loan specialist should provide coverage.</p>
+        <button type="button" data-open-rel8tion-sponsor data-event-pass-nudge-action class="brand-button w-full px-7 py-4 rounded-full font-bold text-sm uppercase tracking-wide">Request My Free Event Pass</button>
+        <button id="dismissRel8tionEventPassNudge" type="button" class="w-full mt-3 text-sm font-black text-slate-500">Maybe Later</button>
+    </aside>
+
+    <div id="rel8tionSponsorModal" class="rel8tion-modal-backdrop" aria-hidden="true">
+        <div class="rel8tion-sponsor-modal" role="dialog" aria-modal="true" aria-label="Rel8tion Event Pass sponsorship information">
+            <button type="button" id="closeRel8tionSponsor" class="rel8tion-modal-close" aria-label="Close sponsorship information">×</button>
+            <div class="p-2 md:p-4">
+                <p class="text-[11px] md:text-sm font-black uppercase tracking-[0.24em] text-[#1f2a5a]/70 mb-4">
+                    Sponsor The Physical Event Pass
+                </p>
+                <h2 class="text-[30px] md:text-[52px] font-extrabold text-slate-900 mb-5 leading-tight">
+                    Help agents try Rel8tion and build lasting professional rel8tionships.
+                </h2>
+                <p class="text-slate-700 text-base md:text-xl font-semibold leading-relaxed mb-6">
+                    Event Pass sponsorship lets a loan officer or trusted industry professional place Rel8tion's physical open-house technology into the field so agents can experience the system without buying the full custom-branded kit upfront.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                    <div class="rel8tion-mini-card rounded-[28px] p-6">
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-4">What sponsors receive</h3>
+                        <div class="space-y-3 text-slate-700 font-bold leading-relaxed">
+                            <div>✓ Professional placement around supported open-house technology</div>
+                            <div>✓ Opportunity to support agents with a simple physical-first system</div>
+                            <div>✓ Event workflow visibility and reporting where available</div>
+                            <div>✓ Relationship-building infrastructure that benefits the agent, sponsor, and buyer experience</div>
+                        </div>
+                    </div>
+                    <div class="rel8tion-mini-card rounded-[28px] p-6">
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-4">Important compliance boundary</h3>
+                        <p class="text-slate-700 font-semibold leading-relaxed mb-4">
+                            Rel8tion organizes the open-house technology layer. Rel8tion does not pre-approve buyers, underwrite loans, collect financial documents, or make credit decisions.
+                        </p>
+                        <p class="text-blue-950 font-black leading-relaxed">
+                            Buyer support is routed only when the buyer asks for help, and any real loan review happens outside Rel8tion with the appropriate licensed professional.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="rel8tionSponsorForm" class="rel8tion-mini-card rounded-[30px] p-5 md:p-7" novalidate>
+                    <input type="hidden" name="source" value="wordpress-home">
+                    <h3 class="text-2xl font-extrabold text-slate-900 mb-2">Request an Event Pass</h3>
+                    <p class="text-slate-700 font-semibold mb-5">Tell us about you and your upcoming open house. Loan-specialist information is optional.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="sponsorName">Agent Name</label>
+                            <input id="sponsorName" name="agent_name" class="rel8tion-sponsor-field" autocomplete="name" required>
+                        </div>
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="agentBrokerage">Brokerage</label>
+                            <input id="agentBrokerage" name="agent_brokerage" class="rel8tion-sponsor-field">
+                        </div>
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="agentPhone">Mobile Phone</label>
+                            <input id="agentPhone" name="agent_phone" type="tel" class="rel8tion-sponsor-field" autocomplete="tel" required>
+                        </div>
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="agentEmail">Email</label>
+                            <input id="agentEmail" name="agent_email" type="email" class="rel8tion-sponsor-field" autocomplete="email" required>
+                        </div>
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="openHouseAddress">Open House Address</label>
+                            <input id="openHouseAddress" name="open_house_address" class="rel8tion-sponsor-field" placeholder="Street, town, ZIP">
+                        </div>
+                        <div>
+                            <label class="rel8tion-sponsor-label" for="openHouseDate">Open House Date / Time</label>
+                            <input id="openHouseDate" name="open_house_date" class="rel8tion-sponsor-field" placeholder="Sunday, 12–2 PM">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="rel8tion-sponsor-label" for="hasLoanSpecialist">Do you currently work with a loan specialist?</label>
+                            <select id="hasLoanSpecialist" name="has_current_loan_specialist" class="rel8tion-sponsor-select">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div id="loanSpecialistFields" class="hidden md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 rounded-[24px] bg-blue-50/80 border border-blue-100 p-5">
+                            <div class="md:col-span-2">
+                                <label class="rel8tion-sponsor-label" for="wantsLoanCoverage">Would you like them to provide coverage for this open house?</label>
+                                <select id="wantsLoanCoverage" name="wants_current_loan_specialist_coverage" class="rel8tion-sponsor-select">
+                                    <option value="no">No</option><option value="yes">Yes</option>
+                                </select>
+                            </div>
+                            <div><label class="rel8tion-sponsor-label" for="loanOfficerName">Loan Specialist Name</label><input id="loanOfficerName" name="loan_officer_name" class="rel8tion-sponsor-field"></div>
+                            <div><label class="rel8tion-sponsor-label" for="loanOfficerCompany">Company</label><input id="loanOfficerCompany" name="loan_officer_company" class="rel8tion-sponsor-field"></div>
+                            <div><label class="rel8tion-sponsor-label" for="loanOfficerPhone">Phone</label><input id="loanOfficerPhone" name="loan_officer_phone" type="tel" class="rel8tion-sponsor-field"></div>
+                            <div><label class="rel8tion-sponsor-label" for="loanOfficerEmail">Email</label><input id="loanOfficerEmail" name="loan_officer_email" type="email" class="rel8tion-sponsor-field"></div>
+                            <p class="md:col-span-2 text-sm font-semibold text-slate-600">We may contact your loan specialist about sponsoring the Event Pass and providing coverage. Nothing is assigned until sponsorship and coverage are confirmed.</p>
+                        </div>
+                    </div>
+                    <p id="eventPassRequestStatus" class="mt-4 font-bold" role="status" aria-live="polite"></p>
+                    <div class="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                        <button id="eventPassRequestSubmit" type="submit" class="brand-button px-8 py-4 rounded-full font-bold text-sm uppercase tracking-wide">
+                            Request My Event Pass
+                        </button>
+                        <button type="button" id="closeRel8tionSponsorSecondary" class="secondary-button px-8 py-4 rounded-full font-bold text-sm uppercase tracking-wide">
+                            Close
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
     <footer class="w-full relative z-30 bg-white/40 backdrop-blur-md border-t border-white/40 mt-12 px-6 py-16">
         <div class="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center md:items-start gap-12">
             <div class="max-w-sm text-center md:text-left">
-                <img src="https://rel8tion.info/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-9 mb-8 mx-auto md:mx-0 opacity-90">
-                <p class="text-slate-600 text-sm font-medium">Rel8tion helps agents, teams, and brokerages protect relationships, automate follow-up, simplify compliance, support cooperation, and move more deals toward closing.</p>
+                <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion Logo" class="h-9 mb-8 mx-auto md:mx-0 opacity-90">
+                <p class="text-slate-600 text-sm font-medium">Rel8tion is physical-first open-house technology: branded hardware, about-20-second activation, no-app buyer check-in, e-signed disclosures, dashboard visibility, buyer affordability workflow support, and sponsor-supported professional relationships.</p>
             </div>
             <div class="flex gap-16 md:gap-24 text-center md:text-left">
                 <div>
                     <div class="font-black text-slate-900 mb-6 uppercase text-[10px] tracking-widest">Platform</div>
                     <ul class="text-sm font-bold text-slate-700 space-y-4">
-                        <li><a href="https://rel8tion.info/howitworks" class="hover:text-slate-900 transition">How It Works</a></li>
-                        <li><a href="https://rel8tion.info/features" class="hover:text-slate-900 transition">Features</a></li>
-                        <li><a href="https://rel8tion.info/pricing" class="hover:text-slate-900 transition">Pricing</a></li>
-                        <li><a href="https://rel8tion.info/contact" class="hover:text-slate-900 transition">Contact</a></li>
-                        <li><a href="https://rel8tion.info/agents" class="hover:text-slate-900 transition">Agents</a></li>
-                        <li><a href="https://rel8tion.info/privacy-policy" class="hover:text-slate-900 transition">Privacy Policy</a></li>
-                        <li><a href="https://rel8tion.info/terms-of-service" class="hover:text-slate-900 transition">Terms of Service</a></li>
+                        <li><a href="https://getrel8tion.com" class="hover:text-slate-900 transition">Open House Kit</a></li>
+                        <li><a href="#event-pass" class="hover:text-slate-900 transition">Event Pass</a></li>
+                        <li><a href="https://my.rel8tion.me" class="hover:text-slate-900 transition">Website Builder</a></li>
+                        <li><a href="https://rel8tion.me/contact" class="hover:text-slate-900 transition">Contact</a></li>
+                        <li><a href="https://rel8tion.me/privacy-policy" class="hover:text-slate-900 transition">Privacy Policy</a></li>
+                        <li><a href="https://rel8tion.me/terms-of-service" class="hover:text-slate-900 transition">Terms of Service</a></li>
+                        <li><a href="https://rel8tion.me/sms-consent" class="hover:text-slate-900 transition">SMS Consent</a></li>
                     </ul>
                 </div>
             </div>
@@ -332,9 +1258,186 @@
         </div>
     </footer>
 </div>
+</div>
 
 <script>
-  const thankYouUrl = "https://rel8tion.info/thank-you";
+document.addEventListener("DOMContentLoaded", function () {
+  const modal = document.getElementById("rel8tionComparisonModal");
+  const closeBtn = document.getElementById("closeRel8tionComparison");
+  const openBtns = document.querySelectorAll("[data-open-rel8tion-comparison]");
+
+  if (!modal || !closeBtn || !openBtns.length) return;
+
+  function openComparisonModal() {
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeComparisonModal() {
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  openBtns.forEach(function (btn) {
+    btn.addEventListener("click", openComparisonModal);
+  });
+
+  closeBtn.addEventListener("click", closeComparisonModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) closeComparisonModal();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeComparisonModal();
+  });
+});
+
+ document.addEventListener("DOMContentLoaded", function () {
+  const sponsorModal = document.getElementById("rel8tionSponsorModal");
+  const sponsorCloseBtn = document.getElementById("closeRel8tionSponsor");
+  const sponsorCloseSecondary = document.getElementById("closeRel8tionSponsorSecondary");
+  const sponsorOpenBtns = document.querySelectorAll("[data-open-rel8tion-sponsor]");
+
+  if (!sponsorModal || !sponsorCloseBtn || !sponsorOpenBtns.length) return;
+
+  function openSponsorModal() {
+    sponsorModal.classList.add("is-open");
+    sponsorModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSponsorModal() {
+    sponsorModal.classList.remove("is-open");
+    sponsorModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  sponsorOpenBtns.forEach(function (btn) {
+    btn.addEventListener("click", openSponsorModal);
+  });
+
+  sponsorCloseBtn.addEventListener("click", closeSponsorModal);
+  if (sponsorCloseSecondary) sponsorCloseSecondary.addEventListener("click", closeSponsorModal);
+
+  sponsorModal.addEventListener("click", function (event) {
+    if (event.target === sponsorModal) closeSponsorModal();
+  });
+
+  const requestForm = document.getElementById("rel8tionSponsorForm");
+  const hasLoanSpecialist = document.getElementById("hasLoanSpecialist");
+  const wantsLoanCoverage = document.getElementById("wantsLoanCoverage");
+  const loanFields = document.getElementById("loanSpecialistFields");
+  const requestStatus = document.getElementById("eventPassRequestStatus");
+  const requestSubmit = document.getElementById("eventPassRequestSubmit");
+  const loanInputs = ["loanOfficerName", "loanOfficerCompany", "loanOfficerPhone", "loanOfficerEmail"]
+    .map(function (id) { return document.getElementById(id); });
+
+  function syncLoanFields() {
+    const hasSpecialist = hasLoanSpecialist && hasLoanSpecialist.value === "yes";
+    const wantsCoverage = hasSpecialist && wantsLoanCoverage && wantsLoanCoverage.value === "yes";
+    if (loanFields) loanFields.classList.toggle("hidden", !hasSpecialist);
+    loanInputs.forEach(function (input) { if (input) input.required = wantsCoverage; });
+  }
+
+  if (hasLoanSpecialist) hasLoanSpecialist.addEventListener("change", syncLoanFields);
+  if (wantsLoanCoverage) wantsLoanCoverage.addEventListener("change", syncLoanFields);
+  syncLoanFields();
+
+  if (requestForm) requestForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+    syncLoanFields();
+    if (!requestForm.reportValidity()) return;
+    requestSubmit.disabled = true;
+    requestSubmit.textContent = "Sending Request...";
+    requestStatus.textContent = "";
+    try {
+      const payload = Object.fromEntries(new FormData(requestForm).entries());
+      payload.source_url = window.location.href;
+      const response = await fetch("https://app.rel8tion.me/api/event-pass-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json().catch(function () { return {}; });
+      if (!response.ok || result.ok === false) throw new Error(result.error || "Unable to send the request.");
+      requestForm.reset();
+      syncLoanFields();
+      requestStatus.className = "mt-4 font-bold text-emerald-700";
+      requestStatus.textContent = "Your Event Pass request was received. Rel8tion will contact you to confirm the open house and coverage.";
+      requestSubmit.textContent = "Request Received";
+    } catch (error) {
+      requestStatus.className = "mt-4 font-bold text-red-700";
+      requestStatus.textContent = error.message || "Unable to send the request. Please try again.";
+      requestSubmit.disabled = false;
+      requestSubmit.textContent = "Request My Event Pass";
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeSponsorModal();
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const nudge = document.getElementById("rel8tionEventPassNudge");
+  const close = document.getElementById("closeRel8tionEventPassNudge");
+  const later = document.getElementById("dismissRel8tionEventPassNudge");
+  const action = nudge && nudge.querySelector("[data-event-pass-nudge-action]");
+  const storageKey = "rel8tion_event_pass_nudge_dismissed";
+  if (!nudge || sessionStorage.getItem(storageKey) === "1") return;
+
+  let shown = false;
+  function dismiss() {
+    nudge.classList.remove("is-visible");
+    sessionStorage.setItem(storageKey, "1");
+    window.removeEventListener("scroll", maybeShow);
+  }
+  function maybeShow() {
+    const pageHeight = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+    if (!shown && (window.scrollY >= 500 || window.scrollY / pageHeight >= 0.16)) {
+      shown = true;
+      window.setTimeout(function () { nudge.classList.add("is-visible"); }, 350);
+    }
+  }
+  close.addEventListener("click", dismiss);
+  later.addEventListener("click", dismiss);
+  if (action) action.addEventListener("click", dismiss);
+  window.addEventListener("scroll", maybeShow, { passive: true });
+  maybeShow();
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async function () {
+  const money = function (amount, currency) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(Number(amount || 0) / 100);
+  };
+  try {
+    const response = await fetch("https://app.rel8tion.me/api/checkout/open-house-kit", { cache: "no-store" });
+    const pricing = await response.json();
+    if (!response.ok || !pricing.ok) return;
+    const monthlyPrice = document.getElementById("homeMonthlyPrice");
+    const monthlyDetail = document.getElementById("homeMonthlyDetail");
+    const annualPrice = document.getElementById("homeAnnualPrice");
+    const annualDetail = document.getElementById("homeAnnualDetail");
+    const currency = pricing.currency || "USD";
+    if (monthlyPrice) monthlyPrice.textContent = money(pricing.monthly.due_today, currency) + " today";
+    if (monthlyDetail) monthlyDetail.textContent = "Complete reusable Open House Kit with " + pricing.monthly.trial_days + " days of service included, then " + money(pricing.monthly.amount, currency) + "/month.";
+    if (annualPrice) annualPrice.textContent = money(pricing.annual.due_today, currency) + " total";
+    if (annualDetail) annualDetail.textContent = "Open House Kit + 12 months of platform service" + (pricing.annual.website_builder_included ? " + custom REL8TION agent website." : ".");
+  } catch (error) {
+    /* Keep the verified current offer visible if live pricing cannot load. */
+  }
+});
+</script>
+
+<script>
+  const thankYouUrl = "https://rel8tion.me/thank-you";
   window.rel8tionThankYouRedirect = thankYouUrl;
 </script>
 
@@ -379,11 +1482,11 @@ document.addEventListener("DOMContentLoaded", function () {
             background:linear-gradient(90deg,#38bdf8,#2563eb);
           ">Contact Us</a>
 
-          <a href="/pricing" style="
+          <a href="https://getrel8tion.com" style="
             display:block; padding:16px 20px; border-radius:999px;
             text-decoration:none; font-weight:800; color:#0f172a;
             border:1px solid #cbd5e1; background:#fff;
-          ">Order Your Smart Sign / Rel8tionchip</a>
+          ">Get the Open House Kit</a>
 
           <button id="closeKErrorModal" style="
             border:none; background:none; color:#64748b;
@@ -404,6 +1507,3 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 });
 </script>
-
-</body>
-</html>
