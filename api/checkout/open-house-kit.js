@@ -169,9 +169,6 @@ module.exports = async function handler(req, res) {
       params.set(`line_items[${index}][price]`, price.id);
       params.set(`line_items[${index}][quantity]`, '1');
     });
-    params.set('billing_address_collection', 'auto');
-    params.set('phone_number_collection[enabled]', 'true');
-    params.set('shipping_address_collection[allowed_countries][0]', 'US');
     params.set('branding_settings[display_name]', 'REL8TION Complete Open House System');
     params.set('branding_settings[background_color]', '#eef8ff');
     params.set('branding_settings[button_color]', '#172c76');
@@ -180,7 +177,6 @@ module.exports = async function handler(req, res) {
     params.set('branding_settings[logo][url]', REL8TION_LOGO_URL);
     params.set('custom_text[submit][message]', FULFILLMENT_MESSAGE);
     params.set('custom_text[after_submit][message]', 'After payment, REL8TION will confirm your company branding, shipping, onboarding, and platform access.');
-    params.set('custom_text[shipping_address][message]', 'Use the best delivery address for the REL8TION Smart Sign and company-branded Rel8tionChips.');
     params.set('success_url', `${origin}${appendQuery(returnPath, `success=1&plan=${interval}&session_id={CHECKOUT_SESSION_ID}`)}`);
     params.set('cancel_url', `${origin}${appendQuery(returnPath, `canceled=1&plan=${interval}`)}`);
 

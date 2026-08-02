@@ -34,8 +34,8 @@
 
     <section id="agent-plans" aria-label="Real estate agent plans">
       <div class="grid">
-        <article class="card featured"><span class="badge">Most Popular</span><h2>REL8TION Agent</h2><p class="description" id="agent-description"></p><div class="price"><strong id="agent-price">—</strong><span id="agent-period"></span></div><div id="agent-savings" class="savings"></div><p id="agent-renewal" class="renewal"></p><ul id="agent-features" class="features"></ul><button id="agent-checkout" class="button" type="button">Choose REL8TION Agent</button></article>
-        <article class="card featured"><span class="badge">Best Complete Value</span><h2>Complete REL8TION Open House System</h2><p class="description" id="system-description"></p><div class="price"><strong id="system-price">—</strong><span>due today</span></div><div class="line">A dollar a day could be a deal today.</div><p id="system-renewal" class="renewal"></p><ul id="system-features" class="features"></ul><p class="supporting">Your company on the hardware. Your relationships in the system.</p><a id="system-checkout" class="button" href="/kit-intake?plan=monthly&source=pricing">Get the Complete System</a></article>
+        <article class="card featured"><span class="badge">Most Popular</span><h2>REL8TION Agent</h2><p class="description" id="agent-description"></p><div class="price"><strong id="agent-price">—</strong><span id="agent-period"></span></div><div id="agent-savings" class="savings"></div><p id="agent-renewal" class="renewal"></p><ul id="agent-features" class="features"></ul><p class="fine"><strong>Fast checkout:</strong> select this price, enter payment, then finish your profile.</p><button id="agent-checkout" class="button" type="button">Continue to Secure Checkout</button></article>
+        <article class="card featured"><span class="badge">Best Complete Value</span><h2>Complete REL8TION Open House System</h2><p class="description" id="system-description"></p><div class="price"><strong id="system-price">—</strong><span>due today</span></div><div class="line">A dollar a day could be a deal today.</div><p id="system-renewal" class="renewal"></p><ul id="system-features" class="features"></ul><p class="supporting">Your company on the hardware. Your relationships in the system.</p><p class="fine"><strong>Payment first:</strong> add branding, shipping, and setup details after checkout.</p><button id="system-checkout" class="button" type="button">Continue to Secure Checkout</button></article>
       </div>
       <article class="secondary"><h2>Digital You — standalone</h2><p id="digital-description"></p><div class="price"><strong id="digital-price">—</strong><span>/year</span></div><p id="digital-renewal" class="renewal"></p><ul id="digital-features" class="features"></ul><p class="fine">Optional custom-domain service: <strong id="domain-price">—</strong>/year.</p><a class="button" href="https://my.rel8tion.me/get-started?source=pricing">Build Digital You</a></article>
       <aside class="banner"><div><h2>Already received an Event Pass?</h2><p>Your Event Pass was provided by a loan officer for a specific open house. Activate it together at the event to access that event’s check-ins, signed disclosures, and dashboard.</p><p>After the event, upgrade to REL8TION Agent for <strong id="event-upgrade-price">—</strong> to keep REL8TION organizing and following up with your relationships.</p></div><div class="actions"><a class="button secondary-button" href="/pass">Activate My Event Pass</a><button class="button agent-start" type="button">Keep REL8TION Working</button></div></aside>
@@ -71,7 +71,7 @@
         set('agent-savings', agent.annual_savings_cents ? `Save ${money(agent.annual_savings_cents, currency)} per year` : ''); set('agent-renewal', `Renews at ${money(agent.renewal_cents, currency)} ${state.billing === 'annual' ? 'per year' : 'per month'}.`); list('agent-features', agent.included_features);
         set('system-description', system.short_description); set('system-price', money(system.due_today_cents, currency));
         set('system-renewal', state.billing === 'annual' ? `Includes the physical kit and first year of REL8TION Agent. Renews at ${money(system.renewal_cents, currency)} per year.` : `Includes 31 days of REL8TION Agent with no additional platform charge, then ${money(system.renewal_cents, currency)} per month.`); list('system-features', system.included_features);
-        document.getElementById('system-checkout').href = `/kit-intake?plan=${state.billing}&source=pricing`;
+        document.getElementById('system-checkout').dataset.plan = state.billing;
         const digital = products.digital_you_annual; set('digital-description', digital.short_description); set('digital-price', money(digital.amount_cents, currency)); set('digital-renewal', `Renews at ${money(digital.renewal_cents, currency)} per year. Included in REL8TION Agent and the Complete Open House System.`); list('digital-features', digital.included_features); set('domain-price', money(products.custom_domain_annual.amount_cents, currency));
         set('event-upgrade-price', `${money(products.rel8tion_agent_monthly.amount_cents, currency)}/month`);
         list('lo-private-features', info.loan_officer_private_consultation.included_features); list('broker-team-features', info.real_estate_broker_team_discounts.included_features);
@@ -91,16 +91,38 @@
       async function startAgentCheckout(button) {
         button.disabled = true;
         try {
-          const response = await fetch('/api/checkout/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_code: button.dataset.planCode, source: 'pricing_page' }) });
+          const response = await fetch('/api/checkout/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_code: button.dataset.planCode, source: incoming.get('source') || 'pricing_page' }) });
           const result = await response.json(); if (!response.ok || !result.url) throw new Error(result.error || 'Checkout unavailable'); location.href = result.url;
         } catch (error) { document.getElementById('pricing-status').classList.add('show'); button.disabled = false; }
       }
 
+      async function startSystemCheckout(button) {
+        button.disabled = true;
+        try {
+          const response = await fetch('/api/checkout/open-house-kit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              plan: button.dataset.plan || state.billing,
+              source: incoming.get('source') || 'pricing_page',
+              flow: 'payment_first',
+              return_path: '/kit-intake'
+            })
+          });
+          const result = await response.json();
+          if (!response.ok || !result.url) throw new Error(result.error || 'Checkout unavailable');
+          location.href = result.url;
+        } catch (error) {
+          document.getElementById('pricing-status').classList.add('show');
+          button.disabled = false;
+        }
+      }
+
       document.querySelectorAll('[data-role]').forEach(button => button.addEventListener('click', () => { state.role = button.dataset.role; updateControls(); }));
       document.querySelectorAll('[data-billing]').forEach(button => button.addEventListener('click', () => { state.billing = button.dataset.billing; updateControls(); }));
-      document.getElementById('agent-checkout').addEventListener('click', event => startAgentCheckout(event.currentTarget)); document.querySelectorAll('.agent-start').forEach(button => button.addEventListener('click', event => startAgentCheckout(event.currentTarget)));
+      document.getElementById('agent-checkout').addEventListener('click', event => startAgentCheckout(event.currentTarget)); document.querySelectorAll('.agent-start').forEach(button => button.addEventListener('click', event => startAgentCheckout(event.currentTarget))); document.getElementById('system-checkout').addEventListener('click', event => startSystemCheckout(event.currentTarget));
       const incoming = new URLSearchParams(location.search); if (['agent','lo'].includes(incoming.get('role'))) state.role = incoming.get('role'); if (['monthly','annual'].includes(incoming.get('billing'))) state.billing = incoming.get('billing'); updateControls();
-      fetch(API, { headers: { Accept: 'application/json' } }).then(response => response.ok ? response.json() : Promise.reject()).then(catalog => { if (!catalog.ok) throw new Error(); state.catalog = catalog; render(); }).catch(() => document.getElementById('pricing-status').classList.add('show'));
+      fetch(API, { headers: { Accept: 'application/json' } }).then(response => response.ok ? response.json() : Promise.reject()).then(catalog => { if (!catalog.ok) throw new Error(); state.catalog = catalog; render(); if (incoming.get('checkout') === 'system') startSystemCheckout(document.getElementById('system-checkout')); else if (incoming.get('checkout') === 'agent') startAgentCheckout(document.getElementById('agent-checkout')); }).catch(() => document.getElementById('pricing-status').classList.add('show'));
     })();
   </script>
 </body>
