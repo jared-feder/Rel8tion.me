@@ -159,15 +159,58 @@ async function verifyEventPassBatch() {
   assert.match(archive.readme, /fresh smart_sign_inventory Event Pass inventory/);
 }
 
+async function verifySmartSignBatch() {
+  const calls = [];
+  const res = await requestBatch({ quantity: 2, inventory_type: 'smart_sign' }, async (url, options = {}) => {
+    calls.push({ url, options });
+    if (options.method === 'POST') {
+      assert.equal(url, 'https://example.supabase.co/rest/v1/smart_sign_inventory');
+      const rows = JSON.parse(options.body);
+      assert.equal(rows.length, 2);
+      assert.equal(new Set(rows.map((row) => row.public_code)).size, 2);
+      for (const row of rows) {
+        assert.match(row.public_code, /^[a-f0-9]{12}$/);
+        assert.equal(row.inventory_type, 'smart_sign');
+        assert.equal(row.is_printed, true);
+        assert.equal(row.qr_url, `https://app.rel8tion.me/s?code=${row.public_code}`);
+        assert.match(row.notes, /^Smart Sign admin print batch smart-sign-qr-/);
+        assert.match(row.metadata.print_batch_id, /^smart-sign-qr-/);
+        assert.equal(row.metadata.print_source, 'admin_qr_batch');
+        assert.equal('smart_sign_id' in row, false);
+        assert.equal('assigned_agent_slug' in row, false);
+        assert.equal('pass_model' in row, false);
+      }
+      return responseJson(rows.map((row, index) => ({ id: `smart-sign-${index + 1}`, ...row })));
+    }
+    assert.match(url, /smart_sign_inventory\?public_code=in\.\(/);
+    assert.match(url, /select=public_code/);
+    return responseJson([]);
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-rel8tion-inventory-type'], 'smart_sign');
+  assert.match(res.headers['content-disposition'], /^attachment; filename="smart-sign-qr-/);
+  assert.equal(calls.length, 2);
+
+  const archive = await readArchive(res.body);
+  assert.equal(archive.csvName, 'smart-sign-qr-batch.csv');
+  const imageFiles = archive.files.filter((name) => /^images\/[a-f0-9]{12}\.png$/.test(name));
+  assert.equal(imageFiles.length, 2);
+  assert.match(archive.csv, /sequence,public_code,qr_url,image_file,batch_id,printed_at/);
+  assert.match(archive.csv, /https:\/\/app\.rel8tion\.me\/s\?code=[a-f0-9]{12}/);
+  assert.match(archive.readme, /regular Smart Sign resolver/);
+  assert.match(archive.readme, /inventory_type=smart_sign/);
+}
+
 async function verifyGuards() {
   let called = false;
-  const invalid = await requestBatch({ quantity: 1, inventory_type: 'smart_sign' }, async () => {
+  const invalid = await requestBatch({ quantity: 1, inventory_type: 'loan_officer' }, async () => {
     called = true;
     return responseJson([]);
   });
   assert.equal(invalid.statusCode, 400);
   assert.equal(called, false);
-  assert.match(invalid.body.error, /agent or event_pass/);
+  assert.match(invalid.body.error, /agent, smart_sign, or event_pass/);
 
   const empty = await requestBatch({ quantity: 1, inventory_type: 'event_pass' }, async () => responseJson([]));
   assert.equal(empty.statusCode, 409);
@@ -177,9 +220,10 @@ async function verifyGuards() {
 (async () => {
   try {
     await verifyAgentBatch();
+    await verifySmartSignBatch();
     await verifyEventPassBatch();
     await verifyGuards();
-    console.log('Admin Agent/Event Pass QR batch verification passed.');
+    console.log('Admin Agent/Smart Sign/Event Pass QR batch verification passed.');
   } finally {
     delete global.fetch;
   }

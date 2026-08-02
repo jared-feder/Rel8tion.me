@@ -1,5 +1,6 @@
 const QRCode = require('qrcode');
 const JSZip = require('jszip');
+const crypto = require('crypto');
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 
 const MAX_BATCH = 100;
@@ -9,6 +10,12 @@ const INVENTORY_TYPES = Object.freeze({
     batchPrefix: 'agent-qr',
     csvFilename: 'agent-qr-batch.csv',
     emptyError: 'No unprinted agent QR codes are available.'
+  },
+  smart_sign: {
+    label: 'Smart Sign',
+    batchPrefix: 'smart-sign-qr',
+    csvFilename: 'smart-sign-qr-batch.csv',
+    emptyError: 'Unable to create fresh Smart Sign QR inventory.'
   },
   event_pass: {
     label: 'Event Pass',
@@ -38,14 +45,60 @@ function batchId(inventoryType) {
 }
 function fileSafe(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '-'); }
 function codeValue(row, inventoryType) {
-  return inventoryType === 'event_pass' ? row.public_code : row.chip_code;
+  return inventoryType === 'agent' ? row.chip_code : row.public_code;
 }
 function qrUrl(row, inventoryType) {
   const code = codeValue(row, inventoryType);
   if (inventoryType === 'event_pass') {
     return `https://app.rel8tion.me/pass?code=${encodeURIComponent(code)}`;
   }
+  if (inventoryType === 'smart_sign') {
+    return `https://app.rel8tion.me/s?code=${encodeURIComponent(code)}`;
+  }
   return row.qr_url || `https://irel8.me/c/${encodeURIComponent(code)}`;
+}
+
+function smartSignCode() {
+  return crypto.randomBytes(6).toString('hex');
+}
+
+function buildSmartSignRows(codes, id, now) {
+  return codes.map((publicCode) => ({
+    public_code: publicCode,
+    inventory_type: 'smart_sign',
+    qr_url: `https://app.rel8tion.me/s?code=${encodeURIComponent(publicCode)}`,
+    is_printed: true,
+    notes: `Smart Sign admin print batch ${id}`,
+    metadata: {
+      print_batch_id: id,
+      printed_at: now,
+      print_source: 'admin_qr_batch'
+    }
+  }));
+}
+
+async function createSmartSigns(quantity, id) {
+  const candidateCodes = new Set();
+  while (candidateCodes.size < quantity * 2) candidateCodes.add(smartSignCode());
+  const candidates = [...candidateCodes];
+  const existing = await supabaseRest(
+    `smart_sign_inventory?public_code=in.(${candidates.map(enc).join(',')})&select=public_code&limit=${candidates.length}`
+  );
+  const existingCodes = new Set((Array.isArray(existing) ? existing : []).map((row) => row.public_code));
+  const codes = candidates.filter((code) => !existingCodes.has(code)).slice(0, quantity);
+  if (codes.length !== quantity) return [];
+
+  const now = new Date().toISOString();
+  const rows = buildSmartSignRows(codes, id, now);
+  const created = await supabaseRest('smart_sign_inventory', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(rows)
+  });
+  return (Array.isArray(created) ? created : [])
+    .filter((row) => row.inventory_type === 'smart_sign')
+    .map((row) => ({ ...row, printed_at: row.metadata?.printed_at || now }))
+    .sort((a, b) => String(a.public_code).localeCompare(String(b.public_code)));
 }
 
 async function reserveAgents(quantity, id) {
@@ -135,16 +188,16 @@ async function reserveEventPasses(quantity, id) {
 }
 
 async function reserveNext(quantity, id, inventoryType) {
-  return inventoryType === 'event_pass'
-    ? reserveEventPasses(quantity, id)
-    : reserveAgents(quantity, id);
+  if (inventoryType === 'smart_sign') return createSmartSigns(quantity, id);
+  if (inventoryType === 'event_pass') return reserveEventPasses(quantity, id);
+  return reserveAgents(quantity, id);
 }
 
 async function createArchive(rows, id, inventoryType) {
   const config = INVENTORY_TYPES[inventoryType];
   const zip = new JSZip();
   const imageFolder = zip.folder('images');
-  const csvRows = inventoryType === 'event_pass'
+  const csvRows = inventoryType !== 'agent'
     ? [['sequence', 'public_code', 'qr_url', 'image_file', 'batch_id', 'printed_at']]
     : [['sequence', 'chip_code', 'qr_url', 'image_file', 'batch_id', 'printed_at']];
 
@@ -167,9 +220,13 @@ async function createArchive(rows, id, inventoryType) {
     'Each PNG is 1024x1024, black on white, with high QR error correction.',
     `The image_file column in ${config.csvFilename} exactly matches the PNG inside the images folder.`
   ];
-  readme.push(inventoryType === 'event_pass'
-    ? 'These QR codes open the Event Pass activation flow. Each code is sourced from fresh smart_sign_inventory Event Pass inventory.'
-    : 'These QR codes open the public agent-profile resolver. NFC remains the private owner-dashboard path.');
+  if (inventoryType === 'event_pass') {
+    readme.push('These QR codes open the Event Pass activation flow. Each code is sourced from fresh smart_sign_inventory Event Pass inventory.');
+  } else if (inventoryType === 'smart_sign') {
+    readme.push('These QR codes open the regular Smart Sign resolver. Each code was created as new smart_sign_inventory inventory_type=smart_sign inventory.');
+  } else {
+    readme.push('These QR codes open the public agent-profile resolver. NFC remains the private owner-dashboard path.');
+  }
   zip.file('README.txt', readme.join('\r\n'));
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 }
@@ -186,7 +243,7 @@ module.exports = async function handler(req, res) {
     const body = parseBody(req);
     const inventoryType = normalizeInventoryType(body.inventory_type || body.type || 'agent');
     if (!inventoryType) {
-      return sendJson(res, 400, { ok: false, error: 'Inventory type must be agent or event_pass.' });
+      return sendJson(res, 400, { ok: false, error: 'Inventory type must be agent, smart_sign, or event_pass.' });
     }
     const quantity = Math.floor(Number(body.quantity ?? 1));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_BATCH) {
@@ -206,4 +263,13 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     return sendJson(res, error.status || 500, { ok: false, error: error.message || 'Unable to export QR batch.' });
   }
+};
+
+module.exports.__test = {
+  INVENTORY_TYPES,
+  buildSmartSignRows,
+  codeValue,
+  normalizeInventoryType,
+  qrUrl,
+  smartSignCode
 };

@@ -4560,7 +4560,9 @@ ${rowsHtml}
       document.getElementById('eventPassQrImage')?.addEventListener('change', scanEventPassImage);
       document.getElementById('eventPassManualForm')?.addEventListener('submit', submitEventPassManual);
       document.getElementById('qrBatchInventoryType')?.addEventListener('change', (event) => {
-        state.qrBatchType = event.currentTarget.value === 'event_pass' ? 'event_pass' : 'agent';
+        state.qrBatchType = ['agent', 'smart_sign', 'event_pass'].includes(event.currentTarget.value)
+          ? event.currentTarget.value
+          : 'agent';
       });
       document.getElementById('exportQrBatch')?.addEventListener('click', exportQrBatch);
       document.querySelectorAll('[data-sponsored-reuse]').forEach((button) => {
@@ -5616,8 +5618,15 @@ ${rowsHtml}
 
     async function exportQrBatch() {
       const typeInput = document.getElementById('qrBatchInventoryType');
-      const inventoryType = typeInput?.value === 'event_pass' ? 'event_pass' : 'agent';
-      const typeLabel = inventoryType === 'event_pass' ? 'Event Pass' : 'Agent Rel8tionChip';
+      const inventoryType = ['agent', 'smart_sign', 'event_pass'].includes(typeInput?.value)
+        ? typeInput.value
+        : 'agent';
+      const typeLabels = {
+        agent: 'Agent Rel8tionChip',
+        smart_sign: 'Smart Sign',
+        event_pass: 'Event Pass'
+      };
+      const typeLabel = typeLabels[inventoryType];
       const quantityInput = document.getElementById('qrBatchQuantity');
       const quantity = Math.floor(Number(quantityInput?.value || 1));
       if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100) {
@@ -5625,7 +5634,10 @@ ${rowsHtml}
         quantityInput?.focus();
         return;
       }
-      if (!window.confirm(`Reserve the next ${quantity} fresh unprinted ${typeLabel} QR code${quantity === 1 ? '' : 's'}, mark them printed, and download the ZIP?`)) return;
+      const confirmation = inventoryType === 'smart_sign'
+        ? `Create ${quantity} new regular Smart Sign inventory row${quantity === 1 ? '' : 's'}, mark them printed, and download the QR ZIP? This will not create or change Event Passes or agent chips.`
+        : `Reserve the next ${quantity} fresh unprinted ${typeLabel} QR code${quantity === 1 ? '' : 's'}, mark them printed, and download the ZIP?`;
+      if (!window.confirm(confirmation)) return;
 
       state.qrBatchType = inventoryType;
       state.actionKey = 'export_qr_batch';
@@ -5643,7 +5655,10 @@ ${rowsHtml}
         }
         const blob = await response.blob();
         const disposition = response.headers.get('content-disposition') || '';
-        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `${inventoryType === 'event_pass' ? 'event-pass-qr' : 'agent-qr'}-batch-${Date.now()}.zip`;
+        const filenamePrefix = inventoryType === 'event_pass'
+          ? 'event-pass-qr'
+          : inventoryType === 'smart_sign' ? 'smart-sign-qr' : 'agent-qr';
+        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `${filenamePrefix}-batch-${Date.now()}.zip`;
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -5653,7 +5668,9 @@ ${rowsHtml}
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
         const count = response.headers.get('x-rel8tion-code-count') || quantity;
-        showToast(`${count} ${typeLabel} QR code${Number(count) === 1 ? '' : 's'} exported and marked printed.`);
+        showToast(inventoryType === 'smart_sign'
+          ? `${count} new Smart Sign QR code${Number(count) === 1 ? '' : 's'} created, exported, and marked printed.`
+          : `${count} ${typeLabel} QR code${Number(count) === 1 ? '' : 's'} exported and marked printed.`);
       } catch (error) {
         showToast(error.message || `Unable to export ${typeLabel} QR codes.`);
       } finally {
@@ -6103,11 +6120,12 @@ ${rowsHtml}
         <div class="section-head">
           <div>
             <h2>QR Batch Printing</h2>
-            <div class="sub">Choose Agent Rel8tionChip or Event Pass, reserve fresh unprinted inventory, and download one ZIP containing the batch CSV plus a matching 1024px PNG for every QR.</div>
+            <div class="sub">Choose Agent Rel8tionChip, Smart Sign, or Event Pass and download one ZIP containing the batch CSV plus a matching 1024px PNG for every QR. Smart Sign creates new regular sign inventory; the other choices reserve existing fresh inventory.</div>
           </div>
           <div class="row-actions">
             <select id="qrBatchInventoryType" class="field" aria-label="QR inventory type" style="min-width:210px;">
               <option value="agent" ${state.qrBatchType === 'agent' ? 'selected' : ''}>Agent Rel8tionChip QR</option>
+              <option value="smart_sign" ${state.qrBatchType === 'smart_sign' ? 'selected' : ''}>Smart Sign QR</option>
               <option value="event_pass" ${state.qrBatchType === 'event_pass' ? 'selected' : ''}>Event Pass QR</option>
             </select>
             <input id="qrBatchQuantity" class="field" type="number" inputmode="numeric" min="1" max="100" value="1" aria-label="Number of QR codes" style="width:110px;">
@@ -6118,8 +6136,8 @@ ${rowsHtml}
         </div>
         <div class="glass-card" style="padding:18px;margin-bottom:24px;">
           <div class="primary">ZIP contents</div>
-          <div class="secondary">agent-qr-batch.csv or event-pass-qr-batch.csv | images/&lt;code&gt;.png | README.txt</div>
-          <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Event Pass export only reserves fresh, unclaimed single-event inventory. Exporting marks rows printed so the next batch cannot duplicate them.</div>
+          <div class="secondary">agent-qr-batch.csv, smart-sign-qr-batch.csv, or event-pass-qr-batch.csv | images/&lt;code&gt;.png | README.txt</div>
+          <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Smart Sign generation creates only new regular smart_sign inventory. Event Pass export only reserves fresh, unclaimed single-event inventory. Exporting marks rows printed so the next batch cannot duplicate them.</div>
         </div>
         ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
           <div>
