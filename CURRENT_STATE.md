@@ -9,6 +9,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` REL8TION COMMAND's QR Batch Printing dropdown now includes **Smart Sign QR** alongside Agent Rel8tionChip and Event Pass.
 - `[IMPLEMENTED]` A Smart Sign batch creates 1-100 brand-new `smart_sign_inventory` rows with `inventory_type=smart_sign`, cryptographically random 12-character public codes, canonical `/s?code=...` destinations, printed batch metadata, and an immediate fulfillment ZIP containing the CSV, matching 1024px PNG files, and README.
 - `[IMPLEMENTED]` Smart Sign generation does not reserve, convert, assign, reset, or edit existing Smart Signs, Event Passes, agent-chip inventory, agents, or events. `smart_sign_inventory.public_code` remains the printable QR source of truth.
+- `[VERIFIED]` Production release `a09f5a0` is live through Vercel deployment `dpl_8qtH3R77KEbQJq6j9z77oG2JtUjn`. The served admin artifact contains the Smart Sign option and safety confirmation, the batch endpoint remains admin-protected, mocked Agent/Smart Sign/Event Pass ZIP verification and production route checks pass, and the deployment produced no HTTP 500 responses during verification. No production inventory row was created by the verification.
 
 ## 2026-08-01: COMMAND focused-profile speed and visible cancellation
 
