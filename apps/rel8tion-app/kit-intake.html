@@ -335,8 +335,8 @@
 
     <section class="shell" aria-labelledby="intake-title">
       <h1 id="intake-title">Open House Kit Details</h1>
-      <p id="intake-intro" class="intro">Confirm the agent and shipping details, choose the summer monthly or paid-for-the-year offer, then continue to secure Stripe Checkout.</p>
-      <div id="notice" class="notice">Summer Special: get the kit for $199 today, then $29/month for SMS follow-up and dashboard access—or pay $499 total for the kit, a full year of service, and your custom agent website.</div>
+      <p id="intake-intro" class="intro">Confirm the agent, company branding, and shipping details; choose monthly or annual billing; then continue to secure Stripe Checkout.</p>
+      <div id="notice" class="notice">Includes the REL8TION Smart Sign, custom company-branded Rel8tionChips, REL8TION Agent, Digital You, and content creation tools. Your company on the hardware. Your relationships in the system.</div>
 
       <section id="match-panel" class="match-panel" aria-live="polite">
         <h2>We may already have you in Rel8tion. Is this you?</h2>
@@ -364,6 +364,22 @@
               <input id="email" name="email" type="email" autocomplete="email" required>
             </label>
           </div>
+        </section>
+
+        <section class="section">
+          <h2>Company-Branded Rel8tionChips</h2>
+          <p class="intro">Upload or link your company logo now, or provide branding after purchase. Missing artwork will not block checkout.</p>
+          <div class="grid">
+            <label>Company Logo URL (optional)
+              <input id="brand-logo-url" name="brand_logo_url" type="url" placeholder="https://example.com/logo.png">
+            </label>
+            <label>Preferred Company Colors (optional)
+              <input id="brand-colors" name="preferred_company_colors" placeholder="Navy, white, and gold">
+            </label>
+          </div>
+          <label style="margin-top:14px;">Branding Notes (optional)
+            <textarea id="brand-notes" name="brand_notes" placeholder="Logo placement, brand standards, or: I will provide branding after purchase."></textarea>
+          </label>
         </section>
 
         <section class="section">
@@ -400,15 +416,15 @@
           <div class="product-grid">
             <label class="product">
               <input type="radio" name="plan" value="monthly" checked>
-              <strong>Open House Kit + Monthly Service</strong>
+              <strong>Complete Open House System — Monthly</strong>
               <span id="monthly-plan-price" class="plan-price">Loading current price...</span>
-              <span id="monthly-plan-detail">Pay for the physical kit today. The first 31 days of platform service are free, then billing starts at the locked promotional monthly rate.</span>
+              <span id="monthly-plan-detail">Pay for the physical kit today. REL8TION Agent begins recurring billing after the included 31-day period.</span>
             </label>
             <label class="product">
               <input type="radio" name="plan" value="annual">
-              <strong>Open House Kit + Paid For The Year</strong>
+              <strong>Complete Open House System — Annual</strong>
               <span id="annual-plan-price" class="plan-price">Loading current price...</span>
-              <span id="annual-plan-detail">Pay once for the kit and first year of platform service, get the Website Builder included, then renew yearly at the locked promotional rate.</span>
+              <span id="annual-plan-detail">Pay today for the physical kit and first year of REL8TION Agent. Annual renewal is clearly disclosed.</span>
             </label>
           </div>
         </section>
@@ -486,33 +502,23 @@
 
     async function loadCurrentPricing() {
       try {
-        const response = await fetch('/api/checkout/open-house-kit', { headers: { Accept: 'application/json' } });
+        const response = await fetch('/api/public/pricing', { headers: { Accept: 'application/json' } });
         const pricing = await response.json().catch(() => ({}));
         if (!response.ok || !pricing.ok) throw new Error('pricing unavailable');
-        const currency = pricing.currency || pricing.kit?.currency || 'usd';
-        const kitPrice = money(pricing.kit?.amount, currency);
-        const monthlyService = money(pricing.monthly?.amount, currency);
-        const annualService = money(pricing.annual?.amount, currency);
-        const monthlyToday = money(pricing.monthly?.due_today, currency);
-        const annualToday = money(pricing.annual?.due_today, currency);
-        const trialDays = Number(pricing.monthly?.trial_days || 0);
-        document.getElementById('monthly-plan-price').textContent = trialDays
-          ? `${monthlyToday} today · first ${trialDays} days free · then ${monthlyService}/month`
-          : `${monthlyToday} today (${kitPrice} kit + ${monthlyService}/month)`;
-        document.getElementById('annual-plan-price').textContent = pricing.annual?.website_builder_included
-          ? `${annualToday} today · kit + first year + Website Builder · renews ${annualService}/year`
-          : `${annualToday} today (${kitPrice} kit + ${annualService}/year)`;
-        if (!pricing.promotion?.active) {
-          document.getElementById('intake-intro').textContent = 'Confirm the agent and shipping details, choose monthly or paid-for-the-year service, then continue to secure Stripe Checkout.';
-          document.getElementById('monthly-plan-detail').textContent = 'Start with the physical kit and keep the dashboard, Event Pass, smart check-in, alerts, and records active monthly.';
-          document.getElementById('annual-plan-detail').textContent = 'Get the same kit and platform access with the annual service option paid upfront.';
-          if (!params.get('success') && !params.get('canceled')) {
-            setNotice('Your Open House Kit order includes the kit plus the selected platform service so the Event Pass and dashboard stay active after checkout.');
-          }
-        }
+        const currency = pricing.currency || 'usd';
+        const monthly = pricing.offers?.open_house_system_monthly;
+        const annual = pricing.offers?.open_house_system_annual;
+        const monthlyToday = money(monthly?.due_today_cents, currency);
+        const annualToday = money(annual?.due_today_cents, currency);
+        const monthlyService = money(monthly?.renewal_cents, currency);
+        const annualService = money(annual?.renewal_cents, currency);
+        const trialDays = Number(monthly?.trial_days || 0);
+        document.getElementById('monthly-plan-price').textContent = `${monthlyToday} today · ${trialDays} included days · then ${monthlyService}/month`;
+        document.getElementById('annual-plan-price').textContent = `${annualToday} today · renews ${annualService}/year`;
       } catch (_) {
-        document.getElementById('monthly-plan-price').textContent = 'Exact total shown before payment in Stripe';
-        document.getElementById('annual-plan-price').textContent = 'Exact total shown before payment in Stripe';
+        document.getElementById('monthly-plan-price').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
+        document.getElementById('annual-plan-price').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
+        form.querySelector('button[type="submit"]').disabled = true;
       }
     }
 
@@ -694,7 +700,7 @@
         : 'open_house_kit_monthly_service';
       const payload = {
         plan: data.plan,
-        source: 'getrel8tion_open_house_kit',
+        source: params.get('source') || 'getrel8tion_open_house_kit',
         flow: data.flow,
         uid: data.uid,
         agent_id: data.agent_id,
@@ -704,6 +710,10 @@
         product: selectedProduct,
         agent: data.agent_name,
         brokerage: data.brokerage,
+        brokerage_name: data.brokerage,
+        brand_logo_url: data.brand_logo_url,
+        preferred_company_colors: data.preferred_company_colors,
+        brand_notes: data.brand_notes,
         phone: data.phone,
         email: data.email,
         address: addressSummary(data),

@@ -284,10 +284,10 @@ Included:
 - automated relationship-building
 - lightweight status center
 
-Recommended price:
+Pricing note:
 
-- `$299/month`
-- `+$199 one-time activation kit fee`
+- This roadmap's former recommended amounts are superseded.
+- Use `config/pricing-catalog.json` for every current amount, billing interval, trial, renewal, entitlement, and Stripe lookup key.
 
 Reasoning:
 
@@ -316,12 +316,10 @@ Included:
 - multi-sign management
 - advanced follow-up controls
 
-Recommended price:
+Pricing status:
 
-- `$599/month`
-- `includes first sign`
-- additional sign recommendation:
-  - `+$99/month per additional active sign`
+- No separate public price is approved for this historical concept.
+- Use `config/pricing-catalog.json` for current sellable products and amounts.
 
 #### Tier 4: Brokerage / Enterprise
 
@@ -339,11 +337,10 @@ Included:
 - shared event controls
 - admin tools
 
-Recommended price:
+Pricing status:
 
-- custom pricing
-- recommend anchor:
-  - `starting around $1,500/month+`
+- Custom pricing only; no public amount is approved.
+- Use `config/pricing-catalog.json` for current sellable products and amounts.
 
 ### 10. What Each Tier Actually Gets
 

@@ -283,9 +283,9 @@ Included:
 - automated lead follow-up
 - relationship-building automation
 
-Recommended price:
-- `$299/month`
-- `+$199 one-time activation kit fee`
+Pricing note:
+- This blueprint's former recommended amounts are superseded.
+- Use `config/pricing-catalog.json` for every current amount and renewal rule.
 
 ### Pro Smart Sign + CRM
 
@@ -299,8 +299,9 @@ Included:
 - CRM-style tools
 - multi-sign visibility
 
-Recommended price:
-- `$599/month`
+Pricing status:
+- No separate public price is approved for this historical concept.
+- Use `config/pricing-catalog.json` for current sellable products and amounts.
 
 ### Brokerage / Enterprise
 
@@ -311,9 +312,9 @@ Included:
 - admin control
 - multi-agent operational tools
 
-Recommended price:
-- custom
-- anchor around `$1,500+/month`
+Pricing status:
+- Custom pricing only; no public amount is approved.
+- Use `config/pricing-catalog.json` for current sellable products and amounts.
 
 ## 10. Rollout Plan
 

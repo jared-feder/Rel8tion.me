@@ -92,6 +92,8 @@
     { "source": "/kit-dashboard.html", "destination": "/apps/rel8tion-app/kit-dashboard.html" },
     { "source": "/kit-intake", "destination": "/apps/rel8tion-app/kit-intake.html" },
     { "source": "/kit-intake.html", "destination": "/apps/rel8tion-app/kit-intake.html" },
+    { "source": "/book-a-call", "destination": "/apps/rel8tion-app/book-a-call.html" },
+    { "source": "/book-a-call.html", "destination": "/apps/rel8tion-app/book-a-call.html" },
     { "source": "/rel8tion-insider", "destination": "/apps/rel8tion-app/rel8tion-insider.html" },
     { "source": "/rel8tion-insider.html", "destination": "/apps/rel8tion-app/rel8tion-insider.html" },
     { "source": "/claim", "destination": "/apps/rel8tion-app/claim.html" },

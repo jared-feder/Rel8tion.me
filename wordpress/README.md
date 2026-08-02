@@ -10,6 +10,12 @@ Current focus:
 
 Files:
 
+- `pricing-section.html`
+  - complete HTML/CSS/JS drop-in for the public WordPress pricing page
+  - fetches the canonical public pricing API and intentionally has no hardcoded dollar amounts
+  - routes private loan-officer consultations and real estate broker/team discount calls to the native REL8TION booking calendar
+  - requires manual publication in WordPress; committing this file does not update the live page
+
 - `hot-list.current-redacted.html`
   - the current page source Jared pasted into the session
   - kept here as the baseline reference

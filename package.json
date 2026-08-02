@@ -5,6 +5,12 @@
     "typecheck": "node scripts/verify-app-architecture.cjs",
     "test": "node tests/app-auth.test.cjs",
     "verify:app": "node scripts/verify-app-architecture.cjs",
+    "pricing:stripe:dry-run": "node scripts/sync-stripe-pricing.cjs --dry-run",
+    "pricing:stripe:apply": "node scripts/sync-stripe-pricing.cjs --apply",
+    "preview:pricing": "node scripts/preview-pricing.cjs",
+    "preview:booking": "node scripts/preview-booking-calendar.cjs",
+    "verify:pricing": "node scripts/verify-pricing.cjs",
+    "verify:booking": "node scripts/verify-booking-calendar.cjs",
     "verify:routes": "node scripts/verify-route-map.cjs",
     "verify:property-experience": "node test/open-house-link.test.cjs",
     "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
@@ -29,6 +35,7 @@
   "dependencies": {
     "cheerio": "^1.0.0",
     "jszip": "^3.10.1",
+    "nodemailer": "^7.0.13",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4"
   }
