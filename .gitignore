@@ -7,12 +7,22 @@
 .env*.local
 node_modules/
 tmp/
+.tmp/
+.pnpm-store/
 supabase/.temp/
 *.err.log
 *.out.log
 output/pdf/*.pdf
+output/outreach/
 docs/live-verification/latest-live-verification-report.json
 docs/live-verification/latest-live-verification-report.md
+
+# Separately managed or generated local app workspaces.
+apps/agent-website-builder/
+apps/v0-real-estate-agent-template/
+
+# Local verification captures.
+my-rel8tion-live.png
 
 # Local/generated exports, backups, and legacy scratch files.
 claim2.html
