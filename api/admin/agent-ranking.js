@@ -15,7 +15,7 @@ const {
   scoreRow,
   tokenSimilarity
 } = require('../../lib/agent-ranking');
-const { buildOpenHouseRows, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
+const { buildOpenHouseRows, isWeekendOpenHouse, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 
 const OPEN_HOUSE_BASE_SELECT = [
@@ -68,6 +68,44 @@ const LISTING_AGENT_DETAIL_SELECT = [
   'scraped_at'
 ].join(',');
 
+const AGENT_LISTING_INVENTORY_SELECT = [
+  'id',
+  'relationship_key',
+  'relationship_source',
+  'relationship_status',
+  'source',
+  'source_listing_id',
+  'agent_id',
+  'queue_row_id',
+  'agent_name',
+  'agent_name_normalized',
+  'brokerage',
+  'phone',
+  'phone_normalized',
+  'email',
+  'listing_status',
+  'address',
+  'city',
+  'state',
+  'zip',
+  'price',
+  'beds',
+  'baths',
+  'sqft',
+  'property_type',
+  'image_url',
+  'listing_url',
+  'open_start',
+  'open_end',
+  'lat',
+  'lng',
+  'is_current',
+  'last_seen_at',
+  'source_checked_at',
+  'updated_at',
+  'source_payload'
+].join(',');
+
 const AREA_COMPARE_SELECT = [
   'id',
   'identity_key',
@@ -103,6 +141,22 @@ function enc(value) {
 
 function one(rows) {
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+function listingInventoryOutreachEnabled() {
+  return process.env.AGENT_LISTING_INVENTORY_OUTREACH_ENABLED === 'true';
+}
+
+const LISTING_MARKETING_RELATIONSHIP_STATUSES = new Set([
+  'worked_with',
+  'interested',
+  'confirmed_open_house',
+  'accepted_open_house',
+  'drip_scheduled'
+]);
+
+function listingMarketingEligible(item = {}) {
+  return LISTING_MARKETING_RELATIONSHIP_STATUSES.has(String(item.relationship_status || '').trim());
 }
 
 function isUuid(value) {
@@ -375,6 +429,152 @@ function openHouseDetailRow(openHouse = {}, agents = [], ranking = {}) {
     match_score: bestAgent ? listingAgentFitScore(ranking, bestAgent) : 0,
     listing_agents: agents.map((agent) => publicListingAgent(agent, ranking))
   };
+}
+
+function inventoryDetailRow(item = {}, ranking = {}) {
+  item = item || {};
+  ranking = ranking || {};
+  return {
+    id: item.id || item.source_listing_id || '',
+    source_listing_id: item.source_listing_id || '',
+    address: item.address || '',
+    city: item.city || '',
+    state: item.state || '',
+    zip: item.zip || '',
+    listing_status: item.listing_status || '',
+    listing_url: item.listing_url || '',
+    listing_photo_url: item.image_url || '',
+    source: item.source || '',
+    price: item.price || null,
+    beds: item.beds || null,
+    baths: item.baths || null,
+    sqft: item.sqft || null,
+    property_type: item.property_type || '',
+    open_start: item.open_start || null,
+    open_end: item.open_end || null,
+    updated_at: item.last_seen_at || item.source_checked_at || item.updated_at || null,
+    agent_name: item.agent_name || ranking.agent_name || '',
+    brokerage: item.brokerage || ranking.brokerage || '',
+    agent_phone: item.phone || item.phone_normalized || ranking.phone || ranking.phone_normalized || '',
+    agent_email: item.email || ranking.email || '',
+    relationship_status: item.relationship_status || '',
+    relationship_source: item.relationship_source || '',
+    marketing_eligible: listingMarketingEligible(item),
+    match_score: Number(item.source_payload?.match_score || 0),
+    match_reason: item.source_payload?.match_reason || ''
+  };
+}
+
+async function loadListingInventoryForRanking(ranking = {}) {
+  const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
+  const email = normalizeEmail(ranking.email);
+  const name = normalizeName(ranking.agent_name);
+  const tries = [];
+  const freshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const base = `select=${AGENT_LISTING_INVENTORY_SELECT}&is_current=eq.true&last_seen_at=gte.${enc(freshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=last_seen_at.desc&limit=250`;
+  if (phone) tries.push(`agent_listing_inventory?phone_normalized=eq.${enc(phone)}&${base}`);
+  if (email) tries.push(`agent_listing_inventory?email=eq.${enc(email)}&${base}`);
+  if (name) tries.push(`agent_listing_inventory?agent_name_normalized=eq.${enc(name)}&${base}`);
+  if (!tries.length) return { rows: [], available: true };
+
+  const settled = await Promise.allSettled(tries.map((path) => supabaseRest(path)));
+  const rows = settled
+    .filter((result) => result.status === 'fulfilled')
+    .flatMap((result) => result.value || []);
+  const rankingBrokerage = normalizeName(ranking.brokerage);
+  const seen = new Set();
+  const deduped = rows.filter((item) => {
+    const itemPhone = normalizePhone(item.phone_normalized || item.phone);
+    const itemEmail = normalizeEmail(item.email);
+    const phoneMatch = phone && itemPhone && phone === itemPhone;
+    const emailMatch = email && itemEmail && email === itemEmail;
+    if (!phoneMatch && !emailMatch) {
+      if (normalizeName(item.agent_name_normalized || item.agent_name) !== name) return false;
+      const itemBrokerage = normalizeName(item.brokerage);
+      if (rankingBrokerage && itemBrokerage && tokenSimilarity(rankingBrokerage, itemBrokerage) < 0.35) return false;
+      if (phone && itemPhone && phone !== itemPhone) return false;
+      if (email && itemEmail && email !== itemEmail) return false;
+    }
+    const key = `${item.source || ''}|${item.source_listing_id || item.id || ''}`;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return {
+    rows: deduped.map((item) => inventoryDetailRow(item, ranking)),
+    available: settled.some((result) => result.status === 'fulfilled')
+  };
+}
+
+function upcomingInventoryCount(rows = [], now = new Date()) {
+  return (rows || []).filter((row) => {
+    const end = row.open_end ? new Date(row.open_end) : null;
+    const start = row.open_start ? new Date(row.open_start) : null;
+    if (end && Number.isFinite(end.getTime())) return end >= now;
+    return Boolean(start && Number.isFinite(start.getTime()) && start >= now);
+  }).length;
+}
+
+function mergeUpcomingOpenHouses(openHouses = [], inventoryRows = [], now = new Date()) {
+  const byKey = new Map();
+  const keyFor = (row) => String(row.source_listing_id || row.id || row.address || '').trim().toLowerCase();
+  for (const row of openHouses || []) {
+    const end = row.open_end ? new Date(row.open_end) : null;
+    const start = row.open_start ? new Date(row.open_start) : null;
+    const upcoming = (end && Number.isFinite(end.getTime()) && end >= now)
+      || (!end && start && Number.isFinite(start.getTime()) && start >= now);
+    if (!upcoming) continue;
+    const key = keyFor(row);
+    if (key) byKey.set(key, row);
+  }
+  for (const row of inventoryRows || []) {
+    const end = row.open_end ? new Date(row.open_end) : null;
+    const start = row.open_start ? new Date(row.open_start) : null;
+    const upcoming = (end && Number.isFinite(end.getTime()) && end >= now)
+      || (!end && start && Number.isFinite(start.getTime()) && start >= now);
+    if (!upcoming) continue;
+    const key = keyFor(row);
+    if (!key) continue;
+    byKey.set(key, { ...(byKey.get(key) || {}), ...row });
+  }
+  return [...byKey.values()]
+    .sort((left, right) => new Date(left.open_start || 0) - new Date(right.open_start || 0));
+}
+
+function inventoryCountsForRankings(rankings = [], inventory = []) {
+  const byRelationship = new Map();
+  const byName = new Map();
+  const add = (map, key, listingId, hasUpcoming) => {
+    if (!key || !listingId) return;
+    if (!map.has(key)) map.set(key, { listings: new Set(), upcoming: new Set() });
+    map.get(key).listings.add(listingId);
+    if (hasUpcoming) map.get(key).upcoming.add(listingId);
+  };
+  const now = new Date();
+  for (const item of inventory || []) {
+    const listingId = `${item.source || ''}|${item.source_listing_id || item.id || ''}`;
+    const end = item.open_end ? new Date(item.open_end) : null;
+    const start = item.open_start ? new Date(item.open_start) : null;
+    const hasUpcoming = Boolean(
+      (end && Number.isFinite(end.getTime()) && end >= now)
+      || (!end && start && Number.isFinite(start.getTime()) && start >= now)
+    );
+    add(byRelationship, item.relationship_key, listingId, hasUpcoming);
+    add(byName, normalizeName(item.agent_name_normalized || item.agent_name), listingId, hasUpcoming);
+  }
+
+  return (rankings || []).map((ranking) => {
+    const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
+    const email = normalizeEmail(ranking.email);
+    const direct = (phone && byRelationship.get(`phone:${phone}`))
+      || (email && byRelationship.get(`email:${email}`))
+      || ((!phone && !email) ? byName.get(normalizeName(ranking.agent_name)) : null);
+    return {
+      ...ranking,
+      database_current_listing_count: direct?.listings.size || 0,
+      database_upcoming_open_house_count: direct?.upcoming.size || 0
+    };
+  });
 }
 
 function roundMetric(value, digits = 1) {
@@ -744,7 +944,10 @@ async function profileDetailsForRanking(ranking) {
   let openHouses = await loadOpenHouseDetailsByIds(ids);
   let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
   let photoCandidates = [];
-  const peerContext = await loadAreaPeerRows(ranking);
+  const [peerContext, inventoryResult] = await Promise.all([
+    loadAreaPeerRows(ranking),
+    loadListingInventoryForRanking(ranking)
+  ]);
 
   if (!openHouses.length && Number(ranking.matched_open_house_count || 0) > 0) {
     const openHouseRows = await loadOpenHouseRows();
@@ -785,20 +988,25 @@ async function profileDetailsForRanking(ranking) {
     .sort((left, right) => new Date(right.open_start || right.updated_at || 0) - new Date(left.open_start || left.updated_at || 0));
   const bestAgent = bestListingAgentForRanking(ranking, allListingAgents || []);
   const bestAgentPhoto = listingAgentPhoto(bestAgent);
+  const upcomingOpenHouses = mergeUpcomingOpenHouses(rows, inventoryResult.rows);
   return {
     ranking,
     profile_photo_url: firstPresent(ranking.agent_photo_url, ranking.image_url, bestAgentPhoto),
     profile_url: bestAgent?.profile_url || '',
     area_comparison: areaComparisonForRanking(ranking, peerContext),
-    current_listings: rows,
-    open_houses: rows,
+    current_listings: inventoryResult.rows,
+    open_houses: upcomingOpenHouses,
+    listing_inventory_available: inventoryResult.available,
+    listing_inventory_outreach_enabled: listingInventoryOutreachEnabled(),
     listing_agents: allListingAgents.map((agent) => publicListingAgent(agent, ranking)),
     summary: {
-      matched_open_house_count: rows.length,
+      matched_open_house_count: upcomingOpenHouses.length,
       matched_listing_agent_count: allListingAgents.length,
-      active_listing_count: Number(ranking.active_listing_count || 0),
+      imported_active_listing_count: Number(ranking.active_listing_count || 0),
+      database_current_listing_count: inventoryResult.rows.length,
+      database_upcoming_open_house_count: upcomingInventoryCount(inventoryResult.rows),
       matched_active_listing_count: Number(ranking.matched_active_listing_count || 0),
-      weekend_open_house_count: Number(ranking.matched_weekend_open_house_count || 0)
+      weekend_open_house_count: upcomingOpenHouses.filter((row) => isWeekendOpenHouse(row.open_start)).length
     }
   };
 }
@@ -1740,12 +1948,20 @@ async function handleList(req) {
   const pageSize = clampLimit(readQuery(req, 'pageSize') || readQuery(req, 'limit') || 50, 50, 250);
   const sortBy = canonicalSortBy(readQuery(req, 'sortBy'));
   const sortDirection = String(readQuery(req, 'sortDirection') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
-  const [rankings, uploads] = await Promise.all([
+  const inventoryFreshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [rankings, uploads, inventory] = await Promise.all([
     supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []),
-    supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => [])
+    supabaseRest('agent_production_uploads?select=*&order=created_at.desc&limit=50').catch(() => []),
+    supabaseRestAll(
+      `agent_listing_inventory?select=relationship_key,source,source_listing_id,agent_name,agent_name_normalized,open_start,open_end&is_current=eq.true&last_seen_at=gte.${enc(inventoryFreshnessCutoff)}&listing_status=in.(active,pending,coming_soon)&order=id.asc`,
+      { maxRows: 20000 }
+    ).catch(() => [])
   ]);
   const trustedView = trustedRankingView(rankings || [], uploads || []);
-  const visibleRankings = trustedView.rankings.map(withFreshPitch);
+  const visibleRankings = inventoryCountsForRankings(
+    trustedView.rankings.map(withFreshPitch),
+    inventory || []
+  );
   const filtered = applyRankingFilters(visibleRankings, filters);
   const sorted = sortRankings(filtered, sortBy, sortDirection);
   const start = (page - 1) * pageSize;
@@ -1912,6 +2128,77 @@ async function handleAddToOutreach(body) {
   return { ranking, queue, variants: buildPitchVariants(ranking) };
 }
 
+async function handleAddListingToOutreach(body) {
+  if (!listingInventoryOutreachEnabled()) {
+    const error = new Error('Manual listing-inventory outreach is not enabled yet.');
+    error.status = 409;
+    throw error;
+  }
+  const ranking = await findRanking(body.ranking_id);
+  const inventoryResult = await loadListingInventoryForRanking(ranking);
+  const inventoryId = String(body.listing_inventory_id || '').trim();
+  const listing = inventoryResult.rows.find((row) => String(row.id || '') === inventoryId);
+  if (!listing) {
+    const error = new Error('Current listing inventory row was not found for this agent.');
+    error.status = 404;
+    throw error;
+  }
+  if (!listing.open_start) {
+    const error = new Error('This listing does not have an upcoming open-house time to market yet.');
+    error.status = 400;
+    throw error;
+  }
+  if (!listing.marketing_eligible) {
+    const error = new Error('Marketing is limited to agents you have worked with or who are marked interested or confirmed.');
+    error.status = 409;
+    throw error;
+  }
+
+  const payload = {
+    ...outreachPayloadFromRanking(ranking),
+    source: 'agent_listing_inventory',
+    template_key: 'agent_listing_open_house',
+    open_house_id: listing.source_listing_id || null,
+    agent_name: listing.agent_name || ranking.agent_name || '',
+    agent_phone: listing.agent_phone || ranking.phone || '',
+    agent_phone_normalized: normalizePhone(listing.agent_phone || ranking.phone_normalized || ranking.phone),
+    agent_email: listing.agent_email || ranking.email || '',
+    brokerage: listing.brokerage || ranking.brokerage || '',
+    address: listing.address || '',
+    city: listing.city || ranking.city || '',
+    state: listing.state || ranking.state || '',
+    zip: listing.zip || ranking.zip || '',
+    price: listing.price || null,
+    beds: listing.beds || null,
+    baths: listing.baths || null,
+    open_start: listing.open_start,
+    open_end: listing.open_end || null,
+    listing_photo_url: listing.listing_photo_url || null,
+    report_note: [
+      `Relationship listing inventory: ${listing.address || listing.source_listing_id}.`,
+      `Upcoming open house: ${listing.open_start}${listing.open_end ? ` through ${listing.open_end}` : ''}.`,
+      `Relationship status: ${listing.relationship_status || 'worked_with'}.`,
+      outreachPayloadFromRanking(ranking).report_note
+    ].filter(Boolean).join('\n')
+  };
+
+  const existing = one(await supabaseRest(
+    `agent_outreach_queue?source=eq.agent_listing_inventory&open_house_id=eq.${enc(listing.source_listing_id)}&agent_phone_normalized=eq.${enc(payload.agent_phone_normalized)}&select=id&limit=1`
+  ).catch(() => []));
+  const queue = existing?.id
+    ? one(await supabaseRest(`agent_outreach_queue?id=eq.${enc(existing.id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      }))
+    : one(await supabaseRest('agent_outreach_queue', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      }));
+  return { ranking, listing, queue };
+}
+
 async function handleGeneratePitch(body) {
   const ranking = await findRanking(body.ranking_id);
   const recommendedPitch = buildPitch(ranking);
@@ -1986,6 +2273,11 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'add_to_outreach') {
       const result = await handleAddToOutreach(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'add_listing_to_outreach') {
+      const result = await handleAddListingToOutreach(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

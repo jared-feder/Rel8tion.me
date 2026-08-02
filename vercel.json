@@ -7,6 +7,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/sync-agent-listing-inventory",
+      "schedule": "23 */2 * * *"
+    },
+    {
       "path": "/api/cron/generate-agent-outreach",
       "schedule": "*/15 * * * *"
     },
