@@ -10,6 +10,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Stripe Checkout no longer explicitly requests phone, billing address, or shipping address for these public plans. Stripe still collects the customer email and payment information required for Checkout; the secured post-payment kit dashboard handles company branding, delivery details, and onboarding afterward.
 - `[IMPLEMENTED]` Event Pass/keychain prefill remains available for field-linked setup, while public WordPress and Open House Kit marketing links use the payment-first handoff.
 - `[IMPLEMENTED]` Previously published WordPress Complete System links that still point to `/kit-intake?source=wordpress` are compatibility-redirected into the payment-first flow unless they carry field/keychain setup context. This makes the already-published block fast immediately while preserving specialized setup paths.
+- `[IMPLEMENTED]` The previously published WordPress Agent link is also recognized by its `rel8tion.me` referrer plus explicit agent/billing selection and opens the selected Stripe Checkout automatically. Direct visits to the app pricing page still render plan comparison normally.
 
 ## 2026-08-02: Canonical pricing and private sales calendar live
 
