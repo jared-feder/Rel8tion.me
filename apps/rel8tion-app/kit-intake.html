@@ -483,6 +483,12 @@
 
     const prefill = getStoredPrefill();
     const requestedPlan = String(params.get('plan') || params.get('product') || '').toLowerCase();
+    const incomingSource = String(params.get('source') || '').toLowerCase();
+    const hasFieldSetupContext = Boolean(params.get('uid') || params.get('prefill') || params.get('update') || prefill.uid || prefill.agent_id);
+    if (incomingSource === 'wordpress' && !params.get('success') && !params.get('canceled') && !hasFieldSetupContext) {
+      const billing = ['annual', 'yearly', 'year'].includes(requestedPlan) ? 'annual' : 'monthly';
+      window.location.replace(`https://app.rel8tion.me/pricing?role=agent&billing=${billing}&checkout=system&source=wordpress`);
+    }
 
     function setNotice(message, type = '') {
       noticeEl.textContent = message;

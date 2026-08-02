@@ -129,6 +129,10 @@ async function run() {
   assert.match(wordpressPricing, /checkout=agent&source=wordpress/);
   assert.match(wordpressPricing, /checkout=system&source=wordpress/);
   assert.doesNotMatch(wordpressPricing, /getrel8tion\.com\/kit-intake\?plan=/);
+  const kitIntake = read('apps/rel8tion-app/kit-intake.html');
+  assert.match(kitIntake, /incomingSource === 'wordpress'/);
+  assert.match(kitIntake, /checkout=system&source=wordpress/);
+  assert.match(kitIntake, /!hasFieldSetupContext/);
 
   const checkout = require('../api/checkout/open-house-kit');
   const originalFetch = global.fetch;
