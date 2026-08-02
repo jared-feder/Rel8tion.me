@@ -658,10 +658,10 @@
     <section class="hero" aria-labelledby="kit-title">
       <div class="hero-grid">
         <div>
-          <div class="promo-badge">Limited Summer Special · Ends September 22</div>
+          <div class="promo-badge">Complete REL8TION Open House System</div>
           <h1 id="kit-title">Smarter open houses, cleaner follow-up, and a better agent website.</h1>
           <p class="subheadline">One reusable smart-sign system for every open house—buyer check-in, instant lead alerts, organized follow-up, and dashboard access without another app.</p>
-          <p id="hero-promo-copy" class="body-copy">Start for $199 today, then keep SMS follow-up and dashboard access for $29/month. Or choose the Summer bundle and get the kit, a full year of service, and your custom agent website for $499 total.</p>
+          <p id="hero-promo-copy" class="body-copy">Choose monthly or annual billing. Both include the physical Open House Kit, REL8TION Agent, Digital You, and content creation tools.</p>
           <div class="kit-detail-grid" style="margin-top:22px;grid-template-columns:1fr;">
             <div class="detail-card"><strong>Use it at every open house</strong><span>Your sign and Rel8tionchips are reusable—activate the next event in seconds.</span></div>
             <div class="detail-card"><strong>Follow up without the busywork</strong><span>Track buyer activity, financing interest, SMS follow-up, and event records from one dashboard.</span></div>
@@ -675,17 +675,17 @@
           </figure>
           <section class="offer-choice">
             <div class="offer-kicker">Start simple</div>
-            <strong id="monthly-price-label" class="offer-price">$199 today</strong>
-            <p id="monthly-price-detail">Get the complete Open House Kit now. SMS follow-up and dashboard service begin at $29/month after the first 31 days.</p>
-            <ul class="offer-list"><li>Reusable Open House Kit</li><li>Buyer check-in and lead tracking</li><li>SMS follow-up and dashboard access</li></ul>
-            <button class="btn plan-cta" type="button" data-plan="monthly">Get Started · $199 Today</button>
+            <strong id="monthly-price-label" class="offer-price">Loading current price…</strong>
+            <p id="monthly-price-detail">The physical kit is charged today. REL8TION Agent starts after the included service period.</p>
+            <ul class="offer-list"><li>REL8TION Smart Sign</li><li>Custom company-branded Rel8tionChips</li><li>REL8TION Agent and Digital You</li></ul>
+            <button class="btn plan-cta" type="button" data-plan="monthly">Choose Monthly Billing</button>
           </section>
           <section class="offer-choice featured">
-            <div class="offer-kicker">Summer 2026 best value</div>
-            <strong id="annual-price-label" class="offer-price">$499 total</strong>
-            <p id="annual-price-detail">Pay once today and get the Open House Kit, one full year of service, and a custom REL8TION agent website. That is a $487 first-year savings versus purchasing both separately ($986).</p>
-            <ul class="offer-list"><li>Everything in the Open House Kit</li><li>12 months of platform service</li><li>Custom agent website included</li></ul>
-            <button class="btn secondary plan-cta" type="button" data-plan="annual">Get Summer Bundle · $499</button>
+            <div class="offer-kicker">Best complete value</div>
+            <strong id="annual-price-label" class="offer-price">Loading current price…</strong>
+            <p id="annual-price-detail">Pay today for the physical kit and first year of REL8TION Agent. The annual service renewal is disclosed before checkout.</p>
+            <ul class="offer-list"><li>Everything in the physical Open House Kit</li><li>First year of REL8TION Agent</li><li>Digital You and content tools included</li></ul>
+            <button class="btn secondary plan-cta" type="button" data-plan="annual">Choose Annual Billing</button>
           </section>
         </div>
       </div>
@@ -742,7 +742,7 @@
 
       <section class="section-band" aria-labelledby="how-it-works-title">
         <h2 id="how-it-works-title">How agents start.</h2>
-        <p>Checkout collects the service plan and shipping details through Stripe. After the kit is prepared, the agent can activate the Event Pass, run smart check-ins, and unlock the website-builder bundle rate.</p>
+        <p>Checkout collects the selected service plan and shipping details through Stripe. After purchase, REL8TION confirms company branding for the Rel8tionChips, prepares the kit, and completes onboarding.</p>
         <div class="steps">
           <div class="step-card">
             <div class="step-number">1</div>
@@ -866,49 +866,32 @@
 
     async function loadCurrentPricing() {
       try {
-        const response = await fetch('/api/checkout/open-house-kit', { headers: { Accept: 'application/json' } });
+        const response = await fetch('/api/public/pricing', { headers: { Accept: 'application/json' } });
         const pricing = await response.json().catch(() => ({}));
         if (!response.ok || !pricing.ok) throw new Error('pricing unavailable');
-        const currency = pricing.currency || pricing.kit?.currency || 'usd';
-        const kitPrice = money(pricing.kit?.amount, currency);
-        const monthlyService = money(pricing.monthly?.amount, currency);
-        const annualService = money(pricing.annual?.amount, currency);
-        const monthlyToday = money(pricing.monthly?.due_today, currency);
-        const annualToday = money(pricing.annual?.due_today, currency);
-        const kitImage = pricing.kit?.product?.images?.[0] || '';
-        const kitImageElement = document.getElementById('kit-product-image');
-        if (kitImageElement && /^https:\/\//i.test(kitImage)) {
-          kitImageElement.src = kitImage;
-          kitImageElement.classList.add('ready');
-        }
+        const currency = pricing.currency || 'usd';
+        const monthly = pricing.offers?.open_house_system_monthly;
+        const annual = pricing.offers?.open_house_system_annual;
+        const monthlyToday = money(monthly?.due_today_cents, currency);
+        const annualToday = money(annual?.due_today_cents, currency);
+        const monthlyService = money(monthly?.renewal_cents, currency);
+        const annualService = money(annual?.renewal_cents, currency);
 
         document.getElementById('monthly-price-label').textContent = `${monthlyToday} today`;
-        const trialDays = Number(pricing.monthly?.trial_days || 0);
-        const promotionActive = Boolean(pricing.promotion?.active);
-        document.querySelectorAll('.promo-badge').forEach((badge) => {
-          badge.hidden = !promotionActive;
-        });
-        if (!promotionActive) {
-          document.getElementById('hero-promo-copy').textContent = 'Start with the Open House Kit for your next event, then choose the monthly or annual REL8TION platform service that fits your business.';
-        }
-        document.getElementById('monthly-price-detail').textContent = trialDays
-          ? `Get the complete kit for ${kitPrice} today. SMS follow-up and dashboard service begin at ${monthlyService}/month after the first ${trialDays} days.`
-          : `${kitPrice} kit + ${monthlyService}/month service, then ${monthlyService}/month.`;
+        const trialDays = Number(monthly?.trial_days || 0);
+        document.getElementById('monthly-price-detail').textContent = `Pay ${monthlyToday} today for the physical Open House Kit. Includes ${trialDays} days of REL8TION Agent, then ${monthlyService}/month.`;
         document.getElementById('annual-price-label').textContent = `${annualToday} total`;
-        document.getElementById('annual-price-detail').textContent = pricing.annual?.website_builder_included
-          ? `Pay ${annualToday} today for the kit, one full year of service, and your custom agent website—a $487 first-year savings versus $986 purchased separately. Service renews at ${annualService}/year.`
-          : `${kitPrice} kit + ${annualService}/year service, then ${annualService}/year.`;
+        document.getElementById('annual-price-detail').textContent = `Pay ${annualToday} today for the physical kit and first year of REL8TION Agent. Service renews at ${annualService}/year.`;
         document.querySelectorAll('.plan-cta[data-plan="monthly"]').forEach((button) => {
           button.textContent = `Get Started · ${monthlyToday} Today`;
         });
         document.querySelectorAll('.plan-cta[data-plan="annual"]').forEach((button) => {
-          button.textContent = pricing.annual?.website_builder_included
-            ? `Get Summer Bundle · ${annualToday}`
-            : `Annual · ${annualToday} Today`;
+          button.textContent = `Annual · ${annualToday} Today`;
         });
       } catch (_) {
-        document.getElementById('monthly-price-label').textContent = '$199 today';
-        document.getElementById('annual-price-label').textContent = '$499 total';
+        document.getElementById('monthly-price-label').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
+        document.getElementById('annual-price-label').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
+        document.querySelectorAll('.plan-cta').forEach((button) => { button.disabled = true; });
       }
     }
 

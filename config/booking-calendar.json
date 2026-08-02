@@ -1,0 +1,26 @@
+{
+  "version": "2026-08-02",
+  "timezone": "America/New_York",
+  "duration_minutes": 30,
+  "slot_increment_minutes": 30,
+  "minimum_notice_hours": 24,
+  "booking_window_days": 60,
+  "notification_email": "jared@rel8tion.me",
+  "availability": [
+    {
+      "weekdays": [1, 2, 3, 4, 5],
+      "start": "10:00",
+      "end": "17:00"
+    }
+  ],
+  "call_types": {
+    "loan_officer": {
+      "display_name": "Private Loan Officer Consultation",
+      "short_description": "Discuss territory, outreach support, requested coverage, team needs, and private pricing."
+    },
+    "broker_team": {
+      "display_name": "Real Estate Broker & Team Consultation",
+      "short_description": "Discuss multi-agent onboarding, brokerage deployment, volume needs, and broker or team discounts."
+    }
+  }
+}

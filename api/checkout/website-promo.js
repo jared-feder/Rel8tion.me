@@ -217,16 +217,9 @@ module.exports = async function handler(req, res) {
     }
 
     const code = kit.websitePromoCodeForSession(session.id);
-    const websiteBuilderIncluded = clean(session.metadata?.website_builder_included).toLowerCase() === 'true';
-    let stripePromotion = { configured: false };
-    try {
-      stripePromotion = await maybeCreateStripePromotionCode({ code, session });
-    } catch (error) {
-      stripePromotion = {
-        configured: true,
-        error: error.message || 'Stripe promotion code could not be created.'
-      };
-    }
+    const websiteBuilderIncluded = ['website_included', 'website_builder_included']
+      .some((key) => clean(session.metadata?.[key]).toLowerCase() === 'true');
+    const stripePromotion = { configured: false };
 
     let order = null;
     let dashboard = null;
@@ -257,8 +250,8 @@ module.exports = async function handler(req, res) {
       website_url: kit.websiteBuilderUrlWithCode(code),
       website_builder_included: websiteBuilderIncluded,
       label: websiteBuilderIncluded
-        ? 'REL8TION Website Builder included with the Summer 2026 annual bundle'
-        : clean(process.env.REL8TION_WEBSITE_PROMO_LABEL || 'Rel8tion website builder bundle rate: $10/month or $100/year', 160),
+        ? 'Digital You is included with this REL8TION plan.'
+        : 'Digital You access requires an eligible REL8TION plan or a standalone annual subscription.',
       order_id: order?.id || null,
       order_fulfillment_status: order?.fulfillment_status || null,
       dashboard_url: dashboard,

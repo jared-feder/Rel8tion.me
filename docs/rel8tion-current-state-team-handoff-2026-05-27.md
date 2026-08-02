@@ -226,7 +226,7 @@ Status: `[PARTIAL]`
 
 `/open-house-kit` is the closeout/upgrade page for agents after an Event Pass event. Stripe Checkout uses the one-time kit price plus required monthly or annual service option.
 
-Checkout page copy explains 14-day delivery expectation, possible earlier delivery by Moe personally when scheduling allows, and Version 1 pricing/rate lock.
+Checkout page copy explains physical fulfillment, company-branded Rel8tionChips, shipping, the selected billing interval, and catalog-backed renewal terms.
 
 Live Stripe env/product configuration should be verified before relying on payment automation.
 

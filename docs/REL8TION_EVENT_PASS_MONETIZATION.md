@@ -113,12 +113,11 @@ Includes:
 - Post-event recap reports
 - Optional live/virtual loan officer support
 
-Suggested pricing:
+Pricing source:
 
-- Hardware/setup: $199
-- Monthly dashboard/service: $49/month
-- Annual option: $399/year
-- Brokerage/team pricing: custom
+- This document's former suggested amounts are superseded.
+- Event Pass remains event-specific and is not a primary public checkout plan.
+- Use `config/pricing-catalog.json` for current agent plans, Complete System checkout rules, and loan-officer add-ons.
 
 ---
 

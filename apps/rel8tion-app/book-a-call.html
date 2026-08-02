@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Book a Private REL8TION Call</title>
+  <meta name="description" content="Book a private REL8TION consultation for loan-officer programs or real estate broker and team deployments.">
+  <style>
+    :root{--navy:#1f2a5a;--blue:#1677ff;--sky:#7dd3fc;--ink:#14213d;--muted:#5c6b85;--glass:rgba(255,255,255,.72);--line:rgba(255,255,255,.82);--shadow:0 26px 70px rgba(31,42,90,.14)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:radial-gradient(circle at 15% 5%,rgba(255,255,255,.95),transparent 26%),radial-gradient(circle at 88% 18%,rgba(125,211,252,.55),transparent 30%),linear-gradient(155deg,#c7edff 0%,#eff8ff 42%,#d9ebff 100%)}
+    body:before,body:after{content:"";position:fixed;border-radius:999px;background:rgba(255,255,255,.48);filter:blur(2px);pointer-events:none}body:before{width:420px;height:120px;left:-80px;top:110px}body:after{width:520px;height:150px;right:-120px;bottom:80px}
+    a{color:inherit}.shell{position:relative;z-index:1;width:min(1120px,calc(100% - 32px));margin:auto;padding:26px 0 64px}.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}.brand{font-weight:900;letter-spacing:.12em;color:var(--navy);text-decoration:none}.back{font-weight:800;text-decoration:none;color:var(--navy)}
+    .hero,.panel{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.hero{border-radius:36px;padding:clamp(28px,6vw,66px);text-align:center}.eyebrow{display:inline-flex;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.72);font-size:12px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;color:var(--navy)}h1{font-size:clamp(38px,7vw,70px);line-height:.98;letter-spacing:-.055em;margin:20px auto 18px;max-width:850px}h2{margin:0 0 8px;font-size:clamp(24px,3vw,34px)}p{line-height:1.65}.lede{font-size:clamp(17px,2.2vw,22px);max-width:760px;margin:0 auto;color:var(--muted)}
+    .type-toggle{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:28px}.type-toggle button,.date-button,.slot-button{font:inherit;cursor:pointer;border:1px solid rgba(31,42,90,.14);background:rgba(255,255,255,.7);color:var(--navy);font-weight:850}.type-toggle button{padding:13px 18px;border-radius:999px}.type-toggle button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:22px;margin-top:22px;min-width:0}.panel{border-radius:30px;padding:clamp(22px,4vw,38px);min-width:0;overflow:hidden}.meta{color:var(--muted);margin:0}.status{display:none;margin:18px 0 0;padding:13px 15px;border-radius:14px;background:#fff4d8;color:#624600;font-weight:750}.status.show{display:block}.status.error{background:#ffe8e8;color:#8a2020}
+    .date-strip{display:flex;gap:9px;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px 12px;margin-top:22px;scrollbar-width:thin}.date-button{flex:0 0 auto;border-radius:16px;padding:12px 15px;min-width:132px}.date-button[aria-pressed="true"]{background:#e6f2ff;border-color:var(--blue);box-shadow:0 0 0 2px rgba(22,119,255,.14)}.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;min-width:0}.slot-button{border-radius:14px;padding:12px 8px;min-width:0}.slot-button:hover,.slot-button:focus-visible{border-color:var(--blue);outline:3px solid rgba(22,119,255,.16)}.slot-button.selected{background:var(--blue);border-color:var(--blue);color:#fff}.empty{grid-column:1/-1;color:var(--muted);padding:18px 0}
+    form{display:grid;gap:14px;margin-top:20px}.field{display:grid;gap:6px}.field label{font-size:13px;font-weight:850;color:var(--navy)}input,select,textarea{width:100%;border:1px solid rgba(31,42,90,.18);background:rgba(255,255,255,.85);border-radius:13px;padding:12px 13px;font:inherit;color:var(--ink)}input:focus,select:focus,textarea:focus{outline:3px solid rgba(22,119,255,.18);border-color:var(--blue)}textarea{min-height:98px;resize:vertical}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.honeypot{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}.submit{border:0;border-radius:15px;padding:14px 18px;background:var(--navy);color:white;font:inherit;font-weight:900;cursor:pointer;box-shadow:0 12px 26px rgba(31,42,90,.22)}.submit:disabled{opacity:.48;cursor:not-allowed}.fine{font-size:12px;color:var(--muted)}.summary{padding:14px;border-radius:16px;background:rgba(230,242,255,.82);font-weight:800;color:var(--navy)}.success{display:none}.success.show{display:block}.booking-area.hidden{display:none}
+    @media(max-width:820px){.layout{grid-template-columns:minmax(0,1fr)}.slots{grid-template-columns:repeat(2,minmax(0,1fr))}.nav{margin-bottom:20px}.shell{width:min(100% - 20px,1120px)}}@media(max-width:600px){.hero,.panel{border-radius:24px}.two{grid-template-columns:minmax(0,1fr)}.slots{grid-template-columns:repeat(2,minmax(0,1fr))}.type-toggle{display:grid}.type-toggle button{width:100%}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="nav" aria-label="Booking navigation"><a class="brand" href="/pricing">REL8TION</a><a class="back" href="/pricing">← Back to plans</a></nav>
+    <section class="hero">
+      <span class="eyebrow">Private consultation</span>
+      <h1>Let’s find the right REL8TION fit.</h1>
+      <p id="hero-copy" class="lede">Choose a private call type, select an available Eastern Time appointment, and receive a calendar invitation.</p>
+      <div class="type-toggle" role="group" aria-label="Choose consultation type">
+        <button type="button" data-type="loan_officer" aria-pressed="true">Loan Officer Consultation</button>
+        <button type="button" data-type="broker_team" aria-pressed="false">Real Estate Broker &amp; Team</button>
+      </div>
+    </section>
+
+    <section class="layout booking-area" id="booking-area">
+      <article class="panel" aria-labelledby="calendar-heading">
+        <h2 id="calendar-heading">Choose a time</h2>
+        <p class="meta">30-minute calls · Monday–Friday · 10:00 AM–5:00 PM Eastern · 24-hour notice</p>
+        <div id="calendar-status" class="status" role="alert"></div>
+        <div id="date-strip" class="date-strip" role="group" aria-label="Available dates"></div>
+        <div id="slots" class="slots" aria-live="polite"></div>
+      </article>
+
+      <article class="panel" aria-labelledby="details-heading">
+        <div id="form-wrap">
+          <h2 id="details-heading">Your details</h2>
+          <p id="call-description" class="meta"></p>
+          <form id="booking-form">
+            <div id="selection" class="summary">Choose an available time to continue.</div>
+            <div class="two"><div class="field"><label for="contact-name">Name</label><input id="contact-name" name="contact_name" autocomplete="name" required></div><div class="field"><label for="company-name">Company or brokerage</label><input id="company-name" name="company_name" autocomplete="organization" required></div></div>
+            <div class="two"><div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div><div class="field"><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" required></div></div>
+            <div class="field"><label for="team-size">Team size <span class="fine">(optional)</span></label><input id="team-size" name="team_size" type="number" min="1" max="100000" inputmode="numeric"></div>
+            <div class="field"><label for="notes">What would you like to discuss? <span class="fine">(optional)</span></label><textarea id="notes" name="notes"></textarea></div>
+            <div class="honeypot" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+            <button id="submit" class="submit" type="submit" disabled>Confirm My Call</button>
+            <p class="fine">By booking, you agree that REL8TION may contact you about this consultation. No loan-officer or broker pricing is published or purchased through this page.</p>
+          </form>
+        </div>
+        <div id="success" class="success" role="status"><span class="eyebrow">Confirmed</span><h2>Your call is on the calendar.</h2><p id="success-copy"></p><p>A calendar invitation is being sent to your email and to the REL8TION team.</p><a class="submit" href="/pricing" style="display:inline-block;text-decoration:none">Return to REL8TION</a></div>
+      </article>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      const state = { type: params.get('type') === 'broker_team' ? 'broker_team' : 'loan_officer', data: null, date: '', slot: null };
+      const byId = (id) => document.getElementById(id);
+      const status = (message, error = false) => { const el = byId('calendar-status'); el.textContent = message || ''; el.className = `status${message ? ' show' : ''}${error ? ' error' : ''}`; };
+      const source = params.get('source') || 'book-a-call';
+
+      function syncTypeButtons() {
+        document.querySelectorAll('[data-type]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.type === state.type)));
+      }
+
+      function groupSlots(slots) {
+        return slots.reduce((groups, slot) => { (groups[slot.local_date] ||= []).push(slot); return groups; }, {});
+      }
+
+      function render() {
+        const groups = groupSlots(state.data?.slots || []);
+        const dates = Object.keys(groups);
+        if (!dates.includes(state.date)) state.date = dates[0] || '';
+        byId('call-description').textContent = state.data?.call_type?.short_description || '';
+        byId('date-strip').innerHTML = dates.slice(0, 20).map((date) => `<button type="button" class="date-button" data-date="${date}" aria-pressed="${date === state.date}">${groups[date][0].date_label}</button>`).join('');
+        byId('slots').innerHTML = state.date ? groups[state.date].map((slot) => `<button type="button" class="slot-button${state.slot?.start === slot.start ? ' selected' : ''}" data-start="${slot.start}">${slot.time_label}</button>`).join('') : '<p class="empty">No appointments are currently available. Email jared@rel8tion.me for help.</p>';
+        byId('selection').textContent = state.slot ? `${state.slot.date_label} at ${state.slot.time_label}` : 'Choose an available time to continue.';
+        byId('submit').disabled = !state.slot;
+        byId('date-strip').querySelectorAll('[data-date]').forEach((button) => button.addEventListener('click', () => { state.date = button.dataset.date; state.slot = null; render(); }));
+        byId('slots').querySelectorAll('[data-start]').forEach((button) => button.addEventListener('click', () => { state.slot = state.data.slots.find((slot) => slot.start === button.dataset.start); render(); }));
+      }
+
+      async function loadAvailability() {
+        state.slot = null; state.data = null; status('Loading available appointments…');
+        syncTypeButtons();
+        params.set('type', state.type); history.replaceState(null, '', `${location.pathname}?${params}`);
+        try {
+          const response = await fetch(`/api/bookings/availability?type=${encodeURIComponent(state.type)}`, { headers: { Accept: 'application/json' } });
+          const data = await response.json();
+          if (!response.ok || !data.ok) throw new Error(data.error || 'Scheduling is temporarily unavailable.');
+          state.data = data; state.date = ''; status(''); render();
+        } catch (error) { status(error.message || 'Scheduling is temporarily unavailable. Please try again shortly.', true); byId('date-strip').innerHTML = ''; byId('slots').innerHTML = ''; }
+      }
+
+      document.querySelectorAll('[data-type]').forEach((button) => button.addEventListener('click', () => { state.type = button.dataset.type; loadAvailability(); }));
+      byId('booking-form').addEventListener('submit', async (event) => {
+        event.preventDefault(); if (!state.slot) return;
+        const button = byId('submit'); button.disabled = true; button.textContent = 'Confirming…'; status('');
+        const form = new FormData(event.currentTarget);
+        const payload = Object.fromEntries(form.entries());
+        Object.assign(payload, { call_type: state.type, starts_at: state.slot.start, source });
+        try {
+          const response = await fetch('/api/bookings/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const data = await response.json();
+          if (!response.ok || !data.ok) throw new Error(data.error || 'We could not reserve that time.');
+          byId('form-wrap').style.display = 'none'; byId('success').classList.add('show');
+          byId('success-copy').textContent = `${data.date_time_label} · Confirmation ${data.booking_code}`;
+          if (data.notification_warning) status('Your time is reserved, but email delivery needs attention. Please save the confirmation code shown here.', true);
+        } catch (error) {
+          status(error.message || 'Scheduling is temporarily unavailable. Please try again shortly.', true);
+          button.disabled = false; button.textContent = 'Confirm My Call';
+          if (/time|booked|available/i.test(error.message || '')) loadAvailability();
+        }
+      });
+      loadAvailability();
+    })();
+  </script>
+</body>
+</html>

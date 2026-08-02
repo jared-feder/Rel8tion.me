@@ -216,6 +216,52 @@ async function upsertOrder(order) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+function metadataBoolean(metadata, key) {
+  return clean(metadata?.[key], 20).toLowerCase() === 'true';
+}
+
+function pricingEntitlementPayload(event, session) {
+  const metadata = session.metadata || {};
+  const planCode = clean(metadata.plan_code, 100);
+  const entitlementCodes = clean(metadata.entitlement_codes, 500).split(',').map((value) => value.trim()).filter(Boolean);
+  const role = clean(metadata.role, 80);
+  if (!planCode || !entitlementCodes.length || !['real_estate_agent', 'loan_officer'].includes(role)) return null;
+  const paymentFailed = event.type === 'checkout.session.async_payment_failed';
+  const active = !paymentFailed && ['paid', 'no_payment_required'].includes(clean(session.payment_status, 80));
+  const customer = session.customer_details || {};
+  const isOutreachSeat = role === 'loan_officer' && planCode.startsWith('lo_outreach_seat_');
+  return {
+    stripe_checkout_session_id: clean(session.id, 160),
+    stripe_customer_id: clean(session.customer, 160) || null,
+    stripe_subscription_id: clean(session.subscription, 160) || null,
+    stripe_event_id: clean(event.id, 160) || null,
+    plan_code: planCode,
+    role,
+    subject_email: clean(customer.email || session.customer_email || metadata.email, 320).toLowerCase() || null,
+    subject_slug: clean(metadata.agent_slug || metadata.loan_officer_slug, 160) || null,
+    status: paymentFailed ? 'payment_failed' : active ? 'active' : 'pending',
+    seat_status: isOutreachSeat ? 'pending_approval' : null,
+    entitlement_codes: entitlementCodes,
+    website_included: metadataBoolean(metadata, 'website_included') || metadataBoolean(metadata, 'website_builder_included'),
+    digital_card_included: metadataBoolean(metadata, 'digital_card_included'),
+    content_tools_included: metadataBoolean(metadata, 'content_tools_included'),
+    outreach_included: isOutreachSeat ? false : metadataBoolean(metadata, 'outreach_included'),
+    metadata,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function upsertPricingEntitlement(payload) {
+  const rows = await supabaseRest('pricing_entitlements?on_conflict=stripe_checkout_session_id&select=id,stripe_checkout_session_id,plan_code,status,seat_status,entitlement_codes,updated_at', {
+    method: 'POST',
+    headers: {
+      Prefer: 'resolution=merge-duplicates,return=representation'
+    },
+    body: JSON.stringify(payload)
+  });
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
 async function handleStripeEvent(event, req) {
   if (!SUPPORTED_EVENTS.has(event.type)) {
     return { ignored: true, reason: 'unsupported_event_type' };
@@ -226,8 +272,13 @@ async function handleStripeEvent(event, req) {
     return { ignored: true, reason: 'not_checkout_session' };
   }
 
+  const entitlementPayload = pricingEntitlementPayload(event, session);
+  const entitlement = entitlementPayload ? await upsertPricingEntitlement(entitlementPayload) : null;
+
   if (!kit.isEligibleOpenHouseKitSession(session)) {
-    return { ignored: true, reason: 'not_open_house_kit_session', session_id: session.id };
+    return entitlement
+      ? { ignored: false, reason: 'pricing_entitlement_recorded', session_id: session.id, entitlement }
+      : { ignored: true, reason: 'not_open_house_kit_or_pricing_session', session_id: session.id };
   }
 
   const order = kit.buildOrderPayloadFromSession(session, {
@@ -248,7 +299,7 @@ async function handleStripeEvent(event, req) {
   } catch (error) {
     welcome = { ok: false, error: error.message || 'Welcome notifications failed.' };
   }
-  return { ignored: false, order: row, welcome };
+  return { ignored: false, order: row, welcome, entitlement };
 }
 
 module.exports = async function handler(req, res) {
@@ -282,3 +333,5 @@ module.exports.config = {
     bodyParser: false
   }
 };
+
+module.exports.pricingEntitlementPayload = pricingEntitlementPayload;
