@@ -6,6 +6,7 @@ process.env.SUPABASE_URL = 'https://rel8tionos-test.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 
 const THREAD_ID = 'b674dd8f-99f1-40f7-9ec2-403634b3571c';
+const QUEUE_ONLY_THREAD_ID = 'a214dd8f-99f1-40f7-9ec2-403634b3571c';
 const LO_UID = 'f855a780-9be7-4d17-b2c6-464344b75475';
 
 const queueRow = {
@@ -16,13 +17,30 @@ const queueRow = {
   agent_phone_normalized: '5165558059',
   agent_email: 'owner@example.test',
   brokerage: 'REL8TION Test',
+  agent_photo_url: 'https://example.test/owner.jpg',
   address: '118 S 31st St',
   city: 'Wyandanch',
   state: 'NY',
   zip: '11798',
+  selected_sms: 'Original open-house outreach',
+  initial_sent_at: '2026-07-15T11:00:00.000Z',
+  initial_send_status: 'sent',
   review_status: 'pending',
   initial_delivery_status: 'delivered',
-  last_delivery_status: 'delivered'
+  last_delivery_status: 'delivered',
+  created_at: '2026-07-15T10:55:00.000Z'
+};
+
+const queueOnlyRow = {
+  ...queueRow,
+  id: QUEUE_ONLY_THREAD_ID,
+  agent_name: 'Queue Only Agent',
+  agent_phone: '(516) 555-9001',
+  agent_phone_normalized: '5165559001',
+  agent_email: 'queue-only@example.test',
+  selected_sms: 'Queue-only outreach',
+  initial_sent_at: '2026-07-15T10:00:00.000Z',
+  created_at: '2026-07-15T09:55:00.000Z'
 };
 
 const inboxRow = {
@@ -72,7 +90,8 @@ global.fetch = async (url, options = {}) => {
   if (target.includes('/rest/v1/agent_outreach_inbox?')) return jsonResponse([inboxRow]);
   if (target.includes('/rest/v1/agent_outreach_queue?')) {
     if (target.includes('id=in.')) return jsonResponse([queueRow]);
-    return jsonResponse([queueRow]);
+    if (target.includes('id=eq.')) return jsonResponse([queueRow]);
+    return jsonResponse([queueRow, queueOnlyRow]);
   }
   if (target.includes('/rest/v1/agent_outreach_replies?')) return jsonResponse([outboundMessage]);
   if (target.includes('/rest/v1/field_demo_visits?')) return jsonResponse([]);
@@ -127,12 +146,20 @@ async function main() {
   assert.equal(listed.threads[0].id, THREAD_ID);
   assert.equal(listed.threads[0].latest_message.body, 'TEST');
   assert.equal(listed.threads[0].can_reply, true);
+  assert.equal(listed.threads[0].message_count, 3);
+  assert.equal(listed.threads[0].agent.identity_key, 'phone:5165558059');
+  assert.equal(listed.threads[0].agent.photo_url, 'https://example.test/owner.jpg');
+  const allThreads = await outreach.listThreads({ filter: 'all', limit: 10 });
+  assert.equal(allThreads.threads.length, 2);
+  assert.equal(allThreads.threads.some((thread) => thread.id === QUEUE_ONLY_THREAD_ID), true);
   await assert.rejects(() => outreach.listThreads({ filter: 'surprise' }), /filter must be/);
 
   const detail = await outreach.getThread(THREAD_ID);
   assert.equal(detail.thread.id, THREAD_ID);
-  assert.equal(detail.messages.length, 1);
-  assert.equal(detail.messages[0].message_sid, 'SM_TEST');
+  assert.equal(detail.thread.message_count, 2);
+  assert.equal(detail.messages.length, 2);
+  assert.equal(detail.messages[0].body, 'Original open-house outreach');
+  assert.equal(detail.messages[1].message_sid, 'SM_TEST');
 
   duplicateLog = null;
   const sent = await outreach.sendReply({
