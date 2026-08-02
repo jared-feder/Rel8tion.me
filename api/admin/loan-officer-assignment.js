@@ -50,6 +50,26 @@ async function loadLoanOfficerProfile(uid) {
   );
 }
 
+async function assertAgentLoanOfficerLink(agentSlug, loanOfficerUid) {
+  const agent = clean(agentSlug, 180);
+  const uid = clean(loanOfficerUid, 80);
+  if (!agent) {
+    const error = new Error('This open house does not have a hosting agent to match against.');
+    error.status = 409;
+    throw error;
+  }
+  const rows = await supabaseRest(
+    `agent_loan_officer_relationships?agent_slug=eq.${enc(agent)}&loan_officer_profile_id=eq.${enc(uid)}&status=eq.active&select=id,agent_slug,loan_officer_profile_id,status,source&limit=1`
+  );
+  const relationship = Array.isArray(rows) ? rows[0] || null : null;
+  if (!relationship?.id) {
+    const error = new Error('Choose a loan officer already linked to this hosting agent.');
+    error.status = 403;
+    throw error;
+  }
+  return relationship;
+}
+
 function clean(value, max = 2000) {
   return String(value || '').trim().slice(0, max);
 }
@@ -370,6 +390,9 @@ async function assignConfirmedVisit(visitId, loanOfficerUid) {
     error.status = 409;
     throw error;
   }
+  const linkedEvent = visit.open_house_event_id ? await loadEvent(visit.open_house_event_id) : null;
+  const agentSlug = visit.agent_slug || linkedEvent?.host_agent_slug || linkedEvent?.setup_context?.agent_slug || '';
+  const relationship = await assertAgentLoanOfficerLink(agentSlug, profile.uid);
   await supabaseRest(`field_demo_visit_participants?field_demo_visit_id=eq.${enc(visit.id)}&responsibility=eq.financing_support&is_primary=eq.true`, {
     method: 'PATCH',
     body: JSON.stringify({ is_primary: false })
@@ -394,14 +417,13 @@ async function assignConfirmedVisit(visitId, loanOfficerUid) {
     ? await supabaseRest(`field_demo_visit_participants?id=eq.${enc(existing.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null)
     : await supabaseRest('field_demo_visit_participants', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) }).then((rows) => rows?.[0] || null);
   let live_coverage = null;
-  if (visit.open_house_event_id) {
-    const event = await loadEvent(visit.open_house_event_id);
-    await endLiveCoverage(event.id);
-    live_coverage = await insertLiveCoverage(event, profile);
+  if (linkedEvent?.id) {
+    await endLiveCoverage(linkedEvent.id);
+    live_coverage = await insertLiveCoverage(linkedEvent, profile);
   }
   const availability_block = await blockConfirmedAvailability(visit, profile);
   const notifications = await notifyConfirmedAssignment(visit, profile);
-  return { visit, loan_officer: profile, participant, live_coverage, availability_block, notifications, calendar_url:assignmentLinks(visit).calendar };
+  return { visit, loan_officer: profile, relationship, participant, live_coverage, availability_block, notifications, calendar_url:assignmentLinks(visit).calendar };
 }
 
 async function assignLiveCoverage(eventId, loanOfficerUid) {
@@ -416,11 +438,15 @@ async function assignLiveCoverage(eventId, loanOfficerUid) {
     throw error;
   }
 
+  const relationship = await assertAgentLoanOfficerLink(
+    event.host_agent_slug || event.setup_context?.agent_slug,
+    profile.uid
+  );
   const ended = await endLiveCoverage(event.id);
   const assigned = await insertLiveCoverage(event, profile);
   const field_assignment = await upsertFieldVisitAssignment(event, profile, 'manual_admin');
 
-  return { event, loan_officer: profile, ended, assigned, field_assignment };
+  return { event, loan_officer: profile, relationship, ended, assigned, field_assignment };
 }
 
 async function removeLoanOfficerProfile(loanOfficerUid) {
@@ -451,17 +477,19 @@ function recentWindowStart() {
 }
 
 async function autoAssignLiveCoverage() {
-  const [events, profiles, sessions] = await Promise.all([
+  const [events, profiles, sessions, relationships] = await Promise.all([
     supabaseRest(
       `open_house_events?status=eq.active&ended_at=is.null&start_time=gte.${enc(recentWindowStart())}&select=id,host_agent_slug,smart_sign_id,open_house_source_id,status,start_time,end_time,ended_at,setup_context,created_at&order=start_time.asc.nullslast,created_at.asc&limit=100`
     ),
     supabaseRest('verified_profiles?is_active=eq.true&select=*&order=full_name.asc.nullslast,created_at.asc&limit=100'),
-    supabaseRest('event_loan_officer_sessions?status=eq.live&select=open_house_event_id,loan_officer_uid')
+    supabaseRest('event_loan_officer_sessions?status=eq.live&select=open_house_event_id,loan_officer_uid'),
+    supabaseRest('agent_loan_officer_relationships?status=eq.active&select=agent_slug,loan_officer_profile_id')
   ]);
 
   const activeEvents = Array.isArray(events) ? events : [];
   const activeProfiles = (Array.isArray(profiles) ? profiles : []).filter((profile) => profile.uid);
   const liveSessions = Array.isArray(sessions) ? sessions : [];
+  const activeRelationships = Array.isArray(relationships) ? relationships : [];
 
   if (!activeProfiles.length) {
     const error = new Error('No active loan officers are available to assign.');
@@ -479,10 +507,23 @@ async function autoAssignLiveCoverage() {
   }
 
   const assignments = [];
+  const skippedUnlinked = [];
   for (const event of activeEvents) {
     if (coveredEvents.has(event.id)) continue;
 
-    const profile = [...activeProfiles].sort((a, b) => {
+    const agentSlug = event.host_agent_slug || event.setup_context?.agent_slug || '';
+    const linkedUids = new Set(
+      activeRelationships
+        .filter((row) => row.agent_slug === agentSlug)
+        .map((row) => row.loan_officer_profile_id)
+        .filter(Boolean)
+    );
+    const eligibleProfiles = activeProfiles.filter((profile) => linkedUids.has(profile.uid));
+    if (!eligibleProfiles.length) {
+      skippedUnlinked.push({ event_id: event.id, agent_slug: agentSlug });
+      continue;
+    }
+    const profile = [...eligibleProfiles].sort((a, b) => {
       const loadDelta = (loadByUid[a.uid] || 0) - (loadByUid[b.uid] || 0);
       if (loadDelta) return loadDelta;
       return String(a.full_name || a.slug || '').localeCompare(String(b.full_name || b.slug || ''));
@@ -495,7 +536,12 @@ async function autoAssignLiveCoverage() {
     loadByUid[profile.uid] = (loadByUid[profile.uid] || 0) + 1;
   }
 
-  return { assignments, available_loan_officers: activeProfiles.length, considered_events: activeEvents.length };
+  return {
+    assignments,
+    skipped_unlinked: skippedUnlinked,
+    available_loan_officers: activeProfiles.length,
+    considered_events: activeEvents.length
+  };
 }
 
 async function handler(req, res) {
@@ -582,3 +628,4 @@ module.exports = handler;
 module.exports.assignLiveCoverage = assignLiveCoverage;
 module.exports.notifyConfirmedAssignment = notifyConfirmedAssignment;
 module.exports.blockConfirmedAvailability = blockConfirmedAvailability;
+module.exports.assertAgentLoanOfficerLink = assertAgentLoanOfficerLink;

@@ -56,6 +56,50 @@ function clean(value, max = 1000) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+async function authUser(token, url, key) {
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: { apikey: key, Authorization: `Bearer ${token}` }
+  });
+  const user = await response.json().catch(() => ({}));
+  if (!response.ok || !user?.email) {
+    const error = new Error('Your loan officer sign-in has expired. Please sign in again.');
+    error.status = 401;
+    throw error;
+  }
+  return user;
+}
+
+async function authenticatedLoanOfficer(req, requestedUid = '') {
+  const token = clean(req.headers?.authorization, 4000).replace(/^Bearer\s+/i, '');
+  if (!token) {
+    const error = new Error('Loan officer sign-in is required.');
+    error.status = 401;
+    throw error;
+  }
+  const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
+  const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
+  if (!url || !key) throw new Error('Supabase Auth is not configured.');
+  const user = await authUser(token, url, key);
+  const rows = await supabaseRest(
+    `verified_profiles?email=ilike.${enc(cleanEmail(user.email))}&is_active=eq.true&select=*&order=updated_at.desc&limit=20`
+  );
+  const profiles = (Array.isArray(rows) ? rows : []).filter((profile) =>
+    profile?.uid && /loan|mortgage/i.test(`${profile.industry || ''} ${profile.title || ''}`)
+  );
+  const requested = clean(requestedUid, 80);
+  const profile = requested
+    ? profiles.find((item) => item.uid === requested)
+    : profiles[0];
+  if (!profile?.uid) {
+    const error = new Error(requested
+      ? 'This loan officer workspace does not belong to the signed-in account.'
+      : 'No approved loan officer profile matches the signed-in account.');
+    error.status = 403;
+    throw error;
+  }
+  return profile;
+}
+
 function phoneDigits(phone) {
   const digits = clean(phone).replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
@@ -207,11 +251,6 @@ async function loadLead(leadId) {
   return loadOne(`leads?id=eq.${enc(leadId)}&select=*`);
 }
 
-async function loadLoanOfficer(uid) {
-  if (!uid) return null;
-  return loadOne(`verified_profiles?uid=eq.${enc(uid)}&is_active=eq.true&select=*`);
-}
-
 function eventAgentSlug(event) {
   return clean(firstPresent(event?.host_agent_slug, event?.agent_slug, event?.setup_context?.agent_slug), 180);
 }
@@ -310,6 +349,25 @@ async function loadActiveGuidance(buyerId, agentSlug) {
   return loadOne(
     `buyer_affordability_guidance?buyer_id=eq.${enc(buyerId)}&agent_slug=eq.${enc(agentSlug)}&status=eq.active&select=*&order=updated_at.desc`
   );
+}
+
+async function assertActiveAgentLoanOfficerLink(agentSlug, loanOfficerUid) {
+  const agent = clean(agentSlug, 180);
+  const uid = clean(loanOfficerUid, 80);
+  if (!agent || !uid) {
+    const error = new Error('Missing linked agent and loan officer context.');
+    error.status = 403;
+    throw error;
+  }
+  const relationship = await loadOne(
+    `agent_loan_officer_relationships?agent_slug=eq.${enc(agent)}&loan_officer_profile_id=eq.${enc(uid)}&status=eq.active&select=id,agent_slug,loan_officer_profile_id,status`
+  );
+  if (!relationship?.id) {
+    const error = new Error('This loan officer is not linked to the hosting agent.');
+    error.status = 403;
+    throw error;
+  }
+  return relationship;
 }
 
 function monthlyPrincipalInterest(loanAmount, ratePercent, termYears) {
@@ -416,8 +474,8 @@ async function loadEventFitData(query) {
   if (!buyerIds.length) return { event, agent_slug: agentSlug, guidance: [], scenarios: [], disclaimer: DISCLAIMER };
   const buyerList = buyerIds.map(enc).join(',');
   const [guidance, scenarios] = await Promise.all([
-    supabaseRest(`buyer_affordability_guidance?buyer_id=in.(${buyerList})&agent_slug=eq.${enc(agentSlug)}&status=eq.active&select=*`),
-    supabaseRest(`buyer_property_fit_scenarios?buyer_id=in.(${buyerList})&agent_slug=eq.${enc(agentSlug)}&select=*&order=created_at.desc&limit=100`)
+    supabaseRest(`buyer_affordability_guidance?buyer_id=in.(${buyerList})&agent_slug=eq.${enc(agentSlug)}&status=eq.active&select=id,buyer_id,status,updated_at`),
+    supabaseRest(`buyer_property_fit_scenarios?buyer_id=in.(${buyerList})&agent_slug=eq.${enc(agentSlug)}&review_status=eq.reviewed&select=id,buyer_id,result_status,result_label,review_status,review_notes,reviewed_at,updated_at&order=reviewed_at.desc.nullslast,updated_at.desc&limit=100`)
   ]);
   return {
     event,
@@ -428,14 +486,7 @@ async function loadEventFitData(query) {
   };
 }
 
-async function upsertGuidance(body) {
-  const loanOfficerUid = clean(body.loan_officer_uid || body.loan_officer_profile_id || body.uid, 80);
-  const profile = await loadLoanOfficer(loanOfficerUid);
-  if (!profile?.uid) {
-    const error = new Error('Active loan officer profile not found.');
-    error.status = 403;
-    throw error;
-  }
+async function upsertGuidance(body, profile) {
   if (!bool(body.lo_attestation_completed_preapproval_outside_rel8tion)) {
     const error = new Error('Loan officer must confirm preapproval work was completed outside Rel8tion.');
     error.status = 400;
@@ -466,6 +517,7 @@ async function upsertGuidance(body) {
     error.status = 400;
     throw error;
   }
+  await assertActiveAgentLoanOfficerLink(agentSlug, profile.uid);
 
   const paymentCap = num(body.max_monthly_housing_payment, null);
   if (!paymentCap || paymentCap <= 0) {
@@ -514,7 +566,7 @@ async function upsertGuidance(body) {
   return { profile, guidance, disclaimer: DISCLAIMER };
 }
 
-async function createScenario(body) {
+async function createScenario(body, profile) {
   let buyerId = clean(body.buyer_id, 80);
   let synced = null;
   if (!buyerId && body.checkin_id) {
@@ -533,10 +585,16 @@ async function createScenario(body) {
     error.status = 403;
     throw error;
   }
+  await assertActiveAgentLoanOfficerLink(agentSlug, profile.uid);
   const guidance = await loadActiveGuidance(buyerId, agentSlug);
   if (!guidance?.id) {
     const error = new Error('LO guidance is required before creating a property scenario.');
     error.status = 409;
+    throw error;
+  }
+  if (guidance.loan_officer_profile_id !== profile.uid) {
+    const error = new Error('This buyer guidance belongs to another loan officer.');
+    error.status = 403;
     throw error;
   }
   const scenarioValues = buildScenario(body, guidance);
@@ -559,13 +617,7 @@ async function createScenario(body) {
   return { guidance, scenario, disclaimer: DISCLAIMER };
 }
 
-async function reviewScenario(body) {
-  const profile = await loadLoanOfficer(clean(body.loan_officer_uid || body.loan_officer_profile_id || body.uid, 80));
-  if (!profile?.uid) {
-    const error = new Error('Active loan officer profile not found.');
-    error.status = 403;
-    throw error;
-  }
+async function reviewScenario(body, profile) {
   const scenario = await loadOne(`buyer_property_fit_scenarios?id=eq.${enc(body.scenario_id)}&select=*`);
   if (!scenario?.id) {
     const error = new Error('Scenario not found.');
@@ -577,6 +629,7 @@ async function reviewScenario(body) {
     error.status = 403;
     throw error;
   }
+  await assertActiveAgentLoanOfficerLink(scenario.agent_slug, profile.uid);
   const allowed = new Set(['reviewed', 'lo_review_required', 'needs_guidance_update']);
   const reviewStatus = clean(body.review_status || 'reviewed', 80);
   if (!allowed.has(reviewStatus)) {
@@ -593,13 +646,7 @@ async function reviewScenario(body) {
   return { scenario: updated, disclaimer: DISCLAIMER };
 }
 
-async function loadLoForm(query) {
-  const profile = await loadLoanOfficer(clean(query.uid || query.loan_officer_uid || query.loan_officer_profile_id, 80));
-  if (!profile?.uid) {
-    const error = new Error('Active loan officer profile not found.');
-    error.status = 403;
-    throw error;
-  }
+async function loadLoForm(query, profile) {
   let buyer = null;
   let checkin = null;
   let event = null;
@@ -620,6 +667,7 @@ async function loadLoForm(query) {
     error.status = 404;
     throw error;
   }
+  await assertActiveAgentLoanOfficerLink(agentSlug, profile.uid);
   const guidance = agentSlug ? await loadActiveGuidance(buyer.id, agentSlug) : null;
   const scenarios = agentSlug
     ? await supabaseRest(`buyer_property_fit_scenarios?buyer_id=eq.${enc(buyer.id)}&agent_slug=eq.${enc(agentSlug)}&select=*&order=created_at.desc&limit=50`)
@@ -638,8 +686,14 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       const mode = clean(req.query?.mode || 'event_fit_data', 80);
+      const profile = mode === 'lo_form'
+        ? await authenticatedLoanOfficer(
+            req,
+            req.query?.uid || req.query?.loan_officer_uid || req.query?.loan_officer_profile_id
+          )
+        : null;
       const data = mode === 'lo_form'
-        ? await loadLoForm(req.query || {})
+        ? await loadLoForm(req.query || {}, profile)
         : await loadEventFitData(req.query || {});
       sendJson(res, 200, { ok: true, mode, ...data });
       return;
@@ -663,17 +717,29 @@ module.exports = async function handler(req, res) {
       return;
     }
     if (action === 'upsert_guidance') {
-      const result = await upsertGuidance(body);
+      const profile = await authenticatedLoanOfficer(
+        req,
+        body.loan_officer_uid || body.loan_officer_profile_id || body.uid
+      );
+      const result = await upsertGuidance(body, profile);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }
     if (action === 'create_scenario') {
-      const result = await createScenario(body);
+      const profile = await authenticatedLoanOfficer(
+        req,
+        body.loan_officer_uid || body.loan_officer_profile_id || body.uid
+      );
+      const result = await createScenario(body, profile);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }
     if (action === 'review_scenario') {
-      const result = await reviewScenario(body);
+      const profile = await authenticatedLoanOfficer(
+        req,
+        body.loan_officer_uid || body.loan_officer_profile_id || body.uid
+      );
+      const result = await reviewScenario(body, profile);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

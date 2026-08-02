@@ -7,6 +7,7 @@
   <title>Rel8tion LO Guidance</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-[#eef8ff] text-slate-900">
   <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 42%,#f8fbff 100%);">
@@ -31,8 +32,11 @@
     </section>
   </main>
 
-  <script>
+  <script type="module">
+    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js';
+
     const params = new URLSearchParams(window.location.search);
+    const authClient = window.supabase.createClient(SUPABASE_URL, KEY);
     const state = {
       uid: params.get('uid') || params.get('loan_officer_uid') || '',
       buyerId: params.get('buyer_id') || '',
@@ -44,7 +48,8 @@
       buyer: null,
       guidance: null,
       scenarios: [],
-      disclaimer: ''
+      disclaimer: '',
+      accessToken: ''
     };
 
     const app = document.getElementById('app');
@@ -79,10 +84,22 @@
     }
 
     async function api(path, options = {}) {
-      const response = await fetch(path, options);
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', `Bearer ${state.accessToken}`);
+      const response = await fetch(path, { ...options, headers });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) throw new Error(data.error || 'Request failed.');
       return data;
+    }
+
+    async function requireLoanOfficerSession() {
+      const { data, error } = await authClient.auth.getSession();
+      if (error) throw error;
+      if (!data.session?.access_token) {
+        window.location.replace('/loan-officer');
+        throw new Error('Loan officer sign-in is required.');
+      }
+      state.accessToken = data.session.access_token;
     }
 
     async function loadContext() {
@@ -96,6 +113,7 @@
       });
       const data = await api(`/api/buyer-affordability?${query.toString()}`);
       state.profile = data.profile;
+      state.uid = data.profile?.uid || state.uid;
       state.buyer = data.buyer;
       state.guidance = data.guidance;
       state.scenarios = data.scenarios || [];
@@ -231,6 +249,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'create_scenario',
+              loan_officer_uid: state.uid,
               event_id: state.eventId,
               agent_slug: state.agent,
               checkin_id: state.checkinId,
@@ -276,7 +295,7 @@
       });
     }
 
-    loadContext().then(render).catch((error) => {
+    requireLoanOfficerSession().then(loadContext).then(render).catch((error) => {
       app.innerHTML = `<div class="py-12 text-center">
         <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Guidance Not Ready</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open LO Guidance</h1>

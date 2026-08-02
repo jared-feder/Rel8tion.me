@@ -1,5 +1,9 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
-const { blockConfirmedAvailability, notifyConfirmedAssignment } = require('./loan-officer-assignment');
+const {
+  assertAgentLoanOfficerLink,
+  blockConfirmedAvailability,
+  notifyConfirmedAssignment
+} = require('./loan-officer-assignment');
 
 const OUTREACH_FOLLOWUPS_DISABLED = true;
 
@@ -305,6 +309,9 @@ async function acceptOpenHouse(body) {
   }
 
   const profile = body.loan_officer_uid ? await loadLoanOfficer(body.loan_officer_uid) : null;
+  const relationship = profile
+    ? await assertAgentLoanOfficerLink(queue.agent_slug || queue.agent, profile.uid)
+    : null;
   const visit = await upsertFieldVisit(queue);
   const participant = profile ? await upsertVisitParticipant(visit, profile) : null;
   const live_coverage = profile ? await upsertLiveCoverageIfEventLinked(visit, profile) : null;
@@ -312,7 +319,7 @@ async function acceptOpenHouse(body) {
   const notifications = profile ? await notifyConfirmedAssignment(visit, profile) : [];
   const updated_queue = await markInterested(queue.id, 'accepted_open_house');
 
-  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, availability_block, notifications };
+  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, relationship, availability_block, notifications };
 }
 
 async function confirmOpenHouse(body) {
@@ -324,6 +331,9 @@ async function confirmOpenHouse(body) {
   }
 
   const profile = body.loan_officer_uid ? await loadLoanOfficer(body.loan_officer_uid) : null;
+  const relationship = profile
+    ? await assertAgentLoanOfficerLink(queue.agent_slug || queue.agent, profile.uid)
+    : null;
   const visit = await upsertFieldVisit(queue, {
     source: 'admin_confirmed_open_house',
     assignment_source: 'confirmed_outreach',
@@ -339,7 +349,7 @@ async function confirmOpenHouse(body) {
   const nextStatus = queue.review_status === 'accepted_open_house' ? 'accepted_open_house' : 'confirmed_open_house';
   const updated_queue = await markInterested(queue.id, nextStatus);
 
-  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, availability_block, notifications };
+  return { queue: updated_queue || queue, visit, participant, live_coverage, loan_officer: profile, relationship, availability_block, notifications };
 }
 
 async function scheduleDrip(body) {

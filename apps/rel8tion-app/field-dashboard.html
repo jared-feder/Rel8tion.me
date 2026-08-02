@@ -12,10 +12,8 @@
     html,body{max-width:100%;overflow-x:hidden}
     button,a,input,select,textarea{touch-action:manipulation}
     @media(max-width:639px){
-      body{padding-bottom:78px}
       #app{padding:14px!important;border-radius:24px!important}
       #profileLabel{max-width:62vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem}
-      .lo-mobile-nav{padding-bottom:max(10px,env(safe-area-inset-bottom))}
       article,section{scroll-margin-top:16px}
       input,select,textarea{font-size:16px!important}
     }
@@ -75,6 +73,7 @@
     const profileLabel = document.getElementById('profileLabel');
     const dashboardRoleLabel = document.getElementById('dashboardRoleLabel');
     const authClient = window.supabase.createClient(SUPABASE_URL, KEY);
+    const DASHBOARD_UNLOCK_TTL_MS = 12 * 60 * 60 * 1000;
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -157,6 +156,27 @@
       return state.role === 'loan_officer';
     }
 
+    function dashboardUnlockKey(userId) {
+      return `rel8tion_lo_dashboard_unlock:${userId}`;
+    }
+
+    function hasCurrentDashboardUnlock(session) {
+      if (!session?.user?.id) return false;
+      try {
+        const unlock = JSON.parse(sessionStorage.getItem(dashboardUnlockKey(session.user.id)) || 'null');
+        return unlock?.userId === session.user.id
+          && Number(unlock.expiresAt || 0) > Date.now()
+          && Number(unlock.unlockedAt || 0) <= Date.now()
+          && Number(unlock.expiresAt || 0) - Number(unlock.unlockedAt || 0) <= DASHBOARD_UNLOCK_TTL_MS;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function loanOfficerLoginHref() {
+      return '/loan-officer';
+    }
+
     function buildAvailabilitySlots(data) {
       const startDate = localDateFromInput(data.get('date'));
       const rangeDays = Math.max(1, Math.min(Number(data.get('range_days') || 1), 90));
@@ -233,12 +253,26 @@
       const contexts = new Map(contextRows.map((row) => [row.visit_id, row]));
       const queueIds = [...new Set(visits.map((visit) => visit.outreach_queue_id).filter(Boolean))];
       for (const queueId of queueIds) {
-        if (contextRows.some((row) => row.id === queueId)) continue;
+        const matchingVisits = visits.filter((visit) => visit.outreach_queue_id === queueId);
+        if (matchingVisits.every((visit) => contexts.has(visit.id))) continue;
         const rows = await request(`agent_outreach_queue?id=eq.${encodeURIComponent(queueId)}&select=id,address,listing_photo_url,agent_name,agent_phone,agent_email,brokerage,open_house_id&limit=1`).catch(() => []);
         const queue = Array.isArray(rows) ? rows[0] : null;
         visits.filter((visit) => visit.outreach_queue_id === queueId).forEach((visit) => { if (queue) contexts.set(visit.id, { visit_id:visit.id, ...queue }); });
       }
-      return visits.map((visit) => ({ ...contexts.get(visit.id), ...visit, listing_photo_url:contexts.get(visit.id)?.listing_photo_url || visit.listing_photo_url || '', address:contexts.get(visit.id)?.address || visit.address || '' }));
+      return visits.map((visit) => {
+        const context = contexts.get(visit.id) || {};
+        return {
+          ...context,
+          ...visit,
+          agent_name: visit.agent_name || context.agent_name || '',
+          agent_phone: visit.agent_phone || context.agent_phone || '',
+          agent_email: visit.agent_email || context.agent_email || '',
+          brokerage: visit.brokerage || context.brokerage || '',
+          listing_photo_url: visit.listing_photo_url || context.listing_photo_url || '',
+          address: visit.address || context.address || '',
+          open_house_id: visit.open_house_id || context.open_house_id || ''
+        };
+      });
     }
 
     function relationshipRange() {
@@ -303,14 +337,59 @@
     }
 
     function groupVisits(participantRows) {
-      const visits = new Map();
+      const visitsById = new Map();
       participantRows.forEach((participant) => {
         const visit = participant.field_demo_visits;
-        if (!visit?.id) return;
-        if (!visits.has(visit.id)) visits.set(visit.id, { ...visit, participants: [] });
-        visits.get(visit.id).participants.push({ ...participant, field_demo_visits: undefined });
+        if (!visit?.id || visit.status === 'cancelled' || participant.status === 'cancelled') return;
+        if (!visitsById.has(visit.id)) visitsById.set(visit.id, { ...visit, participants: [] });
+        visitsById.get(visit.id).participants.push({ ...participant, field_demo_visits: undefined });
       });
-      return [...visits.values()].sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
+
+      const identityFor = (visit) => {
+        if (visit.open_house_event_id) return `event:${visit.open_house_event_id}`;
+        if (visit.outreach_queue_id) return `queue:${visit.outreach_queue_id}`;
+        if (visit.open_house_id) return `source:${visit.open_house_id}:${visit.scheduled_start || ''}:${visit.scheduled_end || ''}`;
+        return `visit:${visit.id}`;
+      };
+      const deduped = new Map();
+      visitsById.forEach((visit) => {
+        const identity = identityFor(visit);
+        const current = deduped.get(identity);
+        if (!current) {
+          deduped.set(identity, visit);
+          return;
+        }
+        const currentCreated = new Date(current.created_at || 0).getTime() || 0;
+        const visitCreated = new Date(visit.created_at || 0).getTime() || 0;
+        const currentActive = current.status === 'cancelled' ? 0 : 1;
+        const visitActive = visit.status === 'cancelled' ? 0 : 1;
+        const canonical = visitActive !== currentActive
+          ? (visitActive > currentActive ? visit : current)
+          : (visitCreated >= currentCreated ? visit : current);
+        const secondary = canonical === visit ? current : visit;
+        const participants = new Map();
+        [...(secondary.participants || []), ...(canonical.participants || [])].forEach((participant) => {
+          const key = participant.id || [
+            participant.participant_profile_id,
+            participant.participant_uid,
+            participant.role,
+            participant.responsibility
+          ].join(':');
+          participants.set(key, participant);
+        });
+        deduped.set(identity, {
+          ...secondary,
+          ...canonical,
+          participants: [...participants.values()],
+          duplicate_visit_ids: [...new Set([
+            ...(secondary.duplicate_visit_ids || []),
+            secondary.id,
+            ...(canonical.duplicate_visit_ids || []),
+            canonical.id
+          ].filter(Boolean))]
+        });
+      });
+      return [...deduped.values()].sort((a, b) => new Date(a.scheduled_start || 0) - new Date(b.scheduled_start || 0));
     }
 
     function responsibilities(visit) {
@@ -540,7 +619,7 @@
             ${items.map(([id, label]) => `<a href="${esc(dashboardSectionHref(id))}" class="rounded-2xl px-3 py-3 text-sm font-black ring-1 ${id === active ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-700 ring-slate-100'}">${esc(label === 'Home' ? 'Overview' : label === 'Times' ? 'Availability' : label === 'Agents' ? 'My Agents' : label === 'Houses' ? 'Open Houses + Buyers' : label)}</a>`).join('')}
           </nav>
         </aside>
-        <nav class="lo-mobile-nav fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
+        <nav class="lo-mobile-nav sticky top-2 z-50 grid grid-cols-5 gap-1 rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[0_14px_45px_rgba(15,23,42,.24)] backdrop-blur lg:hidden">
           ${items.map(([id,label])=>`<a href="${esc(dashboardSectionHref(id))}" class="flex min-h-12 items-center justify-center rounded-2xl px-1 text-center text-[11px] font-black ${id===active?'bg-sky-600 text-white':'text-slate-600'}">${esc(label)}</a>`).join('')}
         </nav>
       `;
@@ -828,18 +907,28 @@
           </div>
           <div class="mt-4 grid gap-3 lg:grid-cols-3">
             ${visits.length ? visits.map((visit) => {
-              const agentLine = [visit.agent_name || visit.agent_slug, visit.brokerage].filter(Boolean).join(' - ');
+              const agentName = visit.agent_name || visit.agent_slug || 'Agent not listed';
+              const agentCompany = visit.brokerage || 'Company not listed';
+              const agentPhone = visit.agent_phone || '';
+              const agentMessage = `Hi ${agentName === 'Agent not listed' ? 'there' : agentName}, this is ${state.profile?.full_name || 'your REL8TION loan officer'}. I am reaching out about your open house at ${visit.address || 'the assigned property'}.`;
               const buyers = (state.buyerRequests[visit.open_house_event_id] || []).length;
               return `
                 <article class="overflow-hidden rounded-[24px] bg-white/85 ring-1 ring-slate-100">
                   ${visit.listing_photo_url ? `<img src="${esc(visit.listing_photo_url)}" alt="${esc(visit.address || 'Open house listing')}" class="h-40 w-full object-cover" loading="lazy">` : ''}
                   <div class="p-4">
                   <div class="flex flex-wrap items-center gap-2">${visitStatusPill(visit.status)}</div>
-                  <h3 class="mt-3 text-lg font-black leading-tight">${esc(agentLine || 'Assigned coverage')}</h3>
+                  <div class="mt-3 text-[10px] font-black uppercase tracking-[.14em] text-sky-700">Hosting Agent</div>
+                  <h3 class="mt-1 text-lg font-black leading-tight">${esc(agentName)}</h3>
+                  <p class="mt-1 text-sm font-bold text-slate-500">${esc(agentCompany)}</p>
+                  <p class="mt-1 text-sm font-black text-slate-700">${agentPhone ? `<a href="${esc(telHref(agentPhone))}" class="hover:text-sky-700">${esc(agentPhone)}</a>` : 'Phone not listed'}</p>
                   <p class="mt-1 text-sm font-bold text-slate-600">${esc(visit.address || visit.open_house_id || visit.open_house_event_id || 'Open house')}</p>
                   <p class="mt-1 text-sm font-bold text-slate-500">${esc(fmtTime(visit.scheduled_start))} - ${esc(fmtTime(visit.scheduled_end))}</p>
                   <p class="mt-2 text-xs font-black uppercase tracking-[.12em] text-slate-400">${buyers} buyer check-in${buyers === 1 ? '' : 's'}</p>
-                  <a href="${esc(directionsHref(visit.address))}" target="_blank" rel="noopener" class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-sm font-black text-white ${visit.address ? '' : 'pointer-events-none opacity-40'}">Directions</a>
+                  <div class="mt-3 grid grid-cols-3 gap-2">
+                    <a href="${esc(telHref(agentPhone))}" class="inline-flex items-center justify-center rounded-full bg-sky-600 px-3 py-3 text-xs font-black text-white ${agentPhone ? '' : 'pointer-events-none opacity-40'}">Call</a>
+                    <a href="${esc(smsHref(agentPhone, agentMessage))}" class="inline-flex items-center justify-center rounded-full bg-white px-3 py-3 text-xs font-black text-sky-700 ring-1 ring-sky-200 ${agentPhone ? '' : 'pointer-events-none opacity-40'}">Text</a>
+                    <a href="${esc(directionsHref(visit.address))}" target="_blank" rel="noopener" class="inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-3 text-xs font-black text-white ${visit.address ? '' : 'pointer-events-none opacity-40'}">Directions</a>
+                  </div>
                   </div>
                 </article>
               `;
@@ -1445,7 +1534,7 @@
       return `<section class="mb-6 flex flex-col gap-4 rounded-[28px] border border-white/80 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center sm:p-5">
         ${photo ? `<img src="${esc(photo)}" alt="${esc(state.profile.full_name)}" class="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-4 ring-white sm:h-28 sm:w-28">` : `<div class="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-sky-100 text-3xl font-black text-sky-700 sm:h-28 sm:w-28">${esc((state.profile.full_name || 'LO').split(/\s+/).map((part)=>part[0]).join('').slice(0,2))}</div>`}
         <div class="min-w-0 flex-1"><div class="text-xs font-black uppercase tracking-[.16em] text-sky-700">Verified Loan Officer</div><h1 class="mt-1 break-words font-['Plus_Jakarta_Sans'] text-3xl font-extrabold sm:text-4xl">${esc(state.profile.full_name || 'Loan Officer')}</h1><p class="mt-1 font-bold text-slate-500">${esc([state.profile.title,state.profile.company_name].filter(Boolean).join(' · '))}</p><p class="mt-1 break-all text-sm font-bold text-slate-400">${esc([state.profile.phone,state.profile.email].filter(Boolean).join(' · '))}</p></div>
-        <div class="grid shrink-0 gap-2"><a href="/loan-officer-event-pass-guide" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white">Event Pass Instructions</a><a href="${esc(dashboardSectionHref('lo-account'))}" class="rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-black text-white">Edit Account</a><a href="${esc(publicProfileHref())}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">View / Share Profile</a></div>
+        <div class="grid shrink-0 gap-2"><a href="/loan-officer-event-pass-guide" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white">Event Pass Instructions</a><a href="${esc(dashboardSectionHref('lo-account'))}" class="rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-black text-white">Edit Account</a><a href="${esc(publicProfileHref())}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">View / Share Profile</a><button type="button" onclick="window.signOutLoanOfficer()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-rose-700 ring-1 ring-rose-200">Sign Out</button></div>
       </section>`;
     }
 
@@ -1458,8 +1547,18 @@
     async function refresh(message = '') {
       state.message = message;
       state.error = '';
-      state.profile = await loadProfile();
-      state.profile = await loadSignedInIdentity() || state.profile;
+      if (isLoanOfficerDashboard()) {
+        state.profile = await loadSignedInIdentity();
+        if (!state.profile?.uid) {
+          if (state.authSession?.user?.id) sessionStorage.removeItem(dashboardUnlockKey(state.authSession.user.id));
+          window.location.replace(loanOfficerLoginHref());
+          return;
+        }
+        state.uid = state.profile.uid;
+        state.slug = state.profile.slug || '';
+      } else {
+        state.profile = await loadProfile();
+      }
       state.availability = await loadAvailability();
       state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows(dashboardRange());
@@ -1702,7 +1801,24 @@
       }
     };
 
-    authClient.auth.getSession().then(({data}) => { state.authSession=data.session || null; return refresh(); }).catch((error) => { state.error=error.message || 'Could not load field dashboard.'; render(); });
+    window.signOutLoanOfficer = async () => {
+      if (state.authSession?.user?.id) sessionStorage.removeItem(dashboardUnlockKey(state.authSession.user.id));
+      await authClient.auth.signOut({ scope: 'local' }).catch(() => null);
+      window.location.replace(loanOfficerLoginHref());
+    };
+
+    async function bootDashboard() {
+      const { data, error } = await authClient.auth.getSession();
+      if (error) throw error;
+      state.authSession = data.session || null;
+      if (isLoanOfficerDashboard() && (!state.authSession || !hasCurrentDashboardUnlock(state.authSession))) {
+        window.location.replace(loanOfficerLoginHref());
+        return;
+      }
+      await refresh();
+    }
+
+    bootDashboard().catch((error) => { state.error=error.message || 'Could not load field dashboard.'; render(); });
   </script>
 </body>
 </html>

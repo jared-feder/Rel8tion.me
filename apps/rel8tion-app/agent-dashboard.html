@@ -89,6 +89,12 @@
       return `/get-open-house-kit?${kitParams.toString()}`;
     }
 
+    function loanOfficerManagementHref() {
+      const managementParams = new URLSearchParams({ area: 'events' });
+      if (state.event?.id) managementParams.set('event', state.event.id);
+      return `/admin?${managementParams.toString()}`;
+    }
+
     async function request(path, options = {}) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         ...options,
@@ -227,41 +233,20 @@
       </div>`;
     }
 
-    function formatMoney(value) {
-      const number = Number(value || 0);
-      return number ? `$${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-';
-    }
-
-    function isUuid(value) {
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
-    }
-
     function guidanceRequestHref(checkin) {
-      const buyerId = checkin.buyer_id || '';
-      const uid = state.loanOfficer?.verified_profile_uid || state.loanOfficer?.loan_officer_uid || '';
       const name = checkin.visitor_name || checkin.name || checkin.metadata?.name || 'Buyer';
       const phone = checkin.visitor_phone || checkin.phone || checkin.metadata?.phone || '';
-      const agentSlug = state.event?.host_agent_slug || state.agent || '';
-      if (isUuid(uid)) {
-        const params = new URLSearchParams({
-          uid,
-          checkin_id: checkin.id || '',
-          buyer_id: buyerId,
-          agent: agentSlug,
-          event: state.event?.id || ''
-        });
-        params.set('return_to', `/agent-dashboard?${new URLSearchParams({ agent: agentSlug, event: state.event?.id || '' }).toString()}`);
-        return { href: `/lo-affordability-guidance?${params.toString()}`, label: 'Request LO Guidance' };
-      }
+      const loanOfficerPhone = state.loanOfficer?.loan_officer_phone || '';
       const message = [
-        `Please add Rel8tion affordability guidance for ${name}.`,
+        `Please review ${name} and add any appropriate Rel8tion affordability guidance from your loan officer dashboard.`,
         phone ? `Buyer phone: ${phone}` : '',
         state.house?.address ? `Property: ${state.house.address}` : '',
         `Event: ${state.event?.id || ''}`
       ].filter(Boolean).join('\n');
       return {
-        href: smsHref(state.loanOfficer?.loan_officer_phone || '', message),
-        label: 'Request LO Guidance'
+        href: smsHref(loanOfficerPhone, message),
+        label: loanOfficerPhone ? 'Text Assigned Loan Officer' : 'No Assigned LO Phone',
+        available: Boolean(loanOfficerPhone)
       };
     }
 
@@ -277,11 +262,10 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-sm font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
-            <div class="mt-1 text-xs font-bold opacity-80">Net estimate: ${esc(formatMoney(scenario.estimated_net_monthly_payment))} / cap ${esc(formatMoney(scenario.monthly_cap))}</div>
+            <div class="mt-1 text-xs font-bold opacity-80">Shared after loan officer review</div>
           </div>
-          <div class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
+          <div class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em]">Reviewed</div>
         </div>
-        <div class="mt-2 text-xs font-bold opacity-80">Price ${esc(formatMoney(scenario.purchase_price))} • Taxes ${esc(formatMoney(scenario.annual_taxes))}/yr • Insurance ${esc(formatMoney(scenario.annual_insurance))}/yr • HOA ${esc(formatMoney(scenario.monthly_hoa))}/mo</div>
         ${scenario.review_notes ? `<div class="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-bold">${esc(scenario.review_notes)}</div>` : ''}
         <p class="mt-2 text-[11px] font-semibold leading-relaxed opacity-80">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
       </div>`;
@@ -296,36 +280,21 @@
         return `<div class="mt-4 rounded-2xl border border-sky-200 bg-sky-50/85 p-4">
           <div class="text-xs font-black uppercase tracking-[.14em] text-sky-700">Property Fit Checker</div>
           <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance needed</h3>
-          <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">A licensed loan officer can add guidance after completing their own preapproval workflow outside Rel8tion.</p>
-          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white">${esc(request.label)}</a>
+          <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">A licensed loan officer can add guidance from their private dashboard after completing their own preapproval workflow outside Rel8tion.</p>
+          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white ${request.available ? '' : 'pointer-events-none opacity-50'}">${esc(request.label)}</a>
           <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(FIT_DISCLAIMER)}</p>
         </div>`;
       }
-      const defaultPrice = Number(state.house?.price || state.event?.setup_context?.price || guidance.max_purchase_price_guidance || 0);
-      const defaultTaxes = Number(state.house?.taxes || state.house?.annual_taxes || 0);
       return `<div class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <div class="text-xs font-black uppercase tracking-[.14em] text-indigo-700">Property Fit Checker</div>
+            <div class="text-xs font-black uppercase tracking-[.14em] text-indigo-700">Loan Officer Guidance</div>
             <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance on file</h3>
           </div>
-          <div class="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700">${esc(formatMoney(guidance.max_monthly_housing_payment))}/mo cap</div>
+          <div class="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700">Private LO workspace</div>
         </div>
-        <div class="mt-3 grid gap-2 text-xs font-bold text-slate-600 md:grid-cols-3">
-          <div class="rounded-xl bg-white/75 px-3 py-2">Max price: ${esc(formatMoney(guidance.max_purchase_price_guidance))}</div>
-          <div class="rounded-xl bg-white/75 px-3 py-2">Rate: ${guidance.rate_assumption_percent ? `${esc(guidance.rate_assumption_percent)}%` : '-'}</div>
-          <div class="rounded-xl bg-white/75 px-3 py-2">Term: ${guidance.loan_term_years ? `${esc(guidance.loan_term_years)} yrs` : '-'}</div>
-        </div>
-        <form data-fit-form data-checkin-id="${esc(checkin.id || '')}" data-buyer-id="${esc(buyerId)}" class="mt-4 grid gap-3 rounded-2xl bg-white/75 p-3 md:grid-cols-2">
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Purchase Price<input name="purchase_price" type="number" min="1" step="any" value="${esc(defaultPrice || '')}" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Property Taxes<input name="annual_taxes" type="number" min="0" step="any" value="${esc(defaultTaxes || '')}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Homeowners Insurance<input name="annual_insurance" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Monthly HOA<input name="monthly_hoa" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <label class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700"><input name="apartment_present" type="checkbox" class="h-4 w-4"> Apartment present</label>
-          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Estimated Rent<input name="estimated_monthly_rent" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
-          <button type="submit" class="rounded-full bg-indigo-600 px-4 py-3 text-sm font-black text-white md:col-span-2">Check Property Fit</button>
-        </form>
-        <div class="mt-3 grid gap-2">${scenarios.length ? scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-indigo-200 bg-white/55 p-3 text-sm font-bold text-slate-500">No saved property scenarios yet.</div>'}</div>
+        <p class="mt-3 text-sm font-semibold leading-relaxed text-slate-600">The loan officer’s limits, assumptions, prequalification information, and property-testing controls stay in the loan officer dashboard. The agent can only see an outcome after the loan officer marks it reviewed.</p>
+        <div class="mt-3 grid gap-2">${scenarios.length ? scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-indigo-200 bg-white/55 p-3 text-sm font-bold text-slate-500">No reviewed property outcome has been shared yet.</div>'}</div>
         <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
       </div>`;
     }
@@ -421,8 +390,8 @@
         return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
           <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Have the NMB loan officer tap their verified keychain to show live coverage and route financing buyers to them.</p>
-          <button onclick="window.armLoanOfficerSignIn()" class="mt-4 w-full rounded-full bg-amber-500 px-5 py-3 text-sm font-black text-white">Add Loan Officer</button>
+          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Loan-officer coverage is assigned from REL8TION COMMAND. No loan-officer Rel8tionChip scan is required.</p>
+          <a href="${esc(loanOfficerManagementHref())}" class="mt-4 block w-full rounded-full bg-amber-500 px-5 py-3 text-center text-sm font-black text-white">Manage Loan Officer</a>
         </div>`;
       }
       const name = lo.loan_officer_name || 'Loan Officer';
@@ -432,8 +401,8 @@
       const isDefault = lo.is_default_fallback === true;
       const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
       const note = isDefault
-        ? 'Default Rel8tion coverage contact. Assign a specific loan officer or have them scan their verified keychain to replace this.'
-        : 'This loan officer is assigned live to this open house.';
+        ? 'Default Rel8tion coverage contact. Assign a specific loan officer from REL8TION COMMAND Open Houses.'
+        : 'This loan officer is assigned live to this open house. Changes are made in REL8TION COMMAND with no loan-officer chip scan.';
       return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
         <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
         <div class="mt-4 flex items-center gap-4">
@@ -449,62 +418,8 @@
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
           <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
         </div>
-        <button onclick="window.armLoanOfficerSignIn()" class="mt-3 w-full rounded-full bg-white/80 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</button>
+        <a href="${esc(loanOfficerManagementHref())}" class="mt-3 block w-full rounded-full bg-white/80 px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</a>
       </div>`;
-    }
-
-    async function submitFitScenario(form) {
-      const button = form.querySelector('button[type="submit"]');
-      const originalText = button?.textContent || 'Check Property Fit';
-      if (button) {
-        button.disabled = true;
-        button.textContent = 'Saving Scenario...';
-      }
-      try {
-        const formData = new FormData(form);
-        const payload = {
-          action: 'create_scenario',
-          event_id: state.event?.id || '',
-          agent_slug: state.event?.host_agent_slug || state.agent || '',
-          checkin_id: form.dataset.checkinId || '',
-          buyer_id: form.dataset.buyerId || '',
-          purchase_price: formData.get('purchase_price') || '',
-          annual_taxes: formData.get('annual_taxes') || '',
-          annual_insurance: formData.get('annual_insurance') || '',
-          monthly_hoa: formData.get('monthly_hoa') || '',
-          apartment_present: formData.get('apartment_present') === 'on',
-          estimated_monthly_rent: formData.get('estimated_monthly_rent') || ''
-        };
-        const response = await fetch('/api/buyer-affordability', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || data.ok === false) throw new Error(data.error || 'Could not save property scenario.');
-        const buyerId = data.scenario?.buyer_id || payload.buyer_id;
-        if (buyerId) {
-          if (!state.affordability.scenariosByBuyerId[buyerId]) state.affordability.scenariosByBuyerId[buyerId] = [];
-          state.affordability.scenariosByBuyerId[buyerId].unshift(data.scenario);
-        }
-        render();
-      } catch (error) {
-        window.alert(error.message || 'Could not save property scenario.');
-      } finally {
-        if (button) {
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-      }
-    }
-
-    function attachFitCheckerHandlers() {
-      document.querySelectorAll('[data-fit-form]').forEach((form) => {
-        form.addEventListener('submit', (event) => {
-          event.preventDefault();
-          submitFitScenario(form);
-        });
-      });
     }
 
     function render() {
@@ -570,7 +485,6 @@
           </aside>
         </section>
       `;
-      attachFitCheckerHandlers();
     }
 
     function renderEndedSummary() {
@@ -679,23 +593,6 @@
       closeCurrentOpenHouse({ move: true }).catch((error) => renderError(error.message || 'Could not move this sign.'));
     };
 
-    window.armLoanOfficerSignIn = function armLoanOfficerSignIn() {
-      if (!state.event?.id) return;
-      window.localStorage.setItem('rel8tion_loan_officer_pending', JSON.stringify({
-        eventId: state.event.id,
-        signId: state.sign?.id || state.signId || '',
-        publicCode: state.sign?.public_code || state.code || '',
-        agentSlug: state.event.host_agent_slug || state.agent || '',
-        createdAt: new Date().toISOString()
-      }));
-      app.innerHTML = `<div class="py-14 text-center">
-        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">NMB Sign-In</div>
-        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Tap Loan Officer Keychain</h1>
-        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">Have the NMB loan officer tap their verified Rel8tionChip now. This dashboard will reopen with loan support marked live.</p>
-        <button onclick="window.localStorage.removeItem('rel8tion_loan_officer_pending'); window.location.reload()" class="mt-6 rounded-full bg-white px-6 py-3 font-black text-slate-700 ring-1 ring-slate-200">Cancel</button>
-      </div>`;
-    };
-
     function renderError(message) {
       agentLabel.textContent = state.agent ? labelSlug(state.agent) : 'Dashboard';
       app.innerHTML = `<div class="py-12 text-center">
@@ -706,6 +603,9 @@
     }
 
     async function init() {
+      try {
+        window.localStorage.removeItem('rel8tion_loan_officer_pending');
+      } catch (_) {}
       if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
       state.sign = await loadSign();
       state.event = await loadEvent();
