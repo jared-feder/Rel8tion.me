@@ -80,8 +80,6 @@ module.exports = async function handler(req, res) {
       mode: 'subscription',
       'line_items[0][price]': price.id,
       'line_items[0][quantity]': '1',
-      billing_address_collection: 'auto',
-      'phone_number_collection[enabled]': 'true',
       success_url: `${origin}/pricing?success=1&plan=${encodeURIComponent(planCode)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing?canceled=1&plan=${encodeURIComponent(planCode)}`
     });

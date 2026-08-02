@@ -121,7 +121,14 @@ async function run() {
   const pricingPage = read('pricing.html');
   assert.match(pricingPage, /book-a-call\?type=loan_officer/);
   assert.match(pricingPage, /book-a-call\?type=broker_team/);
+  assert.match(pricingPage, /flow:\s*'payment_first'/);
+  assert.match(pricingPage, /checkout\/open-house-kit/);
+  assert.doesNotMatch(pricingPage, /id="system-checkout"[^>]+href="\/kit-intake/);
   assert.doesNotMatch(pricingPage, /id="seat-price"|id="pass-standard-price"|id="pass-seat-price"/);
+  const wordpressPricing = read('wordpress/pricing-section.html');
+  assert.match(wordpressPricing, /checkout=agent&source=wordpress/);
+  assert.match(wordpressPricing, /checkout=system&source=wordpress/);
+  assert.doesNotMatch(wordpressPricing, /getrel8tion\.com\/kit-intake\?plan=/);
 
   const checkout = require('../api/checkout/open-house-kit');
   const originalFetch = global.fetch;
@@ -151,7 +158,7 @@ async function run() {
   };
 
   try {
-    const monthly = await invoke(checkout, { method: 'POST', headers: { host: 'getrel8tion.com' }, body: { plan: 'monthly', brokerage: 'Example Realty' } });
+    const monthly = await invoke(checkout, { method: 'POST', headers: { host: 'getrel8tion.com' }, body: { plan: 'monthly', brokerage: 'Example Realty', flow: 'payment_first' } });
     assert.equal(monthly.status, 200);
     const monthlyParams = checkoutRequests.at(-1);
     assert.equal(monthlyParams.get('line_items[0][price]'), 'price_kit_catalog');
@@ -166,6 +173,10 @@ async function run() {
     assert.equal(monthlyParams.get('metadata[trial_days]'), '31');
     assert.equal(monthlyParams.get('metadata[branding_status]'), 'pending');
     assert.equal(monthlyParams.get('metadata[brokerage_name]'), 'Example Realty');
+    assert.equal(monthlyParams.get('metadata[flow]'), 'payment_first');
+    assert.equal(monthlyParams.has('billing_address_collection'), false);
+    assert.equal(monthlyParams.has('phone_number_collection[enabled]'), false);
+    assert.equal(monthlyParams.has('shipping_address_collection[allowed_countries][0]'), false);
 
     const annual = await invoke(checkout, { method: 'POST', headers: { host: 'getrel8tion.com' }, body: { plan: 'annual' } });
     assert.equal(annual.status, 200);
@@ -186,6 +197,8 @@ async function run() {
     const agentParams = checkoutRequests.at(-1);
     assert.equal(agentParams.get('line_items[0][price]'), 'price_agent_annual_catalog');
     assert.equal(agentParams.has('line_items[1][price]'), false);
+    assert.equal(agentParams.has('billing_address_collection'), false);
+    assert.equal(agentParams.has('phone_number_collection[enabled]'), false);
     assert.equal(agentParams.has('shipping_address_collection[allowed_countries][0]'), false);
     assert.equal(agentParams.get('metadata[website_included]'), 'true');
     assert.equal(agentParams.get('metadata[digital_card_included]'), 'true');

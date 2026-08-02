@@ -651,7 +651,7 @@
       <nav class="nav-actions" aria-label="REL8TION links">
         <a class="nav-link" href="#kit-title">Pricing</a>
         <a class="nav-link" href="https://my.rel8tion.me/get-started">Website Builder</a>
-        <a class="nav-link" href="/kit-intake?flow=manual">Start Checkout</a>
+        <a class="nav-link" href="/pricing?role=agent&billing=monthly&checkout=system&source=open-house-kit">Start Checkout</a>
       </nav>
     </div>
 
@@ -895,22 +895,25 @@
       }
     }
 
-    function startManualIntake(plan = '') {
-      const qs = new URLSearchParams(window.location.search);
-      if (!qs.get('flow')) qs.set('flow', 'manual');
-      if (plan) qs.set('plan', plan);
-      window.location.href = `/kit-intake?${qs.toString()}`;
+    function startPaymentFirstCheckout(plan = '') {
+      const qs = new URLSearchParams({
+        role: 'agent',
+        billing: plan || 'monthly',
+        checkout: 'system',
+        source: 'open-house-kit'
+      });
+      window.location.href = `/pricing?${qs.toString()}`;
     }
 
     document.getElementById('scan-keychain').addEventListener('click', armOpenHouseKitScan);
     document.getElementById('manual-intake').addEventListener('click', () => {
-      startManualIntake();
+      startPaymentFirstCheckout();
     });
     document.getElementById('fallback-intake').addEventListener('click', () => {
-      startManualIntake();
+      startPaymentFirstCheckout();
     });
     document.querySelectorAll('.plan-cta').forEach((button) => {
-      button.addEventListener('click', () => startManualIntake(button.dataset.plan || 'monthly'));
+      button.addEventListener('click', () => startPaymentFirstCheckout(button.dataset.plan || 'monthly'));
     });
     loadCurrentPricing();
     if (new URLSearchParams(window.location.search).get('arm') === 'event-pass') {

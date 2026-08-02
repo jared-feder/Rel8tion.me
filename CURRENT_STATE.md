@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-02: Payment-first public checkout
+
+- `[IMPLEMENTED]` Public REL8TION Agent and Complete Open House System calls to action now create Stripe Checkout immediately after the buyer selects monthly or annual pricing. The former public Complete System path no longer requires the long kit-intake form before payment.
+- `[IMPLEMENTED]` Stripe Checkout no longer explicitly requests phone, billing address, or shipping address for these public plans. Stripe still collects the customer email and payment information required for Checkout; the secured post-payment kit dashboard handles company branding, delivery details, and onboarding afterward.
+- `[IMPLEMENTED]` Event Pass/keychain prefill remains available for field-linked setup, while public WordPress and Open House Kit marketing links use the payment-first handoff.
+
 ## 2026-08-02: Canonical pricing and private sales calendar live
 
 - `[VERIFIED]` Production release `57a3623` is live through Vercel deployment `dpl_5i1Gxvn9Ym5aGrxUQsZQsvCHaoJ7` on `app.rel8tion.me`. `/api/public/pricing`, `/pricing`, `/book-a-call`, and the broker/team availability API returned the approved 2026-08-02 catalog and calendar; the repository production-route suite passed against the release.
@@ -247,6 +253,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/a` redirects legacy/public profile traffic to `/b`.
 - `[IMPLEMENTED]` `/b` is the public agent profile and lead capture path.
 - `[IMPLEMENTED]` `/get-open-house-kit`, `/kit-confirm`, and `/kit-intake` support the Complete REL8TION Open House System landing, NFC/keychain prefill, company-branding intake, shipping intake, and Stripe Checkout handoff. Event Pass checkout arming still canonicalizes to the programmed NFC origin (`irel8.me`) before setting browser state. Pricing, trials, renewals, features, entitlements, and Stripe lookup keys now come from `config/pricing-catalog.json` through `/api/public/pricing`; public pages do not fall back to embedded amounts.
+- `[IMPLEMENTED]` Public plan selection is payment-first: the pricing page and WordPress handoff create Stripe Checkout before asking for profile, company-branding, shipping, or setup details. Those details move to secured post-payment onboarding; keychain-prefill remains available for field-linked flows.
 - `[PARTIAL]` Catalog-coded Stripe Checkout sessions are wired to upsert `pricing_entitlements` through the existing signed Stripe webhook. On 2026-08-02, `20260802100949_pricing_entitlements.sql` was applied to the linked production project and verified with forced RLS, the expected indexes, and no `anon`/`authenticated` table grants. The canonical live Stripe Products, default Prices, and seven lookup keys were synchronized and amount/interval verified; the replaced $249.99 kit Price was deactivated. Webhook deployment remains `[NEEDS VERIFICATION]`. The former public Outreach Seat amounts are retired; loan-officer pricing now requires a private consultation and approved proposal, and no call booking grants outreach or territory access.
 - `[IMPLEMENTED]` `/book-a-call` is the REL8TION-owned private consultation calendar for loan officers and for real estate brokers/teams seeking volume discounts. It publishes 30-minute weekday appointments from 10:00 AM–5:00 PM Eastern with 24-hour notice, collects contact/company context, and sends `.ics` invitations to the visitor and `jared@rel8tion.me` through the existing REL8TION SMTP account, with Resend retained as a fallback provider.
 - `[IMPLEMENTED]` Booking reservations use the service-only `rel8tion_call_bookings` ledger defined by `supabase/migrations/20260802140923_rel8tion_call_bookings.sql`. On 2026-08-02, the migration was applied to the linked production project and verified with forced RLS, the confirmed-slot unique index, and no `anon`/`authenticated` table grants. Production Vercel SMTP variables and a sensitive booking IP-hash secret are configured. The production calendar and availability route are verified; a designated real-delivery smoke test remains `[NEEDS VERIFICATION]`.
