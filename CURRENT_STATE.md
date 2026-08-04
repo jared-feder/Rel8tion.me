@@ -13,7 +13,7 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` Corrected the legacy root `book-a-call.html` wrapper. With Vercel `cleanUrls` enabled, that root file takes precedence over the `/book-a-call` rewrite; it had redirected the browser back to itself. It now forwards to the actual `apps/rel8tion-app/book-a-call.html` calendar while preserving the query string and fragment.
 - `[IMPLEMENTED]` `scripts/verify-booking-calendar.cjs` now rejects a self-targeting clean-URL wrapper and requires the real calendar target, protecting the canonical `https://app.rel8tion.me/book-a-call` entry route from the same loop.
-- `[NEEDS VERIFICATION]` Production must be deployed and the page, availability API, and non-mutating booking validation path rechecked on `app.rel8tion.me`.
+- `[VERIFIED]` Production commit `c284a9be` deployed as `dpl_HxrqmnhqYSvbDjxJkcUwVVhUhnGC`. The canonical entry no longer self-loops, the real booking form returns HTTP 200, both loan-officer and broker/team availability return live slots, and an empty create request is rejected with HTTP 400 without creating a booking.
 
 ## 2026-08-04: Protected MelissaSellsNY.com domain-sale page
 
