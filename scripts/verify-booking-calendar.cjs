@@ -53,6 +53,10 @@ async function run() {
 
   const routeMap = JSON.parse(read('vercel.json'));
   assert.ok(routeMap.rewrites.some((route) => route.source === '/book-a-call' && route.destination === '/apps/rel8tion-app/book-a-call.html'));
+  const cleanUrlWrapper = read('book-a-call.html');
+  assert.match(cleanUrlWrapper, /url=\/apps\/rel8tion-app\/book-a-call\.html/);
+  assert.match(cleanUrlWrapper, /location\.replace\(`\/apps\/rel8tion-app\/book-a-call\.html/);
+  assert.doesNotMatch(cleanUrlWrapper, /url=\/book-a-call(?:["'?#<]|$)/);
 
   const migration = read('supabase/migrations/20260802140923_rel8tion_call_bookings.sql');
   assert.match(migration, /unique index[\s\S]*where status = 'confirmed'/i);

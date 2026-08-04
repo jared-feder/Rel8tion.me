@@ -9,6 +9,19 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The public pricing catalog now returns `Access-Control-Allow-Origin: *` on every response. The catalog contains no private data, and the stable wildcard prevents Vercel from caching an origin-less response that later breaks the WordPress pricing page.
 - `[IMPLEMENTED]` The live WordPress homepage links Pricing from its header and footer and shows the current Complete System monthly offer: $199 due today, followed by $29/month after 31 days. The WordPress page remains manually managed and must still be verified separately from the tracked `wordpress/` source after future edits.
 
+## 2026-08-04: Booking calendar route shadow fixed
+
+- `[IMPLEMENTED]` Corrected the legacy root `book-a-call.html` wrapper. With Vercel `cleanUrls` enabled, that root file takes precedence over the `/book-a-call` rewrite; it had redirected the browser back to itself. It now forwards to the actual `apps/rel8tion-app/book-a-call.html` calendar while preserving the query string and fragment.
+- `[IMPLEMENTED]` `scripts/verify-booking-calendar.cjs` now rejects a self-targeting clean-URL wrapper and requires the real calendar target, protecting the canonical `https://app.rel8tion.me/book-a-call` entry route from the same loop.
+- `[NEEDS VERIFICATION]` Production must be deployed and the page, availability API, and non-mutating booking validation path rechecked on `app.rel8tion.me`.
+
+## 2026-08-04: Protected MelissaSellsNY.com domain-sale page
+
+- `[VERIFIED]` `melissasellsny.com` and `www.melissasellsny.com` serve the dedicated domain-for-sale landing page from agent-builder production deployment `dpl_HgwmR2ia2aYQmGF81QdV9Z2JgeoE` at commit `49b6cc9` on `main`.
+- `[IMPLEMENTED]` The domain is reserved directly in agent-builder middleware and rewrites to the `nymelissa` sale route without depending on the mutable `agent_websites` mapping. Non-root public paths redirect to the canonical sale homepage, while system routes such as `/api/contact` remain available.
+- `[IMPLEMENTED]` `npm run build` now runs `verify:melissa-domain-sale` first. The production build fails if the sale component, route override, reserved-domain middleware mapping, canonical metadata, or sale-only sitemap protection is removed.
+- `[VERIFIED]` Both apex and `www` return HTTP 200 with the sale title and offer content, the former Melissa Unger agent-template title is absent, `/about` redirects to `/`, and the domain sitemap contains only the canonical sale URL.
+
 ## 2026-08-04: Agent-first reverse open-house discovery
 
 - `[IMPLEMENTED]` The relationship-listing worker now treats every verifiably sent historical outreach row as a reverse-discovery candidate, in addition to claimed/worked-with and positive-interest agents. Unsent prepared queue rows and placeholder names remain excluded.
