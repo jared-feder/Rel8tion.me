@@ -1,14 +1,5 @@
 const { publicPricingCatalog, readPricingCatalog } = require('../../lib/pricing-catalog');
 
-const ALLOWED_ORIGINS = new Set([
-  'https://rel8tion.me',
-  'https://www.rel8tion.me',
-  'https://app.rel8tion.me',
-  'https://getrel8tion.com',
-  'https://www.getrel8tion.com',
-  'https://my.rel8tion.me'
-]);
-
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -16,11 +7,9 @@ function sendJson(res, status, payload) {
 }
 
 module.exports = function handler(req, res) {
-  const origin = String(req.headers.origin || '');
-  if (ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
+  // This catalog is intentionally public. A wildcard avoids caching an
+  // origin-less response that later omits CORS headers for WordPress clients.
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type');
 

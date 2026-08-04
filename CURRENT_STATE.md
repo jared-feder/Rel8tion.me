@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-04: WordPress pricing connection and public catalog CORS
+
+- `[IMPLEMENTED]` The public pricing catalog now returns `Access-Control-Allow-Origin: *` on every response. The catalog contains no private data, and the stable wildcard prevents Vercel from caching an origin-less response that later breaks the WordPress pricing page.
+- `[IMPLEMENTED]` The live WordPress homepage links Pricing from its header and footer and shows the current Complete System monthly offer: $199 due today, followed by $29/month after 31 days. The WordPress page remains manually managed and must still be verified separately from the tracked `wordpress/` source after future edits.
+
 ## 2026-08-04: Agent-first reverse open-house discovery
 
 - `[IMPLEMENTED]` The relationship-listing worker now treats every verifiably sent historical outreach row as a reverse-discovery candidate, in addition to claimed/worked-with and positive-interest agents. Unsent prepared queue rows and placeholder names remain excluded.
