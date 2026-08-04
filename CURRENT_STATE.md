@@ -4,6 +4,15 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-04: Agent-first reverse open-house discovery
+
+- `[IMPLEMENTED]` The relationship-listing worker now treats every verifiably sent historical outreach row as a reverse-discovery candidate, in addition to claimed/worked-with and positive-interest agents. Unsent prepared queue rows and placeholder names remain excluded.
+- `[IMPLEMENTED]` Targeted OneKey discovery is incremental. Positive relationships run first, prior-outreach agents run next, and other known agents follow; a service-role-only cursor in `rel8tion_runtime_settings.key='agent_listing_inventory_onekey_agent_cursor'` advances after each successful cron so the two-hour job rotates across the full population instead of repeating the first configured batch.
+- `[IMPLEMENTED]` Previously verified OneKey member and office keys are reused from protected `agent_listing_inventory.source_payload` after exact-name and phone-conflict checks. Cache hits skip the agent-directory API call while Sale and Rent inventory are still refreshed, reducing repeat-request volume from three requests to two per known identity.
+- `[IMPLEMENTED]` Upcoming OneKey open houses can be reconciled into canonical `open_houses` when `AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES=true`. Exact source ID is preferred; otherwise normalized address plus a start-time tolerance attaches the known agent to an existing event while preserving that event's ID and source. Events with no canonical match are inserted with their OneKey listing ID. This path does not queue or send outreach.
+- `[IMPLEMENTED]` The scheduled endpoint now emits a PII-free completion summary with duration, profiles scanned/matched, identity-cache hits, listings found, canonical events attached/inserted, and the next cursor.
+- `[NEEDS VERIFICATION]` These changes are local and tested but not yet deployed. Production still has `AGENT_LISTING_INVENTORY_PROMOTE_OPEN_HOUSES=false`; deploy the worker first, run a bounded dry/live verification, then explicitly enable promotion before expecting reverse-discovered events to be attached or added to `open_houses`.
+
 ## 2026-08-02: Payment-first public checkout
 
 - `[IMPLEMENTED]` Public REL8TION Agent and Complete Open House System calls to action now create Stripe Checkout immediately after the buyer selects monthly or annual pricing. The former public Complete System path no longer requires the long kit-intake form before payment.

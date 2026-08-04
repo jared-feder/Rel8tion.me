@@ -12,7 +12,10 @@ const POSITIVE_REVIEW_STATUSES = new Set([
   'accepted_open_house',
   'drip_scheduled'
 ]);
+const HISTORICAL_OUTREACH_STATUSES = new Set(['sent', 'manual_text_sent']);
 const RANKING_RELATIONSHIP_STATUS = 'ranking_only';
+const PRIOR_OUTREACH_RELATIONSHIP_STATUS = 'prior_outreach';
+const ONEKEY_AGENT_CURSOR_KEY = 'agent_listing_inventory_onekey_agent_cursor';
 const ONEKEY_BOXES = [
   { topLeft: '[-73.96,40.80]', bottomRight: '[-73.70,40.54]' },
   { topLeft: '[-73.80,40.92]', bottomRight: '[-73.40,40.55]' },
@@ -66,6 +69,21 @@ function normalizePhone(value) {
 
 function normalizeEmail(value) {
   return cleanText(value).toLowerCase();
+}
+
+function meaningfulAgentName(value) {
+  const normalized = normalizeName(value);
+  if (!normalized || normalized.length < 3) return false;
+  return !/^(agent )?(phone|email)( number)?\b|^(unknown|unavailable|not available|n a|na)$/i.test(normalized);
+}
+
+function wasHistoricalOutreach(row = {}) {
+  return Boolean(
+    cleanText(row.initial_sent_at)
+    || cleanText(row.last_outreach_at)
+    || row.manual_sms_sent === true
+    || HISTORICAL_OUTREACH_STATUSES.has(cleanText(row.initial_send_status).toLowerCase())
+  );
 }
 
 function numberOrNull(value) {
@@ -182,11 +200,12 @@ function relationshipKey(profile = {}) {
 
 function relationshipPriority(status) {
   return {
-    accepted_open_house: 5,
-    confirmed_open_house: 4,
-    interested: 3,
-    drip_scheduled: 2,
-    worked_with: 1
+    accepted_open_house: 6,
+    confirmed_open_house: 5,
+    interested: 4,
+    drip_scheduled: 3,
+    worked_with: 2,
+    prior_outreach: 1
   }[status] || 0;
 }
 
@@ -205,7 +224,12 @@ function mergeProfile(current, candidate) {
     brokerage: preferred.brokerage || alternate.brokerage || '',
     phone: preferred.phone || alternate.phone || '',
     phone_normalized: preferred.phone_normalized || alternate.phone_normalized || '',
-    email: preferred.email || alternate.email || ''
+    email: preferred.email || alternate.email || '',
+    prior_outreach: Boolean(preferred.prior_outreach || alternate.prior_outreach),
+    last_outreach_at: [preferred.last_outreach_at, alternate.last_outreach_at]
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null
   };
 }
 
@@ -220,7 +244,9 @@ function relationshipProfile(input = {}, defaults = {}) {
     phone_normalized: normalizePhone(input.agent_phone_normalized || input.phone_normalized || input.agent_phone || input.phone),
     email: normalizeEmail(input.agent_email || input.email),
     relationship_source: defaults.relationship_source || 'agents',
-    relationship_status: defaults.relationship_status || 'worked_with'
+    relationship_status: defaults.relationship_status || 'worked_with',
+    prior_outreach: defaults.prior_outreach === true || wasHistoricalOutreach(input),
+    last_outreach_at: input.last_outreach_at || input.initial_sent_at || null
   };
   profile.relationship_key = relationshipKey(profile);
   profile.agent_name_normalized = normalizeName(profile.agent_name);
@@ -238,7 +264,7 @@ async function loadRelationshipProfiles(config) {
     supabaseRequestAll(
       config,
       'agent_outreach_queue',
-      `review_status=in.(${[...POSITIVE_REVIEW_STATUSES].join(',')})&select=id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,review_status,source,updated_at&order=updated_at.desc.nullslast`,
+      'select=id,agent_name,agent_phone,agent_phone_normalized,agent_email,brokerage,review_status,source,initial_send_status,initial_sent_at,last_outreach_at,manual_sms_sent,updated_at&order=last_outreach_at.desc.nullslast,updated_at.desc.nullslast',
       config.relationshipLimit
     ).catch(() => []),
     supabaseRequestAll(
@@ -267,19 +293,124 @@ async function loadRelationshipProfiles(config) {
     profiles.set(profile.relationship_key, mergeProfile(profiles.get(profile.relationship_key), profile));
   }
   for (const row of queueRows || []) {
-    const status = POSITIVE_REVIEW_STATUSES.has(row.review_status) ? row.review_status : 'interested';
+    const positive = POSITIVE_REVIEW_STATUSES.has(row.review_status);
+    const historical = wasHistoricalOutreach(row);
+    if (!positive && !historical) continue;
+    const status = positive ? row.review_status : PRIOR_OUTREACH_RELATIONSHIP_STATUS;
     const profile = relationshipProfile({
       ...row,
       queue_row_id: row.id,
       agent_id: null
     }, {
       relationship_source: row.source || 'agent_outreach_queue',
-      relationship_status: status
+      relationship_status: status,
+      prior_outreach: historical
     });
     if (!profile.relationship_key || !profile.agent_name_normalized) continue;
     profiles.set(profile.relationship_key, mergeProfile(profiles.get(profile.relationship_key), profile));
   }
   return [...profiles.values()];
+}
+
+function discoveryPriority(profile = {}) {
+  if (POSITIVE_REVIEW_STATUSES.has(profile.relationship_status)) return 3;
+  if (profile.prior_outreach || profile.relationship_status === PRIOR_OUTREACH_RELATIONSHIP_STATUS) return 2;
+  return 1;
+}
+
+function prioritizeDiscoveryProfiles(profiles = []) {
+  return profiles
+    .filter((profile) => (
+      profile.relationship_status !== RANKING_RELATIONSHIP_STATUS
+      && meaningfulAgentName(profile.agent_name)
+    ))
+    .sort((left, right) => {
+      const priority = discoveryPriority(right) - discoveryPriority(left);
+      if (priority) return priority;
+      const recency = String(right.last_outreach_at || '').localeCompare(String(left.last_outreach_at || ''));
+      if (recency) return recency;
+      return String(left.agent_name_normalized || '').localeCompare(String(right.agent_name_normalized || ''));
+    });
+}
+
+function circularBatch(items = [], limit = items.length, cursor = 0) {
+  if (!items.length || limit <= 0) return { items: [], cursor: 0, next_cursor: 0 };
+  const start = Math.max(0, Number.parseInt(cursor, 10) || 0) % items.length;
+  const count = Math.min(limit, items.length);
+  const selected = Array.from({ length: count }, (_, index) => items[(start + index) % items.length]);
+  return {
+    items: selected,
+    cursor: start,
+    next_cursor: (start + count) % items.length
+  };
+}
+
+async function loadOneKeyAgentCursor(config) {
+  const rows = await supabaseRequest(
+    config,
+    `rel8tion_runtime_settings?key=eq.${ONEKEY_AGENT_CURSOR_KEY}&select=value&limit=1`
+  ).catch(() => []);
+  const cursor = Number.parseInt(rows?.[0]?.value?.cursor, 10);
+  return Number.isFinite(cursor) && cursor >= 0 ? cursor : 0;
+}
+
+async function saveOneKeyAgentCursor(config, cursor, profilesConsidered, nowIso) {
+  if (config.dryRun) return false;
+  await supabaseRequest(config, 'rel8tion_runtime_settings?on_conflict=key', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      key: ONEKEY_AGENT_CURSOR_KEY,
+      value: {
+        cursor,
+        profiles_considered: profilesConsidered,
+        advanced_at: nowIso
+      },
+      updated_by: 'sync-agent-listing-inventory'
+    })
+  });
+  return true;
+}
+
+function cachedOneKeyMatch(profile, payload = {}) {
+  const candidate = {
+    name: cleanText(payload.source_agent_name),
+    phone: cleanText(payload.source_agent_phone),
+    email: normalizeEmail(payload.source_agent_email),
+    brokerage: cleanText(payload.source_brokerage),
+    member_key: cleanText(payload.source_agent_member_key),
+    member_mls_id: cleanText(payload.source_agent_member_mls_id),
+    office_key: cleanText(payload.source_agent_office_key)
+  };
+  if (!candidate.member_key || normalizeName(candidate.name) !== profile.agent_name_normalized) return null;
+  const candidatePhone = normalizePhone(candidate.phone);
+  if (profile.phone_normalized && candidatePhone && profile.phone_normalized !== candidatePhone) return null;
+  return {
+    profile,
+    candidate,
+    match_score: profile.phone_normalized && candidatePhone ? 100 : 95,
+    match_reason: 'onekey_cached_identity'
+  };
+}
+
+async function loadOneKeyIdentityCache(config) {
+  const rows = await supabaseRequestAll(
+    config,
+    'agent_listing_inventory',
+    'source=eq.onekey&select=relationship_key,agent_name,phone_normalized,source_payload,last_seen_at&order=last_seen_at.desc',
+    config.relationshipLimit
+  ).catch(() => []);
+  const cache = new Map();
+  for (const row of rows || []) {
+    if (!row.relationship_key || cache.has(row.relationship_key)) continue;
+    const profile = relationshipProfile({
+      agent_name: row.agent_name,
+      phone_normalized: row.phone_normalized
+    });
+    const match = cachedOneKeyMatch(profile, row.source_payload || {});
+    if (match) cache.set(row.relationship_key, row.source_payload);
+  }
+  return cache;
 }
 
 function agentObject(value) {
@@ -628,13 +759,13 @@ async function loadInternalListingSources(config, nowIso) {
     supabaseRequestAll(
       config,
       'open_houses',
-      `open_end=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source&order=open_end.asc`,
+      `open_end=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source,agent_scraped,agent_enriched,updated_at&order=open_end.asc`,
       config.relationshipLimit
     ),
     supabaseRequestAll(
       config,
       'open_houses',
-      `open_end=is.null&open_start=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source&order=open_start.asc`,
+      `open_end=is.null&open_start=gte.${futureFilter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source,agent_scraped,agent_enriched,updated_at&order=open_start.asc`,
       config.relationshipLimit
     )
   ]);
@@ -654,7 +785,8 @@ function openHousePayload(record, match, nowIso) {
   const end = openEnd ? new Date(openEnd) : null;
   const start = openStart ? new Date(openStart) : null;
   if (!start || !Number.isFinite(start.getTime())) return null;
-  if (end && Number.isFinite(end.getTime()) && end < new Date(nowIso)) return null;
+  const effectiveEnd = end && Number.isFinite(end.getTime()) ? end : start;
+  if (effectiveEnd < new Date(nowIso)) return null;
 
   const profile = match.profile;
   const listing = record.Listing || {};
@@ -666,6 +798,7 @@ function openHousePayload(record, match, nowIso) {
     price: numberOrNull(listing.Price?.ListPrice),
     beds: numberOrNull(structure.BedroomsTotal || computedFacts.BedroomsTotalInteger),
     baths: numberOrNull(structure.BathroomsTotalInteger || computedFacts.BathroomsTotalInteger),
+    sqft: numberOrNull(structure.LivingArea || computedFacts.LivingAreaSquareFeet),
     brokerage: recordBrokerage(record) || profile.brokerage || null,
     agent: profile.agent_name,
     agent_phone: profile.phone || match.candidate.phone || null,
@@ -675,12 +808,102 @@ function openHousePayload(record, match, nowIso) {
     open_start: openStart,
     open_end: openEnd,
     image: primaryImage(record) || null,
-    link: firstPresent(record.CanonicalURL, record.ListingURL) || null,
+    link: firstPresent(record.CanonicalURL, record.ListingURL, oneKeyListingUrl(record)) || null,
     source: 'onekey',
     agent_scraped: true,
     agent_enriched: Boolean(profile.phone_normalized || profile.email),
     updated_at: nowIso
   });
+}
+
+function hasValue(value) {
+  return value !== null && value !== undefined && cleanText(value) !== '';
+}
+
+function openHouseAddressKey(value) {
+  return normalizeName(value)
+    .replace(/\b(street|st)\b/g, 'st')
+    .replace(/\b(avenue|ave)\b/g, 'ave')
+    .replace(/\b(road|rd)\b/g, 'rd')
+    .replace(/\b(drive|dr)\b/g, 'dr')
+    .replace(/\b(boulevard|blvd)\b/g, 'blvd')
+    .replace(/\b(lane|ln)\b/g, 'ln');
+}
+
+function mergeCanonicalOpenHouse(existing, discovered, nowIso) {
+  const oneKeyOwned = cleanText(existing.source).toLowerCase() === 'onekey';
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(discovered)) {
+    if (key === 'id' || key === 'source' || key.startsWith('agent_')) continue;
+    if ((oneKeyOwned || !hasValue(existing[key])) && hasValue(value)) merged[key] = value;
+  }
+  merged.id = existing.id;
+  merged.source = existing.source || discovered.source;
+  merged.agent = meaningfulAgentName(existing.agent) ? existing.agent : discovered.agent;
+  merged.agent_phone = existing.agent_phone || discovered.agent_phone || null;
+  merged.agent_email = existing.agent_email || discovered.agent_email || null;
+  merged.agent_scraped = true;
+  merged.agent_enriched = Boolean(normalizePhone(merged.agent_phone) || normalizeEmail(merged.agent_email));
+  merged.updated_at = nowIso;
+  return merged;
+}
+
+function reconcileOpenHousePayloads(discoveredRows = [], existingRows = [], nowIso = new Date().toISOString()) {
+  const existingById = new Map(existingRows.map((row) => [String(row.id), row]));
+  const existingByAddress = new Map();
+  for (const row of existingRows) {
+    const key = openHouseAddressKey(row.address);
+    if (!key) continue;
+    if (!existingByAddress.has(key)) existingByAddress.set(key, []);
+    existingByAddress.get(key).push(row);
+  }
+
+  const rows = [];
+  const usedExistingIds = new Set();
+  let matchedById = 0;
+  let matchedByAddressTime = 0;
+  let inserted = 0;
+  let attached = 0;
+
+  for (const discovered of discoveredRows) {
+    let existing = existingById.get(String(discovered.id));
+    let matchType = existing ? 'id' : '';
+    if (!existing) {
+      const start = new Date(discovered.open_start).getTime();
+      const candidates = existingByAddress.get(openHouseAddressKey(discovered.address)) || [];
+      existing = candidates
+        .filter((row) => !usedExistingIds.has(String(row.id)))
+        .map((row) => ({ row, delta: Math.abs(new Date(row.open_start).getTime() - start) }))
+        .filter(({ delta }) => Number.isFinite(delta) && delta <= 45 * 60 * 1000)
+        .sort((left, right) => left.delta - right.delta)[0]?.row;
+      if (existing) matchType = 'address_time';
+    }
+
+    if (!existing) {
+      rows.push(discovered);
+      inserted += 1;
+      continue;
+    }
+
+    usedExistingIds.add(String(existing.id));
+    if (matchType === 'id') matchedById += 1;
+    else matchedByAddressTime += 1;
+    const previouslyEnriched = Boolean(
+      meaningfulAgentName(existing.agent)
+      && (normalizePhone(existing.agent_phone) || normalizeEmail(existing.agent_email))
+    );
+    const merged = mergeCanonicalOpenHouse(existing, discovered, nowIso);
+    if (!previouslyEnriched && merged.agent_enriched) attached += 1;
+    rows.push(merged);
+  }
+
+  return {
+    rows,
+    matched_by_id: matchedById,
+    matched_by_address_time: matchedByAddressTime,
+    inserted,
+    attached
+  };
 }
 
 async function fetchOneKeyJson(url, label = 'OneKey request') {
@@ -836,10 +1059,16 @@ async function fetchOneKeyAgentListings(config, match, saleType) {
   return { records: [...byId.values()], total, complete, sale_type: saleType };
 }
 
-async function discoverOneKeyListingsForProfile(config, profile) {
-  const directory = await fetchOneKeyAgentDirectory(profile);
-  const rows = Array.isArray(directory?.Results) ? directory.Results : [];
-  const match = matchOneKeyAgentProfile(profile, rows);
+async function discoverOneKeyListingsForProfile(config, profile, cachedIdentity = null) {
+  let directory = null;
+  let rows = [];
+  let match = cachedIdentity ? cachedOneKeyMatch(profile, cachedIdentity) : null;
+  const identityCacheHit = Boolean(match);
+  if (!match) {
+    directory = await fetchOneKeyAgentDirectory(profile);
+    rows = Array.isArray(directory?.Results) ? directory.Results : [];
+    match = matchOneKeyAgentProfile(profile, rows);
+  }
   if (!match) {
     return {
       profile,
@@ -847,7 +1076,8 @@ async function discoverOneKeyListingsForProfile(config, profile) {
       records: [],
       complete: true,
       directory_total: Number(directory?.Total || rows.length || 0),
-      listing_totals: {}
+      listing_totals: {},
+      identity_cache_hit: false
     };
   }
 
@@ -867,7 +1097,8 @@ async function discoverOneKeyListingsForProfile(config, profile) {
     records: [...byId.values()],
     complete: scans.every((scan) => scan.complete),
     directory_total: Number(directory?.Total || rows.length || 0),
-    listing_totals: Object.fromEntries(scans.map((scan) => [scan.sale_type, scan.total]))
+    listing_totals: Object.fromEntries(scans.map((scan) => [scan.sale_type, scan.total])),
+    identity_cache_hit: identityCacheHit
   };
 }
 
@@ -888,18 +1119,21 @@ async function mapWithConcurrency(items, concurrency, mapper) {
   return results;
 }
 
-async function scanOneKeyAgents(config, profiles = []) {
-  const actionable = profiles.filter((profile) => (
-    profile.relationship_status !== RANKING_RELATIONSHIP_STATUS
-    && profile.agent_name
-  ));
-  const selected = actionable.slice(0, config.oneKeyAgentLimit);
+async function scanOneKeyAgents(config, profiles = [], options = {}) {
+  const actionable = prioritizeDiscoveryProfiles(profiles);
+  const batch = circularBatch(actionable, config.oneKeyAgentLimit, options.cursor || 0);
+  const selected = batch.items;
+  const identityCache = options.identityCache || new Map();
   const results = await mapWithConcurrency(
     selected,
     config.oneKeyAgentConcurrency,
     async (profile) => {
       try {
-        return await discoverOneKeyListingsForProfile(config, profile);
+        return await discoverOneKeyListingsForProfile(
+          config,
+          profile,
+          identityCache.get(profile.relationship_key) || null
+        );
       } catch (error) {
         return {
           profile,
@@ -908,7 +1142,8 @@ async function scanOneKeyAgents(config, profiles = []) {
           complete: false,
           error: error.message || String(error),
           directory_total: 0,
-          listing_totals: {}
+          listing_totals: {},
+          identity_cache_hit: false
         };
       }
     }
@@ -926,8 +1161,11 @@ async function scanOneKeyAgents(config, profiles = []) {
     profiles_scanned: selected.length,
     profiles_matched: results.filter((result) => result.match).length,
     profiles_failed: results.filter((result) => !result.complete).length,
+    identity_cache_hits: results.filter((result) => result.identity_cache_hit).length,
     match_reasons: matchReasons,
     complete: selected.length === actionable.length && results.every((result) => result.complete),
+    cursor: batch.cursor,
+    next_cursor: batch.next_cursor,
     results
   };
 }
@@ -1049,7 +1287,11 @@ async function run(options = {}) {
   const inventoryByKey = new Map();
   const openHousesById = new Map();
 
-  const internal = await loadInternalListingSources(config, nowIso);
+  const [internal, oneKeyAgentCursor, oneKeyIdentityCache] = await Promise.all([
+    loadInternalListingSources(config, nowIso),
+    config.oneKeyAgentDiscoveryEnabled ? loadOneKeyAgentCursor(config) : Promise.resolve(0),
+    config.oneKeyAgentDiscoveryEnabled ? loadOneKeyIdentityCache(config) : Promise.resolve(new Map())
+  ]);
   const websitesById = new Map(internal.websites.map((row) => [String(row.id), row]));
   for (const row of internal.websiteListings) {
     if (!CURRENT_STATUSES.has(cleanText(row.listing_status).toLowerCase().replace(/_/g, ' '))) continue;
@@ -1088,15 +1330,21 @@ async function run(options = {}) {
   }
 
   const agentScan = config.oneKeyAgentDiscoveryEnabled
-    ? await scanOneKeyAgents(config, profiles)
+    ? await scanOneKeyAgents(config, profiles, {
+        cursor: oneKeyAgentCursor,
+        identityCache: oneKeyIdentityCache
+      })
     : {
         entries: [],
         profiles_considered: 0,
         profiles_scanned: 0,
         profiles_matched: 0,
         profiles_failed: 0,
+        identity_cache_hits: 0,
         match_reasons: {},
         complete: false,
+        cursor: 0,
+        next_cursor: 0,
         results: []
       };
   if (config.oneKeyAgentDiscoveryEnabled) {
@@ -1130,6 +1378,7 @@ async function run(options = {}) {
 
   const inventory = [...inventoryByKey.values()];
   const openHouses = [...openHousesById.values()];
+  const openHouseReconciliation = reconcileOpenHousePayloads(openHouses, internal.openHouses, nowIso);
   const inventoryWritten = await upsertRows(
     config,
     'agent_listing_inventory',
@@ -1137,7 +1386,7 @@ async function run(options = {}) {
     'relationship_key,source,source_listing_id'
   );
   const openHousesWritten = config.promoteOpenHouses
-    ? await upsertRows(config, 'open_houses', openHouses, 'id')
+    ? await upsertRows(config, 'open_houses', openHouseReconciliation.rows, 'id')
     : 0;
   const stale = await markStaleInventory(
     config,
@@ -1151,6 +1400,14 @@ async function run(options = {}) {
     : config.oneKeyAgentDiscoveryEnabled
       ? await markStaleOneKeyAgentInventory(config, nowIso, agentScan)
       : { marked_inactive: 0, skipped: true };
+  const cursorSaved = config.oneKeyAgentDiscoveryEnabled && agentScan.profiles_scanned > 0
+    ? await saveOneKeyAgentCursor(
+        config,
+        agentScan.next_cursor,
+        agentScan.profiles_considered,
+        nowIso
+      )
+    : false;
 
   return {
     ok: true,
@@ -1164,7 +1421,11 @@ async function run(options = {}) {
     onekey_agent_profiles_scanned: agentScan.profiles_scanned,
     onekey_agent_profiles_matched: agentScan.profiles_matched,
     onekey_agent_profiles_failed: agentScan.profiles_failed,
+    onekey_agent_identity_cache_hits: agentScan.identity_cache_hits,
     onekey_agent_match_reasons: agentScan.match_reasons,
+    onekey_agent_cursor: agentScan.cursor,
+    onekey_agent_next_cursor: agentScan.next_cursor,
+    onekey_agent_cursor_saved: cursorSaved,
     onekey_agent_scan_complete: config.oneKeyAgentDiscoveryEnabled ? agentScan.complete : null,
     onekey_agent_listings_scanned: agentScan.entries.length,
     boxes: scan.boxes,
@@ -1175,6 +1436,10 @@ async function run(options = {}) {
     inventory_written: inventoryWritten,
     open_house_promotion_enabled: config.promoteOpenHouses,
     open_houses_written: openHousesWritten,
+    open_houses_matched_by_id: openHouseReconciliation.matched_by_id,
+    open_houses_matched_by_address_time: openHouseReconciliation.matched_by_address_time,
+    open_houses_agents_attached: openHouseReconciliation.attached,
+    open_houses_inserted: openHouseReconciliation.inserted,
     marked_inactive: stale.marked_inactive + oneKeyStale.marked_inactive,
     stale_marking_skipped: stale.skipped,
     onekey_stale_marking_skipped: oneKeyStale.skipped,
@@ -1206,8 +1471,12 @@ if (require.main === module) {
 
 module.exports = {
   CURRENT_STATUSES,
+  HISTORICAL_OUTREACH_STATUSES,
   POSITIVE_REVIEW_STATUSES,
+  PRIOR_OUTREACH_RELATIONSHIP_STATUS,
   RANKING_RELATIONSHIP_STATUS,
+  cachedOneKeyMatch,
+  circularBatch,
   inventoryPayload,
   internalInventoryPayload,
   inventorySemanticKey,
@@ -1219,8 +1488,10 @@ module.exports = {
   normalizeName,
   normalizePhone,
   openHousePayload,
+  prioritizeDiscoveryProfiles,
   profileIndexes,
   readConfig,
+  reconcileOpenHousePayloads,
   relationshipKey,
   relationshipProfile,
   run,
@@ -1228,5 +1499,6 @@ module.exports = {
   oneKeyListingUrl,
   scanOneKeyAgents,
   sourceIdentityRecord,
-  similarBrokerage
+  similarBrokerage,
+  wasHistoricalOutreach
 };

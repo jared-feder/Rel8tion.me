@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  cachedOneKeyMatch,
+  circularBatch,
   discoverOneKeyListingsForProfile,
   inventoryPayload,
   internalInventoryPayload,
@@ -10,10 +12,13 @@ const {
   mergeInventoryPayload,
   oneKeyListingUrl,
   openHousePayload,
+  prioritizeDiscoveryProfiles,
   profileIndexes,
   readConfig,
+  reconcileOpenHousePayloads,
   relationshipProfile,
-  sourceIdentityRecord
+  sourceIdentityRecord,
+  wasHistoricalOutreach
 } = require('../agent-listing-inventory-worker.cjs');
 const cronHandler = require('../api/cron/sync-agent-listing-inventory.js');
 const agentRankingHandler = require('../api/admin/agent-ranking.js');
@@ -63,6 +68,66 @@ test('queue relationship profiles do not treat the queue id as an agent id', () 
   assert.equal(profile.agent_id, null);
   assert.equal(profile.queue_row_id, 'queue-row-id');
   assert.equal(profile.relationship_key, 'phone:5165550100');
+});
+
+test('historical outreach includes sent rows but excludes untouched pending rows', () => {
+  assert.equal(wasHistoricalOutreach({ initial_send_status: 'sent' }), true);
+  assert.equal(wasHistoricalOutreach({ manual_sms_sent: true }), true);
+  assert.equal(wasHistoricalOutreach({ last_outreach_at: '2026-07-01T12:00:00Z' }), true);
+  assert.equal(wasHistoricalOutreach({ initial_send_status: 'pending', manual_sms_sent: false }), false);
+});
+
+test('reverse discovery prioritizes positive relationships, then prior outreach, then generic agents', () => {
+  const profiles = [
+    relationshipProfile({ name: 'Generic Agent' }),
+    relationshipProfile({
+      agent_name: 'Prior Agent',
+      initial_sent_at: '2026-07-01T12:00:00Z'
+    }, {
+      relationship_source: 'agent_outreach_queue',
+      relationship_status: 'prior_outreach',
+      prior_outreach: true
+    }),
+    relationshipProfile({ agent_name: 'Interested Agent' }, {
+      relationship_source: 'agent_outreach_queue',
+      relationship_status: 'interested'
+    }),
+    relationshipProfile({ agent_name: 'Agent Phone: 5165550100' }, {
+      relationship_source: 'agent_outreach_queue',
+      relationship_status: 'prior_outreach',
+      prior_outreach: true
+    })
+  ];
+
+  assert.deepEqual(
+    prioritizeDiscoveryProfiles(profiles).map((profile) => profile.agent_name),
+    ['Interested Agent', 'Prior Agent', 'Generic Agent']
+  );
+});
+
+test('reverse discovery cursor rotates through batches and wraps', () => {
+  assert.deepEqual(circularBatch(['a', 'b', 'c', 'd'], 2, 2), {
+    items: ['c', 'd'],
+    cursor: 2,
+    next_cursor: 0
+  });
+  assert.deepEqual(circularBatch(['a', 'b', 'c'], 2, 2).items, ['c', 'a']);
+});
+
+test('cached OneKey identity is reused only for the same non-conflicting agent', () => {
+  const profile = relationshipProfile({
+    name: 'Nina Sabag',
+    phone: '917-705-0005'
+  });
+  const payload = {
+    source_agent_name: 'Nina Sabag',
+    source_agent_phone: '917-705-0005',
+    source_agent_member_key: '326232401',
+    source_agent_office_key: '326109033'
+  };
+
+  assert.equal(cachedOneKeyMatch(profile, payload).candidate.member_key, '326232401');
+  assert.equal(cachedOneKeyMatch(profile, { ...payload, source_agent_phone: '516-555-9999' }), null);
 });
 
 test('an exact agent name and compatible brokerage match without contact enrichment', () => {
@@ -270,8 +335,82 @@ test('inventory and upcoming open-house payloads use trusted relationship contac
   assert.equal(openHouse.id, 'L123');
   assert.equal(openHouse.agent_phone, '516-555-0100');
   assert.equal(openHouse.agent_email, 'ruth@example.com');
+  assert.equal(openHouse.sqft, 2400);
   assert.equal(openHouse.agent_scraped, true);
   assert.equal(openHouse.agent_enriched, true);
+});
+
+test('reverse discovery attaches an agent to an existing canonical event without changing its source or id', () => {
+  const nowIso = '2026-08-04T12:00:00.000Z';
+  const existing = [{
+    id: 'existing-event',
+    address: '12 Main Street, Huntington, NY 11743',
+    open_start: '2026-08-08T16:00:00Z',
+    open_end: '2026-08-08T18:00:00Z',
+    source: 'manual',
+    agent: null,
+    agent_phone: null,
+    agent_email: null,
+    price: 900000
+  }];
+  const discovered = [{
+    id: 'existing-event',
+    address: '12 Main St, Huntington, NY 11743',
+    open_start: '2026-08-08T16:00:00Z',
+    open_end: '2026-08-08T18:00:00Z',
+    source: 'onekey',
+    agent: 'Ruth Chalco',
+    agent_phone: '516-555-0100',
+    agent_email: 'ruth@example.com',
+    price: 925000
+  }];
+  const result = reconcileOpenHousePayloads(discovered, existing, nowIso);
+
+  assert.equal(result.matched_by_id, 1);
+  assert.equal(result.attached, 1);
+  assert.equal(result.inserted, 0);
+  assert.equal(result.rows[0].id, 'existing-event');
+  assert.equal(result.rows[0].source, 'manual');
+  assert.equal(result.rows[0].price, 900000);
+  assert.equal(result.rows[0].agent, 'Ruth Chalco');
+  assert.equal(result.rows[0].agent_enriched, true);
+});
+
+test('reverse discovery cross-references a different source id by normalized address and start time', () => {
+  const existing = [{
+    id: 'estately-event',
+    address: '12 Main Street, Huntington, NY 11743',
+    open_start: '2026-08-08T16:00:00Z',
+    source: 'estately'
+  }];
+  const discovered = [{
+    id: 'M00000489-123',
+    address: '12 Main St, Huntington, NY 11743',
+    open_start: '2026-08-08T16:20:00Z',
+    source: 'onekey',
+    agent: 'Ruth Chalco',
+    agent_phone: '516-555-0100'
+  }];
+  const result = reconcileOpenHousePayloads(discovered, existing, '2026-08-04T12:00:00.000Z');
+
+  assert.equal(result.matched_by_address_time, 1);
+  assert.equal(result.inserted, 0);
+  assert.equal(result.rows[0].id, 'estately-event');
+  assert.equal(result.rows[0].source, 'estately');
+});
+
+test('reverse discovery inserts a OneKey event when no canonical match exists', () => {
+  const discovered = [{
+    id: 'M00000489-new',
+    address: '99 New Road, Huntington, NY 11743',
+    open_start: '2026-08-09T16:00:00Z',
+    source: 'onekey',
+    agent: 'Ruth Chalco'
+  }];
+  const result = reconcileOpenHousePayloads(discovered, [], '2026-08-04T12:00:00.000Z');
+
+  assert.equal(result.inserted, 1);
+  assert.equal(result.rows[0].id, 'M00000489-new');
 });
 
 test('OneKey listing payloads derive location and a clickable URL from current search fields', () => {
