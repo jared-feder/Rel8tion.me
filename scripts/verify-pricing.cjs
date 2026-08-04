@@ -92,9 +92,12 @@ async function run() {
   for (const origin of ['https://rel8tion.me', 'https://www.rel8tion.me', 'https://app.rel8tion.me', 'https://getrel8tion.com', 'https://www.getrel8tion.com', 'https://my.rel8tion.me']) {
     const apiResponse = await invoke(publicApi, { headers: { origin } });
     assert.equal(apiResponse.status, 200);
-    assert.equal(apiResponse.headers['access-control-allow-origin'], origin);
+    assert.equal(apiResponse.headers['access-control-allow-origin'], '*');
     assert.equal(apiResponse.payload.offers.open_house_system_annual.renewal_cents, 30000);
   }
+  const originlessApiResponse = await invoke(publicApi);
+  assert.equal(originlessApiResponse.status, 200);
+  assert.equal(originlessApiResponse.headers['access-control-allow-origin'], '*');
 
   const builderRelativePath = 'apps/v0-real-estate-agent-template/app/get-started/page.tsx';
   if (fs.existsSync(path.join(ROOT, builderRelativePath))) {
