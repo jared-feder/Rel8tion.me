@@ -215,6 +215,14 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The website builder collects these fields and saves new incomplete NY sites as drafts. REL8TION COMMAND can edit the same compliance fields.
 - `[NEEDS VERIFICATION]` Each employing broker must supply its own current, dated SOP URL. REL8TION must not invent broker policies. Fidel Lloyd's license type and Home Affordable Realty Corp office address/phone are populated, but the brokerage SOP URL remains outstanding.
 
+## 2026-08-05: Outreach release and event-time priority
+
+- `[IMPLEMENTED]` The automatic outreach sender now prioritizes eligible future open houses by `open_start` ascending, so the earliest event date and time is dispatched first.
+- `[IMPLEMENTED]` Owner-approved production ceilings are active at 7 sends per run, 20 per rolling hour, and 150 per rolling 24 hours. STOP/opt-out suppression, duplicate-phone cooldown, provider-health gating, future-event eligibility, and listing/render readiness remain enforced.
+- `[IMPLEMENTED]` Direct `send-agent-outreach` invocation now requires the service-role credential. A service-role-only, explicit `override_health_gate=true` request can authorize an owner-directed batch after provider-health review without clearing recipient opt-outs or duplicate suppression.
+- `[IMPLEMENTED]` On 2026-08-05, an owner-directed provider review found 34 accepted/queued outreach messages, 0 provider failures/undelivered messages, and 3 opt-outs in the prior seven days. The owner-directed immediate batches used the service-role-only override; the persistent production opt-out threshold remains unchanged.
+- `[IMPLEMENTED]` The immediate release used 17 rolling-hour slots: 15 delivered, 1 remained sent at final verification, and 1 failed with Twilio 21614 because the destination was not a valid mobile number. No retry was attempted. All due eligible rows for open houses on August 5-7 were exhausted; the next pending queue begins August 8.
+
 ## 2026-07-17: Outreach future-event and brokerage enforcement
 
 - `[IMPLEMENTED]` `send-agent-outreach` now selects only queue rows whose `open_start` is still in the future.
@@ -222,7 +230,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Existing opt-out health gates and hard caps remain unchanged; this correction does not override sender-health suppression.
 - `[IMPLEMENTED]` Initial outreach now asks agents to reply `Y` to book support or `N` for another time while retaining the required `STOP to unsubscribe` instruction.
 - `[IMPLEMENTED]` Twilio inbound outreach replies recognize exact `Y`/`YES` and `N`/`NO` responses. Y marks the thread interested and confirms a follow-up call; N marks it `not_now` and sends the NMB Hard Loans contact positioning. Both automatic responses preserve STOP language and are mirrored into the outreach thread.
-- `[IMPLEMENTED]` As of 2026-07-18, production `send-agent-outreach` caps are 5/run, 20/hour, and 100/day. The rolling opt-out health gate remains enabled (7-day window, 20-send minimum, 1% maximum rate); future-event eligibility and old/manual/past-event backlog exclusions remain in force.
+- `[IMPLEMENTED]` Outreach sender hard ceilings now support the owner-approved 20/hour and 150/day production values; they were activated on 2026-08-05.
 
 This file tracks what is currently implemented, partial, intended, risky, or still needs verification. It should be updated after production-flow changes. `AGENTS.md` is the Codex operating guide; `REL8TION_SYSTEM_OVERVIEW.md` is the human architecture/product overview.
 
@@ -399,7 +407,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` The shared SMS layer supports route-scoped provider env vars: `SMS_OUTREACH_PROVIDER` for outreach/manual outreach and `SMS_EVENTS_PROVIDER` for buyer/event/owner operational traffic. Both fall back to `SMS_PROVIDER`.
 - `[IMPLEMENTED]` Production outreach is split by route: outreach uses toll-free Twilio `+18448211802` through Messaging Service `MG8d7ec49cf1d6d231080b7f870a10eb0b`; event/check-in/owner/system traffic stays on regular Twilio `+15168885461`. Android Gateway is retained as a fallback.
 - `[IMPLEMENTED]` Runtime outreach operator mode is stored in `rel8tion_runtime_settings`; `live` holds eligible non-override rows for manual sending and `away` uses the configured automatic provider. REL8TION COMMAND labels the control `Away: auto` rather than assuming Android.
-- `[IMPLEMENTED]` Root cron code includes outreach generation and send endpoints. During opt-out recovery, the Vercel cron and `send-agent-outreach` Edge Function hard-cap automatic sends at 5 per run, 10 per rolling hour, and 25 per rolling 24 hours, even if older secrets contain higher values. Automatic initial sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending initial SMS copy.
+- `[IMPLEMENTED]` Root cron code includes outreach generation and send endpoints. The Vercel cron and `send-agent-outreach` Edge Function enforce the owner-approved ceilings of 7 per run, 20 per rolling hour, and 150 per rolling 24 hours. Automatic initial sends do not require `approved_for_send=true`; eligible rows are `send_mode=automatic`, generated, rendered, due, with a listing photo and pending initial SMS copy.
 - `[IMPLEMENTED]` `send-agent-outreach` supports a global runtime pause through `rel8tion_runtime_settings.key='outreach_send_paused'` or `OUTREACH_SEND_PAUSED=true`. When enabled, live runs return `paused=true` and send no outreach messages, even if cron fires and rows are due; authenticated dry runs can still inspect candidate routing and copy.
 - `[IMPLEMENTED]` `generate-agent-outreach` reads the same outreach send pause and stages newly generated outreach as `send_mode=manual`, `review_status=manual_ready` while pause/recovery mode is active, so new rows land in the cell-send queue instead of automatic.
 - `[IMPLEMENTED]` As of 2026-06-28, outreach follow-up/drip scheduling is disabled while opt-out health is recovered. Pending live follow-ups were marked `followup_send_status=not_scheduled`, `followup_send_at=null`, `followup_sms=null`, `followup_sms_link=null`, and `followup_block_reason=followups_disabled`; the generator and sender keep future follow-ups unscheduled until this is intentionally re-enabled.

@@ -14,12 +14,12 @@ const BUSINESS_CARD_URL =
 const PUBLIC_APP_BASE_URL =
   (Deno.env.get("REL8TION_PUBLIC_BASE_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://app.rel8tion.me")
     .replace(/\/$/, "");
-const DEFAULT_SEND_MAX_PER_RUN = 5;
-const SEND_MAX_PER_RUN_HARD_CAP = 5;
-const DEFAULT_SEND_MAX_PER_HOUR = 10;
+const DEFAULT_SEND_MAX_PER_RUN = 7;
+const SEND_MAX_PER_RUN_HARD_CAP = 7;
+const DEFAULT_SEND_MAX_PER_HOUR = 20;
 const SEND_MAX_PER_HOUR_HARD_CAP = 20;
-const DEFAULT_SEND_MAX_PER_DAY = 25;
-const SEND_MAX_PER_DAY_HARD_CAP = 100;
+const DEFAULT_SEND_MAX_PER_DAY = 150;
+const SEND_MAX_PER_DAY_HARD_CAP = 150;
 const DEFAULT_DUPLICATE_PHONE_COOLDOWN_DAYS = 30;
 const DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS = 7;
 const DEFAULT_HEALTH_WINDOW_DAYS = 7;
@@ -451,6 +451,18 @@ serve(async (req) => {
       );
     }
 
+    const authorization = req.headers.get("authorization") || "";
+    const requestKey = authorization.replace(/^Bearer\s+/i, "") || req.headers.get("apikey") || "";
+    if (requestKey !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Unauthorized." }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, SEND_MAX_PER_RUN_HARD_CAP);
     const maxPerHour = positiveIntEnv(
       "OUTREACH_SEND_MAX_PER_HOUR",
@@ -477,6 +489,7 @@ serve(async (req) => {
     const maxOptOutRate = positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1);
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
+    const healthGateOverride = body.override_health_gate === true;
 
     if (!isWithinAllowedSendWindow() && !dryRun) {
       return new Response(
@@ -535,7 +548,7 @@ serve(async (req) => {
       now.getTime() - missedOpenHouseMaxAgeDays * 24 * 60 * 60 * 1000,
     );
 
-    if ((outreachSendPaused || healthBlocked) && !dryRun) {
+    if ((outreachSendPaused || (healthBlocked && !healthGateOverride)) && !dryRun) {
       return new Response(
         JSON.stringify(
           {
@@ -549,6 +562,7 @@ serve(async (req) => {
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
             health_blocked: healthBlocked,
+            health_gate_override: healthGateOverride,
             health_window_days: healthWindowDays,
             health_min_sends: healthMinSends,
             health_outreach_sends: recentHealthSendCount,
@@ -638,6 +652,7 @@ serve(async (req) => {
       .or(FOLLOWUPS_DISABLED
         ? `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso})`
         : `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
+      .order("open_start", { ascending: true, nullsFirst: false })
       .order("initial_send_at", { ascending: true, nullsFirst: false })
       .order("followup_send_at", { ascending: true, nullsFirst: false })
       .limit(fetchLimit);
@@ -1097,6 +1112,7 @@ serve(async (req) => {
           outreach_operator_mode: outreachOperatorMode,
           paused: outreachSendPaused,
           health_blocked: healthBlocked,
+          health_gate_override: healthGateOverride,
           health_window_days: healthWindowDays,
           health_min_sends: healthMinSends,
           health_outreach_sends: recentHealthSendCount,
