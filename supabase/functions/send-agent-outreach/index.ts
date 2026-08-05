@@ -49,6 +49,12 @@ type OutreachRow = {
 
 type OutreachOperatorMode = "live" | "away";
 
+type OutreachReleaseWindow = {
+  active: boolean;
+  throughOpenStart: string | null;
+  expiresAt: string | null;
+};
+
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
@@ -184,6 +190,48 @@ async function loadOutreachSendPaused(supabase: any): Promise<boolean> {
   } catch (error) {
     console.warn("[send-agent-outreach] outreach send pause lookup failed", error);
     return false;
+  }
+}
+
+async function loadOutreachReleaseWindow(supabase: any): Promise<OutreachReleaseWindow> {
+  const inactive = { active: false, throughOpenStart: null, expiresAt: null };
+  try {
+    const { data, error } = await supabase
+      .from("rel8tion_runtime_settings")
+      .select("value")
+      .eq("key", "outreach_release_window")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[send-agent-outreach] outreach release window lookup failed", error.message || error);
+      return inactive;
+    }
+
+    const value = data?.value;
+    if (!value || typeof value !== "object") return inactive;
+    const record = value as Record<string, unknown>;
+    if (!truthySetting(record.enabled ?? record.active)) return inactive;
+
+    const throughOpenStart = new Date(String(record.through_open_start || ""));
+    const expiresAt = new Date(String(record.expires_at || ""));
+    const now = new Date();
+    if (
+      !Number.isFinite(throughOpenStart.getTime()) ||
+      !Number.isFinite(expiresAt.getTime()) ||
+      throughOpenStart <= now ||
+      expiresAt <= now
+    ) {
+      return inactive;
+    }
+
+    return {
+      active: true,
+      throughOpenStart: throughOpenStart.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    };
+  } catch (error) {
+    console.warn("[send-agent-outreach] outreach release window lookup failed", error);
+    return inactive;
   }
 }
 
@@ -489,7 +537,7 @@ serve(async (req) => {
     const maxOptOutRate = positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1);
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
-    const healthGateOverride = body.override_health_gate === true;
+    const requestedHealthGateOverride = body.override_health_gate === true;
 
     if (!isWithinAllowedSendWindow() && !dryRun) {
       return new Response(
@@ -516,6 +564,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const outreachSendPaused = await loadOutreachSendPaused(supabase);
     const outreachOperatorMode = await loadOutreachOperatorMode(supabase);
+    const outreachReleaseWindow = await loadOutreachReleaseWindow(supabase);
+    const healthGateOverride = requestedHealthGateOverride || outreachReleaseWindow.active;
     const requestedLimit = Number(body.limit ?? maxPerRun);
     const normalizedRequestedLimit = Math.max(
       0,
@@ -659,6 +709,10 @@ serve(async (req) => {
 
     if (usesAndroidGateway()) {
       query = query.neq("review_status", "android_opted_out");
+    }
+
+    if (outreachReleaseWindow.active && outreachReleaseWindow.throughOpenStart) {
+      query = query.lt("open_start", outreachReleaseWindow.throughOpenStart);
     }
 
     const { data: rows, error } = await query;
@@ -1113,6 +1167,7 @@ serve(async (req) => {
           paused: outreachSendPaused,
           health_blocked: healthBlocked,
           health_gate_override: healthGateOverride,
+          outreach_release_window: outreachReleaseWindow,
           health_window_days: healthWindowDays,
           health_min_sends: healthMinSends,
           health_outreach_sends: recentHealthSendCount,
