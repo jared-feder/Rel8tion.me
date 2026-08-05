@@ -114,6 +114,57 @@ test('Agent Board keeps past events out of the upcoming list', () => {
   assert.equal(rows[0].upcoming_open_house_count, 0);
 });
 
+test('Agent Board keeps a rendered outreach photo when later listing feeds merge the same open house', () => {
+  const rows = buildAgentPerformance({
+    outreach: [{
+      id: 'queue-sarah',
+      open_house_id: 'listing-sarah',
+      agent_name: 'Sarah Fox',
+      agent_phone_normalized: '6319261176',
+      brokerage: 'Signature Premier Properties',
+      address: '48 Route 25A',
+      open_start: '2099-08-05T20:00:00Z',
+      mockup_image_url: 'https://images.example.test/sarah-outreach.jpg',
+      mockup_status: 'rendered'
+    }],
+    listingInventory: [{
+      id: 'inventory-sarah',
+      source_listing_id: 'listing-sarah',
+      queue_row_id: 'queue-sarah',
+      agent_name: 'Sarah Fox',
+      phone_normalized: '6319261176',
+      brokerage: 'Signature Premier Properties',
+      address: '48 Route 25A',
+      open_start: '2099-08-05T20:00:00Z',
+      outreach_image_status: 'pending'
+    }],
+    listingAgents: [{
+      id: 'listing-agent-sarah',
+      open_house_id: 'listing-sarah',
+      name: 'Sarah Fox',
+      phone_normalized: '6319261176',
+      brokerage: 'Signature Premier Properties'
+    }],
+    openHouses: [{
+      id: 'listing-sarah',
+      agent: 'Sarah Fox',
+      agent_phone: '631-926-1176',
+      brokerage: 'Signature Premier Properties',
+      address: '48 Route 25A',
+      open_start: '2099-08-05T20:00:00Z',
+      image: 'https://images.example.test/sarah-listing.jpg'
+    }]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].upcoming_open_houses.length, 1);
+  assert.equal(rows[0].upcoming_open_houses[0].queue_row_id, 'queue-sarah');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_url, 'https://images.example.test/sarah-outreach.jpg');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_status, 'rendered');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_source, 'outreach_queue');
+  assert.equal(rows[0].upcoming_open_houses[0].outreach_image_id, 'queue-sarah');
+});
+
 test('Agent Board ranks future open houses by accepted, interested, prior outreach, then new', () => {
   const upcoming = (id, name, phone, hour) => ({
     id,

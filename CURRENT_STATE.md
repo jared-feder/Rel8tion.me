@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-05: COMMAND outreach-photo merge repair
+
+- `[IMPLEMENTED]` REL8TION COMMAND's focused open-house SMS composer now preserves a rendered property outreach image when the same event is subsequently merged from listing inventory, listing-agent, and canonical open-house feeds. A source record without rendered media can no longer replace the existing rendered URL, status, source, media ID, or linked outreach queue row and leave the control stuck on **Photo generating**.
+- `[NEEDS VERIFICATION]` Production deployment and Sarah Fox's focused 48 Route 25A workflow still need verification before this fix is called live.
+
 ## 2026-08-04: WordPress pricing connection and public catalog CORS
 
 - `[IMPLEMENTED]` The public pricing catalog now returns `Access-Control-Allow-Origin: *` on every response. The catalog contains no private data, and the stable wildcard prevents Vercel from caching an origin-less response that later breaks the WordPress pricing page.
