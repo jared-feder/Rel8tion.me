@@ -51,6 +51,7 @@ type OutreachOperatorMode = "live" | "away";
 
 type OutreachReleaseWindow = {
   active: boolean;
+  fromOpenStart: string | null;
   throughOpenStart: string | null;
   expiresAt: string | null;
 };
@@ -194,7 +195,7 @@ async function loadOutreachSendPaused(supabase: any): Promise<boolean> {
 }
 
 async function loadOutreachReleaseWindow(supabase: any): Promise<OutreachReleaseWindow> {
-  const inactive = { active: false, throughOpenStart: null, expiresAt: null };
+  const inactive = { active: false, fromOpenStart: null, throughOpenStart: null, expiresAt: null };
   try {
     const { data, error } = await supabase
       .from("rel8tion_runtime_settings")
@@ -212,12 +213,16 @@ async function loadOutreachReleaseWindow(supabase: any): Promise<OutreachRelease
     const record = value as Record<string, unknown>;
     if (!truthySetting(record.enabled ?? record.active)) return inactive;
 
+    const fromOpenStartRaw = String(record.from_open_start || "").trim();
+    const fromOpenStart = fromOpenStartRaw ? new Date(fromOpenStartRaw) : null;
     const throughOpenStart = new Date(String(record.through_open_start || ""));
     const expiresAt = new Date(String(record.expires_at || ""));
     const now = new Date();
     if (
+      (fromOpenStartRaw && !Number.isFinite(fromOpenStart?.getTime())) ||
       !Number.isFinite(throughOpenStart.getTime()) ||
       !Number.isFinite(expiresAt.getTime()) ||
+      (fromOpenStart && fromOpenStart >= throughOpenStart) ||
       throughOpenStart <= now ||
       expiresAt <= now
     ) {
@@ -226,6 +231,7 @@ async function loadOutreachReleaseWindow(supabase: any): Promise<OutreachRelease
 
     return {
       active: true,
+      fromOpenStart: fromOpenStart?.toISOString() || null,
       throughOpenStart: throughOpenStart.toISOString(),
       expiresAt: expiresAt.toISOString(),
     };
@@ -709,6 +715,10 @@ serve(async (req) => {
 
     if (usesAndroidGateway()) {
       query = query.neq("review_status", "android_opted_out");
+    }
+
+    if (outreachReleaseWindow.active && outreachReleaseWindow.fromOpenStart) {
+      query = query.gte("open_start", outreachReleaseWindow.fromOpenStart);
     }
 
     if (outreachReleaseWindow.active && outreachReleaseWindow.throughOpenStart) {
