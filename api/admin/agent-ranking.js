@@ -24,6 +24,10 @@ const {
 } = require('../../lib/agent-ranking-history');
 const { buildRelationshipOnlyRankings } = require('../../lib/agent-ranking-relationships');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
+const {
+  createOrResolveAgentProspect,
+  resolveAgentProspectState
+} = require('../../lib/admin-agent-prospect');
 const { run: syncAgentListingInventory } = require('../../agent-listing-inventory-worker.cjs');
 
 const REL8TION_RANKING_TOKEN = process.env.REL8TION_RANKING_TOKEN || '';
@@ -1292,11 +1296,12 @@ async function profileDetailsForRanking(ranking) {
   let openHouses = await loadOpenHouseDetailsByIds(ids);
   let listingAgents = await loadListingAgentDetailsByOpenHouseIds(ids);
   let photoCandidates = [];
-  const [peerContext, inventoryResult, historyData, identityPhotoCandidates] = await Promise.all([
+  const [peerContext, inventoryResult, historyData, identityPhotoCandidates, rel8tionStatus] = await Promise.all([
     loadAreaPeerRows(ranking),
     loadListingInventoryForRanking(ranking),
     loadRel8tionHistoryData(),
-    loadIdentityPhotoCandidates(ranking)
+    loadIdentityPhotoCandidates(ranking),
+    resolveAgentProspectState(ranking, supabaseRest)
   ]);
   const historySignal = historySignalForRanking(ranking, historyData);
   const annotatedRanking = { ...ranking, ...historySignal };
@@ -1370,6 +1375,7 @@ async function profileDetailsForRanking(ranking) {
     current_listings: currentListings,
     open_houses: upcomingOpenHouses,
     open_house_history: openHouseHistory,
+    rel8tion_status: rel8tionStatus,
     listing_inventory_available: inventoryResult.available,
     listing_inventory_outreach_enabled: listingInventoryOutreachEnabled(),
     listing_agents: allListingAgents.map((agent) => publicListingAgent(agent, ranking)),
@@ -2553,32 +2559,12 @@ async function handleFixLocation(body) {
 
 async function handleAddToOutreach(body) {
   const ranking = await findRanking(body.ranking_id);
-  const payload = outreachPayloadFromRanking(ranking);
-  const phone = normalizePhone(payload.agent_phone_normalized || payload.agent_phone);
-  let existing = null;
-  if (phone) {
-    existing = one(await supabaseRest(`agent_outreach_queue?source=eq.agent_ranking&agent_phone_normalized=eq.${enc(phone)}&select=id&limit=1`).catch(() => []));
-  }
-  if (!existing && ranking.email) {
-    existing = one(await supabaseRest(`agent_outreach_queue?source=eq.agent_ranking&agent_email=eq.${enc(ranking.email)}&select=id&limit=1`).catch(() => []));
-  }
-  if (!existing && ranking.agent_name) {
-    existing = one(await supabaseRest(`agent_outreach_queue?source=eq.agent_ranking&agent_name=eq.${enc(ranking.agent_name)}&select=id&limit=1`).catch(() => []));
-  }
+  return createOrResolveAgentProspect({ ranking, supabaseRest });
+}
 
-  const queue = existing?.id
-    ? one(await supabaseRest(`agent_outreach_queue?id=eq.${enc(existing.id)}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify(payload)
-      }))
-    : one(await supabaseRest('agent_outreach_queue', {
-        method: 'POST',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify(payload)
-      }));
-
-  return { ranking, queue, variants: buildPitchVariants(ranking) };
+async function handleCreateProspect(body) {
+  const ranking = await findRanking(body.ranking_id);
+  return createOrResolveAgentProspect({ ranking, supabaseRest });
 }
 
 function formatReminderOpenHouseTime(value) {
@@ -2804,6 +2790,11 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'add_to_outreach') {
       const result = await handleAddToOutreach(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'create_prospect') {
+      const result = await handleCreateProspect(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

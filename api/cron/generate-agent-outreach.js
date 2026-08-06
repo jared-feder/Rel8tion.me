@@ -1,4 +1,21 @@
-const { callSupabaseFunction, cronAuthorized, readJsonBody, send } = require('../../lib/outreach-cron-shared');
+const {
+  callSupabaseFunction,
+  cronAuthorized,
+  readJsonBody,
+  send,
+  supabaseRest
+} = require('../../lib/outreach-cron-shared');
+
+const QUEUE_REFRESH_RPC = 'queue_recent_outreach_candidates';
+
+async function refreshOutreachQueue() {
+  await supabaseRest(`rpc/${QUEUE_REFRESH_RPC}`, {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({})
+  });
+  return { ok: true, rpc: QUEUE_REFRESH_RPC };
+}
 
 module.exports = async function handler(req, res) {
   try {
@@ -16,8 +33,9 @@ module.exports = async function handler(req, res) {
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
     const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_GENERATE_LIMIT || 25), 100));
+    const queueRefresh = await refreshOutreachQueue();
     const payload = await callSupabaseFunction('generate-agent-outreach', { limit }, 'GENERATE_FUNCTION_URL');
-    send(res, 200, { ok: true, stage: 'generate-agent-outreach', payload });
+    send(res, 200, { ok: true, stage: 'generate-agent-outreach', queue_refresh: queueRefresh, payload });
   } catch (error) {
     console.error('[cron/generate-agent-outreach] failed', error);
     send(res, 500, { ok: false, error: error.message || 'Failed to generate agent outreach.' });

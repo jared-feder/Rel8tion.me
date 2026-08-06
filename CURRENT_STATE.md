@@ -4,6 +4,20 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-06: non-sending general agent prospect lane
+
+- `[IMPLEMENTED]` Agent Ranking / Agent Performance now separates general REL8TION prospects from open-house outreach. **Create REL8TION Prospect** checks canonical `agents`, `agent_websites`, and `agent_relationships`; it identifies and links an existing member or relationship before creating a new durable `agent_relationships` prospect.
+- `[IMPLEMENTED]` A new general prospect stores reusable invitation drafts and `invitation_lane=general_agent_invitation` in relationship metadata. It explicitly records `automatic_sending=false` and `outreach_queue_created=false`, writes a relationship event, and does not insert into `agent_outreach_queue` or send a message. The profile shows whether the agent is already on REL8TION before the operator acts.
+- `[VERIFIED]` The prior button failure was caused by attempting to insert a non-open-house agent into `agent_outreach_queue`, whose production `open_house_id` column is required and linked to `open_houses`. Local regression coverage verifies new, existing-member, and existing-prospect paths are duplicate-safe and never call the outreach queue.
+- `[NEEDS VERIFICATION]` Production outreach was explicitly paused in `rel8tion_runtime_settings.outreach_send_paused` before release work. Keep it paused through and after deployment; verify the live UI/API and production relationship record without resuming or sending anything.
+
+## 2026-08-06: source-agnostic outreach queue staging
+
+- `[IMPLEMENTED]` The protected 15-minute `/api/cron/generate-agent-outreach` route now runs the existing `queue_recent_outreach_candidates()` RPC before invoking the outreach-copy generator. Newly enriched eligible open houses therefore enter `agent_outreach_queue` regardless of whether Estately, Trulia, or another source supplied the completed agent fields.
+- `[IMPLEMENTED]` Queue staging remains server-only behind `CRON_SECRET` and the Supabase service role. The live RPC preserves its existing eligibility checks and idempotent `(open_house_id, agent_phone)` upsert, while the generation route fails visibly instead of silently skipping staging when the RPC fails.
+- `[VERIFIED]` The linked production project is `nicanqrfqlbnlmnoernb`; read-only catalog inspection verified `queue_recent_outreach_candidates()` and `queue_outreach_candidate(text)`, their `void` signatures, service-role execution, eligibility filter, and duplicate-safe upsert. The targeted cron regression test and route verification pass locally.
+- `[NEEDS VERIFICATION]` This repair is not live until the app/API change is deployed and the next protected generation run is observed. Deployment can create fresh automatic outreach rows that later sender crons may deliver under the existing health, suppression, quiet-hour, and rate-limit controls; do not deploy casually.
+
 ## 2026-08-05: COMMAND exact-agent profile hydration
 
 - `[IMPLEMENTED]` Agent links no longer depend only on the capped initial Agent Performance slices. Opening an agent now calls the admin-authenticated `/api/admin/agent-profile` endpoint, resolves the exact saved phone, email, name, slug, or ID across the relevant agent, ranking, outreach, inbox, listing, visit, lead, keychain, open-house, and event sources, and merges the focused profile into COMMAND without increasing the global dashboard limits.

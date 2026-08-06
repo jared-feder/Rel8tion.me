@@ -1042,6 +1042,32 @@
       return state.profileDetails?.ranking_id === row?.id ? state.profileDetails : null;
     }
 
+    function rel8tionStatusFor(row, details) {
+      return details?.rel8tion_status || row?.raw_sources?.rel8tion_status || null;
+    }
+
+    function renderProspectAction(row, details, compact = false) {
+      const status = rel8tionStatusFor(row, details);
+      const label = status?.kind === 'existing_member'
+        ? 'Already on REL8TION'
+        : status?.kind === 'existing_prospect' || status?.kind === 'prospect_created'
+          ? 'Prospect saved'
+          : status?.kind === 'existing_relationship'
+            ? 'REL8TION relationship'
+            : compact ? 'Prospect' : 'Create REL8TION Prospect';
+      const disabled = ['existing_member', 'existing_prospect', 'prospect_created', 'existing_relationship'].includes(status?.kind);
+      return `<button class="btn${disabled ? '' : ' primary'}" data-prospect="${esc(row.id)}"${disabled ? ' disabled' : ''}><i data-lucide="${disabled ? 'badge-check' : 'user-plus'}"></i><span>${esc(label)}</span></button>`;
+    }
+
+    function renderRel8tionStatus(row, details) {
+      const status = rel8tionStatusFor(row, details);
+      if (!status) return badge('Checking REL8TION membership', 'info');
+      if (status.kind === 'existing_member') return badge('Already on REL8TION', 'ok');
+      if (status.kind === 'existing_prospect' || status.kind === 'prospect_created') return badge('REL8TION prospect saved', 'ok');
+      if (status.kind === 'existing_relationship') return badge('Existing REL8TION relationship', 'ok');
+      return badge('Not yet on REL8TION', 'info');
+    }
+
     function profilePhotoUrl(row, details) {
       return details?.profile_photo_url || row?.agent_photo_url || row?.image_url || '';
     }
@@ -1795,9 +1821,8 @@
                       ${row.relationship_only ? badge('REL8TION relationship', 'ok') : `
                         <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Report</span></button>
                         <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
-                        <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Queue</span></button>
                         <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
-                        <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Prospect</span></button>
+                        ${renderProspectAction(row, null, true)}
                         <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
                         <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
                       `}
@@ -2003,6 +2028,7 @@
                       ${details?.profile_url ? `<a href="${esc(details.profile_url)}" target="_blank" rel="noopener">Agent source profile</a>` : ''}
                     </div>
                     ${state.profileDetailsLoading && state.profile?.id === row.id ? `<div style="margin-top:10px;">${badge('Loading live listing matches', 'info')}</div>` : ''}
+                    <div style="margin-top:10px;">${renderRel8tionStatus(row, details)}</div>
                   </div>
                   <div class="grade-card ${tierTone(row.recommended_tier)}">
                     <div class="mini-title">${row.relationship_only ? 'Relationship priority' : 'Rel8tion grade'}</div>
@@ -2089,9 +2115,8 @@
                   <div class="actions" style="justify-content:flex-start;margin-top:12px;">
                     <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Open Pitch Modal</span></button>
                     <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Marketing Report</span></button>
-                    <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
                     <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
-                    <button class="btn" data-prospect="${esc(row.id)}"><i data-lucide="user-plus"></i><span>Create Rel8tion Prospect</span></button>
+                    ${renderProspectAction(row, details)}
                     <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Mark Not a Fit</span></button>
                   </div>
                 </div>
@@ -2155,7 +2180,7 @@
                 `}
                 <div class="actions" style="justify-content:flex-start;">
                   <button class="btn" data-pitch="${esc(row.id)}" ${state.action === `pitch:${row.id}` ? 'disabled' : ''}><i data-lucide="sparkles"></i><span>${variants ? 'Regenerate Pitch' : 'Generate Pitch'}</span></button>
-                  <button class="btn primary" data-outreach="${esc(row.id)}"><i data-lucide="send"></i><span>Add to Outreach Queue</span></button>
+                  ${renderProspectAction(row, null)}
                 </div>
               ` : ''}
             </div>
@@ -2591,15 +2616,33 @@
       }
     }
 
-    async function addToOutreach(id, label = 'Added to outreach queue.') {
-      if (!window.confirm('Create or update a manual, non-sending outreach queue row for this agent?')) return;
-      state.action = `outreach:${id}`;
+    async function createProspect(id) {
+      if (!window.confirm('Check whether this agent is already on REL8TION. If not, create a general invitation prospect with saved drafts? Nothing will be queued or sent.')) return;
+      state.action = `prospect:${id}`;
       render();
       try {
-        await api(API, { method: 'POST', body: JSON.stringify({ action: 'add_to_outreach', ranking_id: id }) });
-        showToast(label);
+        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'create_prospect', ranking_id: id }) });
+        const updated = result.ranking || findRanking(id);
+        state.data.rankings = (state.data.rankings || []).map((item) => item.id === id ? { ...item, ...updated } : item);
+        if (state.profile?.id === id) state.profile = { ...state.profile, ...updated };
+        if (state.profileDetails?.ranking_id === id) {
+          state.profileDetails = {
+            ...state.profileDetails,
+            ranking: { ...(state.profileDetails.ranking || {}), ...updated },
+            rel8tion_status: result.rel8tion_status
+          };
+        }
+        if (state.pitchModal?.row?.id === id) state.pitchModal.row = { ...state.pitchModal.row, ...updated };
+        const kind = result.rel8tion_status?.kind;
+        showToast(kind === 'existing_member'
+          ? 'This agent is already on REL8TION. The relationship is linked and nothing was sent.'
+          : kind === 'prospect_created'
+            ? 'REL8TION prospect created with invitation drafts. Nothing was queued or sent.'
+            : kind === 'existing_prospect'
+              ? 'This REL8TION prospect was already saved. Nothing was queued or sent.'
+              : 'Existing REL8TION relationship found. Nothing was queued or sent.');
       } catch (error) {
-        showToast(error.message || 'Unable to add to outreach.');
+        showToast(error.message || 'Unable to create the REL8TION prospect.');
       } finally {
         state.action = '';
         render();
@@ -2792,9 +2835,6 @@
       document.querySelectorAll('[data-pitch]').forEach((button) => {
         button.addEventListener('click', () => generatePitch(button.dataset.pitch));
       });
-      document.querySelectorAll('[data-outreach]').forEach((button) => {
-        button.addEventListener('click', () => addToOutreach(button.dataset.outreach));
-      });
       document.querySelectorAll('[data-market-listing]').forEach((button) => {
         button.addEventListener('click', () => addListingToOutreach(
           button.dataset.marketRanking,
@@ -2802,7 +2842,7 @@
         ));
       });
       document.querySelectorAll('[data-prospect]').forEach((button) => {
-        button.addEventListener('click', () => addToOutreach(button.dataset.prospect, 'Rel8tion prospect staged in outreach queue.'));
+        button.addEventListener('click', () => createProspect(button.dataset.prospect));
       });
       document.querySelectorAll('[data-match]').forEach((button) => {
         button.addEventListener('click', () => showToast('Rows above 75% confidence are matched automatically. Lower-confidence manual matching is the next review pass.'));
