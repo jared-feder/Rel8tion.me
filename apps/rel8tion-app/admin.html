@@ -1578,6 +1578,8 @@
       area: window.localStorage.getItem(AREA_KEY) || 'outreach',
       query: '',
       agentFocus: '',
+      agentHydrationKey: '',
+      agentHydrationError: '',
       openHouseFocus: '',
       agentBoardLimit: 60,
       futureOpenHouseLimit: 60,
@@ -2616,6 +2618,7 @@
         state.loading = false;
         render();
         restoreUiState(restoreSnapshot);
+        if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
         refreshRelationshipsInBackground().catch(() => null);
       } catch (error) {
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
@@ -2887,6 +2890,8 @@ ${rowsHtml}
       if (area !== 'signs') stopEventPassScanner({ silent: true });
       if (state.agentFocus && area !== 'crm') {
         state.agentFocus = '';
+        state.agentHydrationKey = '';
+        state.agentHydrationError = '';
         state.openHouseFocus = '';
         state.query = '';
       }
@@ -4519,6 +4524,8 @@ ${rowsHtml}
       document.getElementById('outreachJump')?.addEventListener('click', () => setArea('outreach'));
       document.getElementById('globalSearch')?.addEventListener('input', (event) => {
         state.agentFocus = '';
+        state.agentHydrationKey = '';
+        state.agentHydrationError = '';
         state.openHouseFocus = '';
         state.agentBoardLimit = 60;
         state.futureOpenHouseLimit = 60;
@@ -5685,6 +5692,7 @@ ${rowsHtml}
     function renderCrm() {
       const allAgents = state.commandIndexes.crmSorted || [];
       const focusedAgent = state.agentFocus ? findAgentByLookup(state.agentFocus, allAgents) : null;
+      const loadingFocusedAgent = Boolean(state.agentFocus && state.agentHydrationKey === normalizedAgentValue(state.agentFocus) && !focusedAgent && !state.agentHydrationError);
       const matchingAgents = focusedAgent ? [focusedAgent] : filterByQuery(allAgents);
       const rows = focusedAgent ? matchingAgents : matchingAgents.slice(0, state.agentBoardLimit);
       const websites = filterByQuery(state.command?.agent_websites || []);
@@ -5701,7 +5709,11 @@ ${rowsHtml}
             <a class="btn soft" href="/admin/agent-ranking"><i data-lucide="chart-no-axes-combined"></i><span>Agent Rankings</span></a>
           </div>
         </div>
-        <div class="rows">${rows.length ? rows.map((row) => focusedAgent ? renderAgentBoardCard(row, true) : renderAgentBoardSummaryCard(row)).join('') : '<div class="glass-card" style="padding:18px;font-weight:900;">No matching agent record loaded.</div>'}</div>
+        <div class="rows">${rows.length
+          ? rows.map((row) => focusedAgent ? renderAgentBoardCard(row, true) : renderAgentBoardSummaryCard(row)).join('')
+          : loadingFocusedAgent
+            ? '<div class="glass-card" style="padding:18px;font-weight:900;">Loading the full agent record...</div>'
+            : `<div class="glass-card" style="padding:18px;font-weight:900;">${esc(state.agentHydrationError || 'No matching agent record loaded.')}</div>`}</div>
         ${!focusedAgent && rows.length < matchingAgents.length ? `<div class="row-actions" style="margin:16px 0 24px;"><button class="btn soft" id="agentBoardShowMore"><i data-lucide="chevrons-down"></i><span>Show 60 more agents</span></button>${badge(`${rows.length} of ${matchingAgents.length}`, 'info')}</div>` : ''}
         ${focusedAgent && websites.length ? renderAgentWebsiteEditor(websites) : ''}
       `;
@@ -5988,6 +6000,50 @@ ${rowsHtml}
       }) || null;
     }
 
+    function mergeHydratedAgentProfiles(profiles) {
+      if (!state.command || !Array.isArray(profiles) || !profiles.length) return;
+      const next = [...(state.command.crm || [])];
+      for (const profile of profiles) {
+        const lookups = [
+          profile.id,
+          profile.agent_id,
+          profile.ranking_id,
+          profile.slug,
+          profile.phone_normalized,
+          profile.phone,
+          profile.email,
+          profile.name
+        ].filter(Boolean);
+        const index = next.findIndex((row) => lookups.some((value) => findAgentByLookup(value, [row])));
+        if (index >= 0) next[index] = { ...next[index], ...profile };
+        else next.unshift(profile);
+      }
+      state.command.crm = next;
+      rebuildCommandIndexes();
+    }
+
+    async function hydrateAgentProfile(agent) {
+      const requestKey = normalizedAgentValue(agent);
+      if (!requestKey || state.agentHydrationKey === requestKey) return;
+      state.agentHydrationKey = requestKey;
+      state.agentHydrationError = '';
+      refreshAreaContent();
+      try {
+        const result = await api(`/api/admin/agent-profile?agent=${encodeURIComponent(agent)}`);
+        if (normalizedAgentValue(state.agentFocus) !== requestKey) return;
+        mergeHydratedAgentProfiles(result.profiles || []);
+        if (!findAgentByLookup(agent, state.command?.crm || [])) {
+          state.agentHydrationError = 'No unified agent record matched this outreach identity.';
+        }
+      } catch (error) {
+        if (normalizedAgentValue(state.agentFocus) === requestKey) {
+          state.agentHydrationError = error.message || 'Unable to load the full agent record.';
+        }
+      } finally {
+        if (normalizedAgentValue(state.agentFocus) === requestKey) refreshAreaContent();
+      }
+    }
+
     function updateCommandAreaUrl(area) {
       const query = new URLSearchParams({ area: area || 'outreach' });
       window.history.pushState({}, '', `/admin?${query.toString()}`);
@@ -6004,6 +6060,8 @@ ${rowsHtml}
       if (!agent) return;
       state.area = 'crm';
       state.agentFocus = agent;
+      state.agentHydrationKey = '';
+      state.agentHydrationError = '';
       state.openHouseFocus = openHouse;
       state.agentDetailLimits = { threads: 20, upcoming: 20, listings: 20 };
       state.query = agent;
@@ -6011,6 +6069,7 @@ ${rowsHtml}
       updateAgentProfileUrl(agent, openHouse);
       syncCommandNavigation();
       refreshAreaContent();
+      hydrateAgentProfile(agent).catch(() => null);
       window.requestAnimationFrame(() => {
         document.getElementById('agent-profile')?.scrollIntoView({ behavior: 'auto', block: 'start' });
       });
@@ -6018,6 +6077,8 @@ ${rowsHtml}
 
     function clearAgentProfile() {
       state.agentFocus = '';
+      state.agentHydrationKey = '';
+      state.agentHydrationError = '';
       state.openHouseFocus = '';
       state.query = '';
       updateAgentProfileUrl();
@@ -7016,11 +7077,14 @@ ${rowsHtml}
       const nextArea = locationParams.get('area') || 'outreach';
       state.area = AREAS.some(([key]) => key === nextArea) ? nextArea : 'outreach';
       state.agentFocus = locationParams.get('agent') || '';
+      state.agentHydrationKey = '';
+      state.agentHydrationError = '';
       state.openHouseFocus = locationParams.get('open_house') || '';
       state.query = state.agentFocus;
       window.localStorage.setItem(AREA_KEY, state.area);
       syncCommandNavigation();
       refreshAreaContent();
+      if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
     });
     window.setInterval(() => {
       refreshLiveData().catch(() => null);

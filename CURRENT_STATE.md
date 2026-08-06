@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-05: COMMAND exact-agent profile hydration
+
+- `[IMPLEMENTED]` Agent links no longer depend only on the capped initial Agent Performance slices. Opening an agent now calls the admin-authenticated `/api/admin/agent-profile` endpoint, resolves the exact saved phone, email, name, slug, or ID across the relevant agent, ranking, outreach, inbox, listing, visit, lead, keychain, open-house, and event sources, and merges the focused profile into COMMAND without increasing the global dashboard limits.
+- `[IMPLEMENTED]` Missing focused profiles show a loading state while the exact lookup runs instead of incorrectly reporting zero matches. Direct focused URLs and browser Back/Forward use the same hydration path, and a failed or genuinely unmatched identity remains visible as an explicit error.
+- `[VERIFIED]` The regression fixture reproducing Marsha Welikson outside the 1,000-row outreach and 3,000-row ranking/listing slices passes, along with the existing Agent Performance, photo, COMMAND performance, route, and architecture checks. All production columns used by the focused lookup were verified read-only against the linked Supabase schema.
+- `[NEEDS VERIFICATION]` The new focused-agent endpoint and Marsha Welikson click-through still need production deployment and authenticated browser verification before this repair is called live.
+
 ## 2026-08-05: COMMAND manual agent headshots
 
 - `[IMPLEMENTED]` Agent Performance cards with no resolved portrait now show a small plus control on the avatar placeholder. The admin can choose a JPG, PNG, or WebP file; COMMAND center-crops it to the established 4:5, 1200x1500 headshot contract before upload.
