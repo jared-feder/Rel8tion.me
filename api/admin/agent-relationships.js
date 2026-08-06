@@ -308,7 +308,7 @@ async function loadBoard(limitValue, options = {}) {
   const pageSize = 1000;
   const summaryOnly = options.summary === true;
   const boardSelect = summaryOnly
-    ? 'id,canonical_key,agent_source_id,agent_slug,name,phone,phone_normalized,email,company,pinned,priority_rank,confirmed_open_houses,worked_with_agent,relationship_sources'
+    ? 'id,canonical_key,agent_source_id,agent_slug,name,phone,phone_normalized,email,company,photo_url,relationship_status,pinned,priority_rank,confirmed_open_houses,worked_with_agent,relationship_sources'
     : '*';
   const rows = [];
   while (rows.length < fetchLimit) {

@@ -25,7 +25,7 @@ const {
 const { buildRelationshipOnlyRankings } = require('../../lib/agent-ranking-relationships');
 const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 const {
-  createOrResolveAgentProspect,
+  createOrResolveAgentRecord,
   resolveAgentProspectState
 } = require('../../lib/admin-agent-prospect');
 const { run: syncAgentListingInventory } = require('../../agent-listing-inventory-worker.cjs');
@@ -2559,12 +2559,12 @@ async function handleFixLocation(body) {
 
 async function handleAddToOutreach(body) {
   const ranking = await findRanking(body.ranking_id);
-  return createOrResolveAgentProspect({ ranking, supabaseRest });
+  return createOrResolveAgentRecord({ ranking, supabaseRest });
 }
 
-async function handleCreateProspect(body) {
+async function handleSaveAgent(body) {
   const ranking = await findRanking(body.ranking_id);
-  return createOrResolveAgentProspect({ ranking, supabaseRest });
+  return createOrResolveAgentRecord({ ranking, supabaseRest });
 }
 
 function formatReminderOpenHouseTime(value) {
@@ -2794,7 +2794,12 @@ module.exports = async function handler(req, res) {
       return;
     }
     if (action === 'create_prospect') {
-      const result = await handleCreateProspect(body);
+      const result = await handleSaveAgent(body);
+      sendJson(res, 200, { ok: true, action, ...result });
+      return;
+    }
+    if (action === 'save_agent') {
+      const result = await handleSaveAgent(body);
       sendJson(res, 200, { ok: true, action, ...result });
       return;
     }

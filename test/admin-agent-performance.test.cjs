@@ -2,6 +2,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildAgentPerformance } = require('../lib/admin-agent-performance');
 
+test('Agent Board keeps a saved agent who has no open house, listing, or outreach', () => {
+  const rows = buildAgentPerformance({
+    relationships: [{
+      id: 'relationship-melissa',
+      display_name: 'Melissa Cuartas',
+      phone: '(347) 804-3357',
+      phone_normalized: '3478043357',
+      brokerage: 'Voro Llc',
+      relationship_status: 'known',
+      updated_at: '2026-08-06T08:18:39.000Z'
+    }]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'Melissa Cuartas');
+  assert.equal(rows[0].relationship_id, 'relationship-melissa');
+  assert.equal(rows[0].relationship_status, 'known');
+  assert.equal(rows[0].relationship_category, 'saved_agent');
+  assert.equal(rows[0].relationship_label, 'Saved agent');
+  assert.equal(rows[0].upcoming_open_house_count, 0);
+  assert.deepEqual(rows[0].sources, ['saved agent']);
+});
+
 test('Agent Board merges sources and keeps agents without messages or listings', () => {
   const rows = buildAgentPerformance({
     agents: [

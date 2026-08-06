@@ -2241,8 +2241,56 @@
       ));
     }
 
+    function relationshipMatchesAgent(row, relationship) {
+      const rowPhone = phoneDigits(row?.phone_normalized || row?.phone || row?.agent_phone_normalized || row?.agent_phone);
+      const relationshipPhone = phoneDigits(relationship?.phone_normalized || relationship?.phone);
+      if (rowPhone && relationshipPhone) return rowPhone === relationshipPhone;
+      const rowSlug = String(row?.slug || row?.agent_slug || '').trim().toLowerCase();
+      const relationshipSlug = String(relationship?.agent_slug || '').trim().toLowerCase();
+      if (rowSlug && relationshipSlug) return rowSlug === relationshipSlug;
+      const rowEmail = String(row?.email || row?.agent_email || '').trim().toLowerCase();
+      const relationshipEmail = String(relationship?.email || '').trim().toLowerCase();
+      if (rowEmail && relationshipEmail) return rowEmail === relationshipEmail;
+      const rowName = String(row?.name || row?.agent_name || '').trim().toLowerCase();
+      const relationshipName = String(relationship?.name || relationship?.display_name || '').trim().toLowerCase();
+      const rowBrokerage = String(row?.brokerage || '').trim().toLowerCase();
+      const relationshipBrokerage = String(relationship?.company || relationship?.brokerage || '').trim().toLowerCase();
+      return Boolean(rowName && rowName === relationshipName && (!rowBrokerage || !relationshipBrokerage || rowBrokerage === relationshipBrokerage));
+    }
+
+    function relationshipToCommandAgent(relationship) {
+      return {
+        id: `relationship:${relationship.id}`,
+        relationship_id: relationship.id,
+        agent_id: '',
+        slug: relationship.agent_slug || '',
+        name: relationship.name || relationship.display_name || 'Saved agent',
+        phone: relationship.phone || relationship.phone_normalized || '',
+        phone_normalized: relationship.phone_normalized || phoneDigits(relationship.phone),
+        email: relationship.email || '',
+        brokerage: relationship.company || relationship.brokerage || '',
+        image_url: relationship.photo_url || '',
+        relationship_status: relationship.relationship_status || 'known',
+        keychain_count: 0,
+        outreach_count: 0,
+        reply_count: 0,
+        lead_count: 0,
+        listing_count: 0,
+        upcoming_open_house_count: 0,
+        historical_open_house_count: 0,
+        accepted_open_house_count: 0,
+        listings: [],
+        upcoming_open_houses: [],
+        outreach_threads: [],
+        latest_outreach: null,
+        latest_activity: null,
+        sources: ['saved agent']
+      };
+    }
+
     function agentRelationshipGroup(row) {
       const relationship = agentRelationship(row);
+      const relationshipStatus = String(relationship?.relationship_status || row?.relationship_status || '').trim().toLowerCase();
       const serverCategory = String(row?.relationship_category || '');
       const threads = Array.isArray(row?.outreach_threads) ? row.outreach_threads : [];
       const statuses = new Set(threads.map((thread) => String(thread.review_status || '').trim().toLowerCase()));
@@ -2250,15 +2298,18 @@
         || relationship?.worked_with_agent
         || relationship?.historical_open_house_agent
         || Number(relationship?.confirmed_open_houses || 0) > 0
+        || ['accepted_open_house', 'confirmed_open_house', 'worked_with'].includes(relationshipStatus)
         || ['accepted_open_house', 'confirmed_open_house', 'worked_with'].some((status) => statuses.has(status));
       const interested = serverCategory === 'interested'
+        || ['interested', 'drip_scheduled'].includes(relationshipStatus)
         || ['interested', 'drip_scheduled'].some((status) => statuses.has(status));
       const priorOutreach = row?.has_prior_outreach === true
         || threads.some((thread) => thread.has_sent_outreach === true || thread.latest_reply_at);
       if (accepted) return { category: 'accepted_worked', label: 'Accepted / worked with', priority: 0, tone: 'ok' };
       if (interested) return { category: 'interested', label: 'Interested', priority: 1, tone: 'warn' };
       if (priorOutreach) return { category: 'prior_outreach', label: 'Prior outreach', priority: 2, tone: 'info' };
-      return { category: 'new', label: 'New agent', priority: 3, tone: 'info' };
+      if (relationship || ['known', 'prospect'].includes(relationshipStatus)) return { category: 'saved_agent', label: 'Saved agent', priority: 3, tone: 'info' };
+      return { category: 'new', label: 'New agent', priority: 4, tone: 'info' };
     }
 
     function compareAgentRelationships(left, right) {
@@ -2537,7 +2588,23 @@
     }
 
     function rebuildCommandIndexes() {
-      const crmSorted = [...(state.command?.crm || [])].sort(compareAgentRelationships);
+      const crmRows = [...(state.command?.crm || [])];
+      for (const relationship of state.relationships || []) {
+        const savedAgent = relationshipToCommandAgent(relationship);
+        const index = crmRows.findIndex((row) => relationshipMatchesAgent(row, relationship));
+        if (index >= 0) {
+          crmRows[index] = {
+            ...savedAgent,
+            ...crmRows[index],
+            relationship_id: relationship.id,
+            relationship_status: relationship.relationship_status || crmRows[index].relationship_status || 'known',
+            sources: [...new Set([...(crmRows[index].sources || []), 'saved agent'])]
+          };
+        } else {
+          crmRows.push(savedAgent);
+        }
+      }
+      const crmSorted = crmRows.sort(compareAgentRelationships);
       const futureOpenHouseMap = new Map();
       for (const agent of crmSorted) {
         const relationshipGroup = agentRelationshipGroup(agent);
@@ -2633,9 +2700,10 @@
       if (!state.verified || state.relationshipsLoading) return;
       state.relationshipsLoading = true;
       try {
-        const relationships = await api('/api/admin/agent-relationships?view=summary&limit=1000');
+        const relationships = await api('/api/admin/agent-relationships?view=summary&limit=5000');
         state.relationships = relationships.agents || state.relationships;
         rebuildCommandIndexes();
+        if (state.area === 'crm') refreshAreaContent();
       } catch (_) {
         // The dashboard projection remains usable while relationship details retry on explicit Refresh.
       } finally {

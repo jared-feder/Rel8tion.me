@@ -1046,26 +1046,26 @@
       return details?.rel8tion_status || row?.raw_sources?.rel8tion_status || null;
     }
 
-    function renderProspectAction(row, details, compact = false) {
+    function renderSaveAgentAction(row, details, compact = false) {
       const status = rel8tionStatusFor(row, details);
       const label = status?.kind === 'existing_member'
         ? 'Already on REL8TION'
-        : status?.kind === 'existing_prospect' || status?.kind === 'prospect_created'
-          ? 'Prospect saved'
+        : status?.kind === 'existing_agent_record' || status?.kind === 'agent_saved'
+          ? 'Agent saved'
           : status?.kind === 'existing_relationship'
             ? 'REL8TION relationship'
-            : compact ? 'Prospect' : 'Create REL8TION Prospect';
-      const disabled = ['existing_member', 'existing_prospect', 'prospect_created', 'existing_relationship'].includes(status?.kind);
-      return `<button class="btn${disabled ? '' : ' primary'}" data-prospect="${esc(row.id)}"${disabled ? ' disabled' : ''}><i data-lucide="${disabled ? 'badge-check' : 'user-plus'}"></i><span>${esc(label)}</span></button>`;
+            : compact ? 'Save agent' : 'Save Agent to REL8TION';
+      const disabled = ['existing_member', 'existing_agent_record', 'agent_saved', 'existing_relationship'].includes(status?.kind);
+      return `<button class="btn${disabled ? '' : ' primary'}" data-save-agent="${esc(row.id)}"${disabled ? ' disabled' : ''}><i data-lucide="${disabled ? 'badge-check' : 'user-plus'}"></i><span>${esc(label)}</span></button>`;
     }
 
     function renderRel8tionStatus(row, details) {
       const status = rel8tionStatusFor(row, details);
       if (!status) return badge('Checking REL8TION membership', 'info');
       if (status.kind === 'existing_member') return badge('Already on REL8TION', 'ok');
-      if (status.kind === 'existing_prospect' || status.kind === 'prospect_created') return badge('REL8TION prospect saved', 'ok');
+      if (status.kind === 'existing_agent_record' || status.kind === 'agent_saved') return badge('Agent saved in REL8TION', 'ok');
       if (status.kind === 'existing_relationship') return badge('Existing REL8TION relationship', 'ok');
-      return badge('Not yet on REL8TION', 'info');
+      return badge('Agent not yet saved in REL8TION', 'info');
     }
 
     function profilePhotoUrl(row, details) {
@@ -1822,7 +1822,7 @@
                         <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Report</span></button>
                         <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Pitch</span></button>
                         <button class="btn" data-fix-location="${esc(row.id)}"><i data-lucide="map-pin"></i><span>Fix Location</span></button>
-                        ${renderProspectAction(row, null, true)}
+                        ${renderSaveAgentAction(row, null, true)}
                         <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match</span></button>
                         <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Not fit</span></button>
                       `}
@@ -2116,7 +2116,7 @@
                     <button class="btn" data-pitch="${esc(row.id)}"><i data-lucide="sparkles"></i><span>Open Pitch Modal</span></button>
                     <button class="btn" data-report="${esc(row.id)}"><i data-lucide="file-text"></i><span>Marketing Report</span></button>
                     <button class="btn warn" data-match="${esc(row.id)}"><i data-lucide="merge"></i><span>Match to Existing Agent</span></button>
-                    ${renderProspectAction(row, details)}
+                    ${renderSaveAgentAction(row, details)}
                     <button class="btn bad" data-not-fit="${esc(row.id)}"><i data-lucide="ban"></i><span>Mark Not a Fit</span></button>
                   </div>
                 </div>
@@ -2180,7 +2180,7 @@
                 `}
                 <div class="actions" style="justify-content:flex-start;">
                   <button class="btn" data-pitch="${esc(row.id)}" ${state.action === `pitch:${row.id}` ? 'disabled' : ''}><i data-lucide="sparkles"></i><span>${variants ? 'Regenerate Pitch' : 'Generate Pitch'}</span></button>
-                  ${renderProspectAction(row, null)}
+                  ${renderSaveAgentAction(row, null)}
                 </div>
               ` : ''}
             </div>
@@ -2616,12 +2616,12 @@
       }
     }
 
-    async function createProspect(id) {
-      if (!window.confirm('Check whether this agent is already on REL8TION. If not, create a general invitation prospect with saved drafts? Nothing will be queued or sent.')) return;
-      state.action = `prospect:${id}`;
+    async function saveAgent(id) {
+      if (!window.confirm('Check whether this agent is already saved in REL8TION. If not, save the agent to COMMAND with optional invitation drafts? Nothing will be queued or sent.')) return;
+      state.action = `save-agent:${id}`;
       render();
       try {
-        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'create_prospect', ranking_id: id }) });
+        const result = await api(API, { method: 'POST', body: JSON.stringify({ action: 'save_agent', ranking_id: id }) });
         const updated = result.ranking || findRanking(id);
         state.data.rankings = (state.data.rankings || []).map((item) => item.id === id ? { ...item, ...updated } : item);
         if (state.profile?.id === id) state.profile = { ...state.profile, ...updated };
@@ -2635,14 +2635,14 @@
         if (state.pitchModal?.row?.id === id) state.pitchModal.row = { ...state.pitchModal.row, ...updated };
         const kind = result.rel8tion_status?.kind;
         showToast(kind === 'existing_member'
-          ? 'This agent is already on REL8TION. The relationship is linked and nothing was sent.'
-          : kind === 'prospect_created'
-            ? 'REL8TION prospect created with invitation drafts. Nothing was queued or sent.'
-            : kind === 'existing_prospect'
-              ? 'This REL8TION prospect was already saved. Nothing was queued or sent.'
+          ? 'This agent is already a REL8TION member. The record is linked and nothing was sent.'
+          : kind === 'agent_saved'
+            ? 'Agent saved to REL8TION and COMMAND. Nothing was queued or sent.'
+            : kind === 'existing_agent_record'
+              ? 'This agent was already saved in REL8TION. Nothing was queued or sent.'
               : 'Existing REL8TION relationship found. Nothing was queued or sent.');
       } catch (error) {
-        showToast(error.message || 'Unable to create the REL8TION prospect.');
+        showToast(error.message || 'Unable to save the agent to REL8TION.');
       } finally {
         state.action = '';
         render();
@@ -2841,8 +2841,8 @@
           button.dataset.marketListing
         ));
       });
-      document.querySelectorAll('[data-prospect]').forEach((button) => {
-        button.addEventListener('click', () => createProspect(button.dataset.prospect));
+      document.querySelectorAll('[data-save-agent]').forEach((button) => {
+        button.addEventListener('click', () => saveAgent(button.dataset.saveAgent));
       });
       document.querySelectorAll('[data-match]').forEach((button) => {
         button.addEventListener('click', () => showToast('Rows above 75% confidence are matched automatically. Lower-confidence manual matching is the next review pass.'));

@@ -9,6 +9,17 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
 
 const phone = '5164459797';
 const rows = {
+  agent_relationships: [{
+    id: 'relationship-melissa',
+    canonical_key: 'phone:3478043357',
+    agent_source_id: 'ranking-melissa',
+    display_name: 'Melissa Cuartas',
+    phone: '(347) 804-3357',
+    phone_normalized: '3478043357',
+    brokerage: 'Voro Llc',
+    relationship_status: 'known',
+    updated_at: '2026-08-06T08:18:39.000Z'
+  }],
   agents: [],
   agent_rankings: [{
     id: 'ranking-marsha',
@@ -112,6 +123,22 @@ test('focused agent hydration finds an identity outside every dashboard slice', 
   assert.equal(profile.outreach_count, 1);
   assert.equal(profile.listing_count, 1);
   assert.equal(profile.ranking_id, 'ranking-marsha');
+});
+
+test('focused agent hydration finds a saved agent with no open house or outreach', async () => {
+  const res = response();
+  await handler({
+    method: 'GET',
+    headers: { 'x-admin-token': 'test-admin-token' },
+    query: { agent: '3478043357' }
+  }, res);
+
+  assert.equal(res.statusCode, 200, JSON.stringify(res.payload));
+  assert.equal(res.payload.profiles.length, 1);
+  assert.equal(res.payload.profiles[0].name, 'Melissa Cuartas');
+  assert.equal(res.payload.profiles[0].relationship_status, 'known');
+  assert.equal(res.payload.profiles[0].relationship_label, 'Saved agent');
+  assert.equal(res.payload.profiles[0].upcoming_open_house_count, 0);
 });
 
 test('COMMAND opens focused agents through the exact-profile endpoint without raising dashboard limits', () => {
