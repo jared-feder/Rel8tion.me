@@ -732,6 +732,55 @@
       font-weight: 900;
     }
 
+    .agent-avatar-wrap {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      flex: 0 0 52px;
+    }
+
+    .agent-photo-add {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      width: 25px;
+      height: 25px;
+      border: 2px solid #fff;
+      border-radius: 999px;
+      background: #0f8fbd;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      cursor: pointer;
+      box-shadow: 0 5px 14px rgba(15, 143, 189, .34);
+      transition: transform .16s ease, background .16s ease;
+    }
+
+    .agent-photo-add:hover:not(:disabled) {
+      transform: scale(1.08);
+      background: #0879a4;
+    }
+
+    .agent-photo-add:focus-visible {
+      outline: 3px solid rgba(56, 189, 248, .42);
+      outline-offset: 2px;
+    }
+
+    .agent-photo-add:disabled {
+      cursor: wait;
+      opacity: .72;
+    }
+
+    .agent-photo-add svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .agent-photo-input {
+      display: none;
+    }
+
     .agent-name {
       font-weight: 900;
       line-height: 1.12;
@@ -1583,6 +1632,7 @@
       loadedAt: '',
       drafts: readDrafts(),
       replyPhotos: {},
+      agentPhotoUploadKey: '',
       eventPassFreshenerResult: null,
       qrBatchType: 'agent'
     };
@@ -1891,6 +1941,25 @@
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join('') || 'R';
+    }
+
+    function renderAgentAvatar(row) {
+      if (row?.image_url) {
+        return `<div class="agent-avatar-wrap"><img class="avatar" src="${esc(row.image_url)}" alt="${esc(row.name || 'Agent')}"></div>`;
+      }
+      const lookup = agentLookupValue(row);
+      const busy = Boolean(lookup && state.agentPhotoUploadKey === lookup);
+      return `
+        <div class="agent-avatar-wrap">
+          <div class="avatar-fallback">${esc(initials(row?.name))}</div>
+          ${lookup ? `
+            <button class="agent-photo-add" type="button" data-agent-photo-pick="${esc(lookup)}" aria-label="Add photo for ${esc(row?.name || 'agent')}" title="Add agent photo" ${busy ? 'disabled' : ''}>
+              <i data-lucide="${busy ? 'loader-circle' : 'plus'}"></i>
+            </button>
+            <input class="agent-photo-input" type="file" accept="image/jpeg,image/png,image/webp" data-agent-photo-input="${esc(lookup)}">
+          ` : ''}
+        </div>
+      `;
     }
 
     function domId(value) {
@@ -2359,6 +2428,99 @@
         throw new Error(data.error || `Request failed: ${response.status}`);
       }
       return data;
+    }
+
+    function readAgentPhotoFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('The selected photo could not be read.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadAgentPhotoImage(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Choose a valid JPG, PNG, or WebP image.'));
+        image.src = dataUrl;
+      });
+    }
+
+    async function prepareAgentPhoto(file) {
+      if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        throw new Error('Choose a JPG, PNG, or WebP image.');
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        throw new Error('Choose an image smaller than 15 MB.');
+      }
+      const image = await loadAgentPhotoImage(await readAgentPhotoFile(file));
+      const targetWidth = 1200;
+      const targetHeight = 1500;
+      const targetRatio = targetWidth / targetHeight;
+      const sourceRatio = image.naturalWidth / image.naturalHeight;
+      let sourceWidth = image.naturalWidth;
+      let sourceHeight = image.naturalHeight;
+      let sourceX = 0;
+      let sourceY = 0;
+      if (sourceRatio > targetRatio) {
+        sourceWidth = image.naturalHeight * targetRatio;
+        sourceX = (image.naturalWidth - sourceWidth) / 2;
+      } else {
+        sourceHeight = image.naturalWidth / targetRatio;
+        sourceY = (image.naturalHeight - sourceHeight) / 2;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('This browser could not prepare the photo.');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, targetWidth, targetHeight);
+      context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+      const dataUrl = canvas.toDataURL('image/jpeg', .88);
+      if (!dataUrl.startsWith('data:image/jpeg;base64,')) {
+        throw new Error('This browser could not prepare the photo.');
+      }
+      return { dataUrl, width: targetWidth, height: targetHeight };
+    }
+
+    async function uploadAgentPhoto(lookup, file) {
+      const row = findAgentByLookup(lookup, state.command?.crm || []);
+      if (!row || row.image_url || !file) return;
+      state.agentPhotoUploadKey = lookup;
+      refreshAreaContent();
+      try {
+        const photo = await prepareAgentPhoto(file);
+        const result = await api('/api/admin/agent-photo', {
+          method: 'POST',
+          body: JSON.stringify({
+            agent: {
+              id: row.agent_id || row.id || '',
+              ranking_id: row.ranking_id || '',
+              slug: row.slug || '',
+              name: row.name || '',
+              phone: row.phone || '',
+              phone_normalized: row.phone_normalized || '',
+              email: row.email || '',
+              brokerage: row.brokerage || '',
+              queue_row_ids: (row.outreach_threads || []).map((thread) => thread.id).filter(Boolean)
+            },
+            photo: photo.dataUrl,
+            width: photo.width,
+            height: photo.height
+          })
+        });
+        state.agentPhotoUploadKey = '';
+        showToast(`Photo saved for ${row.name || 'agent'}.`);
+        if (result.public_url) row.image_url = result.public_url;
+        await loadAll({ showLoading: false });
+      } catch (error) {
+        state.agentPhotoUploadKey = '';
+        showToast(error.message || 'Unable to save the agent photo.');
+        refreshAreaContent();
+      }
     }
 
     function cacheBust(path) {
@@ -4427,6 +4589,16 @@ ${rowsHtml}
           refreshAreaContent();
         });
       });
+      document.querySelectorAll('[data-agent-photo-pick]').forEach((button) => {
+        button.addEventListener('click', () => {
+          button.closest('.agent-avatar-wrap')?.querySelector('[data-agent-photo-input]')?.click();
+        });
+      });
+      document.querySelectorAll('[data-agent-photo-input]').forEach((input) => {
+        input.addEventListener('change', () => {
+          uploadAgentPhoto(input.dataset.agentPhotoInput || '', input.files?.[0]).catch(() => null);
+        });
+      });
       document.getElementById('futureOpenHouseShowMore')?.addEventListener('click', () => {
         state.futureOpenHouseLimit += 60;
         refreshAreaContent();
@@ -5397,7 +5569,7 @@ ${rowsHtml}
       return `
         <article class="glass-card" style="padding:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-            ${row.image_url ? `<img class="avatar" src="${esc(row.image_url)}" alt="${esc(row.name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(row.name))}</div>`}
+            ${renderAgentAvatar(row)}
             <div style="min-width:0;">
               <a class="primary" href="${esc(adminAgentHref(row, 'crm', nextOpenHouse?.id || nextOpenHouse?.source_listing_id || ''))}">${esc(row.name || 'Unknown agent')}</a>
               <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), nextOpenHouse?.address, nextOpenHouse ? fmtDate(nextOpenHouse.open_start) : ''].filter(Boolean).join(' | '))}</div>
@@ -5423,7 +5595,7 @@ ${rowsHtml}
         <article${focused ? ' id="agent-profile"' : ''} class="glass-card" style="padding:18px;display:grid;gap:16px;${focused ? 'outline:2px solid rgba(56,189,248,.72);box-shadow:0 24px 70px rgba(14,116,144,.2);' : ''}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-              ${row.image_url ? `<img class="avatar" src="${esc(row.image_url)}" alt="${esc(row.name || 'Agent')}">` : `<div class="avatar-fallback">${esc(initials(row.name))}</div>`}
+              ${renderAgentAvatar(row)}
               <div style="min-width:0;">
                 <a class="primary" style="font-size:18px;" href="${esc(adminAgentHref(row))}">${esc(row.name || 'Unknown agent')}</a>
                 <div class="secondary">${esc([row.brokerage, fmtPhone(row.phone), row.email].filter(Boolean).join(' | '))}</div>

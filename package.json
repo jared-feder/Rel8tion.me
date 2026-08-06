@@ -19,6 +19,7 @@
     "verify:agent-ranking-token": "node scripts/verify-agent-ranking-token.cjs",
     "verify:rel8tionos-api": "node scripts/verify-rel8tionos-api.cjs",
     "verify:admin-agent-performance": "node test/admin-agent-performance.test.cjs",
+    "verify:admin-agent-photo": "node test/admin-agent-photo.test.cjs",
     "verify:kit-pricing": "node scripts/verify-open-house-kit-pricing.cjs",
     "verify:agent-relationships": "node scripts/verify-agent-relationship-stream.cjs",
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
