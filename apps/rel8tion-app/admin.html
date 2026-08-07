@@ -1581,6 +1581,7 @@
       agentHydrationKey: '',
       agentHydrationError: '',
       openHouseFocus: '',
+      outreachThreadLimit: 40,
       agentBoardLimit: 60,
       futureOpenHouseLimit: 60,
       agentDetailLimits: { threads: 20, upcoming: 20, listings: 20 },
@@ -1627,6 +1628,12 @@
       commandIndexes: {
         crmSorted: [],
         futureOpenHouses: []
+      },
+      relationshipIndexes: {
+        byPhone: new Map(),
+        bySlug: new Map(),
+        byEmail: new Map(),
+        byName: new Map()
       },
       health: null,
       relationships: [],
@@ -2218,44 +2225,42 @@
       const slug = String(row.agent_slug || row.slug || '').trim().toLowerCase();
       const name = String(row.agent_name || row.name || '').trim().toLowerCase();
       const brokerage = String(row.brokerage || row.company || '').trim().toLowerCase();
-      const relationships = state.relationships || [];
-      const findMatch = (predicate) => relationships.find((relationship) => {
-        const relationshipPhone = phoneDigits(relationship.phone_normalized || relationship.phone);
-        const relationshipEmail = String(relationship.email || '').trim().toLowerCase();
-        const relationshipSlug = String(relationship.agent_slug || '').trim().toLowerCase();
-        const relationshipName = String(relationship.name || relationship.display_name || '').trim().toLowerCase();
+      const indexes = state.relationshipIndexes;
+      if (phone) return indexes.byPhone.get(phone) || null;
+      if (slug) return indexes.bySlug.get(slug) || null;
+      if (email) return indexes.byEmail.get(email) || null;
+      const nameMatches = indexes.byName.get(name) || [];
+      return nameMatches.find((relationship) => {
         const relationshipBrokerage = String(relationship.company || relationship.brokerage || '').trim().toLowerCase();
-        return predicate({
-          relationshipPhone,
-          relationshipEmail,
-          relationshipSlug,
-          relationshipName,
-          relationshipBrokerage
-        });
+        return !brokerage || !relationshipBrokerage || brokerage === relationshipBrokerage;
       }) || null;
-      if (phone) return findMatch(({ relationshipPhone }) => phone === relationshipPhone);
-      if (slug) return findMatch(({ relationshipSlug }) => slug === relationshipSlug);
-      if (email) return findMatch(({ relationshipEmail }) => email === relationshipEmail);
-      return findMatch(({ relationshipName, relationshipBrokerage }) => (
-        name && name === relationshipName && (!brokerage || !relationshipBrokerage || brokerage === relationshipBrokerage)
-      ));
     }
 
-    function relationshipMatchesAgent(row, relationship) {
-      const rowPhone = phoneDigits(row?.phone_normalized || row?.phone || row?.agent_phone_normalized || row?.agent_phone);
-      const relationshipPhone = phoneDigits(relationship?.phone_normalized || relationship?.phone);
-      if (rowPhone && relationshipPhone) return rowPhone === relationshipPhone;
-      const rowSlug = String(row?.slug || row?.agent_slug || '').trim().toLowerCase();
-      const relationshipSlug = String(relationship?.agent_slug || '').trim().toLowerCase();
-      if (rowSlug && relationshipSlug) return rowSlug === relationshipSlug;
-      const rowEmail = String(row?.email || row?.agent_email || '').trim().toLowerCase();
-      const relationshipEmail = String(relationship?.email || '').trim().toLowerCase();
-      if (rowEmail && relationshipEmail) return rowEmail === relationshipEmail;
-      const rowName = String(row?.name || row?.agent_name || '').trim().toLowerCase();
-      const relationshipName = String(relationship?.name || relationship?.display_name || '').trim().toLowerCase();
-      const rowBrokerage = String(row?.brokerage || '').trim().toLowerCase();
-      const relationshipBrokerage = String(relationship?.company || relationship?.brokerage || '').trim().toLowerCase();
-      return Boolean(rowName && rowName === relationshipName && (!rowBrokerage || !relationshipBrokerage || rowBrokerage === relationshipBrokerage));
+    function buildRelationshipIndexes(relationships) {
+      const indexes = {
+        byPhone: new Map(),
+        bySlug: new Map(),
+        byEmail: new Map(),
+        byName: new Map()
+      };
+      const setFirst = (map, key, relationship) => {
+        if (key && !map.has(key)) map.set(key, relationship);
+      };
+      for (const relationship of relationships || []) {
+        const phone = phoneDigits(relationship.phone_normalized || relationship.phone);
+        const slug = String(relationship.agent_slug || '').trim().toLowerCase();
+        const email = String(relationship.email || '').trim().toLowerCase();
+        const name = String(relationship.name || relationship.display_name || '').trim().toLowerCase();
+        setFirst(indexes.byPhone, phone, relationship);
+        setFirst(indexes.bySlug, slug, relationship);
+        setFirst(indexes.byEmail, email, relationship);
+        if (name) {
+          const nameMatches = indexes.byName.get(name) || [];
+          nameMatches.push(relationship);
+          indexes.byName.set(name, nameMatches);
+        }
+      }
+      return indexes;
     }
 
     function relationshipToCommandAgent(relationship) {
@@ -2404,6 +2409,7 @@
           })
         });
         state.relationships = result.agents || state.relationships;
+        rebuildCommandIndexes();
         state.actionKey = '';
         showToast(result.message || (pinned ? 'Agent unpinned.' : 'Agent pinned to the top.'));
         render();
@@ -2437,6 +2443,7 @@
           })
         });
         state.relationships = result.agents || state.relationships;
+        rebuildCommandIndexes();
         state.actionKey = '';
         showToast(result.message || (followUpMarked ? 'Follow-up cleared.' : 'Agent marked for follow-up.'));
         render();
@@ -2589,9 +2596,17 @@
 
     function rebuildCommandIndexes() {
       const crmRows = [...(state.command?.crm || [])];
+      state.relationshipIndexes = buildRelationshipIndexes(state.relationships || []);
+      const crmIndexByRelationshipId = new Map();
+      for (let index = 0; index < crmRows.length; index += 1) {
+        const relationship = agentRelationship(crmRows[index]);
+        if (relationship?.id && !crmIndexByRelationshipId.has(relationship.id)) {
+          crmIndexByRelationshipId.set(relationship.id, index);
+        }
+      }
       for (const relationship of state.relationships || []) {
         const savedAgent = relationshipToCommandAgent(relationship);
-        const index = crmRows.findIndex((row) => relationshipMatchesAgent(row, relationship));
+        const index = crmIndexByRelationshipId.get(relationship.id) ?? -1;
         if (index >= 0) {
           crmRows[index] = {
             ...savedAgent,
@@ -2700,7 +2715,7 @@
       if (!state.verified || state.relationshipsLoading) return;
       state.relationshipsLoading = true;
       try {
-        const relationships = await api('/api/admin/agent-relationships?view=summary&limit=5000');
+        const relationships = await api('/api/admin/agent-relationships?view=summary&limit=1000');
         state.relationships = relationships.agents || state.relationships;
         rebuildCommandIndexes();
         if (state.area === 'crm') refreshAreaContent();
@@ -2976,6 +2991,7 @@ ${rowsHtml}
 
     function setOutreachFilter(filter) {
       state.outreachFilter = filter;
+      state.outreachThreadLimit = 40;
       refreshAreaContent();
     }
 
@@ -4656,6 +4672,10 @@ ${rowsHtml}
         state.agentBoardLimit += 60;
         refreshAreaContent();
       });
+      document.getElementById('outreachShowMore')?.addEventListener('click', () => {
+        state.outreachThreadLimit += 40;
+        refreshAreaContent();
+      });
       document.querySelectorAll('[data-agent-detail-more]').forEach((button) => {
         button.addEventListener('click', () => {
           const section = button.dataset.agentDetailMore;
@@ -5083,7 +5103,8 @@ ${rowsHtml}
     }
 
     function renderOutreach() {
-      const rows = filteredInbox();
+      const matchingRows = filteredInbox();
+      const rows = matchingRows.slice(0, state.outreachThreadLimit);
       const latestInbound = latestInboundThreads(8);
       const cronReady = countValue(state.command?.overview?.outreach_queue_cron_ready, state.command?.overview?.outreach_queue_approved_ready || 0);
       const paused = state.command?.overview?.outreach_queue_paused || 0;
@@ -5095,7 +5116,7 @@ ${rowsHtml}
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${rows.length} conversations in this view | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(autoReady)} auto | ${esc(paused)} paused</div>
+            <div class="sub">${matchingRows.length} conversations in this view | showing ${rows.length} | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(autoReady)} auto | ${esc(paused)} paused</div>
           </div>
           <div class="header-actions">
             ${renderOutreachModeControls()}
@@ -5122,6 +5143,7 @@ ${rowsHtml}
           ${!state.loading && rows.length === 0 ? '<div class="glass-card" style="padding:18px;font-weight:900;">No conversations in this view.</div>' : ''}
           ${rows.map(renderOutreachCard).join('')}
         </div>
+        ${rows.length < matchingRows.length ? `<div class="row-actions" style="margin:16px 0 24px;"><button class="btn soft" id="outreachShowMore"><i data-lucide="chevrons-down"></i><span>Show 40 more conversations</span></button>${badge(`${rows.length} of ${matchingRows.length}`, 'info')}</div>` : ''}
         ${renderOutreachQueue()}
       `;
     }

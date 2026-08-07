@@ -44,13 +44,31 @@ test('background refresh avoids the multi-megabyte dashboard bundle', () => {
 
 test('relationship hydration is deferred and uses the summary projection', () => {
   const body = functionSource('refreshRelationshipsInBackground');
-  assert.match(body, /agent-relationships\?view=summary&limit=5000/);
+  assert.match(body, /agent-relationships\?view=summary&limit=1000/);
   assert.match(body, /rebuildCommandIndexes\(\)/);
   assert.match(functionSource('rebuildCommandIndexes'), /relationshipToCommandAgent/);
   assert.match(functionSource('agentRelationshipGroup'), /label: 'Saved agent'/);
   assert.doesNotMatch(functionSource('loadAll'), /agent-relationships/);
   assert.match(relationshipApiSource, /summaryOnly \? boardRows : attachFollowUpConversations\(boardRows\)/);
   assert.match(relationshipApiSource, /agent_board_v1_summary/);
+});
+
+test('relationship merging uses prebuilt identity indexes instead of nested scans', () => {
+  const lookup = functionSource('agentRelationship');
+  const rebuild = functionSource('rebuildCommandIndexes');
+  assert.match(functionSource('buildRelationshipIndexes'), /byPhone: new Map\(\)/);
+  assert.match(lookup, /state\.relationshipIndexes/);
+  assert.doesNotMatch(lookup, /state\.relationships.*\.find/);
+  assert.match(rebuild, /crmIndexByRelationshipId/);
+  assert.doesNotMatch(rebuild, /findIndex/);
+});
+
+test('outreach conversations render in bounded increments', () => {
+  const body = functionSource('renderOutreach');
+  assert.match(source, /outreachThreadLimit: 40/);
+  assert.match(body, /matchingRows\.slice\(0, state\.outreachThreadLimit\)/);
+  assert.match(body, /outreachShowMore/);
+  assert.match(body, /Show 40 more conversations/);
 });
 
 test('focused agent details are bounded and can be expanded incrementally', () => {
