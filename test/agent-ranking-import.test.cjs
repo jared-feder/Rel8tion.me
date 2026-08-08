@@ -148,3 +148,47 @@ test('merging a newer report preserves linked agent data and relationship histor
   assert.deepEqual(new Set(merged.matched_open_house_ids), new Set(['oh-1', 'oh-2']));
   assert.deepEqual(new Set(merged.raw_sources.brokerage_history), new Set(['EXP Realty LLC', 'eXp Realty']));
 });
+
+test('an exact-name unique same-brokerage phone change updates the existing identity', () => {
+  const previous = ranking({ phone: '7187634110', phone_normalized: '7187634110' });
+  const current = ranking({ phone: '9172570211', phone_normalized: '9172570211' });
+  const byIdentity = __test.canonicalRankingMap([previous]);
+  const resolution = __test.resolveExistingRankingForImport(
+    current,
+    byIdentity,
+    new Map([['emily alcantara', [previous]]])
+  );
+  assert.equal(resolution.status, 'phone_alias_resolved');
+  const resolved = __test.preserveExistingContactForPhoneAlias(previous, current, resolution);
+  assert.equal(resolved.phone_normalized, '7187634110');
+  assert.equal(resolved.identity_key, 'import:emily alcantara|7187634110');
+  assert.deepEqual(new Set(resolved.raw_sources.phone_aliases), new Set(['7187634110', '9172570211']));
+});
+
+test('an exact-name phone change is held when multiple same-brokerage identities already exist', () => {
+  const first = ranking({
+    agent_name: 'Ryan Serhant',
+    brokerage: 'Serhant LLC',
+    phone: '6464807665',
+    phone_normalized: '6464807665'
+  });
+  const second = ranking({
+    agent_name: 'Ryan Serhant',
+    brokerage: 'Serhant LLC',
+    phone: '5612620856',
+    phone_normalized: '5612620856'
+  });
+  const current = ranking({
+    agent_name: 'Ryan Serhant',
+    brokerage: 'Serhant LLC',
+    phone: '5613067220',
+    phone_normalized: '5613067220'
+  });
+  const resolution = __test.resolveExistingRankingForImport(
+    current,
+    __test.canonicalRankingMap([first, second]),
+    new Map([['ryan serhant', [first, second]]])
+  );
+  assert.equal(resolution.status, 'identity_alias_held');
+  assert.equal(resolution.candidates.length, 2);
+});

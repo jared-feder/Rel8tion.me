@@ -1770,6 +1770,89 @@ function canonicalRankingMap(rankings = []) {
   return map;
 }
 
+function canonicalRankingNameMap(rankings = []) {
+  const map = new Map();
+  for (const ranking of rankings || []) {
+    const name = normalizeName(ranking.agent_name || '');
+    if (!name) continue;
+    if (!map.has(name)) map.set(name, []);
+    map.get(name).push(ranking);
+  }
+  return map;
+}
+
+function resolveExistingRankingForImport(candidate, existingByIdentity, existingByName) {
+  const identityKey = identityKeyForAgentRanking(candidate) || candidate.identity_key;
+  const exact = existingByIdentity.get(identityKey);
+  if (exact) return { status: 'exact', existing: exact, identity_key: identityKey };
+
+  const name = normalizeName(candidate.agent_name || '');
+  const phone = normalizePhone(candidate.phone_normalized || candidate.phone);
+  const brokerage = normalizeName(candidate.brokerage || '');
+  if (!name || !phone) return { status: 'new', existing: null, identity_key: identityKey };
+
+  const sameName = existingByName.get(name) || [];
+  if (!sameName.length) return { status: 'new', existing: null, identity_key: identityKey };
+
+  const sameBrokerage = brokerage
+    ? sameName.filter((ranking) => normalizeName(ranking.brokerage || '') === brokerage)
+    : [];
+  if (sameBrokerage.length === 1) {
+    return {
+      status: 'phone_alias_resolved',
+      existing: sameBrokerage[0],
+      identity_key: identityKeyForAgentRanking(sameBrokerage[0]) || sameBrokerage[0].identity_key,
+      reported_phone: phone
+    };
+  }
+
+  return {
+    status: 'identity_alias_held',
+    existing: null,
+    identity_key: identityKey,
+    reported_phone: phone,
+    candidates: sameName
+  };
+}
+
+function aliasResolutionExample(candidate, resolution) {
+  return {
+    agent_name: candidate.agent_name || null,
+    candidate_brokerage: candidate.brokerage || null,
+    reported_phone: resolution.reported_phone || normalizePhone(candidate.phone_normalized || candidate.phone),
+    existing_candidates: (resolution.candidates || [resolution.existing]).filter(Boolean).map((ranking) => ({
+      identity_key: identityKeyForAgentRanking(ranking) || ranking.identity_key || null,
+      brokerage: ranking.brokerage || null,
+      phone_normalized: normalizePhone(ranking.phone_normalized || ranking.phone)
+    }))
+  };
+}
+
+function preserveExistingContactForPhoneAlias(existing, candidate, resolution) {
+  const canonicalPhone = normalizePhone(existing.phone_normalized || existing.phone);
+  const reportedPhone = resolution.reported_phone || normalizePhone(candidate.phone_normalized || candidate.phone);
+  const candidateRaw = candidate.raw_sources || {};
+  const existingRaw = existing.raw_sources || {};
+  return {
+    ...candidate,
+    phone: existing.phone || canonicalPhone,
+    phone_normalized: canonicalPhone,
+    identity_key: identityKeyForAgentRanking(existing) || existing.identity_key,
+    raw_sources: {
+      ...candidateRaw,
+      reported_phone: reportedPhone,
+      phone_aliases: uniqueStrings([
+        existingRaw.phone_aliases || [],
+        candidateRaw.phone_aliases || [],
+        canonicalPhone,
+        reportedPhone
+      ]),
+      phone_alias_resolution: 'exact_name_unique_same_brokerage',
+      phone_alias_resolved_at: new Date().toISOString()
+    }
+  };
+}
+
 function importChangeExample(existing, candidate, assessment) {
   return {
     identity_key: identityKeyForAgentRanking(candidate) || candidate.identity_key || null,
@@ -1859,48 +1942,69 @@ function mergeRankingForImport(existing, candidate, assessment) {
 
 function assessImportContinuity(rankings = [], existingRankings = []) {
   const existingByIdentity = canonicalRankingMap(existingRankings);
+  const existingByName = canonicalRankingNameMap(existingRankings);
   const summary = {
     existing_matches: 0,
     new_rankings: 0,
+    phone_aliases_resolved: 0,
+    identity_aliases_held: 0,
     severe_drops_held: 0,
     large_increases_accepted: 0,
     stale_snapshots_skipped: 0,
     same_snapshot_weaker_skipped: 0,
+    phone_alias_examples: [],
+    identity_alias_examples: [],
     severe_drop_examples: [],
     large_increase_examples: []
   };
 
   for (const ranking of rankings || []) {
-    const key = identityKeyForAgentRanking(ranking) || ranking.identity_key;
-    const existing = existingByIdentity.get(key);
-    if (!existing) {
+    const resolution = resolveExistingRankingForImport(ranking, existingByIdentity, existingByName);
+    if (resolution.status === 'identity_alias_held') {
+      summary.identity_aliases_held += 1;
+      if (summary.identity_alias_examples.length < 10) {
+        summary.identity_alias_examples.push(aliasResolutionExample(ranking, resolution));
+      }
+      continue;
+    }
+    if (resolution.status === 'new') {
       summary.new_rankings += 1;
       continue;
     }
+    const existing = resolution.existing;
+    const candidate = resolution.status === 'phone_alias_resolved'
+      ? preserveExistingContactForPhoneAlias(existing, ranking, resolution)
+      : ranking;
+    if (resolution.status === 'phone_alias_resolved') {
+      summary.phone_aliases_resolved += 1;
+      if (summary.phone_alias_examples.length < 10) {
+        summary.phone_alias_examples.push(aliasResolutionExample(ranking, resolution));
+      }
+    }
     summary.existing_matches += 1;
-    const assessment = assessListReportsChange(existing, ranking);
+    const assessment = assessListReportsChange(existing, candidate);
     const existingTimestamp = sourceSnapshotTimestamp(existing);
-    const candidateTimestamp = sourceSnapshotTimestamp(ranking);
+    const candidateTimestamp = sourceSnapshotTimestamp(candidate);
     if (existingTimestamp && candidateTimestamp && candidateTimestamp < existingTimestamp) {
       summary.stale_snapshots_skipped += 1;
       continue;
     }
     if (existingTimestamp && candidateTimestamp && candidateTimestamp === existingTimestamp
-      && strongerListReportsSnapshot(existing, ranking) === existing) {
+      && strongerListReportsSnapshot(existing, candidate) === existing) {
       summary.same_snapshot_weaker_skipped += 1;
       continue;
     }
     if (assessment.severe_drop && (!existingTimestamp || !candidateTimestamp || candidateTimestamp > existingTimestamp)) {
       summary.severe_drops_held += 1;
       if (summary.severe_drop_examples.length < 10) {
-        summary.severe_drop_examples.push(importChangeExample(existing, ranking, assessment));
+        summary.severe_drop_examples.push(importChangeExample(existing, candidate, assessment));
       }
       continue;
     }
     if (assessment.large_increase) {
       summary.large_increases_accepted += 1;
       if (summary.large_increase_examples.length < 10) {
-        summary.large_increase_examples.push(importChangeExample(existing, ranking, assessment));
+        summary.large_increase_examples.push(importChangeExample(existing, candidate, assessment));
       }
     }
   }
@@ -1913,23 +2017,35 @@ async function upsertRankings(rankings) {
   const existing = await supabaseRestAll('agent_rankings?select=*&order=id.asc')
     .catch(() => []);
   const existingByIdentity = canonicalRankingMap(existing);
+  const existingByName = canonicalRankingNameMap(existing);
   const existingIdentityKeys = new Set(existingByIdentity.keys());
   const heldForReview = [];
   const largeChangesAccepted = [];
   const staleSnapshotsSkipped = [];
   const sameSnapshotWeakerSkipped = [];
+  const phoneAliasesResolved = [];
+  const identityAliasesHeld = [];
   const payloadRows = [];
 
   for (const row of deduped.rows) {
-    const ranking = {
+    let ranking = {
       ...row,
       identity_key: identityKeyForAgentRanking(row) || row.identity_key
     };
     if (!ranking.identity_key) continue;
-    const existingRanking = existingByIdentity.get(ranking.identity_key);
-    if (!existingRanking) {
+    const resolution = resolveExistingRankingForImport(ranking, existingByIdentity, existingByName);
+    if (resolution.status === 'identity_alias_held') {
+      identityAliasesHeld.push(aliasResolutionExample(ranking, resolution));
+      continue;
+    }
+    if (resolution.status === 'new') {
       payloadRows.push(ranking);
       continue;
+    }
+    const existingRanking = resolution.existing;
+    if (resolution.status === 'phone_alias_resolved') {
+      phoneAliasesResolved.push(aliasResolutionExample(ranking, resolution));
+      ranking = preserveExistingContactForPhoneAlias(existingRanking, ranking, resolution);
     }
 
     const assessment = assessListReportsChange(existingRanking, ranking);
@@ -1975,7 +2091,9 @@ async function upsertRankings(rankings) {
     held_for_review: heldForReview,
     large_changes_accepted: largeChangesAccepted,
     stale_snapshots_skipped: staleSnapshotsSkipped,
-    same_snapshot_weaker_skipped: sameSnapshotWeakerSkipped
+    same_snapshot_weaker_skipped: sameSnapshotWeakerSkipped,
+    phone_aliases_resolved: phoneAliasesResolved,
+    identity_aliases_held: identityAliasesHeld
   };
 }
 
@@ -2565,6 +2683,8 @@ async function handleConfirm(body, auth) {
     new_rankings_inserted: upserted.created.length,
     existing_rankings_updated: upserted.updated.length,
     rankings_held_for_review: upserted.held_for_review.length,
+    phone_aliases_resolved: upserted.phone_aliases_resolved.length,
+    identity_aliases_held: upserted.identity_aliases_held.length,
     large_changes_accepted: upserted.large_changes_accepted.length,
     stale_snapshots_skipped: upserted.stale_snapshots_skipped.length,
     same_snapshot_weaker_skipped: upserted.same_snapshot_weaker_skipped.length,
@@ -2577,7 +2697,11 @@ async function handleConfirm(body, auth) {
     large_changes_accepted_count: upserted.large_changes_accepted.length,
     large_changes_accepted_examples: upserted.large_changes_accepted.slice(0, 20),
     stale_snapshots_skipped_count: upserted.stale_snapshots_skipped.length,
-    same_snapshot_weaker_skipped_count: upserted.same_snapshot_weaker_skipped.length
+    same_snapshot_weaker_skipped_count: upserted.same_snapshot_weaker_skipped.length,
+    phone_aliases_resolved_count: upserted.phone_aliases_resolved.length,
+    phone_aliases_resolved_examples: upserted.phone_aliases_resolved.slice(0, 20),
+    identity_aliases_held_count: upserted.identity_aliases_held.length,
+    identity_aliases_held_examples: upserted.identity_aliases_held.slice(0, 20)
   };
   await supabaseRest(`agent_production_uploads?id=eq.${enc(upload.id)}`, {
     method: 'PATCH',
@@ -2603,6 +2727,8 @@ async function handleConfirm(body, auth) {
     large_changes_accepted: upserted.large_changes_accepted,
     stale_snapshots_skipped: upserted.stale_snapshots_skipped,
     same_snapshot_weaker_skipped: upserted.same_snapshot_weaker_skipped,
+    phone_aliases_resolved: upserted.phone_aliases_resolved,
+    identity_aliases_held: upserted.identity_aliases_held,
     failed_rows: [...importInsert.failed, ...(upserted.failed || [])],
     import_summary: importSummary,
     summary: summarizeRankings(savedRankings),
@@ -3068,5 +3194,7 @@ module.exports.__test = {
   historyDetailRow,
   inventoryCountsForRankings,
   mergeRankingForImport,
+  preserveExistingContactForPhoneAlias,
+  resolveExistingRankingForImport,
   openHouseReminderVariants
 };

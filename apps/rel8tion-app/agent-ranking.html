@@ -1642,6 +1642,8 @@
         ['Duplicates skipped', s.duplicates_skipped],
         ['New rankings inserted', s.new_rankings_inserted],
         ['Existing rankings updated', s.existing_rankings_updated],
+        ['Phone aliases resolved', s.phone_aliases_resolved],
+        ['Ambiguous identity aliases held', s.identity_aliases_held],
         ['Large increases accepted', s.large_changes_accepted],
         ['Severe drops held', s.rankings_held_for_review],
         ['Older snapshots skipped', s.stale_snapshots_skipped],
@@ -1953,10 +1955,13 @@
                     <div class="info-grid">
                       <div><div class="mini-title">Existing rankings</div><strong>${num(continuity.existing_matches)}</strong></div>
                       <div><div class="mini-title">New rankings</div><strong>${num(continuity.new_rankings)}</strong></div>
+                      <div><div class="mini-title">Phone aliases resolved</div><strong>${num(continuity.phone_aliases_resolved)}</strong></div>
+                      <div><div class="mini-title">Ambiguous aliases held</div><strong>${num(continuity.identity_aliases_held)}</strong></div>
                       <div><div class="mini-title">Large increases accepted</div><strong>${num(continuity.large_increases_accepted)}</strong></div>
                       <div><div class="mini-title">Severe drops held</div><strong>${num(continuity.severe_drops_held)}</strong></div>
                     </div>
                     ${continuity.severe_drops_held ? `<div class="empty" style="text-align:left;border-color:#f0b429;background:#fff8e6;">The raw ListReports rows will be preserved, but these severe decreases will not replace the current ranking until reviewed: ${(continuity.severe_drop_examples || []).map((item) => `${esc(item.agent_name || 'Unknown')} (${num(item.previous_total)} → ${num(item.candidate_total)})`).join(', ')}.</div>` : ''}
+                    ${continuity.identity_aliases_held ? `<div class="empty" style="text-align:left;border-color:#f0b429;background:#fff8e6;">These exact-name/different-phone rows are ambiguous and will remain in raw history without creating another current ranking: ${(continuity.identity_alias_examples || []).map((item) => esc(item.agent_name || 'Unknown')).join(', ')}${continuity.identity_aliases_held > (continuity.identity_alias_examples || []).length ? ` and ${num(continuity.identity_aliases_held - (continuity.identity_alias_examples || []).length)} more` : ''}.</div>` : ''}
                     <details>
                       <summary style="font-weight:900;cursor:pointer;">Detected columns and manual mapping</summary>
                       <div class="mapping-grid" style="margin-top:12px;">
