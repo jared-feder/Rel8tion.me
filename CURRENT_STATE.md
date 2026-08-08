@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-08: HomeKey / Property Keepsake QR
+
+- `[IMPLEMENTED]` REL8TION COMMAND open-house, accepted-visit, and confirmed-report rows expose **Create HomeKey QR**. The admin-authenticated generator returns the property, durable listing-agent and loan-officer attribution, a permanent `/h/:public_code` URL, QR preview, Copy Link, Preview Page, and a 1600 px high-error-correction PNG download. A unique attribution key makes repeat generation for the same assignment duplicate-safe.
+- `[IMPLEMENTED]` HomeKey is separate from Event Pass, Smart Sign, Rel8tionChip, NFC, activation, and check-in inventory. Property facts remain in `open_houses` and `open_house_property_profiles`; `property_keepsakes` stores only the durable code and source/attribution IDs.
+- `[IMPLEMENTED]` The public page asks for identity only after the buyer chooses Save, agent relationship, similar homes, off-market opportunities, price alert, different area, or financing help and explicitly consents. Matching phone or email submissions update one existing `leads` row instead of creating duplicates. The feature sends no SMS, email, alert, or campaign automatically.
+- `[VERIFIED]` Production migration `20260808085230` is applied and recorded. Both new tables have RLS enabled, no anon/authenticated grants, least-privilege service-role access, and indexed foreign keys. Focused local generation, rendering, lead, analytics, route, syntax, and COMMAND regression tests pass against a real linked-property fixture.
+- `[NEEDS VERIFICATION]` The application release and full live browser-to-API-to-database flow remain pending until the production deployment is complete.
+
 ## 2026-08-06: non-sending general agent prospect lane
 
 - `[IMPLEMENTED]` Agent Ranking / Agent Performance now separates general REL8TION prospects from open-house outreach. **Create REL8TION Prospect** checks canonical `agents`, `agent_websites`, and `agent_relationships`; it identifies and links an existing member or relationship before creating a new durable `agent_relationships` prospect.

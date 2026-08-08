@@ -122,6 +122,7 @@
     { "source": "/lo-sign-activate", "destination": "/apps/rel8tion-app/lo-sign-activate.html" },
     { "source": "/lo-sign-activate.html", "destination": "/apps/rel8tion-app/lo-sign-activate.html" },
     { "source": "/l/:id", "destination": "/api/open-house-link?id=:id" },
+    { "source": "/h/:code", "destination": "/api/open-house-link?homekey=:code" },
     { "source": "/o/:id", "destination": "/api/outreach-preview?id=:id" },
     { "source": "/c/:code", "destination": "/api/chip-qr?code=:code" },
     { "source": "/chip/:code", "destination": "/api/chip-qr?code=:code" },

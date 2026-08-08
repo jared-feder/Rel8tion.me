@@ -54,6 +54,32 @@ test('missing numeric facts stay absent and the buyer page keeps event navigatio
   assert.doesNotMatch(html, /<span>Year built<\/span><strong><\/strong>/);
 });
 
+test('HomeKey rendering is action-gated, keeps durable contacts, and hides missing socials', () => {
+  const html = renderListingPage({
+    id: 'house-1',
+    house: { id: 'house-1', address: '12 Home Key Lane', image: 'https://images.example/home.webp' },
+    profile: { open_house_id: 'house-1', address: '12 Home Key Lane', city: 'Queens', state: 'NY', price: 725000, listing_status: 'Sold' },
+    targetUrl: '',
+    externalCheck: { available: false },
+    keepsake: true,
+    homekey: { id: 'homekey-1', public_code: 'HK-test-code' },
+    agents: [{ name: 'Listing Agent', title: 'Licensed Real Estate Salesperson', phone: '5165550101', website_url: 'https://agent.example' }],
+    loanOfficer: { name: 'Loan Officer', company: 'NMB', phone: '5165550102' }
+  });
+
+  assert.match(html, /This home is no longer available, but your HomeKey still works/);
+  assert.match(html, /Save This Home/);
+  assert.match(html, /I Want This Agent To Help Me/);
+  assert.match(html, /DIDN'T LOVE THIS HOUSE\?/);
+  assert.match(html, /FINANCING SUPPORT/);
+  assert.match(html, /keepsakeInterestForm/);
+  assert.match(html, /class="interest-form hidden"/);
+  assert.match(html, /HK-test-code/);
+  assert.doesNotMatch(html, />Instagram</);
+  assert.doesNotMatch(html, />Facebook</);
+  assert.doesNotMatch(html, />LinkedIn</);
+});
+
 test('property profile migration keeps the raw profile server-managed', () => {
   const migration = fs.readFileSync(
     path.join(__dirname, '../supabase/migrations/20260801055717_open_house_property_profiles.sql'),

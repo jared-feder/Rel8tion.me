@@ -1398,6 +1398,19 @@
       gap: 14px;
     }
 
+    .homekey-modal { width: min(820px, 100%); }
+    .homekey-preview-grid { display: grid; gap: 16px; }
+    .homekey-property-preview { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 14px; align-items: center; }
+    .homekey-property-preview img, .homekey-photo-fallback { width: 112px; height: 92px; border-radius: 8px; object-fit: cover; background: rgba(219,234,254,.85); }
+    .homekey-photo-fallback { display: grid; place-items: center; color: #294284; font-size: 28px; font-weight: 950; }
+    .homekey-people { display: grid; gap: 10px; }
+    .homekey-person { border: 1px solid rgba(219,234,254,.95); border-radius: 8px; background: rgba(255,255,255,.8); padding: 12px; }
+    .homekey-qr-panel { display: grid; place-items: center; gap: 10px; border: 1px solid rgba(219,234,254,.95); border-radius: 8px; background: #fff; padding: 16px; }
+    .homekey-qr-panel img { width: min(320px, 100%); height: auto; image-rendering: pixelated; }
+    .homekey-url { width: 100%; overflow-wrap: anywhere; border-radius: 8px; background: #eff6ff; padding: 10px; color: #294284; font-weight: 850; text-align: center; }
+    .homekey-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    @media (min-width: 720px) { .homekey-preview-grid { grid-template-columns: minmax(0,1fr) minmax(280px,.8fr); } .homekey-people { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
     .coverage-head {
       display: flex;
       justify-content: space-between;
@@ -1622,6 +1635,7 @@
         }
       },
       coveragePickerKey: '',
+      homekeyModal: null,
       inbox: [],
       counts: { all: 0, inbound: 0, needs_reply: 0, interested: 0, opt_out: 0 },
       command: null,
@@ -2728,7 +2742,7 @@
 
     async function refreshLiveData() {
       if (!state.verified || state.loading || state.liveRefreshing || document.visibilityState !== 'visible') return;
-      if (state.sendingKey || state.actionKey || state.coveragePickerKey || isCommandEditing()) return;
+      if (state.sendingKey || state.actionKey || state.coveragePickerKey || state.homekeyModal || isCommandEditing()) return;
       state.liveRefreshing = true;
       try {
         const [inbox, health] = await Promise.all([
@@ -3603,6 +3617,68 @@ ${rowsHtml}
         return;
       }
       openCoveragePicker(key);
+    }
+
+    async function openHomeKey(openHouseId, fieldVisitId = '') {
+      if (!openHouseId) return showToast('This open house does not have a source property ID yet.');
+      state.homekeyModal = { loading: true, error: '', data: null, open_house_id: openHouseId, field_visit_id: fieldVisitId };
+      render();
+      try {
+        const result = await api('/api/admin/open-house-homekey', {
+          method: 'POST',
+          body: JSON.stringify({ open_house_id: openHouseId, field_visit_id: fieldVisitId || null })
+        });
+        state.homekeyModal = { loading: false, error: '', data: result, open_house_id: openHouseId, field_visit_id: fieldVisitId };
+        render();
+        showToast(result.reused ? 'Opened the existing HomeKey — no duplicate created.' : 'HomeKey created.');
+      } catch (error) {
+        state.homekeyModal = { loading: false, error: error.message || 'Unable to create HomeKey.', data: null, open_house_id: openHouseId, field_visit_id: fieldVisitId };
+        render();
+      }
+    }
+
+    function closeHomeKey() {
+      state.homekeyModal = null;
+      render();
+    }
+
+    async function copyHomeKeyLink() {
+      const url = state.homekeyModal?.data?.url || '';
+      if (!url) return;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('HomeKey link copied.');
+      } catch (_) {
+        window.prompt('Copy this HomeKey link:', url);
+      }
+    }
+
+    async function downloadHomeKeyQr() {
+      const code = state.homekeyModal?.data?.homekey?.public_code || '';
+      if (!code) return;
+      try {
+        const response = await fetch(`/api/admin/open-house-homekey?format=png&code=${encodeURIComponent(code)}`, {
+          cache: 'no-store',
+          headers: authHeaders()
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Download failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') || '';
+        const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || `homekey-${code}-qr.png`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        showToast('Downloaded 1600 px HomeKey QR PNG.');
+      } catch (error) {
+        showToast(error.message || 'Unable to download HomeKey QR.');
+      }
     }
 
     function acceptOpenHouse(key) {
@@ -4500,6 +4576,56 @@ ${rowsHtml}
       `;
     }
 
+    function renderHomeKeyModal() {
+      const modal = state.homekeyModal;
+      if (!modal) return '';
+      const data = modal.data || null;
+      const property = data?.property || {};
+      const listingAgent = data?.listing_agent || null;
+      const loanOfficer = data?.loan_officer || null;
+      const address = [property.address, property.city, property.state, property.zip].filter(Boolean).join(', ') || modal.open_house_id || 'Open house';
+      return `
+        <div class="modal-backdrop" data-homekey-backdrop>
+          <section class="coverage-modal homekey-modal" role="dialog" aria-modal="true" aria-labelledby="homekeyTitle">
+            <div class="coverage-head">
+              <div>
+                <div class="mini-title">HOMEKEY / PROPERTY KEEPSAKE QR</div>
+                <h2 id="homekeyTitle">${modal.loading ? 'Creating HomeKey...' : data ? 'HomeKey ready' : 'HomeKey could not be created'}</h2>
+                <div class="small">One permanent buyer page. Repeated generation for this exact assignment returns the same code.</div>
+              </div>
+              <button type="button" class="btn soft" data-homekey-close aria-label="Close HomeKey panel"><i data-lucide="x"></i><span>Close</span></button>
+            </div>
+            ${modal.loading ? '<div class="mini-panel"><div class="primary">Building the durable attribution record and QR preview...</div></div>' : ''}
+            ${modal.error ? `<div class="error small">${esc(modal.error)}</div><div><button type="button" class="btn primary" data-homekey-retry><i data-lucide="refresh-cw"></i><span>Try again</span></button></div>` : ''}
+            ${data ? `
+              <div class="homekey-preview-grid">
+                <div style="display:grid;gap:14px;">
+                  <div class="homekey-property-preview">
+                    ${property.photo_url ? `<img src="${esc(property.photo_url)}" alt="${esc(address)}">` : '<div class="homekey-photo-fallback">⌂</div>'}
+                    <div><div class="mini-title">Property</div><div class="address">${esc(address)}</div><div class="small">${data.reused ? 'Existing HomeKey reused' : 'New HomeKey created'} · ${esc(data.homekey?.public_code || '')}</div></div>
+                  </div>
+                  <div class="homekey-people">
+                    <div class="homekey-person"><div class="mini-title">Listing agent</div><div class="primary">${esc(listingAgent?.name || 'Not identified')}</div><div class="small">${esc([listingAgent?.brokerage, listingAgent?.phone, listingAgent?.email].filter(Boolean).join(' | ') || 'No imported contact details')}</div></div>
+                    <div class="homekey-person"><div class="mini-title">Assigned loan officer</div><div class="primary">${esc(loanOfficer?.full_name || 'Not assigned')}</div><div class="small">${esc([loanOfficer?.company_name, loanOfficer?.phone, loanOfficer?.email].filter(Boolean).join(' | ') || 'This HomeKey will preserve no LO attribution until an assigned version is generated.')}</div></div>
+                  </div>
+                </div>
+                <div class="homekey-qr-panel">
+                  <img src="${esc(data.qr_data_url || '')}" alt="HomeKey QR preview">
+                  <div class="homekey-url">${esc(data.url || '')}</div>
+                  <div class="homekey-modal-actions">
+                    <a class="btn soft" href="${esc(data.url || '#')}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>Preview Page</span></a>
+                    <button type="button" class="btn primary" id="downloadHomeKeyQr"><i data-lucide="download"></i><span>Download QR PNG</span></button>
+                    <button type="button" class="btn soft" id="copyHomeKeyLink"><i data-lucide="copy"></i><span>Copy Link</span></button>
+                  </div>
+                  <div class="small">Download is a 1600 px PNG with high error correction for clean small-format printing.</div>
+                </div>
+              </div>
+            ` : ''}
+          </section>
+        </div>
+      `;
+    }
+
     function renderShell() {
       const areaLabel = AREAS.find(([key]) => key === state.area)?.[1] || 'Outreach command';
       const o = state.command?.overview || {};
@@ -4594,6 +4720,7 @@ ${rowsHtml}
           </div>
         </main>
         ${renderCoveragePicker()}
+        ${renderHomeKeyModal()}
       `;
 
       document.getElementById('refreshBtn')?.addEventListener('click', () => loadAll());
@@ -4783,6 +4910,16 @@ ${rowsHtml}
       document.querySelector('[data-coverage-backdrop]')?.addEventListener('click', (event) => {
         if (event.target === event.currentTarget) closeCoveragePicker();
       });
+      document.querySelectorAll('[data-create-homekey]').forEach((button) => {
+        button.addEventListener('click', () => openHomeKey(button.dataset.createHomekey, button.dataset.homekeyVisit || ''));
+      });
+      document.querySelectorAll('[data-homekey-close]').forEach((button) => button.addEventListener('click', closeHomeKey));
+      document.querySelector('[data-homekey-backdrop]')?.addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) closeHomeKey();
+      });
+      document.querySelector('[data-homekey-retry]')?.addEventListener('click', () => openHomeKey(state.homekeyModal?.open_house_id || '', state.homekeyModal?.field_visit_id || ''));
+      document.getElementById('downloadHomeKeyQr')?.addEventListener('click', downloadHomeKeyQr);
+      document.getElementById('copyHomeKeyLink')?.addEventListener('click', copyHomeKeyLink);
       document.querySelectorAll('[data-accept-open-house]').forEach((button) => {
         button.addEventListener('click', () => acceptOpenHouse(button.dataset.acceptOpenHouse));
       });
@@ -5572,11 +5709,11 @@ ${rowsHtml}
           <div class="primary">${esc(row.lead_name || row.name || row.visitor_name || 'Buyer lead')}</div>
           <div class="secondary">${esc([fmtPhone(row.lead_phone || row.phone || row.visitor_phone), row.lead_email || row.email || row.visitor_email].filter(Boolean).join(' | '))}</div>
         </div>
-        <div>${badge(row.lead_source === 'event_checkin' ? 'check-in' : 'profile lead', row.lead_source === 'event_checkin' ? 'ok' : 'info')}</div>
+        <div>${badge(row.lead_source === 'event_checkin' ? 'check-in' : row.lead_source === 'homekey' ? 'HomeKey' : 'profile lead', row.lead_source === 'event_checkin' || row.lead_source === 'homekey' ? 'ok' : 'info')}</div>
         <div>${badge(row.financing_label || 'Unknown', /needs/i.test(row.financing_label || '') ? 'warn' : 'info')}</div>
         <div>
           <div class="primary">${esc(row.property_label || 'No property')}</div>
-          <div class="secondary">${esc([row.agent_label, fmtDate(row.created_at)].filter(Boolean).join(' | '))}</div>
+          <div class="secondary">${esc([row.agent_label, Array.isArray(row.metadata?.actions) ? row.metadata.actions.join(', ') : '', fmtDate(row.created_at)].filter(Boolean).join(' | '))}</div>
         </div>
         <div>${contactActions(row.lead_phone || row.phone || row.visitor_phone, row.lead_email || row.email || row.visitor_email)}</div>
       `);
@@ -6211,6 +6348,7 @@ ${rowsHtml}
           ${badge(`${row.live_loan_officer_count || 0} LO`, row.live_loan_officer_count ? 'ok' : 'info')}
         </div>
         <div class="row-actions">
+          ${row.open_house_source_id ? `<button class="btn primary" data-create-homekey="${esc(row.open_house_source_id)}"><i data-lucide="house"></i><span>Create HomeKey QR</span></button>` : ''}
           ${row.host_agent_slug ? `<a class="btn ${live ? 'primary' : 'soft'}" href="${esc(dashboardHref)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>${live ? 'Open live event' : 'View event'}</span></a>` : badge('No host link', 'warn')}
           ${live ? `<button class="btn bad" data-end-event="${esc(row.id)}" ${state.actionKey === `end_event:${row.id}` ? 'disabled' : ''}><i data-lucide="octagon-x"></i><span>${state.actionKey === `end_event:${row.id}` ? 'Ending...' : 'End event'}</span></button>` : ''}
         </div>
@@ -6295,6 +6433,7 @@ ${rowsHtml}
         <div>${badge(fmtDate(row.scheduled_start) || 'No time', 'info')}</div>
         <div>${badge(participantNames || 'No LO assigned', participantNames ? 'ok' : 'warn')}</div>
         <div class="row-actions">
+          ${row.open_house_id ? `<button class="btn primary" data-create-homekey="${esc(row.open_house_id)}" data-homekey-visit="${esc(row.id)}"><i data-lucide="house"></i><span>Create HomeKey QR</span></button>` : ''}
           ${agentLookupValue(row) ? `<a class="btn primary" href="${esc(agentHref)}"><i data-lucide="message-square-text"></i><span>Agent + message</span></a>` : ''}
           <select id="visit_lo_${domId(row.id)}" class="select" ${profiles.length ? '' : 'disabled'}>
             ${profiles.length ? profiles.map((profile) => `<option value="${esc(profile.uid)}"${profile.uid === (primary?.participant_uid || row.loan_officer_uid) ? ' selected' : ''}>${esc(loanOfficerLabel(profile))}</option>`).join('') : '<option>No active loan officers</option>'}
@@ -7029,6 +7168,7 @@ ${rowsHtml}
               ${updateKey ? `<button class="btn ${pinned ? 'primary' : 'soft'}" data-toggle-agent-pin="${esc(updateKey)}" ${pinBusy ? 'disabled' : ''}><i data-lucide="pin"></i><span>${pinBusy ? 'Saving...' : pinned ? 'Pinned' : 'Pin to top'}</span></button>` : ''}
               ${updateKey ? `<button class="btn ${followUpMarked ? 'primary' : 'soft'}" data-toggle-agent-follow-up="${esc(updateKey)}" ${followUpBusy ? 'disabled' : ''}><i data-lucide="bell-ring"></i><span>${followUpBusy ? 'Saving...' : followUpMarked ? 'Follow-up marked' : 'Mark follow-up'}</span></button>` : ''}
               ${updateKey ? `<button class="btn soft" data-confirm-open-house="${esc(updateKey)}" ${updateBusy ? 'disabled' : ''}><i data-lucide="calendar-days"></i><span>${updateBusy ? 'Saving...' : 'Update date'}</span></button>` : ''}
+              ${row.open_house_id ? `<button class="btn primary" data-create-homekey="${esc(row.open_house_id)}" data-homekey-visit="${esc(row.field_visit_id || '')}"><i data-lucide="house"></i><span>Create HomeKey QR</span></button>` : ''}
             </div>
             <div class="report-detail-grid">
               <div class="report-detail">

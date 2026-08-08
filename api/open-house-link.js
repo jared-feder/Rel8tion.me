@@ -515,6 +515,14 @@ async function loadOpenHouse(openHouseId) {
   return first(rows);
 }
 
+async function loadHomeKey(code) {
+  if (!code) return null;
+  const rows = await supabaseRest(
+    `property_keepsakes?public_code=eq.${encodeURIComponent(code)}&status=eq.active&select=*&limit=1`
+  );
+  return first(rows);
+}
+
 async function loadEvent(eventId) {
   if (!eventId) return null;
   const rows = await supabaseRest(
@@ -542,7 +550,146 @@ async function resolveListing(id) {
   };
 }
 
-function renderListingPage({ id, house, event, profile = null, targetUrl, externalCheck, images = [], buyerEventId = '', origin = 'https://app.rel8tion.me' }) {
+function normalizedPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+}
+
+function matchAgentWebsite(agent, websites) {
+  const email = cleanText(agent?.email).toLowerCase();
+  const phone = normalizedPhone(agent?.phone);
+  const name = cleanText(agent?.name).toLowerCase();
+  return (websites || []).find((site) => (
+    (email && cleanText(site.email).toLowerCase() === email)
+    || (phone && normalizedPhone(site.phone) === phone)
+    || (name && cleanText(site.name).toLowerCase() === name)
+  )) || null;
+}
+
+function agentWebsiteUrl(site) {
+  if (!site || site.status !== 'published') return '';
+  const customDomain = cleanText(site.custom_domain).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+  if (customDomain && /^[a-z0-9.-]+(?::\d+)?$/i.test(customDomain)) return `https://${customDomain}`;
+  return site.slug ? `https://my.rel8tion.me/${encodeURIComponent(site.slug)}` : '';
+}
+
+async function loadKeepsakeAgents(openHouseId, fallback = {}, listingAgentId = '') {
+  const [listingRows, websiteRows] = await Promise.all([
+    supabaseRest(`listing_agents?${listingAgentId ? `id=eq.${encodeURIComponent(listingAgentId)}&` : `open_house_id=eq.${encodeURIComponent(openHouseId)}&`}select=id,name,phone,email,brokerage,is_primary,primary_photo_url,directory_photo_url,profile_url&order=is_primary.desc.nullslast,created_at.asc&limit=8`).catch(() => []),
+    supabaseRest('agent_websites?status=eq.published&select=name,slug,title,brokerage,email,phone,photo_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,zillow_url,realtor_url&order=updated_at.desc&limit=500').catch(() => [])
+  ]);
+  const baseRows = (listingRows || []).length ? listingRows : [{
+    name: fallback.agent_name || fallback.agent || '',
+    phone: fallback.agent_phone || '',
+    email: fallback.agent_email || '',
+    brokerage: fallback.brokerage || '',
+    is_primary: true
+  }];
+
+  return baseRows.filter((agent) => agent.name || agent.phone || agent.email).map((agent) => {
+    const site = matchAgentWebsite(agent, websiteRows);
+    return {
+      name: firstPresent(agent.name, site?.name, fallback.agent_name, fallback.agent),
+      title: firstPresent(site?.title, 'Listing Agent'),
+      brokerage: firstPresent(agent.brokerage, site?.brokerage, fallback.brokerage),
+      phone: firstPresent(agent.phone, site?.phone, fallback.agent_phone),
+      email: firstPresent(agent.email, site?.email, fallback.agent_email),
+      photo_url: validExternalUrl(firstPresent(agent.primary_photo_url, agent.directory_photo_url, site?.photo_url)),
+      profile_url: validExternalUrl(firstPresent(agent.profile_url, agentWebsiteUrl(site))),
+      website_url: validExternalUrl(agentWebsiteUrl(site)),
+      facebook_url: validExternalUrl(site?.facebook_url),
+      instagram_url: validExternalUrl(site?.instagram_url),
+      linkedin_url: validExternalUrl(site?.linkedin_url),
+      zillow_url: validExternalUrl(site?.zillow_url),
+      realtor_url: validExternalUrl(site?.realtor_url),
+      is_primary: agent.is_primary !== false
+    };
+  });
+}
+
+function visitDistance(visit, targetTime) {
+  const visitTime = new Date(visit?.scheduled_start || 0).getTime();
+  if (!Number.isFinite(visitTime)) return Number.MAX_SAFE_INTEGER;
+  if (!Number.isFinite(targetTime)) return -visitTime;
+  return Math.abs(visitTime - targetTime);
+}
+
+async function loadKeepsakeLoanOfficer(openHouseId, event, targetStart, attributedUid = '', preserveUnassigned = false) {
+  if (attributedUid) {
+    const profile = first(await supabaseRest(
+      `verified_profiles?uid=eq.${encodeURIComponent(attributedUid)}&select=*&limit=1`
+    ).catch(() => []));
+    if (!profile) return null;
+    return {
+      uid: profile.uid,
+      name: profile.full_name,
+      title: firstPresent(profile.title, 'Loan Officer'),
+      company: profile.company_name,
+      phone: profile.phone,
+      email: profile.email,
+      photo_url: validExternalUrl(profile.photo_url),
+      website_url: validExternalUrl(profile.cta_url),
+      calendar_url: validExternalUrl(profile.calendar_url),
+      bio: cleanText(profile.bio),
+      areas: Array.isArray(profile.areas) ? profile.areas.map(cleanText).filter(Boolean).slice(0, 8) : []
+    };
+  }
+  if (preserveUnassigned) return null;
+  const visitFilters = [
+    `open_house_id.eq.${encodeURIComponent(openHouseId)}`,
+    event?.id ? `open_house_event_id.eq.${encodeURIComponent(event.id)}` : ''
+  ].filter(Boolean);
+  const [visitRows, sessionRows] = await Promise.all([
+    supabaseRest(`field_demo_visits?or=(${visitFilters.join(',')})&status=neq.cancelled&select=id,open_house_event_id,scheduled_start,status&order=scheduled_start.desc&limit=20`).catch(() => []),
+    event?.id
+      ? supabaseRest(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(event.id)}&select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=5`).catch(() => [])
+      : Promise.resolve([])
+  ]);
+  const targetTime = new Date(targetStart || 0).getTime();
+  const visit = [...(visitRows || [])].sort((a, b) => visitDistance(a, targetTime) - visitDistance(b, targetTime))[0] || null;
+  const participant = visit?.id ? first(await supabaseRest(
+    `field_demo_visit_participants?field_demo_visit_id=eq.${encodeURIComponent(visit.id)}&role=eq.loan_officer&status=neq.cancelled&select=*&order=is_primary.desc,created_at.asc&limit=1`
+  ).catch(() => [])) : null;
+  const session = first(sessionRows);
+  const uid = firstPresent(participant?.participant_profile_id, participant?.participant_uid, session?.verified_profile_uid, session?.loan_officer_uid);
+  const profile = uid ? first(await supabaseRest(
+    `verified_profiles?uid=eq.${encodeURIComponent(uid)}&is_active=eq.true&select=*&limit=1`
+  ).catch(() => [])) : null;
+  if (!participant && !session && !profile) return null;
+
+  return {
+    uid: firstPresent(profile?.uid, uid),
+    name: firstPresent(profile?.full_name, participant?.participant_name, session?.loan_officer_name, session?.loan_officer_slug),
+    title: firstPresent(profile?.title, session?.loan_officer_title, 'Loan Officer'),
+    company: firstPresent(profile?.company_name, participant?.participant_company, session?.loan_officer_company),
+    phone: firstPresent(profile?.phone, participant?.participant_phone, session?.loan_officer_phone),
+    email: firstPresent(profile?.email, participant?.participant_email, session?.loan_officer_email),
+    photo_url: validExternalUrl(firstPresent(profile?.photo_url, session?.loan_officer_photo_url)),
+    website_url: validExternalUrl(firstPresent(profile?.cta_url, session?.loan_officer_cta_url)),
+    calendar_url: validExternalUrl(firstPresent(profile?.calendar_url, session?.loan_officer_calendar_url)),
+    bio: cleanText(profile?.bio),
+    areas: Array.isArray(profile?.areas) ? profile.areas.map(cleanText).filter(Boolean).slice(0, 8) : []
+  };
+}
+
+async function loadKeepsakePeople({ house, event, profile, homekey = null }) {
+  const openHouseId = firstPresent(house?.id, profile?.open_house_id, event?.open_house_source_id);
+  if (!openHouseId) return { agents: [], loanOfficer: null };
+  const fallback = { ...(house || {}), ...(profile || {}), ...(event?.setup_context || {}) };
+  const [agents, loanOfficer] = await Promise.all([
+    loadKeepsakeAgents(openHouseId, fallback, homekey?.listing_agent_id || ''),
+    loadKeepsakeLoanOfficer(
+      openHouseId,
+      event,
+      firstPresent(profile?.open_start, house?.open_start, event?.start_time),
+      homekey?.loan_officer_uid || '',
+      Boolean(homekey)
+    )
+  ]);
+  return { agents, loanOfficer };
+}
+
+function renderListingPage({ id, house, event, profile = null, targetUrl, externalCheck, images = [], buyerEventId = '', origin = 'https://app.rel8tion.me', keepsake = false, homekey = null, agents = [], loanOfficer = null }) {
   const context = event?.setup_context || {};
   const property = {
     ...context,
@@ -551,6 +698,7 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
     image: profile?.primary_image || house?.image || context.image
   };
   const address = firstPresent(property.address, 'Open house listing');
+  const locationLine = [property.city, property.state, property.zip].filter(Boolean).join(', ').replace(/, ([A-Z]{2}), /, '$1 ');
   const price = money(property.price);
   const beds = property.beds;
   const baths = property.baths;
@@ -568,7 +716,61 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
     ? `${String(origin || '').replace(/\/$/, '')}/event?event=${encodeURIComponent(buyerEventId)}`
     : '';
   const phoneDigits = String(agentPhone || '').replace(/\D/g, '');
+  const listingStatus = cleanText(property.listing_status).toLowerCase();
+  const homeUnavailable = Boolean(keepsake && (
+    property._homekey_source_missing
+    || (listingStatus && !/(active|coming soon|pending|continue to show)/i.test(listingStatus))
+  ));
   const galleryJson = JSON.stringify(gallery).replace(/</g, '\\u003c');
+  const listingAgents = (agents || []).length ? agents : [{
+    name: agent,
+    title: 'Listing Agent',
+    brokerage,
+    phone: agentPhone,
+    email: agentEmail,
+    is_primary: true
+  }];
+  const primaryAgent = listingAgents.find((item) => item.is_primary) || listingAgents[0] || null;
+  const socialLink = (url, label, contactKind) => url ? `<a class="social-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer" data-homekey-contact="${esc(contactKind)}">${esc(label)}</a>` : '';
+  const contactCard = (person, kind, index = 0) => {
+    if (!person?.name && !person?.phone && !person?.email) return '';
+    const phone = String(person.phone || '').replace(/\D/g, '');
+    const contact = JSON.stringify({
+      name: person.name || '',
+      title: person.title || (kind === 'agent' ? 'Listing Agent' : 'Loan Officer'),
+      company: person.brokerage || person.company || '',
+      phone: person.phone || '',
+      email: person.email || '',
+      url: person.website_url || person.profile_url || ''
+    });
+    const links = kind === 'agent'
+      ? [
+        socialLink(person.website_url, 'Website', 'agent'),
+        socialLink(person.profile_url && person.profile_url !== person.website_url ? person.profile_url : '', 'Profile', 'agent'),
+        socialLink(person.instagram_url, 'Instagram', 'agent'),
+        socialLink(person.facebook_url, 'Facebook', 'agent'),
+        socialLink(person.linkedin_url, 'LinkedIn', 'agent'),
+        socialLink(person.zillow_url, 'Zillow', 'agent'),
+        socialLink(person.realtor_url, 'Realtor.com', 'agent')
+      ]
+      : [socialLink(person.website_url, 'Website', 'loan_officer'), socialLink(person.calendar_url, 'Book a time', 'loan_officer')];
+    return `<article class="person-card ${kind}">
+      <div class="person-head">
+        ${person.photo_url ? `<img class="person-photo" src="${esc(person.photo_url)}" alt="${esc(person.name || kind)}">` : `<div class="person-photo person-fallback">${esc(String(person.name || kind).slice(0, 1).toUpperCase())}</div>`}
+        <div><div class="eyebrow">${kind === 'agent' ? (index ? 'Co-listing agent' : 'Listing agent') : 'Financing resource'}</div><h2>${esc(person.name || (kind === 'agent' ? 'Listing agent' : 'Loan officer'))}</h2><p>${esc([person.title, person.brokerage || person.company].filter(Boolean).join(' · '))}</p></div>
+      </div>
+      ${person.bio ? `<p class="person-bio">${esc(person.bio)}</p>` : ''}
+      <div class="contact-actions">
+        ${phone ? `<a href="tel:${esc(phone)}" data-homekey-contact="${esc(kind)}">Call</a><a href="sms:${esc(phone)}" data-homekey-contact="${esc(kind)}">Text</a>` : ''}
+        ${person.email ? `<a href="mailto:${esc(person.email)}" data-homekey-contact="${esc(kind)}">Email</a>` : ''}
+        <button type="button" data-save-contact="${esc(contact)}" data-homekey-contact="${esc(kind)}">Save contact</button>
+      </div>
+      ${links.some(Boolean) ? `<div class="social-links">${links.join('')}</div>` : ''}
+    </article>`;
+  };
+  const peopleHtml = keepsake
+    ? `<section class="people-grid">${listingAgents.map((item, index) => contactCard(item, 'agent', index)).join('')}${loanOfficer ? contactCard(loanOfficer, 'loan_officer') : ''}</section>`
+    : `<section class="detail-card"><h2>${esc(agent || 'Hosting agent')}</h2><p>${esc([brokerage, agentPhone, agentEmail].filter(Boolean).join(' · ') || 'Ask the hosting agent for current property information and next steps.')}</p></section>`;
   const factCards = [
     ['Price', price],
     ['Bedrooms', beds],
@@ -628,6 +830,46 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
     .detail-card p { margin: 0; color: #475569; font-weight: 650; line-height: 1.65; }
     .feature-list { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
     .feature { border-radius: 999px; background: #eaf2ff; color: #294284; padding: 9px 12px; font-size: 13px; font-weight: 850; }
+    .unavailable-banner { border-radius: 20px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; padding: 16px; font-weight: 850; line-height: 1.5; }
+    .homekey-primary-actions, .future-actions, .financing-actions { display: grid; gap: 10px; }
+    .homekey-action { width: 100%; min-height: 52px; border: 1px solid #bfdbfe; border-radius: 18px; background: #eff6ff; color: #1f2a5a; padding: 12px 14px; text-align: left; font-weight: 950; }
+    a.homekey-action { display: flex; align-items: center; text-decoration: none; }
+    .homekey-action.primary-action { border: 0; background: linear-gradient(90deg,#1f2a5a,#2563eb); color: #fff; text-align: center; }
+    .relationship-cta { border-radius: 24px; background: #fff1f2; border: 1px solid #fecdd3; padding: 20px; text-align: center; }
+    .relationship-cta h2, .future-card h2, .financing-card h2 { margin: 0 0 8px; color: #1f2a5a; }
+    .relationship-cta p, .future-card p, .financing-card p { margin: 0 0 16px; color: #64748b; font-weight: 700; line-height: 1.5; }
+    .future-card, .financing-card { border-radius: 24px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; }
+    .action-selection { border-radius: 16px; background: rgba(255,255,255,.14); padding: 12px 14px; color: #fff; font-weight: 900; }
+    .hidden { display: none !important; }
+    .people-grid { display: grid; gap: 14px; }
+    .person-card { border-radius: 24px; background: #fff; border: 1px solid #dbeafe; padding: 18px; box-shadow: 0 14px 34px rgba(31,42,90,.08); }
+    .person-card.loan_officer { border-color: #bae6fd; background: linear-gradient(145deg,#f0f9ff,#fff); }
+    .person-head { display: grid; grid-template-columns: 68px minmax(0,1fr); align-items: center; gap: 14px; }
+    .person-photo { width: 68px; height: 68px; border-radius: 20px; object-fit: cover; background: #dbeafe; }
+    .person-fallback { display: grid; place-items: center; color: #294284; font-size: 28px; font-weight: 950; }
+    .eyebrow { color: #2563eb; font-size: 10px; font-weight: 950; letter-spacing: .13em; text-transform: uppercase; }
+    .person-card h2 { margin: 4px 0; color: #1f2a5a; font-size: 22px; }
+    .person-card p { margin: 0; color: #64748b; font-weight: 700; line-height: 1.45; }
+    .person-bio { margin-top: 14px !important; }
+    .contact-actions, .social-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .contact-actions a, .contact-actions button, .social-link { border: 1px solid #dbeafe; border-radius: 999px; background: #eff6ff; color: #294284; padding: 9px 12px; text-decoration: none; font-size: 13px; font-weight: 900; }
+    .social-link { background: #fff; color: #334155; border-color: #e2e8f0; }
+    .keepsake-card { overflow: hidden; border-radius: 26px; background: linear-gradient(135deg,#17224f,#2563eb); color: #fff; padding: 22px; }
+    .keepsake-card h2 { margin: 0 0 8px; font-size: 28px; }
+    .keepsake-card > p { margin: 0; color: #dbeafe; font-weight: 700; line-height: 1.55; }
+    .choice-grid { display: grid; gap: 10px; margin: 18px 0; }
+    .choice { display: flex; align-items: flex-start; gap: 11px; border-radius: 17px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); padding: 13px; color: #fff; font-weight: 850; }
+    .choice input { width: 20px; height: 20px; margin-top: 1px; accent-color: #67e8f9; }
+    .interest-form { display: grid; gap: 10px; }
+    .interest-fields { display: grid; gap: 10px; }
+    .interest-form input[type="text"], .interest-form input[type="tel"], .interest-form input[type="email"] { width: 100%; min-height: 50px; border: 1px solid rgba(255,255,255,.25); border-radius: 15px; background: #fff; color: #17224f; padding: 12px 14px; font: inherit; font-weight: 750; }
+    .consent { display: flex; align-items: flex-start; gap: 10px; color: #dbeafe; font-size: 12px; font-weight: 700; line-height: 1.45; }
+    .consent input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: #67e8f9; }
+    .interest-form button[type="submit"] { min-height: 52px; border: 0; border-radius: 999px; background: #67e8f9; color: #17224f; padding: 13px 18px; font-weight: 950; }
+    .form-status { min-height: 18px; color: #fff; font-size: 13px; font-weight: 850; }
+    .keepsake-tools { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+    .keepsake-tools button { border: 1px solid rgba(255,255,255,.3); border-radius: 999px; background: transparent; color: #fff; padding: 10px 13px; font-weight: 900; }
+    .hp-field { position: absolute !important; left: -10000px !important; width: 1px !important; height: 1px !important; overflow: hidden !important; }
     .actions { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 22px; }
     a.button { display: flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 999px; padding: 14px 18px; text-decoration: none; font-size: 16px; font-weight: 900; }
     .primary { background: linear-gradient(90deg, #1f2a5a, #2563eb); color: white; box-shadow: 0 18px 38px rgba(37,99,235,.22); }
@@ -640,22 +882,30 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
     .lightbox-close, .lightbox-nav { border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: rgba(255,255,255,.12); color: #fff; padding: 11px 15px; font-weight: 900; }
     .lightbox-image { width: 100%; height: 100%; min-height: 0; object-fit: contain; border-radius: 18px; }
     .lightbox-controls { display: flex; justify-content: center; gap: 12px; }
-    @media (min-width: 720px) { .actions { grid-template-columns: repeat(${[mlsAvailable, returnToEvent, phoneDigits].filter(Boolean).length || 1}, minmax(0,1fr)); } .body { padding: 34px; } .gallery-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .fact-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+    @media (min-width: 720px) { .actions { grid-template-columns: repeat(${[mlsAvailable, returnToEvent, phoneDigits].filter(Boolean).length || 1}, minmax(0,1fr)); } .body { padding: 34px; } .gallery-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .fact-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .people-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .interest-fields { grid-template-columns: repeat(3,minmax(0,1fr)); } .homekey-primary-actions, .future-actions, .financing-actions { grid-template-columns: repeat(3,minmax(0,1fr)); } }
   </style>
 </head>
 <body>
   <main>
     <div class="brand">
       <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="REL8TION">
-      <div class="pill">Open House</div>
+      <div class="pill">${keepsake ? 'Keep This Home' : 'Open House'}</div>
     </div>
     <section class="card">
       ${image ? `<button type="button" class="hero-button" data-gallery-index="0" aria-label="Open property photo gallery"><img class="hero" src="${esc(image)}" alt="${esc(address)}"><span class="photo-count">${esc(gallery.length)} photo${gallery.length === 1 ? '' : 's'} · tap to expand</span></button>` : '<div class="fallback">Property</div>'}
       <div class="body">
         <div>
           <h1>${esc(address)}</h1>
-          <div class="sub">${esc([brokerage, agent ? `Hosted by ${agent}` : ''].filter(Boolean).join(' · '))}</div>
+          <div class="sub">${esc([locationLine, brokerage, agent ? `${keepsake ? 'Listed by' : 'Hosted by'} ${agent}` : ''].filter(Boolean).join(' · '))}</div>
         </div>
+
+        ${homeUnavailable ? '<div class="unavailable-banner">This home is no longer available, but your HomeKey still works. Use it to reach the original listing agent, explore similar homes, ask about off-market opportunities, or get financing guidance.</div>' : ''}
+
+        ${keepsake ? `<div class="homekey-primary-actions">
+          <button type="button" class="homekey-action" data-homekey-action="home_saved">♡ Save This Home</button>
+          <button type="button" class="homekey-action" data-homekey-action="similar_homes">🏘 Show Me Similar Homes</button>
+          <button type="button" class="homekey-action" data-homekey-action="financing_help">💰 What Would My Payment Be?</button>
+        </div>` : ''}
 
         ${gallery.length > 1 ? `<div class="gallery-grid">${gallery.slice(1).map((url, index) => `<button type="button" class="thumb" data-gallery-index="${index + 1}" aria-label="Open property photo ${index + 2} of ${gallery.length}"><img src="${esc(url)}" alt="${esc(`${address} photo ${index + 2}`)}" loading="lazy"></button>`).join('')}</div>` : ''}
 
@@ -668,10 +918,53 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
 
         ${features.length ? `<section class="detail-card"><h2>Property features</h2><div class="feature-list">${features.map((feature) => `<span class="feature">${esc(feature)}</span>`).join('')}</div></section>` : ''}
 
-        <section class="detail-card">
-          <h2>${esc(agent || 'Hosting agent')}</h2>
-          <p>${esc([brokerage, agentPhone, agentEmail].filter(Boolean).join(' · ') || 'Ask the hosting agent for current property information and next steps.')}</p>
+        ${peopleHtml}
+
+        ${keepsake && primaryAgent ? `<section class="relationship-cta">
+          <h2>❤️ I Want This Agent To Help Me</h2>
+          <p>Keep ${esc(primaryAgent.name || 'this listing agent')} as your real-estate connection for similar properties and future opportunities.</p>
+          <button type="button" class="homekey-action primary-action" data-homekey-action="agent_relationship">I want this agent to help me</button>
+        </section>` : ''}
+
+        ${keepsake ? `<section class="future-card">
+          <h2>DIDN'T LOVE THIS HOUSE?</h2>
+          <p>Your HomeKey remains useful. Tell us what would help next.</p>
+          <div class="future-actions">
+            <button type="button" class="homekey-action" data-homekey-action="similar_homes">Show Me Similar Homes</button>
+            <button type="button" class="homekey-action" data-homekey-action="off_market">Tell Me About Off-Market Opportunities</button>
+            <button type="button" class="homekey-action" data-homekey-action="price_alert">Alert Me If The Price Changes</button>
+            <button type="button" class="homekey-action" data-homekey-action="different_area">I'm Looking Somewhere Else</button>
+          </div>
         </section>
+        <section class="financing-card">
+          <h2>FINANCING SUPPORT</h2>
+          <p>${loanOfficer?.name ? `${esc(loanOfficer.name)} is the financing resource attributed to this HomeKey.` : 'Ask for optional financing help without completing an application on this page.'}</p>
+          <div class="financing-actions">
+            <button type="button" class="homekey-action" data-homekey-action="financing_help">💰 Estimate My Payment</button>
+            <button type="button" class="homekey-action" data-homekey-action="financing_help">🏦 See What I Could Qualify For</button>
+            ${loanOfficer?.phone ? `<a class="homekey-action" href="sms:${esc(String(loanOfficer.phone).replace(/\D/g, ''))}" data-homekey-contact="loan_officer">💬 Ask My Loan Officer</a>` : ''}
+            <button type="button" class="homekey-action" data-homekey-action="financing_help">Get Pre-Approved</button>
+          </div>
+        </section>` : ''}
+
+        ${keepsake ? `<section class="keepsake-card">
+          <h2>Keep the little house.</h2>
+          <p>Nothing is required just to view this page. If you choose an action above, share only the contact information needed for follow-up.</p>
+          <form class="interest-form hidden" id="keepsakeInterestForm">
+            <div class="action-selection" id="keepsakeActionSelection"></div>
+            <input type="hidden" name="selected_action" value="">
+            <div class="interest-fields">
+              <input type="text" name="name" autocomplete="name" placeholder="Your name" maxlength="120" required>
+              <input type="tel" name="phone" autocomplete="tel" placeholder="Mobile number">
+              <input type="email" name="email" autocomplete="email" placeholder="Email address">
+            </div>
+            <label class="hp-field" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+            <label class="consent"><input type="checkbox" name="consent" required><span>I agree that the attributed listing agent, loan officer when relevant, and REL8TION may contact me about the request I selected. Recurring alerts or marketing require this explicit opt-in. Consent is not required to view the property.</span></label>
+            <button type="submit">Send my request</button>
+            <div class="form-status" id="keepsakeFormStatus" role="status" aria-live="polite"></div>
+          </form>
+          <div class="keepsake-tools"><button type="button" id="shareKeepsake">Share this home</button></div>
+        </section>` : ''}
 
         <div class="actions">
           ${mlsAvailable ? `<a class="button primary" href="${esc(targetUrl)}" rel="noopener noreferrer">Open MLS Listing</a>` : ''}
@@ -679,7 +972,7 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
           ${phoneDigits ? `<a class="button secondary" href="sms:${esc(phoneDigits)}?body=${encodeURIComponent(`Hi${agent ? ` ${agent}` : ''}, I have a question about ${address}.`)}">Ask the host agent</a>` : ''}
           ${!returnToEvent && !mlsAvailable && !phoneDigits ? '<a class="button secondary" href="/">Back To REL8TION</a>' : ''}
         </div>
-        <div class="note">Listing information is provided for the open-house experience and should be verified with the hosting real estate professional. ${property.source ? `Source: ${esc(property.source)}.` : ''}</div>
+        <div class="note">Listing information is provided for the open-house experience and should be verified with the listing real estate professional. Loan officer information is provided as an optional resource; no financing application data is collected here. ${property.source ? `Source: ${esc(property.source)}.` : ''}</div>
       </div>
     </section>
   </main>
@@ -718,9 +1011,134 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
       if (event.key === 'ArrowLeft') showPropertyPhoto(propertyGalleryIndex - 1);
       if (event.key === 'ArrowRight') showPropertyPhoto(propertyGalleryIndex + 1);
     });
+    document.querySelectorAll('[data-save-contact]').forEach((button) => button.addEventListener('click', () => {
+      let contact = {};
+      try { contact = JSON.parse(button.dataset.saveContact || '{}'); } catch (_) {}
+      const escapeVcard = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+      const vcard = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        'FN:' + escapeVcard(contact.name),
+        contact.title ? 'TITLE:' + escapeVcard(contact.title) : '',
+        contact.company ? 'ORG:' + escapeVcard(contact.company) : '',
+        contact.phone ? 'TEL;TYPE=CELL:' + escapeVcard(contact.phone) : '',
+        contact.email ? 'EMAIL:' + escapeVcard(contact.email) : '',
+        contact.url ? 'URL:' + escapeVcard(contact.url) : '',
+        'END:VCARD'
+      ].filter(Boolean).join('\r\n');
+      const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = String(contact.name || 'rel8tion-contact').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.vcf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }));
+    const keepsakeForm = document.getElementById('keepsakeInterestForm');
+    const homekeyCode = ${JSON.stringify(homekey?.public_code || '')};
+    const homekeyActionLabels = {
+      home_saved: 'Save This Home',
+      agent_relationship: 'I Want This Agent To Help Me',
+      similar_homes: 'Show Me Similar Homes',
+      off_market: 'Tell Me About Off-Market Opportunities',
+      price_alert: 'Alert Me If The Price Changes',
+      different_area: "I'm Looking Somewhere Else",
+      financing_help: 'Financing Help'
+    };
+    document.querySelectorAll('[data-homekey-action]').forEach((button) => button.addEventListener('click', () => {
+      if (!keepsakeForm) return;
+      const action = button.dataset.homekeyAction || '';
+      keepsakeForm.elements.selected_action.value = action;
+      let detail = keepsakeForm.elements.request_detail;
+      if (!detail) {
+        detail = document.createElement('input');
+        detail.type = 'hidden';
+        detail.name = 'request_detail';
+        keepsakeForm.appendChild(detail);
+      }
+      detail.value = button.textContent.trim();
+      document.getElementById('keepsakeActionSelection').textContent = 'Selected: ' + (homekeyActionLabels[action] || button.textContent.trim());
+      keepsakeForm.classList.remove('hidden');
+      keepsakeForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      keepsakeForm.elements.name?.focus({ preventScroll: true });
+    }));
+    keepsakeForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const status = document.getElementById('keepsakeFormStatus');
+      const submit = keepsakeForm.querySelector('button[type="submit"]');
+      const form = new FormData(keepsakeForm);
+      const selectedAction = String(form.get('selected_action') || '');
+      if (!selectedAction) {
+        status.textContent = 'Choose an action first.';
+        return;
+      }
+      submit.disabled = true;
+      status.textContent = 'Saving your preferences...';
+      try {
+        const response = await fetch('/api/open-house-keepsake-interest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            homekey_code: homekeyCode,
+            selected_action: selectedAction,
+            request_detail: form.get('request_detail'),
+            name: form.get('name'),
+            phone: form.get('phone'),
+            email: form.get('email'),
+            website: form.get('website'),
+            consent: form.get('consent') === 'on'
+          })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.ok === false) throw new Error(result.error || 'Unable to save your preferences.');
+        status.textContent = result.updated_existing ? 'Updated — your choices are saved without creating a duplicate.' : 'Saved — you are connected. Keep this little house handy.';
+      } catch (error) {
+        status.textContent = error.message || 'Unable to save your preferences.';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    async function recordHomekeyEvent(eventType, metadata = {}) {
+      if (!homekeyCode) return;
+      await fetch('/api/homekey-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({ homekey_code: homekeyCode, event_type: eventType, metadata })
+      }).catch(() => null);
+    }
+    document.querySelectorAll('[data-homekey-contact]').forEach((link) => link.addEventListener('click', () => {
+      const kind = link.dataset.homekeyContact === 'loan_officer'
+        ? 'loan_officer_contact_clicked'
+        : 'agent_contact_clicked';
+      recordHomekeyEvent(kind, { label: String(link.textContent || '').trim().slice(0, 80) });
+    }));
+    document.getElementById('shareKeepsake')?.addEventListener('click', async () => {
+      const shareData = { title: document.title, text: 'Keep this home and its local contacts handy.', url: window.location.href };
+      if (navigator.share) {
+        await navigator.share(shareData).catch(() => null);
+      } else {
+        await navigator.clipboard?.writeText(window.location.href).catch(() => null);
+        const status = document.getElementById('keepsakeFormStatus');
+        if (status) status.textContent = 'Property link copied.';
+      }
+    });
   </script>
 </body>
 </html>`;
+}
+
+async function trackHomeKeyView(homekey) {
+  if (!homekey?.id) return;
+  await supabaseRest('property_keepsake_events', {
+    method: 'POST',
+    body: JSON.stringify({
+      property_keepsake_id: homekey.id,
+      event_type: 'homekey_viewed',
+      metadata: {}
+    })
+  }).catch(() => null);
 }
 
 module.exports = async function handler(req, res) {
@@ -730,13 +1148,25 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
     }
 
-    const id = cleanId(readQuery(req, 'id'));
+    const homekeyCode = cleanId(readQuery(req, 'homekey'));
+    const homekey = homekeyCode ? await loadHomeKey(homekeyCode).catch(() => null) : null;
+    if (homekeyCode && !homekey) {
+      return sendJson(res, 404, { ok: false, error: 'HomeKey not found.' });
+    }
+    const id = cleanId(homekey?.open_house_id || readQuery(req, 'id'));
     if (!id) {
       return sendJson(res, 400, { ok: false, error: 'Missing listing id.' });
     }
 
     const buyerEventId = cleanId(readQuery(req, 'event'));
     const listing = await resolveListing(id);
+    if (homekey?.open_house_event_id) {
+      const attributedEvent = await loadEvent(homekey.open_house_event_id).catch(() => null);
+      if (attributedEvent) {
+        listing.event = attributedEvent;
+        listing.targetUrl = listing.targetUrl || setupContextUrl(attributedEvent);
+      }
+    }
     if (buyerEventId && !listing.event) {
       const buyerEvent = await loadEvent(buyerEventId).catch(() => null);
       if (buyerEvent && (!listing.house?.id || String(buyerEvent.open_house_source_id || '') === String(listing.house.id))) {
@@ -772,6 +1202,16 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    if (!listing.house && homekey) {
+      const stored = await loadStoredPropertyProfile(id).catch(() => null);
+      listing.house = {
+        ...(stored || {}),
+        id,
+        address: stored?.address || 'Your HomeKey property',
+        _homekey_source_missing: true
+      };
+    }
+
     if (!listing.house && !listing.event) {
       return sendJson(res, 404, { ok: false, error: 'No open house was found for this link.' });
     }
@@ -788,8 +1228,12 @@ module.exports = async function handler(req, res) {
     const propertyTargetUrl = targetUrl || profile?.listing_url || '';
     const externalCheck = await checkExternalUrl(propertyTargetUrl);
     const images = propertyImages(profile || listing.house);
+    const people = homekey
+      ? await loadKeepsakePeople({ house: listing.house, event: listing.event, profile, homekey })
+      : { agents: [], loanOfficer: null };
+    if (homekey && req.method !== 'HEAD') await trackHomeKeyView(homekey);
 
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+    res.setHeader('Cache-Control', homekey ? 'no-store, no-cache, max-age=0, must-revalidate' : 'public, max-age=300, s-maxage=300');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send(renderListingPage({
       id,
@@ -799,7 +1243,11 @@ module.exports = async function handler(req, res) {
       externalCheck,
       images,
       buyerEventId,
-      origin: requestOrigin(req)
+      origin: requestOrigin(req),
+      keepsake: Boolean(homekey),
+      homekey,
+      agents: people.agents,
+      loanOfficer: people.loanOfficer
     }));
   } catch (error) {
     return sendJson(res, error.status || 500, {
@@ -816,6 +1264,7 @@ module.exports.__test = {
   loadOneKeyRecord,
   loadPropertyImages,
   loadPropertyProfile,
+  loadKeepsakePeople,
   oneKeyImageIdentifiers,
   propertyProfileIsFresh,
   propertyImages,

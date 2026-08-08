@@ -528,13 +528,15 @@ function buildLeads({ leads, checkins, events }) {
   const eventById = new Map((events || []).map((event) => [event.id, event]));
   const profileLeads = (leads || []).map((lead) => ({
     ...lead,
-    lead_source: 'profile',
+    lead_source: lead.source === 'homekey' ? 'homekey' : 'profile',
     lead_name: lead.name || 'Buyer lead',
     lead_phone: lead.phone || '',
     lead_email: lead.email || '',
     property_label: lead.property_address || '',
     agent_label: lead.agent_slug || lead.agent || '',
-    financing_label: lead.preapproved === true ? 'Pre-approved' : lead.preapproved === false ? 'Needs financing' : 'Unknown',
+    financing_label: lead.source === 'homekey' && Array.isArray(lead.metadata?.actions) && lead.metadata.actions.includes('financing_help')
+      ? 'Financing requested'
+      : lead.preapproved === true ? 'Pre-approved' : lead.preapproved === false ? 'Needs financing' : 'Unknown',
     created_at: lead.created_at
   }));
 
@@ -702,7 +704,7 @@ module.exports = async function handler(req, res) {
       safeRest('event_checkins?select=id,open_house_event_id,visitor_name,visitor_phone,visitor_email,pre_approved,created_at,metadata&order=created_at.desc&limit=800', [], warnings, 'event_checkins'),
       safeRest('event_loan_officer_sessions?select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'event_loan_officer_sessions'),
       safeRest('verified_profiles?select=*&order=updated_at.desc.nullslast,created_at.desc&limit=250', [], warnings, 'verified_profiles'),
-      safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,created_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
+      safeRest('leads?select=id,name,phone,email,agent_slug,agent,preapproved,property_address,source,source_key,metadata,created_at,updated_at&order=created_at.desc&limit=500', [], warnings, 'leads'),
       safeRestAll('field_demo_visits?select=*&order=scheduled_start.asc.nullslast,created_at.desc', [], warnings, 'field_demo_visits'),
       safeRestAll('field_demo_visit_participants?select=*&order=is_primary.desc,created_at.asc', [], warnings, 'field_demo_visit_participants'),
       safeRest('loan_officer_support_requests?select=id,full_name,company_name,email,phone,phone_normalized,experience,coverage_areas,availability,notes,status,source,created_at,updated_at&order=created_at.desc&limit=250', [], warnings, 'loan_officer_support_requests'),
