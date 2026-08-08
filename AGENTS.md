@@ -87,6 +87,8 @@ Preserve these priorities:
 - `[IMPLEMENTED]` A printed agent QR may be deliberately converted to an Event Pass only by retiring its agent inventory row and creating a matching `smart_sign_inventory` Event Pass row with explicit conversion metadata tied to the original row id. Only that narrow case may redirect `/c/:code` to `/pass?code=...`; `smart_sign_inventory.public_code` remains the Event Pass source of truth.
 - `[IMPLEMENTED]` Linked loan-officer/NMB/verified-professional QR rows redirect to `/nmb-verified?slug=<lo_slug>`. Do not route printed LO QR codes directly to `/loan-officer-dashboard` or `/lo-field-dashboard`.
 - `[IMPLEMENTED]` Smart Sign and Event Pass printable QR rows use `smart_sign_inventory.public_code`.
+- `[IMPLEMENTED]` HomeKey/property-keepsake QR rows are a separate product and use `property_keepsakes.public_code` with public route `/h/:public_code`. Do not store them in, convert them into, or route them through Rel8tionChip, Smart Sign, Event Pass, NFC activation, or event check-in inventory.
+- `[IMPLEMENTED]` Repeating HomeKey creation for the same open house, visit, listing-agent attribution, and loan-officer attribution must reuse the existing `property_keepsakes` row and public code. Verify exactly one row exists; do not mint duplicates. Preserve the nullable loan-officer attribution captured at creation so a later assignment change does not silently rewrite an already distributed keepsake.
 - `[IMPLEMENTED]` REL8TION COMMAND Event Pass QR batch export may reserve only fresh, unprinted, unclaimed, unassigned, non-sponsored `single_event` rows. It must not print active, historical, sponsored, or reusable passes, and it must record print-batch metadata without changing `public_code`.
 - `[RISK]` `smart_signs.public_code` may still exist as a legacy fallback for old smart sign links. It must not be used for new QR printing or Event Pass source-of-truth behavior.
 
@@ -106,6 +108,7 @@ Preserve these priorities:
 - `[PARTIAL]` `send-lead-sms` source is checked in under `supabase/functions/send-lead-sms` and uses the shared SMS provider layer. Deployed source/version, provider env, and live delivery remain `[NEEDS VERIFICATION]` unless checked in Supabase.
 - `[NEEDS VERIFICATION]` Known RPCs used by app code but not proven from checked-in SQL include `find_nearest_open_house`, `queue_recent_outreach_candidates`, `verified_profiles_lookup`, and `verified_profiles_activate_or_create`.
 - `[INTENDED]` Sensitive writes should continue moving toward Edge Functions or serverless APIs with explicit validation. Current browser code still performs some direct Supabase writes.
+- `[RISK]` If local and linked Supabase migration histories have unrelated drift, do not run a bulk `supabase db push` and do not repair unrelated migration entries. Inspect live schema and types first, apply only the reviewed target migration SQL, verify its columns, indexes, RLS policies, and grants, then mark only that exact migration version applied. New public-link tables such as `property_keepsakes` must default to RLS-on with no anon/authenticated table access and the narrowest required service-role grants.
 
 ## Vercel Boundaries
 
@@ -167,6 +170,7 @@ Preserve these priorities:
 - Keep static pages browser-compatible. Avoid adding build-only assumptions unless a build pipeline already exists for that area.
 - Use existing helper modules under `apps/rel8tion-app/src/api` and `apps/rel8tion-app/src/core` when editing app modules.
 - Root API routes under `api/` are Node/Vercel serverless code.
+- Server template literals that emit browser `<script>` blocks cross two JavaScript parsers. Escape regex backslashes, string backslashes, and `\r\n` for the emitted source as well as for the server module; a server-side `node --check` alone cannot catch malformed generated JavaScript.
 - Supabase Edge Functions under `supabase/functions/` are Deno TypeScript.
 - Files under `docs/supabase-functions/` are reference/source-tracking copies unless deployment is verified separately.
 - Default to ASCII in new files unless the target file already uses non-ASCII heavily.
@@ -212,6 +216,13 @@ Mockup renderer tests:
 Set-Location apps/mockup-renderer
 npm test
 ```
+
+Generated-page and HomeKey release checks:
+
+- For server-rendered HTML containing inline JavaScript, extract every emitted `<script>` body in a focused test and parse it with `new Function(script)`. Keep the server-module syntax check too; the two checks cover different parse layers.
+- Repeat the exact HomeKey create action and query `property_keepsakes` to prove the same public code is returned and exactly one row exists.
+- After deployment, open a real `/h/:public_code` page in a browser, select an action, confirm the consent form appears, and confirm there are no fresh console errors. Do not submit a fake lead merely to prove rendering.
+- A protected Vercel preview may return the protection page to ordinary HTTP requests; use `vercel curl --deployment <deployment-url>` for preview route checks, then verify the public production domain and exact deployed Git SHA before reporting the flow live.
 
 OneKey freshness dry-run:
 
