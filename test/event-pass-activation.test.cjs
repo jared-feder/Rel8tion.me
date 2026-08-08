@@ -14,8 +14,38 @@ function extractFunction(name, nextName) {
   return html.slice(start, end);
 }
 
-const matcherSource = extractFunction('matchingEventPassBackingSign', 'async function createEventPassBackingSign');
+const rebindSource = extractFunction('canRebindFreshenedEventPass', 'function matchingEventPassBackingSign');
+const canRebindFreshenedEventPass = new Function(`${rebindSource}; return canRebindFreshenedEventPass;`)();
+const matcherSource = extractFunction('matchingEventPassBackingSign', 'async function rebindFreshenedEventPass');
 const matchingEventPassBackingSign = new Function(`${matcherSource}; return matchingEventPassBackingSign;`)();
+
+test('only an explicitly Freshened inactive and unowned pass may replace a stale UID', () => {
+  const inventory = {
+    public_code: 'ep-test',
+    smart_sign_id: null,
+    claimed_at: null,
+    metadata: {
+      freshened_at: '2026-08-08T19:12:57.826Z',
+      freshened_source: 'admin_event_pass_scanner'
+    }
+  };
+  const stale = {
+    id: 'sign-1',
+    public_code: 'ep-test',
+    status: 'inactive',
+    owner_agent_slug: null,
+    active_event_id: null,
+    activation_method: 'event_pass_keychain'
+  };
+
+  assert.equal(canRebindFreshenedEventPass(inventory, null, stale), true);
+  assert.equal(canRebindFreshenedEventPass({ ...inventory, claimed_at: '2026-08-08T19:15:00Z' }, null, stale), false);
+  assert.equal(canRebindFreshenedEventPass({ ...inventory, metadata: {} }, null, stale), false);
+  assert.equal(canRebindFreshenedEventPass(inventory, { id: 'another-sign' }, stale), false);
+  assert.equal(canRebindFreshenedEventPass(inventory, null, { ...stale, status: 'active' }), false);
+  assert.equal(canRebindFreshenedEventPass(inventory, null, { ...stale, owner_agent_slug: 'another-agent' }), false);
+  assert.equal(canRebindFreshenedEventPass(inventory, null, { ...stale, active_event_id: 'event-1' }), false);
+});
 
 test('Event Pass backing-sign recovery reuses only the same QR and NFC pair', () => {
   const inventory = { public_code: 'ep-test' };
@@ -56,6 +86,8 @@ test('activation page parses and handles duplicate insert races without exposing
   const createEnd = html.indexOf('\n    async function linkInventoryToSign', createStart);
   const createSource = html.slice(createStart, createEnd);
   assert.match(createSource, /getSignByPublicCode\(inventory\.public_code\)/);
+  assert.match(createSource, /canRebindFreshenedEventPass\(inventory,byUid,byCode\)/);
+  assert.match(createSource, /rebindFreshenedEventPass\(inventory,byCode\)/);
   assert.match(createSource, /includes\('23505'\)/);
   assert.match(createSource, /linkInventoryToSign\(inventory,raced\)/);
 });
