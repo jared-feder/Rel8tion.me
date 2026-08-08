@@ -5,6 +5,8 @@ const test = require('node:test');
 
 const activationPath = path.join(__dirname, '../apps/rel8tion-app/sign-demo-activate.html');
 const html = fs.readFileSync(activationPath, 'utf8');
+const routerPath = path.join(__dirname, '../apps/rel8tion-app/k.html');
+const routerHtml = fs.readFileSync(routerPath, 'utf8');
 
 function extractFunction(name, nextName) {
   const start = html.indexOf(`function ${name}(`);
@@ -90,4 +92,37 @@ test('activation page parses and handles duplicate insert races without exposing
   assert.match(createSource, /rebindFreshenedEventPass\(inventory,byCode\)/);
   assert.match(createSource, /includes\('23505'\)/);
   assert.match(createSource, /linkInventoryToSign\(inventory,raced\)/);
+});
+
+test('completed Event Pass history never creates a one-time-use activation lock', () => {
+  assert.doesNotMatch(html, /one-event Event Pass|Event Pass has already been used/);
+  assert.doesNotMatch(html, /eventPassRenewalAllowed|getRecentEventForSign/);
+  assert.match(html, /already live for another open house\. End its current event before activating it again\./);
+});
+
+test('NFC router blocks only a currently active Event Pass, not an inactive pass with history', async () => {
+  const start = routerHtml.indexOf('async function eventPassInventoryCurrentlyActive(');
+  const end = routerHtml.indexOf('\n    async function findRemoteEventPassActivationSession', start);
+  assert.notEqual(start, -1, 'eventPassInventoryCurrentlyActive must exist');
+  assert.notEqual(end, -1, 'eventPassInventoryCurrentlyActive must end before the next helper');
+  const source = routerHtml.slice(start, end);
+  assert.doesNotMatch(source, /open_house_events|created_at|alreadyUsed/i);
+
+  const makeCheck = (sign) => {
+    const requests = [];
+    const request = async (url) => {
+      requests.push(url);
+      return sign ? [sign] : [];
+    };
+    const check = new Function('request', `${source}; return eventPassInventoryCurrentlyActive;`)(request);
+    return { check, requests };
+  };
+
+  const inactive = makeCheck({ id: 'sign-1', status: 'inactive', active_event_id: null });
+  assert.equal(await inactive.check({ smart_sign_id: 'sign-1' }), false);
+  assert.equal(inactive.requests.length, 1);
+
+  const active = makeCheck({ id: 'sign-1', status: 'active', active_event_id: 'event-2' });
+  assert.equal(await active.check({ smart_sign_id: 'sign-1' }), true);
+  assert.equal(active.requests.length, 1);
 });

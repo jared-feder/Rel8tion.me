@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-08: Event Pass reuse correction
+
+- `[IMPLEMENTED]` Normal Event Passes no longer have a one-time-use activation gate. An inactive pass can create or join a new open-house event even when preserved historical events exist; only a currently active event on another open house blocks reassignment.
+- `[IMPLEMENTED]` `/k` now evaluates whether an Event Pass is currently active instead of treating any historical event as proof that the pass was already used. Legacy `pass_model=single_event`, `reuse_allowed=false`, and `reuse_status=not_reusable` values remain storage-era metadata and do not control normal Event Pass activation.
+- `[IMPLEMENTED]` Focused regression coverage protects both activation paths and the NFC router from restoring the retired one-time-use rule. Production deployment and a physical scan/tap retry remain `[NEEDS VERIFICATION]`.
+
 ## 2026-08-08: Event Pass duplicate-key recovery
 
 - `[IMPLEMENTED]` Event Pass activation now recovers an existing backing `smart_signs` row when an inventory reset or interrupted activation left `smart_sign_inventory.smart_sign_id` blank. Recovery requires the printed Event Pass public code and its NFC UID to match the same backing row, then relinks the inventory instead of attempting a duplicate insert that returns PostgreSQL `23505`.

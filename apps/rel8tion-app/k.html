@@ -464,7 +464,7 @@
         return false;
       }
       const inventory = await loadInventoryByPublicCode(pending.publicCode);
-      if (await eventPassInventoryAlreadyUsed(inventory)) {
+      if (await eventPassInventoryCurrentlyActive(inventory)) {
         window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
         return false;
       }
@@ -500,13 +500,11 @@
       return Array.isArray(rows) ? rows[0] : null;
     }
 
-    async function eventPassInventoryAlreadyUsed(inventory = {}) {
+    async function eventPassInventoryCurrentlyActive(inventory = {}) {
       if (!inventory?.smart_sign_id) return false;
       const signRows = await request(`smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=id,status,active_event_id&limit=1`).catch(() => []);
       const sign = Array.isArray(signRows) ? signRows[0] : null;
-      if (sign?.active_event_id || sign?.status === 'active') return true;
-      const eventRows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=id&order=created_at.desc&limit=1`).catch(() => []);
-      return Array.isArray(eventRows) && eventRows.length > 0;
+      return Boolean(sign?.active_event_id || sign?.status === 'active');
     }
 
     async function findRemoteEventPassActivationSession(agentSlug = '', chipUid = '') {
@@ -522,7 +520,7 @@
           if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > EVENT_PASS_UNBOUND_WINDOW_MS) continue;
         }
         const inventory = await loadInventoryByPublicCode(row.public_code);
-        if (await eventPassInventoryAlreadyUsed(inventory)) continue;
+        if (await eventPassInventoryCurrentlyActive(inventory)) continue;
         if (inventory?.inventory_type === 'event_pass') {
           return { ...row, inventory };
         }
