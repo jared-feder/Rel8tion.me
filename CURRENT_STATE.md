@@ -8,7 +8,8 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` Event Pass activation now recovers an existing backing `smart_signs` row when an inventory reset or interrupted activation left `smart_sign_inventory.smart_sign_id` blank. Recovery requires the printed Event Pass public code and its NFC UID to match the same backing row, then relinks the inventory instead of attempting a duplicate insert that returns PostgreSQL `23505`.
 - `[IMPLEMENTED]` Crossed QR/NFC pairs now stop with a plain-language mismatch message. A concurrent duplicate insert is re-read and reused only after the same code/UID validation. Focused regression coverage parses the activation page and verifies matching, mismatch, and duplicate-race contracts.
-- `[NEEDS VERIFICATION]` Commit, deployment, and a physical retry of the affected Event Pass remain required before this repair is called live.
+- `[VERIFIED]` Repair commit `ec3981df` is live on `app.rel8tion.me` through production deployment `dpl_4QPFVAfL4Y7ZmLVgfnmY1FnzREJE`. The canonical activation wrapper redirects to the app file, and the live app file contains the matching QR/NFC recovery and `23505` race handling. Focused tests, production route verification, and the post-deploy Vercel error scan passed.
+- `[NEEDS VERIFICATION]` Rescan and tap the affected physical Event Pass to verify its exact QR/NFC pair relinks successfully; no production pass row was reset, deleted, or changed during diagnosis.
 
 ## 2026-08-08: HomeKey / Property Keepsake QR
 
