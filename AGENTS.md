@@ -78,6 +78,7 @@ Preserve these priorities:
 - `[IMPLEMENTED]` Rear-sign dashboard verification takes precedence over loan-officer sign-in browser state.
 - `[IMPLEMENTED]` Sign activation chip scans take precedence over backup-keychain linking so a fresh sign chip cannot be claimed as an agent backup keychain.
 - `[IMPLEMENTED]` Pending Event Pass and Sponsored Event Pass activation must keep their Event Pass behavior and must not fall into normal agent profile/keychain claim behavior.
+- `[IMPLEMENTED]` A detached Event Pass inventory row may still have its original backing `smart_signs` row. Recovery must reuse and relink that row only when both `public_code` and the physical Event Pass NFC UID match; never retry a blind insert after `23505`, never cross-link a QR and NFC from different passes, and never reset or delete the pass merely to clear the error.
 - `[IMPLEMENTED]` Normal claimed agent NFC opens `/agent-home?agent=<slug>&uid=<uid>` only after higher-priority setup, rear-sign, Event Pass, LO, and backup-keychain flows are ruled out.
 
 ## QR And Inventory Guardrails

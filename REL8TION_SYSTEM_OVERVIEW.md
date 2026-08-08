@@ -92,6 +92,7 @@ The agent owner dashboard validates the claimed NFC UID/agent pairing before loa
 - `[IMPLEMENTED]` `/sign-demo-activate` handles smart sign setup and listing binding.
 - `[IMPLEMENTED]` `/s` and `/sign` resolve smart sign public codes and route to setup or live event state.
 - `[IMPLEMENTED]` Front smart sign NFC is buyer-facing and routes to check-in.
+- `[IMPLEMENTED]` Event Pass activation treats the printed QR public code and NFC UID as one physical identity. If its inventory link is missing but the backing sign row remains, the flow may relink only that exact matching pair; mismatched passes stop instead of creating or cross-linking records.
 - `[IMPLEMENTED]` Rear smart sign NFC is operator-facing and requires an agent keychain challenge before dashboard access.
 - `[IMPLEMENTED]` A smart sign attaches to one active live open house event at a time.
 

@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-08: Event Pass duplicate-key recovery
+
+- `[IMPLEMENTED]` Event Pass activation now recovers an existing backing `smart_signs` row when an inventory reset or interrupted activation left `smart_sign_inventory.smart_sign_id` blank. Recovery requires the printed Event Pass public code and its NFC UID to match the same backing row, then relinks the inventory instead of attempting a duplicate insert that returns PostgreSQL `23505`.
+- `[IMPLEMENTED]` Crossed QR/NFC pairs now stop with a plain-language mismatch message. A concurrent duplicate insert is re-read and reused only after the same code/UID validation. Focused regression coverage parses the activation page and verifies matching, mismatch, and duplicate-race contracts.
+- `[NEEDS VERIFICATION]` Commit, deployment, and a physical retry of the affected Event Pass remain required before this repair is called live.
+
 ## 2026-08-08: HomeKey / Property Keepsake QR
 
 - `[IMPLEMENTED]` REL8TION COMMAND open-house, accepted-visit, and confirmed-report rows expose **Create HomeKey QR**. The admin-authenticated generator returns the property, durable listing-agent and loan-officer attribution, a permanent `/h/:public_code` URL, QR preview, Copy Link, Preview Page, and a 1600 px high-error-correction PNG download. A unique attribution key makes repeat generation for the same assignment duplicate-safe.

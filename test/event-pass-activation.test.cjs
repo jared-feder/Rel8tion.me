@@ -1,0 +1,61 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const activationPath = path.join(__dirname, '../apps/rel8tion-app/sign-demo-activate.html');
+const html = fs.readFileSync(activationPath, 'utf8');
+
+function extractFunction(name, nextName) {
+  const start = html.indexOf(`function ${name}(`);
+  const end = html.indexOf(`\n    ${nextName}`, start);
+  assert.notEqual(start, -1, `${name} must exist`);
+  assert.notEqual(end, -1, `${name} must end before ${nextName}`);
+  return html.slice(start, end);
+}
+
+const matcherSource = extractFunction('matchingEventPassBackingSign', 'async function createEventPassBackingSign');
+const matchingEventPassBackingSign = new Function(`${matcherSource}; return matchingEventPassBackingSign;`)();
+
+test('Event Pass backing-sign recovery reuses only the same QR and NFC pair', () => {
+  const inventory = { public_code: 'ep-test' };
+  const matching = {
+    id: 'sign-1',
+    public_code: 'ep-test',
+    uid_primary: 'chip-1',
+    activation_uid_primary: 'chip-1',
+    activation_method: 'event_pass_keychain'
+  };
+
+  assert.equal(matchingEventPassBackingSign(inventory, 'chip-1', matching, matching), matching);
+  assert.equal(matchingEventPassBackingSign(inventory, 'chip-1', null, matching), matching);
+  assert.equal(matchingEventPassBackingSign(inventory, 'chip-1', null, null), null);
+});
+
+test('Event Pass backing-sign recovery rejects crossed QR and NFC records', () => {
+  const inventory = { public_code: 'ep-test' };
+  const otherCode = { id: 'sign-1', public_code: 'ep-other', uid_primary: 'chip-1' };
+  const otherChip = {
+    id: 'sign-2',
+    public_code: 'ep-test',
+    uid_primary: 'chip-2',
+    activation_method: 'event_pass_keychain'
+  };
+
+  assert.throws(() => matchingEventPassBackingSign(inventory, 'chip-1', otherCode, null), /QR and NFC do not match/);
+  assert.throws(() => matchingEventPassBackingSign(inventory, 'chip-1', null, otherChip), /QR and NFC do not match/);
+  assert.throws(() => matchingEventPassBackingSign(inventory, 'chip-1', otherCode, otherChip), /QR and NFC do not match/);
+});
+
+test('activation page parses and handles duplicate insert races without exposing raw 23505', () => {
+  for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+    if (match[1].trim()) new Function(match[1]);
+  }
+
+  const createStart = html.indexOf('async function createEventPassBackingSign(');
+  const createEnd = html.indexOf('\n    async function linkInventoryToSign', createStart);
+  const createSource = html.slice(createStart, createEnd);
+  assert.match(createSource, /getSignByPublicCode\(inventory\.public_code\)/);
+  assert.match(createSource, /includes\('23505'\)/);
+  assert.match(createSource, /linkInventoryToSign\(inventory,raced\)/);
+});
