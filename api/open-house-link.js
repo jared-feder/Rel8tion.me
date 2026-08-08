@@ -1014,7 +1014,7 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
     document.querySelectorAll('[data-save-contact]').forEach((button) => button.addEventListener('click', () => {
       let contact = {};
       try { contact = JSON.parse(button.dataset.saveContact || '{}'); } catch (_) {}
-      const escapeVcard = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+      const escapeVcard = (value) => String(value || '').replace(/\\\\/g, '\\\\\\\\').replace(/\\n/g, '\\\\n').replace(/,/g, '\\\\,').replace(/;/g, '\\\\;');
       const vcard = [
         'BEGIN:VCARD',
         'VERSION:3.0',
@@ -1025,7 +1025,7 @@ function renderListingPage({ id, house, event, profile = null, targetUrl, extern
         contact.email ? 'EMAIL:' + escapeVcard(contact.email) : '',
         contact.url ? 'URL:' + escapeVcard(contact.url) : '',
         'END:VCARD'
-      ].filter(Boolean).join('\r\n');
+      ].filter(Boolean).join('\\r\\n');
       const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);

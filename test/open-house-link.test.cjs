@@ -78,6 +78,9 @@ test('HomeKey rendering is action-gated, keeps durable contacts, and hides missi
   assert.doesNotMatch(html, />Instagram</);
   assert.doesNotMatch(html, />Facebook</);
   assert.doesNotMatch(html, />LinkedIn</);
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  assert.ok(scripts.length > 0);
+  scripts.forEach((script) => assert.doesNotThrow(() => new Function(script)));
 });
 
 test('property profile migration keeps the raw profile server-managed', () => {
