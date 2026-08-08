@@ -125,6 +125,20 @@ export function normalizeImportRows(csvText: string, options?: {
 }): ProductionParseResult;
 
 export function identityKeyForAgentRanking(row: Partial<ProductionImportRow | AgentRanking>): string;
+export function assessListReportsChange(
+  previous: Partial<ProductionImportRow | AgentRanking>,
+  candidate: Partial<ProductionImportRow | AgentRanking>
+): {
+  previous_total: number;
+  candidate_total: number;
+  total_delta: number;
+  deltas: Record<string, number>;
+  listings_days_since_last_delta: number;
+  severe_drop: boolean;
+  large_increase: boolean;
+  classification: 'severe_drop' | 'large_increase' | 'normal';
+};
+export function strongerListReportsSnapshot<T extends Partial<ProductionImportRow | AgentRanking>>(left: T, right: T): T;
 export function dedupeRowsByIdentityKey<T extends Partial<ProductionImportRow | AgentRanking>>(rows: T[]): {
   rows: Array<T & { identity_key: string }>;
   duplicate_rows: T[];

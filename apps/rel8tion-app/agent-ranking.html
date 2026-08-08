@@ -1619,7 +1619,7 @@
       return `
         <div class="info-card">
           <h3>Import ListReports exports</h3>
-          <p>Import listing, recency, and buyside signals from ListReports for prospecting. REL8TION-verified current listings and upcoming open houses are shown separately.</p>
+          <p>Import listing, recency, and buyside signals from ListReports for prospecting. The importer keeps one current row per normalized agent name and phone, preserves stronger same-period snapshots, and holds severe month-over-month drops for review. REL8TION-verified current listings and upcoming open houses are shown separately.</p>
         </div>
         <div class="info-card" id="gaps">
           <h3>Location intelligence</h3>
@@ -1642,6 +1642,10 @@
         ['Duplicates skipped', s.duplicates_skipped],
         ['New rankings inserted', s.new_rankings_inserted],
         ['Existing rankings updated', s.existing_rankings_updated],
+        ['Large increases accepted', s.large_changes_accepted],
+        ['Severe drops held', s.rankings_held_for_review],
+        ['Older snapshots skipped', s.stale_snapshots_skipped],
+        ['Same-period weaker skipped', s.same_snapshot_weaker_skipped],
         ['Failed rows', s.failed_rows]
       ];
       return `
@@ -1893,6 +1897,7 @@
       if (!state.uploadOpen) return '';
       const u = state.upload;
       const preview = u.preview;
+      const continuity = preview?.continuity || {};
       const headers = preview?.headers || [];
       return `
         <div class="modal-backdrop" data-close-upload>
@@ -1942,9 +1947,16 @@
                       <h3>Preview before final import</h3>
                       <div class="small">${num(preview.row_count)} uploaded | ${num(preview.valid_count)} campaign-ready | ${num(preview.skipped_missing_phone_name)} skipped missing phone/name | ${num(preview.duplicates_skipped)} duplicates skipped | ${num(preview.matched_count)} existing profile matches | ${num(preview.unmatched_count)} new imported prospects</div>
                     </div>
-                    ${preview.needs_review_count ? badge(`${preview.needs_review_count} need review`, 'warn') : badge('Ready', 'ok')}
+                    ${continuity.severe_drops_held ? badge(`${continuity.severe_drops_held} severe drops will be held`, 'warn') : preview.needs_review_count ? badge(`${preview.needs_review_count} need identity review`, 'warn') : badge('Ready', 'ok')}
                   </div>
                   <div class="panel-body grid" style="gap:14px;">
+                    <div class="info-grid">
+                      <div><div class="mini-title">Existing rankings</div><strong>${num(continuity.existing_matches)}</strong></div>
+                      <div><div class="mini-title">New rankings</div><strong>${num(continuity.new_rankings)}</strong></div>
+                      <div><div class="mini-title">Large increases accepted</div><strong>${num(continuity.large_increases_accepted)}</strong></div>
+                      <div><div class="mini-title">Severe drops held</div><strong>${num(continuity.severe_drops_held)}</strong></div>
+                    </div>
+                    ${continuity.severe_drops_held ? `<div class="empty" style="text-align:left;border-color:#f0b429;background:#fff8e6;">The raw ListReports rows will be preserved, but these severe decreases will not replace the current ranking until reviewed: ${(continuity.severe_drop_examples || []).map((item) => `${esc(item.agent_name || 'Unknown')} (${num(item.previous_total)} → ${num(item.candidate_total)})`).join(', ')}.</div>` : ''}
                     <details>
                       <summary style="font-weight:900;cursor:pointer;">Detected columns and manual mapping</summary>
                       <div class="mapping-grid" style="margin-top:12px;">
@@ -2310,6 +2322,15 @@
         return;
       }
       state.upload.fileText = await file.text();
+      if (file.lastModified && !state.upload.period_start && !state.upload.period_end) {
+        const modified = new Date(file.lastModified);
+        const year = modified.getFullYear();
+        const month = String(modified.getMonth() + 1).padStart(2, '0');
+        const day = String(modified.getDate()).padStart(2, '0');
+        const snapshotDate = `${year}-${month}-${day}`;
+        state.upload.period_start = snapshotDate;
+        state.upload.period_end = snapshotDate;
+      }
       state.upload.preview = null;
       render();
     }
@@ -2358,7 +2379,7 @@
         const result = await api(API, { method: 'POST', body: JSON.stringify(uploadPayload('confirm_import')) });
         const summary = result.import_summary || {};
         state.lastImportSummary = summary;
-        showToast(`Import complete: ${summary.valid_rows || result.imported_rows || 0} valid, ${summary.duplicates_skipped || 0} duplicate skipped, ${summary.failed_rows || 0} failed.`);
+        showToast(`Import complete: ${summary.valid_rows || result.imported_rows || 0} valid, ${summary.duplicates_skipped || 0} duplicates skipped, ${summary.rankings_held_for_review || 0} severe drops held, ${summary.failed_rows || 0} failed.`);
         state.uploadOpen = false;
         state.upload = freshUploadState();
         await loadData();

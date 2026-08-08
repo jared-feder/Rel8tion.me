@@ -3,6 +3,7 @@ const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('
 const {
   buildPitch,
   buildPitchVariants,
+  assessListReportsChange,
   dedupeRowsByIdentityKey,
   identityKeyForAgentRanking,
   marketAverages,
@@ -14,6 +15,7 @@ const {
   outreachPayloadFromRanking,
   rankingFromImportRow,
   scoreRow,
+  strongerListReportsSnapshot,
   tokenSimilarity
 } = require('../../lib/agent-ranking');
 const { buildOpenHouseRows, isWeekendOpenHouse, matchOpenHousesForRanking } = require('../../lib/agent-ranking-open-house');
@@ -23,7 +25,7 @@ const {
   historySignalForRanking
 } = require('../../lib/agent-ranking-history');
 const { buildRelationshipOnlyRankings } = require('../../lib/agent-ranking-relationships');
-const { inferCountyFromRow, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
+const { inferCountyFromRow, mergeBestLocation, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 const {
   createOrResolveAgentRecord,
   resolveAgentProspectState
@@ -1535,11 +1537,8 @@ function rankingIdentity(row) {
 function displayDedupeKey(row) {
   const name = normalizeName(row.agent_name || [row.first_name, row.last_name].filter(Boolean).join(' '));
   const phone = normalizePhone(row.phone_normalized || row.phone);
-  const agentId = String(row.agent_id || '').trim();
-  const brokerage = normalizeName(row.brokerage || '');
   if (!name || !phone) return '';
-  if (agentId) return `display:agent:${agentId}|${phone}`;
-  return `display:${name}|${brokerage}|${phone}`;
+  return `display:${name}|${phone}`;
 }
 
 function rankingStrength(row) {
@@ -1569,6 +1568,7 @@ function strongerRanking(left, right) {
 function sourceSnapshotTimestamp(row = {}) {
   const raw = row.raw_sources || {};
   const values = [
+    raw.snapshot_at,
     raw.period_end,
     raw.source_period_end,
     raw.period_start,
@@ -1584,11 +1584,11 @@ function sourceSnapshotTimestamp(row = {}) {
 }
 
 function preferredDisplayRanking(left, right) {
-  const leftAgentId = String(left.agent_id || '').trim();
-  const rightAgentId = String(right.agent_id || '').trim();
+  const leftName = normalizeName(left.agent_name || '');
+  const rightName = normalizeName(right.agent_name || '');
   const leftPhone = normalizePhone(left.phone_normalized || left.phone);
   const rightPhone = normalizePhone(right.phone_normalized || right.phone);
-  if (leftAgentId && leftAgentId === rightAgentId && leftPhone && leftPhone === rightPhone) {
+  if (leftName && leftName === rightName && leftPhone && leftPhone === rightPhone) {
     const leftTimestamp = sourceSnapshotTimestamp(left);
     const rightTimestamp = sourceSnapshotTimestamp(right);
     if (leftTimestamp !== rightTimestamp) return leftTimestamp > rightTimestamp ? left : right;
@@ -1598,13 +1598,6 @@ function preferredDisplayRanking(left, right) {
 
 function maxNumber(...values) {
   return Math.max(0, ...values.map((value) => Number(value || 0)).filter((value) => Number.isFinite(value)));
-}
-
-function minPositiveNumber(...values) {
-  const positive = values
-    .map((value) => Number(value || 0))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  return positive.length ? Math.min(...positive) : 0;
 }
 
 function latestDateValue(...values) {
@@ -1690,12 +1683,6 @@ function mergeDisplayDuplicateRanking(kept, duplicate, key) {
     agent_id: kept.agent_id || duplicate.agent_id || null,
     latest_import_row_id: kept.latest_import_row_id || duplicate.latest_import_row_id || null,
     email: kept.email || duplicate.email || null,
-    active_listing_count: maxNumber(kept.active_listing_count, duplicate.active_listing_count),
-    sold_listing_count: maxNumber(kept.sold_listing_count, duplicate.sold_listing_count),
-    listings_days_since_last: minPositiveNumber(kept.listings_days_since_last, duplicate.listings_days_since_last),
-    listings_active_last_12_months: maxNumber(kept.listings_active_last_12_months, duplicate.listings_active_last_12_months),
-    buyside_last_90_days: maxNumber(kept.buyside_last_90_days, duplicate.buyside_last_90_days),
-    buyside_last_12_months: maxNumber(kept.buyside_last_12_months, duplicate.buyside_last_12_months),
     open_house_count: maxNumber(kept.open_house_count, duplicate.open_house_count),
     matched_open_house_count: maxNumber(kept.matched_open_house_count, duplicate.matched_open_house_count),
     matched_weekend_open_house_count: maxNumber(kept.matched_weekend_open_house_count, duplicate.matched_weekend_open_house_count),
@@ -1765,15 +1752,207 @@ function dedupeRankingsForDisplay(rankings) {
   return { rankings: [...map.values()], collapsed, groups };
 }
 
+function preferredCanonicalRanking(left, right) {
+  const leftTimestamp = sourceSnapshotTimestamp(left);
+  const rightTimestamp = sourceSnapshotTimestamp(right);
+  if (leftTimestamp !== rightTimestamp) return leftTimestamp > rightTimestamp ? left : right;
+  return strongerListReportsSnapshot(left, right);
+}
+
+function canonicalRankingMap(rankings = []) {
+  const map = new Map();
+  for (const ranking of rankings || []) {
+    const key = identityKeyForAgentRanking(ranking) || ranking.identity_key;
+    if (!key) continue;
+    const existing = map.get(key);
+    map.set(key, existing ? preferredCanonicalRanking(existing, ranking) : ranking);
+  }
+  return map;
+}
+
+function importChangeExample(existing, candidate, assessment) {
+  return {
+    identity_key: identityKeyForAgentRanking(candidate) || candidate.identity_key || null,
+    agent_name: candidate.agent_name || existing?.agent_name || null,
+    phone_normalized: normalizePhone(candidate.phone_normalized || candidate.phone),
+    previous_brokerage: existing?.brokerage || null,
+    candidate_brokerage: candidate.brokerage || null,
+    previous_total: assessment.previous_total,
+    candidate_total: assessment.candidate_total,
+    total_delta: assessment.total_delta,
+    listings_days_since_last_delta: assessment.listings_days_since_last_delta,
+    previous_metrics: {
+      active_listing_count: Number(existing?.active_listing_count || 0),
+      listings_active_last_12_months: Number(existing?.listings_active_last_12_months || 0),
+      buyside_last_90_days: Number(existing?.buyside_last_90_days || 0),
+      buyside_last_12_months: Number(existing?.buyside_last_12_months || 0)
+    },
+    candidate_metrics: {
+      active_listing_count: Number(candidate.active_listing_count || 0),
+      listings_active_last_12_months: Number(candidate.listings_active_last_12_months || 0),
+      buyside_last_90_days: Number(candidate.buyside_last_90_days || 0),
+      buyside_last_12_months: Number(candidate.buyside_last_12_months || 0)
+    }
+  };
+}
+
+function mergeRankingForImport(existing, candidate, assessment) {
+  if (!existing) return candidate;
+  const bestLocation = mergeBestLocation(existing, candidate);
+  const existingRaw = existing.raw_sources || {};
+  const candidateRaw = candidate.raw_sources || {};
+  const previousUploadIds = uniqueStrings([
+    existingRaw.previous_upload_ids || [],
+    existingRaw.upload_id,
+    existingRaw.source_upload_id
+  ]);
+  const brokerageHistory = uniqueStrings([
+    existingRaw.brokerage_history || [],
+    existing.brokerage,
+    candidate.brokerage
+  ]);
+  const identityHistory = uniqueStrings([
+    existingRaw.identity_history || [],
+    existing.identity_key,
+    candidate.identity_key
+  ]);
+
+  return {
+    ...candidate,
+    agent_id: candidate.agent_id || existing.agent_id || null,
+    email: candidate.email || existing.email || null,
+    market_area: bestLocation.market_area || null,
+    county: bestLocation.county || null,
+    primary_county: bestLocation.primary_county || bestLocation.county || null,
+    city: bestLocation.city || null,
+    state: bestLocation.state || null,
+    zip: bestLocation.zip || null,
+    inferred_county: bestLocation.inferred_county || null,
+    location_confidence: Number(bestLocation.location_confidence || 0),
+    location_source: bestLocation.location_source || 'missing',
+    open_house_count: maxNumber(existing.open_house_count, candidate.open_house_count),
+    matched_open_house_count: maxNumber(existing.matched_open_house_count, candidate.matched_open_house_count),
+    matched_weekend_open_house_count: maxNumber(existing.matched_weekend_open_house_count, candidate.matched_weekend_open_house_count),
+    matched_active_listing_count: maxNumber(existing.matched_active_listing_count, candidate.matched_active_listing_count),
+    matched_open_house_ids: uniqueStrings([
+      existing.matched_open_house_ids || [],
+      candidate.matched_open_house_ids || []
+    ]),
+    has_open_house_this_weekend: Boolean(existing.has_open_house_this_weekend || candidate.has_open_house_this_weekend),
+    has_phone: Boolean(existing.has_phone || candidate.has_phone || candidate.phone_normalized),
+    has_email: Boolean(existing.has_email || candidate.has_email || candidate.email || existing.email),
+    last_activity_at: latestDateValue(existing.last_activity_at, candidate.last_activity_at) || null,
+    last_matched_open_house_at: latestDateValue(existing.last_matched_open_house_at, candidate.last_matched_open_house_at) || null,
+    raw_sources: {
+      ...existingRaw,
+      ...candidateRaw,
+      canonical_identity_key: identityKeyForAgentRanking(candidate) || candidate.identity_key || null,
+      previous_upload_ids: previousUploadIds,
+      brokerage_history: brokerageHistory,
+      identity_history: identityHistory,
+      continuity_classification: assessment.classification,
+      continuity_total_delta: assessment.total_delta,
+      continuity_checked_at: new Date().toISOString()
+    }
+  };
+}
+
+function assessImportContinuity(rankings = [], existingRankings = []) {
+  const existingByIdentity = canonicalRankingMap(existingRankings);
+  const summary = {
+    existing_matches: 0,
+    new_rankings: 0,
+    severe_drops_held: 0,
+    large_increases_accepted: 0,
+    stale_snapshots_skipped: 0,
+    same_snapshot_weaker_skipped: 0,
+    severe_drop_examples: [],
+    large_increase_examples: []
+  };
+
+  for (const ranking of rankings || []) {
+    const key = identityKeyForAgentRanking(ranking) || ranking.identity_key;
+    const existing = existingByIdentity.get(key);
+    if (!existing) {
+      summary.new_rankings += 1;
+      continue;
+    }
+    summary.existing_matches += 1;
+    const assessment = assessListReportsChange(existing, ranking);
+    const existingTimestamp = sourceSnapshotTimestamp(existing);
+    const candidateTimestamp = sourceSnapshotTimestamp(ranking);
+    if (existingTimestamp && candidateTimestamp && candidateTimestamp < existingTimestamp) {
+      summary.stale_snapshots_skipped += 1;
+      continue;
+    }
+    if (existingTimestamp && candidateTimestamp && candidateTimestamp === existingTimestamp
+      && strongerListReportsSnapshot(existing, ranking) === existing) {
+      summary.same_snapshot_weaker_skipped += 1;
+      continue;
+    }
+    if (assessment.severe_drop && (!existingTimestamp || !candidateTimestamp || candidateTimestamp > existingTimestamp)) {
+      summary.severe_drops_held += 1;
+      if (summary.severe_drop_examples.length < 10) {
+        summary.severe_drop_examples.push(importChangeExample(existing, ranking, assessment));
+      }
+      continue;
+    }
+    if (assessment.large_increase) {
+      summary.large_increases_accepted += 1;
+      if (summary.large_increase_examples.length < 10) {
+        summary.large_increase_examples.push(importChangeExample(existing, ranking, assessment));
+      }
+    }
+  }
+
+  return summary;
+}
+
 async function upsertRankings(rankings) {
   const deduped = dedupeRowsByIdentityKey(rankings);
-  const existing = await supabaseRestAll('agent_rankings?select=id,identity_key&order=id.asc')
+  const existing = await supabaseRestAll('agent_rankings?select=*&order=id.asc')
     .catch(() => []);
-  const existingIdentityKeys = new Set((existing || []).map((row) => row.identity_key).filter(Boolean));
-  const payloadRows = deduped.rows.map((ranking) => ({
-    ...ranking,
-    identity_key: identityKeyForAgentRanking(ranking) || ranking.identity_key
-  })).filter((ranking) => ranking.identity_key);
+  const existingByIdentity = canonicalRankingMap(existing);
+  const existingIdentityKeys = new Set(existingByIdentity.keys());
+  const heldForReview = [];
+  const largeChangesAccepted = [];
+  const staleSnapshotsSkipped = [];
+  const sameSnapshotWeakerSkipped = [];
+  const payloadRows = [];
+
+  for (const row of deduped.rows) {
+    const ranking = {
+      ...row,
+      identity_key: identityKeyForAgentRanking(row) || row.identity_key
+    };
+    if (!ranking.identity_key) continue;
+    const existingRanking = existingByIdentity.get(ranking.identity_key);
+    if (!existingRanking) {
+      payloadRows.push(ranking);
+      continue;
+    }
+
+    const assessment = assessListReportsChange(existingRanking, ranking);
+    const existingTimestamp = sourceSnapshotTimestamp(existingRanking);
+    const candidateTimestamp = sourceSnapshotTimestamp(ranking);
+    if (existingTimestamp && candidateTimestamp && candidateTimestamp < existingTimestamp) {
+      staleSnapshotsSkipped.push(importChangeExample(existingRanking, ranking, assessment));
+      continue;
+    }
+    if (existingTimestamp && candidateTimestamp && candidateTimestamp === existingTimestamp
+      && strongerListReportsSnapshot(existingRanking, ranking) === existingRanking) {
+      sameSnapshotWeakerSkipped.push(importChangeExample(existingRanking, ranking, assessment));
+      continue;
+    }
+    if (assessment.severe_drop && (!existingTimestamp || !candidateTimestamp || candidateTimestamp > existingTimestamp)) {
+      heldForReview.push(importChangeExample(existingRanking, ranking, assessment));
+      continue;
+    }
+    if (assessment.large_increase) {
+      largeChangesAccepted.push(importChangeExample(existingRanking, ranking, assessment));
+    }
+    payloadRows.push(mergeRankingForImport(existingRanking, ranking, assessment));
+  }
 
   const result = await postRowsResilient('agent_rankings?on_conflict=identity_key', payloadRows, {
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' }
@@ -1792,7 +1971,11 @@ async function upsertRankings(rankings) {
     failed: result.failed,
     collapsed_duplicates: deduped.duplicates_skipped,
     skipped_missing_identity: deduped.skipped_missing_identity,
-    skipped_missing_identity_count: deduped.skipped_missing_identity_count
+    skipped_missing_identity_count: deduped.skipped_missing_identity_count,
+    held_for_review: heldForReview,
+    large_changes_accepted: largeChangesAccepted,
+    stale_snapshots_skipped: staleSnapshotsSkipped,
+    same_snapshot_weaker_skipped: sameSnapshotWeakerSkipped
   };
 }
 
@@ -2290,6 +2473,16 @@ function sortRankings(rankings, sortBy, direction) {
 async function handlePreview(body) {
   const parsed = await parseAndMatch(body);
   const finalRows = dedupeRowsByIdentityKey(parsed.rows);
+  const existingRankings = await supabaseRestAll('agent_rankings?select=*&order=id.asc').catch(() => []);
+  const previewRankings = finalRows.rows.map((row) => ({
+    ...row,
+    raw_sources: {
+      period_start: body.period_start || null,
+      period_end: body.period_end || null,
+      snapshot_at: body.period_end || body.period_start || null
+    }
+  }));
+  const continuity = assessImportContinuity(previewRankings, existingRankings);
   return {
     headers: parsed.headers,
     mapping: parsed.mapping,
@@ -2302,6 +2495,7 @@ async function handlePreview(body) {
     matched_count: parsed.matched_count,
     unmatched_count: parsed.unmatched_count,
     needs_review_count: parsed.needs_review_count,
+    continuity,
     preview_rows: parsed.rows.slice(0, 20)
   };
 }
@@ -2310,6 +2504,11 @@ async function handleConfirm(body, auth) {
   const parsed = await parseAndMatch(body);
   const finalRows = dedupeRowsByIdentityKey(parsed.rows);
   const metadata = uploadMetadata(body, auth);
+  if (metadata.source_name.toLowerCase() === 'listreports' && !metadata.period_end) {
+    const error = new Error('ListReports imports require a report period end date so older or duplicate snapshots cannot overwrite newer numbers.');
+    error.status = 400;
+    throw error;
+  }
   const defaults = locationDefaults(body);
   const upload = one(await supabaseRest('agent_production_uploads', {
     method: 'POST',
@@ -2350,6 +2549,7 @@ async function handleConfirm(body, auth) {
       source_upload_id: upload.id,
       period_start: upload.period_start || null,
       period_end: upload.period_end || null,
+      snapshot_at: upload.period_end || upload.period_start || upload.created_at || null,
       original_filename: upload.original_filename || null,
       open_house_match_status: 'deferred_to_profile_modal'
     };
@@ -2364,8 +2564,34 @@ async function handleConfirm(body, auth) {
     duplicates_skipped: finalRows.duplicates_skipped + Number(upserted.collapsed_duplicates || 0),
     new_rankings_inserted: upserted.created.length,
     existing_rankings_updated: upserted.updated.length,
+    rankings_held_for_review: upserted.held_for_review.length,
+    large_changes_accepted: upserted.large_changes_accepted.length,
+    stale_snapshots_skipped: upserted.stale_snapshots_skipped.length,
+    same_snapshot_weaker_skipped: upserted.same_snapshot_weaker_skipped.length,
     failed_rows: importInsert.failed.length + (upserted.failed?.length || 0)
   };
+
+  const continuityMetadata = {
+    held_for_review_count: upserted.held_for_review.length,
+    held_for_review_examples: upserted.held_for_review.slice(0, 20),
+    large_changes_accepted_count: upserted.large_changes_accepted.length,
+    large_changes_accepted_examples: upserted.large_changes_accepted.slice(0, 20),
+    stale_snapshots_skipped_count: upserted.stale_snapshots_skipped.length,
+    same_snapshot_weaker_skipped_count: upserted.same_snapshot_weaker_skipped.length
+  };
+  await supabaseRest(`agent_production_uploads?id=eq.${enc(upload.id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      raw_metadata: {
+        ...(upload.raw_metadata || {}),
+        import_summary: importSummary,
+        continuity: continuityMetadata
+      }
+    })
+  }).catch((error) => {
+    console.warn('[agent-ranking] unable to persist continuity metadata:', error.message || error);
+  });
 
   return {
     upload,
@@ -2373,6 +2599,10 @@ async function handleConfirm(body, auth) {
     rankings_created: upserted.created.length,
     rankings_updated: upserted.updated.length,
     rankings_collapsed_duplicates: upserted.collapsed_duplicates || 0,
+    rankings_held_for_review: upserted.held_for_review,
+    large_changes_accepted: upserted.large_changes_accepted,
+    stale_snapshots_skipped: upserted.stale_snapshots_skipped,
+    same_snapshot_weaker_skipped: upserted.same_snapshot_weaker_skipped,
     failed_rows: [...importInsert.failed, ...(upserted.failed || [])],
     import_summary: importSummary,
     summary: summarizeRankings(savedRankings),
@@ -2830,10 +3060,13 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.__test = {
+  assessImportContinuity,
   areaComparisonForRanking,
   bestProfilePhotoCandidate,
+  canonicalRankingMap,
   dedupeRankingsForDisplay,
   historyDetailRow,
   inventoryCountsForRankings,
+  mergeRankingForImport,
   openHouseReminderVariants
 };

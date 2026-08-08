@@ -18,7 +18,7 @@ const suffolk = {
 
 assert.equal(
   identityKeyForAgentRanking(nassau),
-  'import:aaleyah allen|exp realty|9292454568'
+  'import:aaleyah allen|9292454568'
 );
 assert.equal(
   identityKeyForAgentRanking(suffolk),
@@ -40,10 +40,10 @@ const movedBrokerage = {
   ...nassau,
   brokerage: 'Another Brokerage'
 };
-assert.notEqual(
+assert.equal(
   identityKeyForAgentRanking(movedBrokerage),
   identityKeyForAgentRanking(nassau),
-  'brokerage remains part of the canonical ranking identity'
+  'a brokerage change must update the same current ranking'
 );
 
 const deduped = dedupeRowsByIdentityKey([
@@ -59,8 +59,8 @@ assert.equal(deduped.duplicates_skipped, 1);
 assert.equal(deduped.rows[0].agent_rank_score, 80);
 assert.equal(
   deduped.rows[0].identity_key,
-  'import:aaleyah allen|exp realty|9292454568',
-  'stale location-based keys must be replaced before upsert'
+  'import:aaleyah allen|9292454568',
+  'stale brokerage/location-based keys must be replaced before upsert'
 );
 
 console.log('Agent ranking canonical identity checks passed.');
