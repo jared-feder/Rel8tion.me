@@ -9,6 +9,9 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The owner-approved rolling seven-day opt-out health threshold is 5%. The COMMAND control API and `send-agent-outreach` use 5% as the code fallback, and production stores the same value in `rel8tion_runtime_settings.key='outreach_guardrails'` without changing the pause, release window, or volume ceilings.
 - `[IMPLEMENTED]` `send-agent-manual-reply` marks operator-composed SMS/MMS replies to omit the repeated `Reply STOP to opt out.` footer. Initial outreach still retains its Y/N/STOP disclosure, and the shared provider layer still fails closed on suppression lookup, blocks opted-out recipients, and honors inbound STOP-family keywords.
 - `[VERIFIED]` The pre-change provider-health review found 130 logged outreach sends and 11 opt-outs in the prior seven days (8.46%), with zero outreach provider failures in the prior 24 hours. A 5% threshold therefore remains health-blocking at the current rolling rate; this change does not authorize a health override or send a batch.
+- `[IMPLEMENTED]` Automatic initial outreach is limited to future open houses inside a rolling seven-day horizon and remains ordered by `open_start ASC`, then due send time. COMMAND exposes the horizon as an editable 1-21 day guardrail; increasing it is treated as a less-restrictive change that requires typed confirmation.
+- `[VERIFIED]` The pre-change queue review found 65 otherwise eligible rows inside the next seven days and 5 rows 8-21 days away. The sender already prioritized the soonest date/time, but the new upper bound prevents farther events from filling a thin near-term batch.
+- `[IMPLEMENTED]` Generic automatic follow-up/drip sending remains disabled. An inbound Y/N can receive the existing immediate confirmation, and operators can send a direct manual reply; no unattended second-touch sequence is enabled by the weekly priority change.
 
 ## 2026-08-08: Event Pass reuse correction
 

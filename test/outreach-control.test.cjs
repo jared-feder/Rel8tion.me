@@ -24,7 +24,8 @@ const settings = new Map([
       missed_open_house_max_age_days: 7,
       health_window_days: 7,
       health_min_sends: 20,
-      max_opt_out_rate: 0.05
+      max_opt_out_rate: 0.05,
+      send_horizon_days: 7
     },
     updated_at: '2026-08-10T12:00:00.000Z',
     updated_by: 'test'
@@ -63,6 +64,7 @@ global.fetch = async (url, options = {}) => {
       health_window_days: 14,
       health_min_sends: 10,
       max_opt_out_rate: 0.005,
+      send_horizon_days: 7,
       health_outreach_sends: 40,
       health_opt_outs: 0,
       health_opt_out_rate: 0,
@@ -156,7 +158,8 @@ test('admin API saves a tighter runtime configuration and returns live stats', a
         missed_open_house_max_age_days: 5,
         health_window_days: 14,
         health_min_sends: 10,
-        max_opt_out_rate: 0.005
+        max_opt_out_rate: 0.005,
+        send_horizon_days: 5
       },
       expected_updated_at: settings.get('outreach_guardrails').updated_at
     }
@@ -164,6 +167,7 @@ test('admin API saves a tighter runtime configuration and returns live stats', a
   assert.equal(res.statusCode, 200);
   assert.equal(res.payload.ok, true);
   assert.equal(res.payload.guardrails.value.max_per_day, 25);
+  assert.equal(res.payload.guardrails.value.send_horizon_days, 5);
   assert.equal(res.payload.stats.queue_total, 12);
   assert.equal(writes.at(-1).key, 'outreach_guardrails');
 });
@@ -179,10 +183,15 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.match(admin, /id="outreachStartAll"/);
   assert.match(admin, /Current opt-out rate/);
   assert.match(admin, /Open houses enriched/);
+  assert.match(admin, /Upcoming send horizon days/);
+  assert.match(admin, /soonest date\/time first/);
   assert.match(admin, /Locked recipient protections/);
   assert.match(sender, /loadOutreachGuardrails/);
   assert.match(sender, /\.eq\("key", "outreach_guardrails"\)/);
   assert.match(sender, /DEFAULT_MAX_OPT_OUT_RATE = 0\.05/);
+  assert.match(sender, /DEFAULT_SEND_HORIZON_DAYS = 7/);
+  assert.match(sender, /\.lt\("open_start", sendHorizonThrough\)/);
+  assert.match(sender, /\.order\("open_start", \{ ascending: true/);
   assert.match(manualReply, /omit_repeated_stop_disclosure:\s*true/);
   assert.match(manualReply, /Cannot send manual reply to opted-out contact/);
   assert.match(sharedSms, /metadata\.omit_repeated_stop_disclosure !== true/);

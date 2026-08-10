@@ -25,6 +25,7 @@ const DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS = 7;
 const DEFAULT_HEALTH_WINDOW_DAYS = 7;
 const DEFAULT_HEALTH_MIN_SENDS = 20;
 const DEFAULT_MAX_OPT_OUT_RATE = 0.05;
+const DEFAULT_SEND_HORIZON_DAYS = 7;
 const FOLLOWUPS_DISABLED = true;
 
 type OutreachRow = {
@@ -65,6 +66,7 @@ type OutreachGuardrails = {
   healthWindowDays: number;
   healthMinSends: number;
   maxOptOutRate: number;
+  sendHorizonDays: number;
 };
 
 function normalizePhone(phone: string | null): string {
@@ -309,6 +311,7 @@ async function loadOutreachGuardrails(supabase: any, fallback: OutreachGuardrail
       healthWindowDays: positiveIntSetting(value.health_window_days, fallback.healthWindowDays, 30),
       healthMinSends: positiveIntSetting(value.health_min_sends, fallback.healthMinSends, 1000),
       maxOptOutRate: positiveFloatSetting(value.max_opt_out_rate, fallback.maxOptOutRate, 1),
+      sendHorizonDays: positiveIntSetting(value.send_horizon_days, fallback.sendHorizonDays, 21),
     };
   } catch (error) {
     console.warn("[send-agent-outreach] outreach guardrail lookup failed", error);
@@ -597,6 +600,7 @@ serve(async (req) => {
       healthWindowDays: positiveIntEnv("OUTREACH_HEALTH_WINDOW_DAYS", DEFAULT_HEALTH_WINDOW_DAYS, 30),
       healthMinSends: positiveIntEnv("OUTREACH_HEALTH_MIN_SENDS", DEFAULT_HEALTH_MIN_SENDS, 1000),
       maxOptOutRate: positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1),
+      sendHorizonDays: positiveIntEnv("OUTREACH_SEND_HORIZON_DAYS", DEFAULT_SEND_HORIZON_DAYS, 21),
     };
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
@@ -612,6 +616,7 @@ serve(async (req) => {
       healthWindowDays,
       healthMinSends,
       maxOptOutRate,
+      sendHorizonDays,
     } = guardrails;
 
     if (!isWithinAllowedSendWindow() && !dryRun) {
@@ -625,6 +630,7 @@ serve(async (req) => {
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
+            send_horizon_days: sendHorizonDays,
             message: "Current time is outside allowed send window (8:00 AM-9:00 PM ET). No messages sent.",
           },
           null,
@@ -665,6 +671,9 @@ serve(async (req) => {
     const fetchLimit = Math.min(Math.max(inspectionLimit * 200, 250), 1000);
     const now = new Date();
     const nowIso = now.toISOString();
+    const sendHorizonThrough = new Date(
+      now.getTime() + sendHorizonDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const cooldownCutoff = new Date(
       now.getTime() - duplicatePhoneCooldownDays * 24 * 60 * 60 * 1000,
     ).toISOString();
@@ -685,6 +694,8 @@ serve(async (req) => {
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
+            send_horizon_days: sendHorizonDays,
+            send_horizon_through: sendHorizonThrough,
             health_blocked: healthBlocked,
             health_gate_override: healthGateOverride,
             health_window_days: healthWindowDays,
@@ -721,6 +732,8 @@ serve(async (req) => {
             max_per_run: maxPerRun,
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
+            send_horizon_days: sendHorizonDays,
+            send_horizon_through: sendHorizonThrough,
             recent_outreach_sends_1h: recentHourlySendCount,
             recent_outreach_sends_24h: recentDailySendCount,
             hourly_remaining: hourlyRemaining,
@@ -773,6 +786,7 @@ serve(async (req) => {
       .eq("mockup_status", "rendered")
       .not("listing_photo_url", "is", null)
       .gt("open_start", nowIso)
+      .lt("open_start", sendHorizonThrough)
       .or(FOLLOWUPS_DISABLED
         ? `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso})`
         : `and(initial_send_status.eq.pending,initial_send_at.lte.${nowIso}),and(followup_send_status.eq.pending,followup_send_at.lte.${nowIso})`)
@@ -1237,6 +1251,8 @@ serve(async (req) => {
           max_per_run: maxPerRun,
           max_per_hour: maxPerHour,
           max_per_day: maxPerDay,
+          send_horizon_days: sendHorizonDays,
+          send_horizon_through: sendHorizonThrough,
           recent_outreach_sends_1h: recentHourlySendCount,
           recent_outreach_sends_24h: recentDailySendCount,
           hourly_remaining: hourlyRemaining,

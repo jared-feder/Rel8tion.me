@@ -14,7 +14,8 @@ const DEFAULT_GUARDRAILS = Object.freeze({
   missed_open_house_max_age_days: 7,
   health_window_days: 7,
   health_min_sends: 20,
-  max_opt_out_rate: 0.05
+  max_opt_out_rate: 0.05,
+  send_horizon_days: 7
 });
 
 const GUARDRAIL_RULES = Object.freeze({
@@ -25,7 +26,8 @@ const GUARDRAIL_RULES = Object.freeze({
   missed_open_house_max_age_days: { min: 1, max: 30, integer: true },
   health_window_days: { min: 1, max: 30, integer: true },
   health_min_sends: { min: 1, max: 1000, integer: true },
-  max_opt_out_rate: { min: 0.001, max: 1, integer: false }
+  max_opt_out_rate: { min: 0.001, max: 1, integer: false },
+  send_horizon_days: { min: 1, max: 21, integer: true }
 });
 
 function parseBody(req) {
@@ -84,7 +86,8 @@ function isLooseningGuardrails(current, next) {
     || next.missed_open_house_max_age_days > current.missed_open_house_max_age_days
     || next.health_window_days < current.health_window_days
     || next.health_min_sends > current.health_min_sends
-    || next.max_opt_out_rate > current.max_opt_out_rate;
+    || next.max_opt_out_rate > current.max_opt_out_rate
+    || next.send_horizon_days > current.send_horizon_days;
 }
 
 function normalizeReleaseWindow(value) {
@@ -268,7 +271,8 @@ async function loadControl() {
     missed_open_house_max_age_days: diagnostic.missed_open_house_max_age_days,
     health_window_days: diagnostic.health_window_days,
     health_min_sends: diagnostic.health_min_sends,
-    max_opt_out_rate: diagnostic.max_opt_out_rate
+    max_opt_out_rate: diagnostic.max_opt_out_rate,
+    send_horizon_days: diagnostic.send_horizon_days
   });
   const guardrails = normalizeGuardrails(guardrailRow?.value, diagnosticGuardrails);
 
@@ -287,7 +291,8 @@ async function loadControl() {
       hard_caps: {
         max_per_run: GUARDRAIL_RULES.max_per_run.max,
         max_per_hour: GUARDRAIL_RULES.max_per_hour.max,
-        max_per_day: GUARDRAIL_RULES.max_per_day.max
+        max_per_day: GUARDRAIL_RULES.max_per_day.max,
+        send_horizon_days: GUARDRAIL_RULES.send_horizon_days.max
       }
     },
     release_window: {
@@ -315,6 +320,7 @@ async function loadControl() {
       'valid mobile phone requirement',
       '8:00 AM-9:00 PM Eastern quiet hours',
       'future open-house requirement',
+      'rolling upcoming open-house horizon, soonest first',
       'generated copy, rendered image, and listing-photo readiness',
       'terminal delivery and duplicate-recipient checks'
     ],

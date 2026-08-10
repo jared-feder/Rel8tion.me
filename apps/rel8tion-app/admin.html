@@ -3727,6 +3727,7 @@ ${rowsHtml}
         max_per_day: number('guardrailMaxPerDay'),
         duplicate_phone_cooldown_days: number('guardrailCooldownDays'),
         missed_open_house_max_age_days: number('guardrailMissedAgeDays'),
+        send_horizon_days: number('guardrailSendHorizonDays'),
         health_window_days: number('guardrailHealthWindowDays'),
         health_min_sends: number('guardrailHealthMinSends'),
         max_opt_out_rate: number('guardrailMaxOptOutPercent') / 100
@@ -3739,6 +3740,7 @@ ${rowsHtml}
         || next.max_per_day > current.max_per_day
         || next.duplicate_phone_cooldown_days < current.duplicate_phone_cooldown_days
         || next.missed_open_house_max_age_days > current.missed_open_house_max_age_days
+        || next.send_horizon_days > current.send_horizon_days
         || next.health_window_days < current.health_window_days
         || next.health_min_sends > current.health_min_sends
         || next.max_opt_out_rate > current.max_opt_out_rate;
@@ -5506,6 +5508,7 @@ ${rowsHtml}
               ${metric('Current opt-out rate', `${(rate * 100).toFixed(2)}%`, `${sender.health_opt_outs || 0} opt-outs / ${sender.health_outreach_sends || 0} sends in ${guardrails.health_window_days || 7} days · stop at ${(maxRate * 100).toFixed(2)}%`, sender.health_blocked ? 'bad' : 'ok')}
               ${metric('Messages pending', stats.queue_pending || 0, `${stats.queue_automatic_due || 0} automatic rows are due now`, stats.queue_pending ? 'info' : 'warn')}
               ${metric('Open houses enriched', stats.week_enriched_open_houses || 0, `${weekCoverage}% of ${stats.week_open_houses || 0} open houses scheduled this week`, weekCoverage >= 75 ? 'ok' : weekCoverage ? 'warn' : 'bad')}
+              ${metric('Priority window', `${guardrails.send_horizon_days || 7} days`, 'Future open houses only · soonest date/time first', 'ok')}
               ${metric('Sent last hour', sender.recent_outreach_sends_1h || 0, `${sender.hourly_remaining ?? guardrails.max_per_hour ?? 0} remaining under the hourly cap`, 'info')}
               ${metric('Sent last 24 hours', sender.recent_outreach_sends_24h || 0, `${sender.daily_remaining ?? guardrails.max_per_day ?? 0} remaining under the 24-hour cap`, 'info')}
               ${metric('Queue inventory', stats.queue_total || 0, `${stats.queue_manual_hold || 0} manual/held · ${stats.queue_blocked_or_failed || 0} blocked or failed`, 'info')}
@@ -5526,9 +5529,10 @@ ${rowsHtml}
               ${field('guardrailMaxPerDay', 'Maximum per 24 hours', guardrails.max_per_day || 150, 'min="1" max="150" step="1"', 'Rolling 24-hour maximum; hard cap 150.')}
               ${field('guardrailCooldownDays', 'Same-phone cooldown days', guardrails.duplicate_phone_cooldown_days || 30, 'min="1" max="365" step="1"', 'Blocks another initial outreach to the same normalized phone.')}
               ${field('guardrailMissedAgeDays', 'Missed-event max age days', guardrails.missed_open_house_max_age_days || 7, 'min="1" max="30" step="1"', 'Maximum age for any missed-open-house recovery copy.')}
+              ${field('guardrailSendHorizonDays', 'Upcoming send horizon days', guardrails.send_horizon_days || 7, 'min="1" max="21" step="1"', 'Only future open houses inside this rolling window are eligible; soonest date/time goes first.')}
               ${field('guardrailHealthWindowDays', 'Health window days', guardrails.health_window_days || 7, 'min="1" max="30" step="1"', 'Rolling window used for opt-out health.')}
               ${field('guardrailHealthMinSends', 'Minimum sends before stop', guardrails.health_min_sends || 20, 'min="1" max="1000" step="1"', 'Health stop activates only after this sample size.')}
-              ${field('guardrailMaxOptOutPercent', 'Maximum opt-out rate (%)', Number(guardrails.max_opt_out_rate || .01) * 100, 'min="0.1" max="100" step="0.1"', 'At or above this rate, automatic sending stops.')}
+              ${field('guardrailMaxOptOutPercent', 'Maximum opt-out rate (%)', Number(guardrails.max_opt_out_rate || .05) * 100, 'min="0.1" max="100" step="0.1"', 'At or above this rate, automatic sending stops.')}
             </div>
             <div class="reply-footer">
               <div class="small">Less restrictive changes require typing REL8TION. Updated ${control.guardrails?.updated_at ? fmtDate(control.guardrails.updated_at) : 'from sender environment'}${control.guardrails?.updated_by ? ` by ${esc(control.guardrails.updated_by)}` : ''}.</div>

@@ -74,6 +74,8 @@ Use the real Supabase secret value for `TWILIO_STATUS_CALLBACK_TOKEN`; do not pa
 - Twilio `OptOutType=STOP` and exact STOP keywords suppress the phone globally. Exact `START`/`UNSTOP` removes the application suppression; old queue rows are not automatically requeued.
 - Initial outreach has a 30-day same-phone cooldown by default (`OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS`).
 - The sender has a rolling health gate: 7-day window, at least 20 outreach sends, and an owner-approved 5% maximum opt-out rate as of 2026-08-10. The runtime `outreach_guardrails.max_opt_out_rate` value overrides the matching code/environment fallback. Change it only after owner approval and provider-health review.
+- Automatic initial outreach uses `outreach_guardrails.send_horizon_days` with a seven-day default and 21-day hard maximum. The sender requires `open_start` to be in the future and before the rolling horizon, then orders candidates by `open_start ASC`, `initial_send_at ASC`, and `followup_send_at ASC`. Increasing the horizon in COMMAND requires typed confirmation.
+- Generic automatic follow-up/drip sending remains disabled. The active reply procedures are the immediate Y/N confirmation for a direct inbound response and operator-composed manual replies; neither path enables an unattended second touch.
 
 Inbound behavior:
 
