@@ -14,7 +14,7 @@ const DEFAULT_GUARDRAILS = Object.freeze({
   missed_open_house_max_age_days: 7,
   health_window_days: 7,
   health_min_sends: 20,
-  max_opt_out_rate: 0.01
+  max_opt_out_rate: 0.05
 });
 
 const GUARDRAIL_RULES = Object.freeze({

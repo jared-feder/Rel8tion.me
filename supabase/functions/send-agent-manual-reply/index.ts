@@ -280,6 +280,7 @@ serve(async (req) => {
         provider_override: providerOverride,
         campaign: typeof body.campaign === "string" ? body.campaign : null,
         step: "manual_reply",
+        omit_repeated_stop_disclosure: true,
         reply_to_recent_inbound: replyToRecentInbound,
         last_inbound_at: lastInboundAt,
         media_source: mediaSource || null,

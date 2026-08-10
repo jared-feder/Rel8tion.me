@@ -24,7 +24,7 @@ const settings = new Map([
       missed_open_house_max_age_days: 7,
       health_window_days: 7,
       health_min_sends: 20,
-      max_opt_out_rate: 0.01
+      max_opt_out_rate: 0.05
     },
     updated_at: '2026-08-10T12:00:00.000Z',
     updated_by: 'test'
@@ -114,7 +114,7 @@ test('guardrails clamp to hard safety ceilings and detect less restrictive chang
     max_per_run: 99,
     max_per_hour: 99,
     max_per_day: 999,
-    max_opt_out_rate: 0.02
+    max_opt_out_rate: 0.06
   });
   assert.equal(next.max_per_run, 7);
   assert.equal(next.max_per_hour, 20);
@@ -131,7 +131,7 @@ test('admin API rejects a less restrictive guardrail update without typed confir
       action: 'update_guardrails',
       guardrails: {
         ...settings.get('outreach_guardrails').value,
-        max_opt_out_rate: 0.02
+        max_opt_out_rate: 0.06
       },
       expected_updated_at: settings.get('outreach_guardrails').updated_at
     }
@@ -172,6 +172,8 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   const root = path.join(__dirname, '..');
   const admin = fs.readFileSync(path.join(root, 'apps/rel8tion-app/admin.html'), 'utf8');
   const sender = fs.readFileSync(path.join(root, 'supabase/functions/send-agent-outreach/index.ts'), 'utf8');
+  const manualReply = fs.readFileSync(path.join(root, 'supabase/functions/send-agent-manual-reply/index.ts'), 'utf8');
+  const sharedSms = fs.readFileSync(path.join(root, 'supabase/functions/_shared/sms.ts'), 'utf8');
   assert.match(admin, /\['outreachControl', 'Outreach Control'\]/);
   assert.match(admin, /id="outreachStopAll"/);
   assert.match(admin, /id="outreachStartAll"/);
@@ -180,4 +182,9 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.match(admin, /Locked recipient protections/);
   assert.match(sender, /loadOutreachGuardrails/);
   assert.match(sender, /\.eq\("key", "outreach_guardrails"\)/);
+  assert.match(sender, /DEFAULT_MAX_OPT_OUT_RATE = 0\.05/);
+  assert.match(manualReply, /omit_repeated_stop_disclosure:\s*true/);
+  assert.match(manualReply, /Cannot send manual reply to opted-out contact/);
+  assert.match(sharedSms, /metadata\.omit_repeated_stop_disclosure !== true/);
+  assert.match(sharedSms, /sms_suppressed: Recipient is on the global SMS suppression list/);
 });

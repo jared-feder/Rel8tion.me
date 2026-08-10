@@ -84,7 +84,7 @@ Outreach device:
 - `demo_request`
 - `manual_outreach`
 
-Outreach sends are blocked from 9 PM to 8 AM America/New_York and always include `Reply STOP to opt out.`
+Outreach sends are blocked from 9 PM to 8 AM America/New_York. Initial outreach includes `Reply STOP to opt out.`; operator-composed replies through `send-agent-manual-reply` omit that repeated footer after the initial disclosure. Global suppression and inbound STOP-family handling remain mandatory on both Android and Twilio routes.
 
 ## Inbound Webhook
 

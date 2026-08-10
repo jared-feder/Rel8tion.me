@@ -67,13 +67,13 @@ Use the real Supabase secret value for `TWILIO_STATUS_CALLBACK_TOKEN`; do not pa
 - `twilio-inbound-reply` is protected and should not be used directly as the Twilio public webhook.
 - `twilio-message-status` is protected by `TWILIO_STATUS_CALLBACK_TOKEN`.
 - `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the outreach route or brokerage override is using Twilio.
-- `send-agent-manual-reply` may accept a service-role/admin `provider_override` of `twilio` for owner-approved manual outreach campaigns that must be sent through Twilio while preserving `manual_outreach` logging, STOP text, suppression checks, and reply threading.
+- `send-agent-manual-reply` may accept a service-role/admin `provider_override` of `twilio` for owner-approved manual outreach campaigns that must be sent through Twilio while preserving `manual_outreach` logging, suppression checks, and reply threading. Initial outreach retains the STOP disclosure; operator-composed replies omit the repeated footer.
 - The shared SMS layer supports route-scoped provider selection with `SMS_OUTREACH_PROVIDER` and `SMS_EVENTS_PROVIDER`, falling back to `SMS_PROVIDER`.
 - The outreach functions can pass a per-message provider override for brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES`.
 - Suppression checks are global across Twilio and Android. A STOP captured on either provider blocks both routes, and a suppression-query failure blocks the send instead of failing open.
 - Twilio `OptOutType=STOP` and exact STOP keywords suppress the phone globally. Exact `START`/`UNSTOP` removes the application suppression; old queue rows are not automatically requeued.
 - Initial outreach has a 30-day same-phone cooldown by default (`OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS`).
-- The sender has a rolling health gate: 7-day window, at least 20 outreach sends, and a default 1% maximum opt-out rate. Configure with `OUTREACH_HEALTH_WINDOW_DAYS`, `OUTREACH_HEALTH_MIN_SENDS`, and `OUTREACH_MAX_OPT_OUT_RATE` only after review.
+- The sender has a rolling health gate: 7-day window, at least 20 outreach sends, and an owner-approved 5% maximum opt-out rate as of 2026-08-10. The runtime `outreach_guardrails.max_opt_out_rate` value overrides the matching code/environment fallback. Change it only after owner approval and provider-health review.
 
 Inbound behavior:
 
@@ -135,6 +135,12 @@ Inbound reply test:
 - Last 30 days contained 222 logged outreach/manual-outreach sends and 8 recorded opt-outs, about 3.6%. This is above the healthy target and is why the backlog must not be released at once.
 - The live queue contained 523 pending initial rows during the audit. A restart must select a small fresh pilot; never unpause the entire backlog without rechecking freshness, suppression, cooldown, and consent/relationship basis.
 - Existing suppression rows were provider-scoped (7 Android, 8 Twilio). The shared send check is now provider-agnostic so all 15 block both delivery paths.
+
+## 2026-08-10 Opt-Out Threshold Review
+
+- Owner direction raised the rolling seven-day opt-out stop threshold from 1% to 5% without changing volume ceilings or recipient-level protections.
+- The pre-change review found 130 logged outreach sends, 11 opt-outs (8.46%), and zero provider failures in the prior 24 hours. Automatic outreach therefore remains health-stopped at a 5% threshold unless the rolling rate falls below it; no override or batch send is authorized by this setting change.
+- Initial outreach keeps the Y/N/STOP disclosure. Operator-composed replies no longer repeat the STOP footer, but shared suppression lookup, opted-out row blocking, inbound STOP-family handling, and Twilio's network-level blocking remain active.
 
 ## Quick Verification Queries
 
