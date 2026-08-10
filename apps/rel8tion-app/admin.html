@@ -230,6 +230,23 @@
 
     .nav-button.active svg { color: #2445d8; }
 
+    .outreach-control-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .outreach-control-grid > .glass-card { grid-column: span 12; }
+    .outreach-control-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .outreach-control-metric { border: 1px solid rgba(219,234,254,.95); border-radius: 8px; background: rgba(255,255,255,.72); padding: 14px; }
+    .outreach-control-metric strong { display: block; margin-top: 5px; font-family: "Plus Jakarta Sans", Inter, sans-serif; font-size: 28px; line-height: 1; }
+    .outreach-control-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .outreach-control-field { display: grid; gap: 6px; }
+    .outreach-control-field label { color: #526b84; font-size: 11px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+    .outreach-protection-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .outreach-protection { display: flex; align-items: flex-start; gap: 8px; border: 1px solid rgba(187,247,208,.9); border-radius: 8px; background: rgba(240,253,244,.74); padding: 10px; color: #166534; font-size: 12px; font-weight: 800; }
+    .outreach-protection svg { width: 16px; min-width: 16px; }
+
     .sidebar-card {
       margin: 0 6px;
       border: 1px solid rgba(255,255,255,.82);
@@ -1514,6 +1531,8 @@
       .confirmed-report-grid { grid-template-columns: 1fr; }
       .confirmed-card { grid-template-columns: 1fr; }
       .report-media { min-height: 240px; }
+      .outreach-control-metrics,
+      .outreach-control-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 760px) {
@@ -1549,6 +1568,9 @@
       .report-toolbar { justify-content: flex-start; }
       .report-detail-grid { grid-template-columns: 1fr; }
       .coverage-form-grid { grid-template-columns: 1fr; }
+      .outreach-control-metrics,
+      .outreach-control-form,
+      .outreach-protection-list { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1568,6 +1590,7 @@
 
     const AREAS = [
       ['outreach', 'Outreach command'],
+      ['outreachControl', 'Outreach Control'],
       ['leads', 'Leads'],
       ['crm', 'Agent Performance'],
       ['buyerFinder', 'Buyer finder'],
@@ -1650,6 +1673,7 @@
         byName: new Map()
       },
       health: null,
+      outreachControl: null,
       relationships: [],
       outreachSearch: { query: '', rows: [], loading: false, error: '' },
       loadedAt: '',
@@ -2699,15 +2723,17 @@
         restoreUiState(uiSnapshot);
       }
       try {
-        const [dashboard, inbox, health] = await Promise.all([
+        const [dashboard, inbox, health, outreachControl] = await Promise.all([
           api('/api/admin/dashboard').catch((error) => ({ ok: false, error: error.message })),
           api('/api/admin/outreach-inbox?limit=600'),
-          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
+          api('/api/admin/outreach-control').catch((error) => ({ ok: false, error: error.message }))
         ]);
         state.command = dashboard.ok === false ? null : dashboard;
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
+        state.outreachControl = outreachControl;
         rebuildCommandIndexes();
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
@@ -2745,15 +2771,20 @@
       if (state.sendingKey || state.actionKey || state.coveragePickerKey || state.homekeyModal || isCommandEditing()) return;
       state.liveRefreshing = true;
       try {
-        const [inbox, health] = await Promise.all([
+        const controlRequest = state.area === 'outreachControl'
+          ? api('/api/admin/outreach-control').catch((error) => ({ ok: false, error: error.message }))
+          : Promise.resolve(state.outreachControl);
+        const [inbox, health, outreachControl] = await Promise.all([
           api('/api/admin/outreach-inbox?limit=600'),
-          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message }))
+          api('/api/admin/outreach-health?hours=96').catch((error) => ({ ok: false, status: 'bad', error: error.message })),
+          controlRequest
         ]);
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
+        state.outreachControl = outreachControl || state.outreachControl;
         state.loadedAt = inbox.loaded_at || new Date().toISOString();
-        if (state.area === 'outreach') refreshAreaContent();
+        if (state.area === 'outreach' || state.area === 'outreachControl') refreshAreaContent();
       } catch (_) {
         // Keep the last good dashboard snapshot; the manual Refresh button remains available.
       } finally {
@@ -3637,6 +3668,156 @@ ${rowsHtml}
       }
     }
 
+    function outreachControlValue(path, fallback = '') {
+      let value = state.outreachControl;
+      for (const key of path.split('.')) value = value?.[key];
+      return value ?? fallback;
+    }
+
+    function localDateTimeValue(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return '';
+      const pad = (number) => String(number).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function isoFromLocalInput(id) {
+      const value = document.getElementById(id)?.value || '';
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+    }
+
+    async function setOutreachPaused(paused) {
+      const currentlyPaused = state.outreachControl?.paused === true;
+      if (paused === currentlyPaused) return;
+      let reason = paused ? window.prompt('Pause all automatic outreach? Add an optional reason:', 'Paused from REL8TION COMMAND') : 'Resumed from REL8TION COMMAND';
+      if (paused && reason === null) return;
+      if (!paused && !window.confirm('Start automatic outreach? Eligible rows can send on the next cron run, subject to every active guardrail.')) return;
+
+      state.actionKey = paused ? 'outreach_control:pause' : 'outreach_control:resume';
+      refreshAreaContent();
+      try {
+        const result = await api('/api/admin/outreach-control', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'set_pause',
+            paused,
+            reason: String(reason || '').trim(),
+            expected_updated_at: outreachControlValue('pause_setting.updated_at', '')
+          })
+        });
+        state.outreachControl = result;
+        state.actionKey = '';
+        showToast(paused ? 'Automatic outreach stopped.' : 'Automatic outreach started.');
+        refreshAreaContent();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to change outreach state.');
+        await loadAll({ showLoading: false });
+      }
+    }
+
+    function readGuardrailForm() {
+      const number = (id) => Number(document.getElementById(id)?.value || 0);
+      return {
+        max_per_run: number('guardrailMaxPerRun'),
+        max_per_hour: number('guardrailMaxPerHour'),
+        max_per_day: number('guardrailMaxPerDay'),
+        duplicate_phone_cooldown_days: number('guardrailCooldownDays'),
+        missed_open_house_max_age_days: number('guardrailMissedAgeDays'),
+        health_window_days: number('guardrailHealthWindowDays'),
+        health_min_sends: number('guardrailHealthMinSends'),
+        max_opt_out_rate: number('guardrailMaxOptOutPercent') / 100
+      };
+    }
+
+    function loosensOutreachGuardrails(current, next) {
+      return next.max_per_run > current.max_per_run
+        || next.max_per_hour > current.max_per_hour
+        || next.max_per_day > current.max_per_day
+        || next.duplicate_phone_cooldown_days < current.duplicate_phone_cooldown_days
+        || next.missed_open_house_max_age_days > current.missed_open_house_max_age_days
+        || next.health_window_days < current.health_window_days
+        || next.health_min_sends > current.health_min_sends
+        || next.max_opt_out_rate > current.max_opt_out_rate;
+    }
+
+    async function saveOutreachGuardrails() {
+      const current = outreachControlValue('guardrails.value', {});
+      const guardrails = readGuardrailForm();
+      const loosening = loosensOutreachGuardrails(current, guardrails);
+      let confirmation = '';
+      if (loosening) {
+        confirmation = window.prompt('This change makes at least one outreach guardrail less restrictive. Type REL8TION to save:') || '';
+        if (confirmation !== 'REL8TION') return showToast('Guardrail change cancelled.');
+      } else if (!window.confirm('Save this outreach guardrail configuration?')) {
+        return;
+      }
+
+      state.actionKey = 'outreach_control:guardrails';
+      refreshAreaContent();
+      try {
+        const result = await api('/api/admin/outreach-control', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'update_guardrails',
+            guardrails,
+            confirmation,
+            expected_updated_at: outreachControlValue('guardrails.updated_at', '')
+          })
+        });
+        state.outreachControl = result;
+        state.actionKey = '';
+        showToast('Outreach guardrails saved.');
+        refreshAreaContent();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to save guardrails.');
+        await loadAll({ showLoading: false });
+      }
+    }
+
+    async function saveOutreachReleaseWindow() {
+      const enabled = document.getElementById('releaseWindowEnabled')?.checked === true;
+      let confirmation = '';
+      if (enabled) {
+        confirmation = window.prompt('This window bypasses only the rolling opt-out health stop for the selected event dates. STOP suppression and all locked protections remain active. Type REL8TION to enable:') || '';
+        if (confirmation !== 'REL8TION') return showToast('Override window change cancelled.');
+      } else if (!window.confirm('Disable the current outreach health override window?')) {
+        return;
+      }
+
+      state.actionKey = 'outreach_control:release';
+      refreshAreaContent();
+      try {
+        const result = await api('/api/admin/outreach-control', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'update_release_window',
+            confirmation,
+            expected_updated_at: outreachControlValue('release_window.updated_at', ''),
+            release_window: {
+              enabled,
+              from_open_start: isoFromLocalInput('releaseWindowFrom'),
+              through_open_start: isoFromLocalInput('releaseWindowThrough'),
+              expires_at: isoFromLocalInput('releaseWindowExpires'),
+              reason: document.getElementById('releaseWindowReason')?.value?.trim() || ''
+            }
+          })
+        });
+        state.outreachControl = result;
+        state.actionKey = '';
+        showToast(enabled ? 'Health override window enabled.' : 'Health override window disabled.');
+        refreshAreaContent();
+      } catch (error) {
+        state.actionKey = '';
+        showToast(error.message || 'Unable to save the release window.');
+        await loadAll({ showLoading: false });
+      }
+    }
+
     function closeHomeKey() {
       state.homekeyModal = null;
       render();
@@ -4465,6 +4646,7 @@ ${rowsHtml}
     function areaIcon(area) {
       return {
         outreach: 'message-square-reply',
+        outreachControl: 'sliders-horizontal',
         leads: 'contact-round',
         crm: 'users-round',
         buyerFinder: 'home',
@@ -4896,6 +5078,11 @@ ${rowsHtml}
       document.querySelectorAll('[data-outreach-mode]').forEach((button) => {
         button.addEventListener('click', () => setOutreachOperatorMode(button.dataset.outreachMode));
       });
+      document.getElementById('outreachStopAll')?.addEventListener('click', () => setOutreachPaused(true));
+      document.getElementById('outreachStartAll')?.addEventListener('click', () => setOutreachPaused(false));
+      document.getElementById('saveOutreachGuardrails')?.addEventListener('click', saveOutreachGuardrails);
+      document.getElementById('saveOutreachReleaseWindow')?.addEventListener('click', saveOutreachReleaseWindow);
+      document.getElementById('outreachControlRetry')?.addEventListener('click', () => loadAll({ showLoading: false }));
       document.querySelectorAll('[data-coverage-choice]').forEach((button) => {
         button.addEventListener('click', () => confirmCoverageChoice(Number(button.dataset.coverageChoice)));
       });
@@ -5052,6 +5239,7 @@ ${rowsHtml}
     }
 
     function renderArea() {
+      if (state.area === 'outreachControl') return renderOutreachControl();
       if (state.area === 'leads') return renderLeads();
       if (state.area === 'crm') return renderCrm();
       if (state.area === 'buyerFinder') return renderBuyerFinder();
@@ -5235,6 +5423,147 @@ ${rowsHtml}
         ${!finder.loading && finder.loaded && !rows.length ? '<div class="glass-card" style="padding:18px;font-weight:900;">No upcoming listings or open houses matched those parameters.</div>' : ''}
         <div class="finder-results">
           ${rows.map(renderBuyerFinderCard).join('')}
+        </div>
+      `;
+    }
+
+    function renderOutreachControl() {
+      const control = state.outreachControl || {};
+      if (control.ok === false) {
+        return `<div class="glass-card" style="padding:18px;display:grid;gap:10px;"><div class="mini-title">Outreach Control unavailable</div><div class="error small">${esc(control.error || 'Unable to load sender controls.')}</div><button class="btn soft" id="outreachControlRetry"><i data-lucide="refresh-cw"></i><span>Try again</span></button></div>`;
+      }
+
+      const guardrails = control.guardrails?.value || {};
+      const stats = control.stats || {};
+      const sender = control.sender || {};
+      const release = control.release_window?.value || {};
+      const paused = control.paused === true;
+      const healthStopped = sender.health_blocked === true && sender.health_gate_override !== true;
+      const sendingStopped = paused || healthStopped;
+      const busy = String(state.actionKey || '').startsWith('outreach_control:');
+      const rate = Number(sender.health_opt_out_rate || 0);
+      const maxRate = Number(guardrails.max_opt_out_rate || 0);
+      const weekCoverage = stats.week_open_houses
+        ? Math.round((Number(stats.week_enriched_open_houses || 0) / Number(stats.week_open_houses)) * 100)
+        : 0;
+      const updatedBy = control.pause_setting?.updated_by || control.guardrails?.updated_by || 'sender configuration';
+
+      const metric = (label, value, detail, tone = 'info') => `
+        <div class="outreach-control-metric">
+          <div class="mini-title">${esc(label)}</div>
+          <strong>${esc(value)}</strong>
+          <div class="small">${esc(detail)}</div>
+          <div style="margin-top:8px;">${badge(tone === 'bad' ? 'Needs attention' : tone === 'ok' ? 'Healthy' : 'Live', tone)}</div>
+        </div>
+      `;
+      const field = (id, label, value, attrs, help) => `
+        <div class="outreach-control-field">
+          <label for="${id}">${esc(label)}</label>
+          <input id="${id}" class="field" type="number" value="${esc(value)}" ${attrs}>
+          <div class="small">${esc(help)}</div>
+        </div>
+      `;
+
+      return `
+        <div class="section-head">
+          <div>
+            <h2>Outreach Control</h2>
+            <div class="sub">One protected control surface for sender state, live guardrails, queue volume, and outreach health.</div>
+          </div>
+          <div class="header-actions">
+            ${badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}
+            ${sender.health_gate_override ? badge('HEALTH OVERRIDE ACTIVE', 'warn') : ''}
+            ${renderOutreachModeControls()}
+          </div>
+        </div>
+
+        <div class="outreach-control-grid">
+          <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
+            <div class="reply-footer">
+              <div>
+                <div class="mini-title">Master sender switch</div>
+                <div class="address">${paused ? 'Automatic outreach is stopped' : healthStopped ? 'Health stop is blocking outreach' : 'Automatic outreach is allowed'}</div>
+                <div class="small">${paused
+                  ? `Paused ${control.pause_setting?.updated_at ? fmtDate(control.pause_setting.updated_at) : ''} by ${updatedBy}. Cron can still inspect rows but cannot send.`
+                  : healthStopped
+                    ? `The rolling opt-out rate is at or above the configured ${Math.round(maxRate * 10000) / 100}% threshold.`
+                    : 'The next cron run may send eligible rows within the limits below.'}</div>
+              </div>
+              <div class="row-actions">
+                <button class="btn bad" id="outreachStopAll" ${busy || paused ? 'disabled' : ''}><i data-lucide="circle-stop"></i><span>${state.actionKey === 'outreach_control:pause' ? 'Stopping...' : 'Stop outreach'}</span></button>
+                <button class="btn primary" id="outreachStartAll" ${busy || !paused ? 'disabled' : ''}><i data-lucide="circle-play"></i><span>${state.actionKey === 'outreach_control:resume' ? 'Starting...' : 'Start outreach'}</span></button>
+              </div>
+            </div>
+            <div class="small">Start does not bypass health, volume, quiet-hour, readiness, duplicate-recipient, phone-validity, or STOP protections.</div>
+          </section>
+
+          <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
+            <div class="reply-footer">
+              <div><div class="mini-title">Current outreach stats</div><div class="small">Live sender diagnostic plus exact database counts.</div></div>
+              ${badge(control.loaded_at ? `Updated ${fmtDate(control.loaded_at)}` : 'Loading', 'info')}
+            </div>
+            <div class="outreach-control-metrics">
+              ${metric('Current opt-out rate', `${(rate * 100).toFixed(2)}%`, `${sender.health_opt_outs || 0} opt-outs / ${sender.health_outreach_sends || 0} sends in ${guardrails.health_window_days || 7} days · stop at ${(maxRate * 100).toFixed(2)}%`, sender.health_blocked ? 'bad' : 'ok')}
+              ${metric('Messages pending', stats.queue_pending || 0, `${stats.queue_automatic_due || 0} automatic rows are due now`, stats.queue_pending ? 'info' : 'warn')}
+              ${metric('Open houses enriched', stats.week_enriched_open_houses || 0, `${weekCoverage}% of ${stats.week_open_houses || 0} open houses scheduled this week`, weekCoverage >= 75 ? 'ok' : weekCoverage ? 'warn' : 'bad')}
+              ${metric('Sent last hour', sender.recent_outreach_sends_1h || 0, `${sender.hourly_remaining ?? guardrails.max_per_hour ?? 0} remaining under the hourly cap`, 'info')}
+              ${metric('Sent last 24 hours', sender.recent_outreach_sends_24h || 0, `${sender.daily_remaining ?? guardrails.max_per_day ?? 0} remaining under the 24-hour cap`, 'info')}
+              ${metric('Queue inventory', stats.queue_total || 0, `${stats.queue_manual_hold || 0} manual/held · ${stats.queue_blocked_or_failed || 0} blocked or failed`, 'info')}
+            </div>
+          </section>
+
+          <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
+            <div class="reply-footer">
+              <div>
+                <div class="mini-title">Editable sender guardrails</div>
+                <div class="small">Runtime values take effect on the next sender run. Volume fields cannot exceed the code hard caps.</div>
+              </div>
+              ${badge(control.guardrails?.source === 'runtime' ? 'COMMAND runtime' : 'Sender environment', control.guardrails?.source === 'runtime' ? 'ok' : 'info')}
+            </div>
+            <div class="outreach-control-form">
+              ${field('guardrailMaxPerRun', 'Maximum per run', guardrails.max_per_run || 7, 'min="1" max="7" step="1"', 'Hard cap: 7 messages per cron run.')}
+              ${field('guardrailMaxPerHour', 'Maximum per hour', guardrails.max_per_hour || 20, 'min="1" max="20" step="1"', 'Rolling 60-minute maximum; hard cap 20.')}
+              ${field('guardrailMaxPerDay', 'Maximum per 24 hours', guardrails.max_per_day || 150, 'min="1" max="150" step="1"', 'Rolling 24-hour maximum; hard cap 150.')}
+              ${field('guardrailCooldownDays', 'Same-phone cooldown days', guardrails.duplicate_phone_cooldown_days || 30, 'min="1" max="365" step="1"', 'Blocks another initial outreach to the same normalized phone.')}
+              ${field('guardrailMissedAgeDays', 'Missed-event max age days', guardrails.missed_open_house_max_age_days || 7, 'min="1" max="30" step="1"', 'Maximum age for any missed-open-house recovery copy.')}
+              ${field('guardrailHealthWindowDays', 'Health window days', guardrails.health_window_days || 7, 'min="1" max="30" step="1"', 'Rolling window used for opt-out health.')}
+              ${field('guardrailHealthMinSends', 'Minimum sends before stop', guardrails.health_min_sends || 20, 'min="1" max="1000" step="1"', 'Health stop activates only after this sample size.')}
+              ${field('guardrailMaxOptOutPercent', 'Maximum opt-out rate (%)', Number(guardrails.max_opt_out_rate || .01) * 100, 'min="0.1" max="100" step="0.1"', 'At or above this rate, automatic sending stops.')}
+            </div>
+            <div class="reply-footer">
+              <div class="small">Less restrictive changes require typing REL8TION. Updated ${control.guardrails?.updated_at ? fmtDate(control.guardrails.updated_at) : 'from sender environment'}${control.guardrails?.updated_by ? ` by ${esc(control.guardrails.updated_by)}` : ''}.</div>
+              <button class="btn primary" id="saveOutreachGuardrails" ${busy ? 'disabled' : ''}><i data-lucide="save"></i><span>${state.actionKey === 'outreach_control:guardrails' ? 'Saving...' : 'Save guardrails'}</span></button>
+            </div>
+          </section>
+
+          <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
+            <div class="reply-footer">
+              <div>
+                <div class="mini-title">Bounded health override window</div>
+                <div class="small">Advanced control: limits eligible event dates and temporarily bypasses only the rolling opt-out health stop.</div>
+              </div>
+              ${badge(control.release_window?.active ? 'ACTIVE' : release.enabled ? 'CONFIGURED / INACTIVE' : 'OFF', control.release_window?.active ? 'warn' : 'info')}
+            </div>
+            <label class="btn soft" style="justify-content:flex-start;"><input id="releaseWindowEnabled" type="checkbox" ${release.enabled ? 'checked' : ''}><span>Enable bounded health override</span></label>
+            <div class="outreach-control-form">
+              <div class="outreach-control-field"><label for="releaseWindowFrom">Event date from (optional)</label><input id="releaseWindowFrom" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.from_open_start))}"><div class="small">Inclusive lower bound for open_start.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowThrough">Event date through</label><input id="releaseWindowThrough" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.through_open_start))}"><div class="small">Exclusive upper bound; must be in the future.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowExpires">Override expires</label><input id="releaseWindowExpires" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.expires_at))}"><div class="small">Automatic fail-closed expiration.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowReason">Reason</label><input id="releaseWindowReason" class="field" maxlength="240" value="${esc(release.reason || '')}" placeholder="Owner-approved release scope"><div class="small">Stored with the runtime setting for operator context.</div></div>
+            </div>
+            <div class="reply-footer">
+              <div class="small">A global pause always wins. This override never bypasses STOP suppression, cooldown, volume limits, quiet hours, phone validity, or readiness checks.</div>
+              <button class="btn ${release.enabled ? 'bad' : 'soft'}" id="saveOutreachReleaseWindow" ${busy ? 'disabled' : ''}><i data-lucide="shield-alert"></i><span>${state.actionKey === 'outreach_control:release' ? 'Saving...' : release.enabled ? 'Update override' : 'Save override setting'}</span></button>
+            </div>
+          </section>
+
+          <section class="glass-card" style="padding:18px;display:grid;gap:12px;">
+            <div><div class="mini-title">Locked recipient protections</div><div class="small">These safeguards are visible here but cannot be disabled from COMMAND.</div></div>
+            <div class="outreach-protection-list">
+              ${(control.locked_protections || []).map((item) => `<div class="outreach-protection"><i data-lucide="shield-check"></i><span>${esc(item)}</span></div>`).join('')}
+            </div>
+            ${(control.warnings || []).length ? `<div class="error small">${esc(control.warnings.join(' | '))}</div>` : ''}
+          </section>
         </div>
       `;
     }

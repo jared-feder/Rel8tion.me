@@ -56,6 +56,17 @@ type OutreachReleaseWindow = {
   expiresAt: string | null;
 };
 
+type OutreachGuardrails = {
+  maxPerRun: number;
+  maxPerHour: number;
+  maxPerDay: number;
+  duplicatePhoneCooldownDays: number;
+  missedOpenHouseMaxAgeDays: number;
+  healthWindowDays: number;
+  healthMinSends: number;
+  maxOptOutRate: number;
+};
+
 function normalizePhone(phone: string | null): string {
   if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
@@ -251,6 +262,58 @@ function positiveFloatEnv(name: string, fallback: number, max: number): number {
   const parsed = Number(Deno.env.get(name) || "");
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.min(parsed, max);
+}
+
+function positiveIntSetting(value: unknown, fallback: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.min(Math.floor(parsed), max));
+}
+
+function positiveFloatSetting(value: unknown, fallback: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
+async function loadOutreachGuardrails(supabase: any, fallback: OutreachGuardrails): Promise<OutreachGuardrails> {
+  try {
+    const { data, error } = await supabase
+      .from("rel8tion_runtime_settings")
+      .select("value")
+      .eq("key", "outreach_guardrails")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[send-agent-outreach] outreach guardrail lookup failed", error.message || error);
+      return fallback;
+    }
+
+    const value: Record<string, unknown> = data?.value && typeof data.value === "object"
+      ? data.value as Record<string, unknown>
+      : {};
+    return {
+      maxPerRun: positiveIntSetting(value.max_per_run, fallback.maxPerRun, SEND_MAX_PER_RUN_HARD_CAP),
+      maxPerHour: positiveIntSetting(value.max_per_hour, fallback.maxPerHour, SEND_MAX_PER_HOUR_HARD_CAP),
+      maxPerDay: positiveIntSetting(value.max_per_day, fallback.maxPerDay, SEND_MAX_PER_DAY_HARD_CAP),
+      duplicatePhoneCooldownDays: positiveIntSetting(
+        value.duplicate_phone_cooldown_days,
+        fallback.duplicatePhoneCooldownDays,
+        365,
+      ),
+      missedOpenHouseMaxAgeDays: positiveIntSetting(
+        value.missed_open_house_max_age_days,
+        fallback.missedOpenHouseMaxAgeDays,
+        30,
+      ),
+      healthWindowDays: positiveIntSetting(value.health_window_days, fallback.healthWindowDays, 30),
+      healthMinSends: positiveIntSetting(value.health_min_sends, fallback.healthMinSends, 1000),
+      maxOptOutRate: positiveFloatSetting(value.max_opt_out_rate, fallback.maxOptOutRate, 1),
+    };
+  } catch (error) {
+    console.warn("[send-agent-outreach] outreach guardrail lookup failed", error);
+    return fallback;
+  }
 }
 
 async function recentOutreachSendCount(supabase: any, sinceIso: string): Promise<number> {
@@ -517,33 +580,39 @@ serve(async (req) => {
       );
     }
 
-    const maxPerRun = positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, SEND_MAX_PER_RUN_HARD_CAP);
-    const maxPerHour = positiveIntEnv(
-      "OUTREACH_SEND_MAX_PER_HOUR",
-      DEFAULT_SEND_MAX_PER_HOUR,
-      SEND_MAX_PER_HOUR_HARD_CAP,
-    );
-    const maxPerDay = positiveIntEnv(
-      "OUTREACH_SEND_MAX_PER_DAY",
-      DEFAULT_SEND_MAX_PER_DAY,
-      SEND_MAX_PER_DAY_HARD_CAP,
-    );
-    const duplicatePhoneCooldownDays = positiveIntEnv(
-      "OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS",
-      DEFAULT_DUPLICATE_PHONE_COOLDOWN_DAYS,
-      365,
-    );
-    const missedOpenHouseMaxAgeDays = positiveIntEnv(
-      "OUTREACH_MISSED_OPEN_HOUSE_MAX_AGE_DAYS",
-      DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS,
-      30,
-    );
-    const healthWindowDays = positiveIntEnv("OUTREACH_HEALTH_WINDOW_DAYS", DEFAULT_HEALTH_WINDOW_DAYS, 30);
-    const healthMinSends = positiveIntEnv("OUTREACH_HEALTH_MIN_SENDS", DEFAULT_HEALTH_MIN_SENDS, 1000);
-    const maxOptOutRate = positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1);
+    const guardrailFallback: OutreachGuardrails = {
+      maxPerRun: positiveIntEnv("OUTREACH_SEND_MAX_PER_RUN", DEFAULT_SEND_MAX_PER_RUN, SEND_MAX_PER_RUN_HARD_CAP),
+      maxPerHour: positiveIntEnv("OUTREACH_SEND_MAX_PER_HOUR", DEFAULT_SEND_MAX_PER_HOUR, SEND_MAX_PER_HOUR_HARD_CAP),
+      maxPerDay: positiveIntEnv("OUTREACH_SEND_MAX_PER_DAY", DEFAULT_SEND_MAX_PER_DAY, SEND_MAX_PER_DAY_HARD_CAP),
+      duplicatePhoneCooldownDays: positiveIntEnv(
+        "OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS",
+        DEFAULT_DUPLICATE_PHONE_COOLDOWN_DAYS,
+        365,
+      ),
+      missedOpenHouseMaxAgeDays: positiveIntEnv(
+        "OUTREACH_MISSED_OPEN_HOUSE_MAX_AGE_DAYS",
+        DEFAULT_MISSED_OPEN_HOUSE_MAX_AGE_DAYS,
+        30,
+      ),
+      healthWindowDays: positiveIntEnv("OUTREACH_HEALTH_WINDOW_DAYS", DEFAULT_HEALTH_WINDOW_DAYS, 30),
+      healthMinSends: positiveIntEnv("OUTREACH_HEALTH_MIN_SENDS", DEFAULT_HEALTH_MIN_SENDS, 1000),
+      maxOptOutRate: positiveFloatEnv("OUTREACH_MAX_OPT_OUT_RATE", DEFAULT_MAX_OPT_OUT_RATE, 1),
+    };
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true || body.mode === "dry_run" || body.mode === "diagnostic_no_send";
     const requestedHealthGateOverride = body.override_health_gate === true;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const guardrails = await loadOutreachGuardrails(supabase, guardrailFallback);
+    const {
+      maxPerRun,
+      maxPerHour,
+      maxPerDay,
+      duplicatePhoneCooldownDays,
+      missedOpenHouseMaxAgeDays,
+      healthWindowDays,
+      healthMinSends,
+      maxOptOutRate,
+    } = guardrails;
 
     if (!isWithinAllowedSendWindow() && !dryRun) {
       return new Response(
@@ -567,7 +636,6 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
     const outreachSendPaused = await loadOutreachSendPaused(supabase);
     const outreachOperatorMode = await loadOutreachOperatorMode(supabase);
     const outreachReleaseWindow = await loadOutreachReleaseWindow(supabase);
