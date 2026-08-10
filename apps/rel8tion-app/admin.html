@@ -2094,10 +2094,6 @@
       return state.command?.outreach_operator?.mode === 'away' ? 'away' : 'live';
     }
 
-    function isDouglasEllimanOutreach(row) {
-      return /douglas\s+elliman/i.test(String(row?.brokerage || ''));
-    }
-
     function isOutreachCronReady(row) {
       if (!row) return false;
       return isOutreachSendCandidate({ ...row, send_mode: 'automatic' });
@@ -2105,7 +2101,6 @@
 
     function sendApprovalBadge(row) {
       if (row?.send_mode && row.send_mode !== 'automatic' && isOutreachCronReady(row)) return badge('Manual ready', 'warn');
-      if (isOutreachSendCandidate(row) && isDouglasEllimanOutreach(row)) return badge('Twilio ready', 'ok');
       if (isOutreachSendCandidate(row) && outreachOperatorMode() === 'live') return badge('Manual ready', 'warn');
       if (isOutreachSendCandidate(row)) return badge('Auto ready', 'ok');
       if (row?.send_mode && row.send_mode !== 'automatic') return badge('Paused', 'info');
@@ -3145,8 +3140,8 @@ ${rowsHtml}
       const normalized = mode === 'away' ? 'away' : 'live';
       if (normalized === outreachOperatorMode()) return;
       const prompt = normalized === 'away'
-        ? 'Switch outreach to Away mode? Ready rows can send through the configured automatic provider on the next cron run.'
-        : 'Switch outreach to Live mode? Non-Douglas Elliman ready rows will wait for manual SMS instead of auto-sending.';
+        ? 'Switch outreach to Away mode? Eligible ready rows from every brokerage can send through the configured automatic provider on the next cron run.'
+        : 'Switch outreach to Live mode? All ready rows will wait for manual SMS instead of auto-sending.';
       if (!window.confirm(prompt)) return;
 
       state.actionKey = `outreach_mode:${normalized}`;
@@ -3156,7 +3151,7 @@ ${rowsHtml}
           method: 'POST',
           body: JSON.stringify({ mode: normalized })
         });
-        showToast(normalized === 'away' ? 'Away mode enabled.' : 'Live manual mode enabled.');
+        showToast(normalized === 'away' ? 'Away automatic mode enabled for every brokerage.' : 'Live manual mode enabled for every brokerage.');
         state.actionKey = '';
         await loadAll({ showLoading: false });
       } catch (error) {

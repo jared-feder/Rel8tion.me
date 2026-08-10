@@ -293,6 +293,7 @@ Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` `send-agent-outreach` now selects only queue rows whose `open_start` is still in the future.
 - `[IMPLEMENTED]` Brokerage-specific Twilio restrictions were retired by owner direction on 2026-07-17. When the operator is away, future eligible rows from any brokerage may use the configured automatic outreach provider.
+- `[IMPLEMENTED]` On 2026-08-10, the remaining Douglas Elliman provider exception was removed from COMMAND counts/badges and `send-agent-outreach`. Live mode now holds every brokerage for manual sending; Away mode sends every eligible brokerage through the configured automatic provider.
 - `[IMPLEMENTED]` Existing opt-out health gates and hard caps remain unchanged; this correction does not override sender-health suppression.
 - `[IMPLEMENTED]` Initial outreach now asks agents to reply `Y` to book support or `N` for another time while retaining the required `STOP to unsubscribe` instruction.
 - `[IMPLEMENTED]` Twilio inbound outreach replies recognize exact `Y`/`YES` and `N`/`NO` responses. Y marks the thread interested and confirms a follow-up call; N marks it `not_now` and sends the NMB Hard Loans contact positioning. Both automatic responses are mirrored into the outreach thread and may omit the repeated STOP footer because the initial outreach already carried the disclosure; suppression remains enforced.

@@ -247,7 +247,7 @@ Important tables and fields:
 
 Agent website records carry separate fields for marketing title and exact license type, plus brokerage identity/contact information and broker-controlled compliance links. Public generated sites surface the NY Housing and Anti-Discrimination Disclosure, the employing broker's Standardized Operating Procedures when supplied, brokerage website when supplied, and the listing brokerage on property advertising. A missing SOP URL is a publish-readiness issue; broker policy content is never inferred by REL8TION.
 
-Automatic agent outreach is restricted to future open houses. When the operator is away, future eligible rows from any brokerage may use the configured automatic outreach provider. Provider health, opt-out, duplicate-phone, hourly, daily, and per-run gates are enforced independently.
+Automatic agent outreach is restricted to future open houses. Live operator mode holds every brokerage for manual sending; Away mode allows future eligible rows from every brokerage to use the configured automatic outreach provider. No brokerage receives a provider or automatic-send exception. Provider health, opt-out, duplicate-phone, hourly, daily, and per-run gates are enforced independently.
 ### Loan officer registration approval
 
 Public loan officers apply through `/loan-officer-support`; an application alone does not confer verified status. REL8TION COMMAND performs the trust boundary: an admin approval creates or reuses the applicant's verified loan-officer profile, marks the application approved, sends an activation SMS, attempts an activation email, and opens the activation page so profile details can be completed before dashboard use. Email remains dependent on Resend sender configuration.

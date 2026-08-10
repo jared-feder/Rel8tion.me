@@ -137,21 +137,6 @@ function configuredOutreachProvider(): "twilio" | "android_gateway" {
     : "twilio";
 }
 
-function twilioOutreachBrokeragePatterns(): string[] {
-  return String(Deno.env.get("SMS_TWILIO_OUTREACH_BROKERAGES") || "douglas elliman")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function outreachProviderOverrideForRow(row: OutreachRow): "twilio" | null {
-  const brokerage = String(row.brokerage || "").toLowerCase();
-  if (!brokerage) return null;
-  return twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern))
-    ? "twilio"
-    : null;
-}
-
 function normalizeOperatorMode(value: unknown, fallback: OutreachOperatorMode = "live"): OutreachOperatorMode {
   return String(value || "").trim().toLowerCase() === "away" ? "away" : fallback;
 }
@@ -937,7 +922,7 @@ serve(async (req) => {
         const configuredProvider = configuredOutreachProvider();
         const selectedProvider = outreachOperatorMode === "away"
           ? configuredProvider
-          : outreachProviderOverrideForRow(row) || "manual";
+          : "manual";
         const providerOverride = selectedProvider === "manual"
           ? null
           : selectedProvider as "twilio" | "android_gateway";
@@ -1203,7 +1188,7 @@ serve(async (req) => {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const providerForBlock = attemptedProvider || outreachProviderOverrideForRow(row) || (usesAndroidGateway() ? "android_gateway" : "twilio");
+        const providerForBlock = attemptedProvider || configuredOutreachProvider();
         const terminalBlock = getTerminalSmsBlock(message, providerForBlock);
         const update: Record<string, unknown> = { send_error: message };
 

@@ -175,6 +175,7 @@ test('admin API saves a tighter runtime configuration and returns live stats', a
 test('COMMAND exposes the master switch, stats, editable limits, and locked protections', () => {
   const root = path.join(__dirname, '..');
   const admin = fs.readFileSync(path.join(root, 'apps/rel8tion-app/admin.html'), 'utf8');
+  const dashboard = fs.readFileSync(path.join(root, 'api/admin/dashboard.js'), 'utf8');
   const sender = fs.readFileSync(path.join(root, 'supabase/functions/send-agent-outreach/index.ts'), 'utf8');
   const manualReply = fs.readFileSync(path.join(root, 'supabase/functions/send-agent-manual-reply/index.ts'), 'utf8');
   const sharedSms = fs.readFileSync(path.join(root, 'supabase/functions/_shared/sms.ts'), 'utf8');
@@ -192,6 +193,11 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.match(sender, /DEFAULT_SEND_HORIZON_DAYS = 7/);
   assert.match(sender, /\.lt\("open_start", sendHorizonThrough\)/);
   assert.match(sender, /\.order\("open_start", \{ ascending: true/);
+  assert.doesNotMatch(admin, /Non-Douglas Elliman/i);
+  assert.doesNotMatch(admin, /isDouglasEllimanOutreach/);
+  assert.doesNotMatch(dashboard, /SMS_TWILIO_OUTREACH_BROKERAGES|isTwilioOutreachBrokerage/);
+  assert.doesNotMatch(sender, /SMS_TWILIO_OUTREACH_BROKERAGES|outreachProviderOverrideForRow/);
+  assert.match(sender, /outreachOperatorMode === "away"\s*\? configuredProvider\s*:\s*"manual"/);
   assert.match(manualReply, /omit_repeated_stop_disclosure:\s*true/);
   assert.match(manualReply, /Cannot send manual reply to opted-out contact/);
   assert.match(sharedSms, /metadata\.omit_repeated_stop_disclosure !== true/);

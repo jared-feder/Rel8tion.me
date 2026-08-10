@@ -11,8 +11,8 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - Default provider secret: `SMS_PROVIDER=twilio`.
 - Outreach provider secret: `SMS_OUTREACH_PROVIDER=twilio`.
 - Event/system provider override: set `SMS_EVENTS_PROVIDER=twilio`.
-- The legacy brokerage-specific override `SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman` can remain, but all automatic outreach now uses the dedicated toll-free route.
-- Runtime operator mode is `away`, meaning ready rows use the configured automatic provider. `live` still holds non-override rows for manual sending.
+- The legacy brokerage-specific override `SMS_TWILIO_OUTREACH_BROKERAGES` is retired and no longer read by the sender or COMMAND dashboard.
+- Runtime operator mode is `away`, meaning eligible ready rows from every brokerage use the configured automatic provider. `live` holds every ready row for manual sending.
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.
@@ -66,10 +66,10 @@ Use the real Supabase secret value for `TWILIO_STATUS_CALLBACK_TOKEN`; do not pa
 - `twilio-inbound-router` forwards inbound payloads into `twilio-inbound-reply` using service-role auth.
 - `twilio-inbound-reply` is protected and should not be used directly as the Twilio public webhook.
 - `twilio-message-status` is protected by `TWILIO_STATUS_CALLBACK_TOKEN`.
-- `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the outreach route or brokerage override is using Twilio.
+- `send-agent-outreach` and `send-agent-manual-reply` build per-message status callback URLs for Twilio delivery events when the selected outreach route is using Twilio.
 - `send-agent-manual-reply` may accept a service-role/admin `provider_override` of `twilio` for owner-approved manual outreach campaigns that must be sent through Twilio while preserving `manual_outreach` logging, suppression checks, and reply threading. Initial outreach retains the STOP disclosure; operator-composed replies omit the repeated footer.
 - The shared SMS layer supports route-scoped provider selection with `SMS_OUTREACH_PROVIDER` and `SMS_EVENTS_PROVIDER`, falling back to `SMS_PROVIDER`.
-- The outreach functions can pass a per-message provider override for brokerages listed in `SMS_TWILIO_OUTREACH_BROKERAGES`.
+- The automatic outreach provider is selected by route configuration, not by brokerage.
 - Suppression checks are global across Twilio and Android. A STOP captured on either provider blocks both routes, and a suppression-query failure blocks the send instead of failing open.
 - Twilio `OptOutType=STOP` and exact STOP keywords suppress the phone globally. Exact `START`/`UNSTOP` removes the application suppression; old queue rows are not automatically requeued.
 - Initial outreach has a 30-day same-phone cooldown by default (`OUTREACH_DUPLICATE_PHONE_COOLDOWN_DAYS`).

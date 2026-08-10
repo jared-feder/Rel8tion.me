@@ -12,13 +12,12 @@ Android fallback route:
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=android_gateway
 SMS_EVENTS_PROVIDER=twilio
-SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
 ```
 
 Runtime mode is stored in `rel8tion_runtime_settings` as `outreach_operator_mode`:
 
-- `live`: non-Douglas Elliman waits for manual send in COMMAND.
-- `away`: ready rows use whichever provider is configured by `SMS_OUTREACH_PROVIDER`.
+- `live`: every ready row waits for manual send in COMMAND.
+- `away`: eligible ready rows from every brokerage use whichever provider is configured by `SMS_OUTREACH_PROVIDER`.
 
 Android route settings:
 
@@ -26,7 +25,6 @@ Android route settings:
 SMS_PROVIDER=twilio
 SMS_OUTREACH_PROVIDER=android_gateway
 SMS_EVENTS_PROVIDER=twilio
-SMS_TWILIO_OUTREACH_BROKERAGES=Douglas Elliman
 
 ANDROID_EVENTS_GATEWAY_URL=https://api.sms-gate.app
 ANDROID_EVENTS_GATEWAY_USERNAME=

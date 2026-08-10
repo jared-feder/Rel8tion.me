@@ -96,16 +96,11 @@ function normalizeOutreachOperatorMode(value, fallback = 'live') {
   return String(value || '').trim().toLowerCase() === 'away' ? 'away' : fallback;
 }
 
-function twilioOutreachBrokeragePatterns() {
-  return String(process.env.SMS_TWILIO_OUTREACH_BROKERAGES || 'Douglas Elliman')
-    .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function isTwilioOutreachBrokerage(row) {
-  const brokerage = String(row?.brokerage || '').toLowerCase();
-  return Boolean(brokerage && twilioOutreachBrokeragePatterns().some((pattern) => brokerage.includes(pattern)));
+function configuredOutreachProvider() {
+  const provider = String(process.env.SMS_OUTREACH_PROVIDER || process.env.SMS_PROVIDER || 'twilio')
+    .trim()
+    .toLowerCase();
+  return provider === 'android_gateway' ? 'android_gateway' : 'twilio';
 }
 
 function isOutreachReadyCandidate(row) {
@@ -798,13 +793,14 @@ module.exports = async function handler(req, res) {
     });
 
     const outreachSendCandidates = outreach.filter(isOutreachSendCandidate);
-    const outreachTwilioCandidates = outreachSendCandidates.filter(isTwilioOutreachBrokerage);
-    const outreachNonTwilioCandidates = outreachSendCandidates.filter((row) => !isTwilioOutreachBrokerage(row));
     const outreachManualModeCandidates = outreach.filter((row) => row.send_mode !== 'automatic' && isOutreachReadyCandidate(row));
     const outreachManualReady = outreachOperator.mode === 'live'
-      ? [...outreachNonTwilioCandidates, ...outreachManualModeCandidates]
+      ? [...outreachSendCandidates, ...outreachManualModeCandidates]
       : outreachManualModeCandidates;
-    const outreachAutoReady = outreachOperator.mode === 'away' ? outreachNonTwilioCandidates : [];
+    const outreachAutoReady = outreachOperator.mode === 'away' ? outreachSendCandidates : [];
+    const outreachProvider = configuredOutreachProvider();
+    const outreachTwilioCandidates = outreachProvider === 'twilio' ? outreachAutoReady : [];
+    const outreachAndroidCandidates = outreachProvider === 'android_gateway' ? outreachAutoReady : [];
     const outreachPaused = outreachManualModeCandidates;
 
     sendJson(res, 200, {
@@ -820,11 +816,11 @@ module.exports = async function handler(req, res) {
         loan_officer_coverage_signs: loanOfficerCoverageSignRows.length,
         outreach_queue: outreach.length,
         outreach_queue_pending: outreach.filter((row) => !row.initial_sent_at && !['blocked', 'failed', 'sent'].includes(row.initial_send_status || '')).length,
-        outreach_queue_cron_ready: outreachTwilioCandidates.length + outreachAutoReady.length,
+        outreach_queue_cron_ready: outreachAutoReady.length,
         outreach_queue_twilio_ready: outreachTwilioCandidates.length,
         outreach_queue_manual_ready: outreachManualReady.length,
         outreach_queue_auto_ready: outreachAutoReady.length,
-        outreach_queue_android_ready: outreachAutoReady.length,
+        outreach_queue_android_ready: outreachAndroidCandidates.length,
         outreach_queue_paused: outreachPaused.length,
         outreach_queue_needs_approval: 0,
         outreach_queue_approved_ready: outreachSendCandidates.length,
