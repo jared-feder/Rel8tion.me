@@ -72,6 +72,7 @@ global.fetch = async (url, options = {}) => {
       recent_outreach_sends_24h: 8,
       hourly_remaining: 8,
       daily_remaining: 17,
+      outreach_provider: 'twilio',
       outreach_release_window: { active: false }
     });
   }
@@ -168,6 +169,7 @@ test('admin API saves a tighter runtime configuration and returns live stats', a
   assert.equal(res.payload.ok, true);
   assert.equal(res.payload.guardrails.value.max_per_day, 25);
   assert.equal(res.payload.guardrails.value.send_horizon_days, 5);
+  assert.equal(res.payload.sender.provider, 'twilio');
   assert.equal(res.payload.stats.queue_total, 12);
   assert.equal(writes.at(-1).key, 'outreach_guardrails');
 });
@@ -186,6 +188,11 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.match(admin, /Open houses enriched/);
   assert.match(admin, /Upcoming send horizon days/);
   assert.match(admin, /soonest date\/time first/);
+  assert.match(admin, /Outbound delivery route/);
+  assert.match(admin, /Twilio toll-free/);
+  assert.match(admin, /Android SMS Gateway fallback/);
+  assert.match(admin, /At desk: manual/);
+  assert.match(admin, /Away: automatic/);
   assert.match(admin, /Locked recipient protections/);
   assert.match(sender, /loadOutreachGuardrails/);
   assert.match(sender, /\.eq\("key", "outreach_guardrails"\)/);
@@ -198,6 +205,7 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.doesNotMatch(dashboard, /SMS_TWILIO_OUTREACH_BROKERAGES|isTwilioOutreachBrokerage/);
   assert.doesNotMatch(sender, /SMS_TWILIO_OUTREACH_BROKERAGES|outreachProviderOverrideForRow/);
   assert.match(sender, /outreachOperatorMode === "away"\s*\? configuredProvider\s*:\s*"manual"/);
+  assert.match(sender, /outreach_provider: configuredProvider/);
   assert.match(manualReply, /omit_repeated_stop_disclosure:\s*true/);
   assert.match(manualReply, /Cannot send manual reply to opted-out contact/);
   assert.match(sharedSms, /metadata\.omit_repeated_stop_disclosure !== true/);

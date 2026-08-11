@@ -2094,6 +2094,15 @@
       return state.command?.outreach_operator?.mode === 'away' ? 'away' : 'live';
     }
 
+    function outreachDeliveryProvider() {
+      const provider = state.outreachControl?.sender?.provider || state.command?.outreach_provider || 'twilio';
+      return provider === 'android_gateway' ? 'android_gateway' : 'twilio';
+    }
+
+    function outreachDeliveryLabel() {
+      return outreachDeliveryProvider() === 'android_gateway' ? 'Android SMS Gateway fallback' : 'Twilio toll-free';
+    }
+
     function isOutreachCronReady(row) {
       if (!row) return false;
       return isOutreachSendCandidate({ ...row, send_mode: 'automatic' });
@@ -3139,9 +3148,10 @@ ${rowsHtml}
     async function setOutreachOperatorMode(mode) {
       const normalized = mode === 'away' ? 'away' : 'live';
       if (normalized === outreachOperatorMode()) return;
+      const deliveryRoute = outreachDeliveryLabel();
       const prompt = normalized === 'away'
-        ? 'Switch outreach to Away mode? Eligible ready rows from every brokerage can send through the configured automatic provider on the next cron run.'
-        : 'Switch outreach to Live mode? All ready rows will wait for manual SMS instead of auto-sending.';
+        ? `Switch handling to Away / automatic? Eligible ready rows from every brokerage can send through ${deliveryRoute} on the next cron run.`
+        : `Switch handling to At desk / manual? All ready rows will wait for manual SMS. The ${deliveryRoute} delivery route will not change.`;
       if (!window.confirm(prompt)) return;
 
       state.actionKey = `outreach_mode:${normalized}`;
@@ -3151,7 +3161,7 @@ ${rowsHtml}
           method: 'POST',
           body: JSON.stringify({ mode: normalized })
         });
-        showToast(normalized === 'away' ? 'Away automatic mode enabled for every brokerage.' : 'Live manual mode enabled for every brokerage.');
+        showToast(normalized === 'away' ? `Away automatic handling enabled through ${deliveryRoute}.` : `At-desk manual handling enabled; route remains ${deliveryRoute}.`);
         state.actionKey = '';
         await loadAll({ showLoading: false });
       } catch (error) {
@@ -5437,6 +5447,9 @@ ${rowsHtml}
       const paused = control.paused === true;
       const healthStopped = sender.health_blocked === true && sender.health_gate_override !== true;
       const sendingStopped = paused || healthStopped;
+      const provider = sender.provider === 'android_gateway' ? 'android_gateway' : 'twilio';
+      const providerLabel = provider === 'android_gateway' ? 'Android SMS Gateway fallback' : 'Twilio toll-free';
+      const operatorMode = sender.operator_mode === 'away' ? 'away' : 'live';
       const busy = String(state.actionKey || '').startsWith('outreach_control:');
       const rate = Number(sender.health_opt_out_rate || 0);
       const maxRate = Number(guardrails.max_opt_out_rate || 0);
@@ -5469,12 +5482,33 @@ ${rowsHtml}
           </div>
           <div class="header-actions">
             ${badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}
+            ${badge(provider === 'twilio' ? 'TWILIO ROUTE' : 'ANDROID FALLBACK ROUTE', provider === 'twilio' ? 'ok' : 'warn')}
+            ${badge(operatorMode === 'away' ? 'AUTOMATIC HANDLING' : 'MANUAL HANDLING', operatorMode === 'away' ? 'ok' : 'info')}
             ${sender.health_gate_override ? badge('HEALTH OVERRIDE ACTIVE', 'warn') : ''}
-            ${renderOutreachModeControls()}
           </div>
         </div>
 
         <div class="outreach-control-grid">
+          <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
+            <div class="reply-footer">
+              <div>
+                <div class="mini-title">Outbound delivery route</div>
+                <div class="address">${esc(providerLabel)}</div>
+                <div class="small">This is the provider that automatic outreach will use. Twilio and Android fallback are delivery routes; they are separate from sender status and operator handling.</div>
+              </div>
+              ${badge(provider === 'twilio' ? 'PRIMARY ROUTE' : 'FALLBACK ACTIVE', provider === 'twilio' ? 'ok' : 'warn')}
+            </div>
+            <div class="reply-footer">
+              <div>
+                <div class="mini-title">Operator handling</div>
+                <div class="address">${operatorMode === 'away' ? 'Away / automatic' : 'At desk / manual'}</div>
+                <div class="small">At desk holds every brokerage for manual sending. Away allows eligible rows from every brokerage to use the delivery route shown above.</div>
+              </div>
+              ${renderOutreachModeControls(operatorMode)}
+            </div>
+            <div class="small">The retired Douglas Elliman exception belonged to the old Android fallback setup. It does not control Twilio and is no longer part of either route.</div>
+          </section>
+
           <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
             <div class="reply-footer">
               <div>
@@ -5577,11 +5611,12 @@ ${rowsHtml}
       const manualReady = state.command?.overview?.outreach_queue_manual_ready || 0;
       const autoReady = state.command?.overview?.outreach_queue_auto_ready ?? state.command?.overview?.outreach_queue_android_ready ?? 0;
       const operatorMode = outreachOperatorMode();
+      const providerLabel = outreachDeliveryLabel();
       return `
         <div class="section-head">
           <div>
             <h2>Outreach command</h2>
-            <div class="sub">${matchingRows.length} conversations in this view | showing ${rows.length} | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | mode ${esc(operatorMode)} | ${esc(twilioReady)} Twilio | ${esc(manualReady)} manual | ${esc(autoReady)} auto | ${esc(paused)} paused</div>
+            <div class="sub">${matchingRows.length} conversations in this view | showing ${rows.length} | ${esc(state.counts.inbound || 0)} inbound | ${esc(state.counts.needs_reply || 0)} need reply | route ${esc(providerLabel)} | handling ${operatorMode === 'away' ? 'automatic' : 'manual'} | ${esc(twilioReady)} Twilio ready | ${esc(manualReady)} manual | ${esc(autoReady)} auto | ${esc(paused)} paused</div>
           </div>
           <div class="header-actions">
             ${renderOutreachModeControls()}
@@ -5724,16 +5759,16 @@ ${rowsHtml}
       `;
     }
 
-    function renderOutreachModeControls() {
-      const mode = outreachOperatorMode();
+    function renderOutreachModeControls(modeOverride = '') {
+      const mode = modeOverride === 'away' || modeOverride === 'live' ? modeOverride : outreachOperatorMode();
       const busy = String(state.actionKey || '').startsWith('outreach_mode:');
       return `
         <div class="row-actions">
           <button class="btn ${mode === 'live' ? 'primary' : 'soft'}" data-outreach-mode="live" ${busy || mode === 'live' ? 'disabled' : ''}>
-            <i data-lucide="hand"></i><span>${busy && state.actionKey === 'outreach_mode:live' ? 'Switching...' : 'Live: manual'}</span>
+            <i data-lucide="hand"></i><span>${busy && state.actionKey === 'outreach_mode:live' ? 'Switching...' : 'At desk: manual'}</span>
           </button>
           <button class="btn ${mode === 'away' ? 'primary' : 'soft'}" data-outreach-mode="away" ${busy || mode === 'away' ? 'disabled' : ''}>
-            <i data-lucide="send"></i><span>${busy && state.actionKey === 'outreach_mode:away' ? 'Switching...' : 'Away: auto'}</span>
+            <i data-lucide="send"></i><span>${busy && state.actionKey === 'outreach_mode:away' ? 'Switching...' : 'Away: automatic'}</span>
           </button>
         </div>
       `;

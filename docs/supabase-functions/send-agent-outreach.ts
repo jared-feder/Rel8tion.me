@@ -603,6 +603,7 @@ serve(async (req) => {
       maxOptOutRate,
       sendHorizonDays,
     } = guardrails;
+    const configuredProvider = configuredOutreachProvider();
 
     if (!isWithinAllowedSendWindow() && !dryRun) {
       return new Response(
@@ -616,6 +617,7 @@ serve(async (req) => {
             max_per_hour: maxPerHour,
             max_per_day: maxPerDay,
             send_horizon_days: sendHorizonDays,
+            outreach_provider: configuredProvider,
             message: "Current time is outside allowed send window (8:00 AM-9:00 PM ET). No messages sent.",
           },
           null,
@@ -689,6 +691,7 @@ serve(async (req) => {
             health_opt_outs: recentHealthOptOutCount,
             health_opt_out_rate: recentOptOutRate,
             max_opt_out_rate: maxOptOutRate,
+            outreach_provider: configuredProvider,
             outreach_operator_mode: outreachOperatorMode,
             message: outreachSendPaused
               ? "Outbound outreach sending is paused. No messages sent this run."
@@ -723,6 +726,7 @@ serve(async (req) => {
             recent_outreach_sends_24h: recentDailySendCount,
             hourly_remaining: hourlyRemaining,
             daily_remaining: dailyRemaining,
+            outreach_provider: configuredProvider,
             outreach_operator_mode: outreachOperatorMode,
             message: "Outreach send throttle is active. No messages sent this run.",
             results: [],
@@ -919,7 +923,6 @@ serve(async (req) => {
           continue;
         }
 
-        const configuredProvider = configuredOutreachProvider();
         const selectedProvider = outreachOperatorMode === "away"
           ? configuredProvider
           : "manual";
@@ -1242,6 +1245,7 @@ serve(async (req) => {
           recent_outreach_sends_24h: recentDailySendCount,
           hourly_remaining: hourlyRemaining,
           daily_remaining: dailyRemaining,
+          outreach_provider: configuredProvider,
           outreach_operator_mode: outreachOperatorMode,
           paused: outreachSendPaused,
           health_blocked: healthBlocked,

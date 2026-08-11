@@ -302,6 +302,7 @@ async function loadControl() {
       updated_by: releaseRow?.updated_by || null
     },
     sender: {
+      provider: diagnostic.outreach_provider === 'android_gateway' ? 'android_gateway' : 'twilio',
       health_blocked: diagnostic.health_blocked === true,
       health_gate_override: diagnostic.health_gate_override === true,
       health_outreach_sends: Number(diagnostic.health_outreach_sends || 0),

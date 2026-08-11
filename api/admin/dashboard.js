@@ -849,6 +849,7 @@ module.exports = async function handler(req, res) {
           ))
         ).length
       },
+      outreach_provider: outreachProvider,
       outreach_operator: outreachOperator,
       crm: crmRows,
       agent_websites: agentWebsites,

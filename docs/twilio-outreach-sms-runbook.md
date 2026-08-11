@@ -12,7 +12,7 @@ This is the durable recovery note for REL8TION outreach SMS. Keep this file in s
 - Outreach provider secret: `SMS_OUTREACH_PROVIDER=twilio`.
 - Event/system provider override: set `SMS_EVENTS_PROVIDER=twilio`.
 - The legacy brokerage-specific override `SMS_TWILIO_OUTREACH_BROKERAGES` is retired and no longer read by the sender or COMMAND dashboard.
-- Runtime operator mode is `away`, meaning eligible ready rows from every brokerage use the configured automatic provider. `live` holds every ready row for manual sending.
+- Runtime operator mode is `away`, shown in COMMAND as `Away / automatic`, meaning eligible ready rows from every brokerage use the configured automatic provider. The stored `live` mode is shown as `At desk / manual` and holds every ready row for manual sending. This handling state is separate from the displayed Twilio or Android delivery route.
 - The code also accepts `TWILIO_FROM_NUMBER`, but this project currently uses `TWILIO_PHONE`.
 - Existing `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` remain the account credentials unless the Twilio account/subaccount changes.
 - `TWILIO_STATUS_CALLBACK_TOKEN` exists only as a Supabase secret. Rotate it with `supabase secrets set`; do not commit the token value.

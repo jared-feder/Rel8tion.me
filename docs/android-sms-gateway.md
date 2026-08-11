@@ -16,8 +16,10 @@ SMS_EVENTS_PROVIDER=twilio
 
 Runtime mode is stored in `rel8tion_runtime_settings` as `outreach_operator_mode`:
 
-- `live`: every ready row waits for manual send in COMMAND.
-- `away`: eligible ready rows from every brokerage use whichever provider is configured by `SMS_OUTREACH_PROVIDER`.
+- `live` (`At desk / manual` in COMMAND): every ready row waits for manual send.
+- `away` (`Away / automatic` in COMMAND): eligible ready rows from every brokerage use whichever provider is configured by `SMS_OUTREACH_PROVIDER`.
+
+COMMAND displays the delivery route separately from handling mode. Selecting At desk or Away does not switch Twilio to Android or Android to Twilio.
 
 Android route settings:
 
