@@ -9,7 +9,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` HomeKey and COMMAND agent-performance assembly no longer treat generic values such as `Listing Agent`, `Agent`, or `Unknown` as a real person. Open-house identity now resolves through exact listing ID plus matching phone/email across `listing_agents`, `agent_outreach_queue`, `agent_listing_inventory`, and canonical `agents` records while preserving the durable HomeKey attribution row.
 - `[IMPLEMENTED]` The OneKey freshness worker now fills `open_houses.agent` when the current OneKey record provides a name and preserves an existing real name when the refreshed source omits it.
 - `[VERIFIED]` Production migration `20260812143000` repaired 3,085 previously blank/placeholder `open_houses.agent` values only where all exact queue and inventory sources agreed on one real name. Conflicting or unresolved rows were skipped. The reported 165 Meister Blvd row now resolves to Ruth Chalco from its exact open-house queue/inventory identity.
-- `[NEEDS VERIFICATION]` Application deployment and live HomeKey/report rendering verification remain pending.
+- `[VERIFIED]` Production release `9b1d25e5` is live through Vercel deployment `dpl_EnZq4cKhJDHvLEBVCa5UXHCCh48G` on `app.rel8tion.me`. The reported HomeKey returns HTTP 200, renders Ruth Chalco with Compass Greater NY LLC, and no longer renders the generic `Listing agent` heading. The production route suite passed; the bounded deployment log scan found no HTTP 5xx failures (only existing Node `DEP0169` deprecation warnings).
 
 ## 2026-08-10: Outreach opt-out threshold and reply footer
 
