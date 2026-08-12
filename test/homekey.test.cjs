@@ -10,7 +10,7 @@ process.env.PUBLIC_APP_URL = 'https://app.rel8tion.me';
 
 const homekeyHandler = require('../api/admin/open-house-homekey.js');
 const interestHandler = require('../api/open-house-keepsake-interest.js');
-const { renderListingPage } = require('../api/open-house-link.js').__test;
+const { loadKeepsakeAgents, renderListingPage } = require('../api/open-house-link.js').__test;
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
@@ -42,10 +42,13 @@ test('HomeKey generation is idempotent for one open-house assignment and downloa
   let creates = 0;
   global.fetch = async (url, options = {}) => {
     const target = String(url);
-    if (target.includes('/open_houses?')) return jsonResponse([{ id: 'house-1', address: '12 Home Key Lane', image: 'https://images.example/home.webp', open_start: '2026-08-09T17:00:00Z' }]);
+    if (target.includes('/open_houses?')) return jsonResponse([{ id: 'house-1', address: '12 Home Key Lane', image: 'https://images.example/home.webp', open_start: '2026-08-09T17:00:00Z', agent: null, agent_phone: '5165550101', agent_email: 'ruth@example.test', brokerage: 'Example Realty' }]);
     if (target.includes('/open_house_property_profiles?')) return jsonResponse([{ open_house_id: 'house-1', address: '12 Home Key Lane', city: 'Queens', state: 'NY', zip: '11375', primary_image: 'https://images.example/home.webp', open_start: '2026-08-09T17:00:00Z' }]);
     if (target.includes('/field_demo_visits?')) return jsonResponse([{ id: 'visit-1', open_house_id: 'house-1', open_house_event_id: 'event-1', scheduled_start: '2026-08-09T17:00:00Z', status: 'confirmed' }]);
     if (target.includes('/listing_agents?')) return jsonResponse([{ id: '11111111-1111-4111-8111-111111111111', name: 'Listing Agent', phone: '5165550101', is_primary: true }]);
+    if (target.includes('/agent_outreach_queue?')) return jsonResponse([{ id: 'queue-1', agent_name: 'Ruth Example', agent_phone: '5165550101', agent_email: 'ruth@example.test', brokerage: 'Example Realty' }]);
+    if (target.includes('/agent_listing_inventory?')) return jsonResponse([]);
+    if (target.includes('/agents?')) return jsonResponse([{ id: 'agent-1', name: 'Ruth Example', phone: '5165550101', email: 'ruth@example.test', brokerage: 'Example Realty' }]);
     if (target.includes('/field_demo_visit_participants?')) return jsonResponse([{ participant_profile_id: '22222222-2222-4222-8222-222222222222', participant_uid: '22222222-2222-4222-8222-222222222222', role: 'loan_officer', is_primary: true }]);
     if (target.includes('/verified_profiles?')) return jsonResponse([{ uid: '22222222-2222-4222-8222-222222222222', full_name: 'Assigned LO', company_name: 'NMB', phone: '5165550102' }]);
     if (target.includes('/property_keepsakes?attribution_key=')) return jsonResponse(stored ? [stored] : []);
@@ -72,6 +75,7 @@ test('HomeKey generation is idempotent for one open-house assignment and downloa
   assert.equal(second.body.reused, true);
   assert.equal(second.body.homekey.public_code, first.body.homekey.public_code);
   assert.equal(second.body.homekey.loan_officer_uid, '22222222-2222-4222-8222-222222222222');
+  assert.equal(first.body.listing_agent.name, 'Ruth Example');
   assert.equal(creates, 1);
   assert.match(first.body.url, /^https:\/\/app\.rel8tion\.me\/h\/[A-Za-z0-9_-]+$/);
   assert.match(first.body.qr_data_url, /^data:image\/png;base64,/);
@@ -141,6 +145,29 @@ test('HomeKey migration keeps durable records and events server-managed', () => 
   assert.match(migration, /alter table public\.property_keepsakes enable row level security/);
   assert.match(migration, /revoke all on table public\.property_keepsakes from anon, authenticated/);
   assert.match(migration, /create unique index if not exists leads_source_key_unique_idx/);
+});
+
+test('HomeKey resolves a real agent name from exact listing sources instead of rendering a placeholder', async () => {
+  global.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('/listing_agents?')) return jsonResponse([{ id: 'listing-agent-1', open_house_id: 'house-ruth', name: 'Listing Agent', phone: '7188098671', brokerage: 'Compass Greater NY LLC', is_primary: true }]);
+    if (target.includes('/agent_outreach_queue?')) return jsonResponse([{ id: 'queue-ruth', open_house_id: 'house-ruth', agent_name: 'Ruth Chalco', agent_phone: '(718) 809-8671', agent_email: 'ruth.chalco@compass.com', brokerage: 'Compass Greater NY LLC' }]);
+    if (target.includes('/agent_listing_inventory?')) return jsonResponse([{ id: 'inventory-ruth', source_listing_id: 'house-ruth', agent_name: 'Ruth Chalco', phone: '(718) 809-8671', email: 'ruth.chalco@compass.com', brokerage: 'Compass Greater NY LLC' }]);
+    if (target.includes('/agents?')) return jsonResponse([{ id: 'agent-ruth', name: 'Ruth Chalco', phone: '(718) 809-8671', brokerage: 'Compass Greater NY LLC' }]);
+    if (target.includes('/agent_websites?')) return jsonResponse([]);
+    throw new Error(`Unexpected request: ${target}`);
+  };
+
+  const agents = await loadKeepsakeAgents('house-ruth', {
+    agent_phone: '(718) 809-8671',
+    agent_email: 'ruth.chalco@compass.com',
+    brokerage: 'Compass Greater NY LLC'
+  }, 'listing-agent-1');
+
+  assert.equal(agents.length, 1);
+  assert.equal(agents[0].name, 'Ruth Chalco');
+  assert.equal(agents[0].email, 'ruth.chalco@compass.com');
+  assert.notEqual(agents[0].name, 'Listing Agent');
 });
 
 test('real linked open-house fixture renders its verified property, agent, and assigned loan officer', () => {

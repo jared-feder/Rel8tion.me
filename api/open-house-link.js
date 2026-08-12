@@ -1,4 +1,10 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
+const {
+  normalizedPhone,
+  resolveAgentIdentity,
+  sameAgentContact,
+  usableAgentName
+} = require('../lib/agent-identity');
 
 const ONEKEY_PROPERTY_IMAGES_URL = 'https://www.onekeymls.com/api/property-images';
 const ONEKEY_SEARCH_URL = 'https://www.onekeymls.com/api/search';
@@ -550,11 +556,6 @@ async function resolveListing(id) {
   };
 }
 
-function normalizedPhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
-  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-}
-
 function matchAgentWebsite(agent, websites) {
   const email = cleanText(agent?.email).toLowerCase();
   const phone = normalizedPhone(agent?.phone);
@@ -574,28 +575,54 @@ function agentWebsiteUrl(site) {
 }
 
 async function loadKeepsakeAgents(openHouseId, fallback = {}, listingAgentId = '') {
-  const [listingRows, websiteRows] = await Promise.all([
-    supabaseRest(`listing_agents?${listingAgentId ? `id=eq.${encodeURIComponent(listingAgentId)}&` : `open_house_id=eq.${encodeURIComponent(openHouseId)}&`}select=id,name,phone,email,brokerage,is_primary,primary_photo_url,directory_photo_url,profile_url&order=is_primary.desc.nullslast,created_at.asc&limit=8`).catch(() => []),
-    supabaseRest('agent_websites?status=eq.published&select=name,slug,title,brokerage,email,phone,photo_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,zillow_url,realtor_url&order=updated_at.desc&limit=500').catch(() => [])
+  const [listingRowsRaw, queueRows, inventoryRows] = await Promise.all([
+    supabaseRest(`listing_agents?open_house_id=eq.${encodeURIComponent(openHouseId)}&select=id,open_house_id,name,phone,email,brokerage,is_primary,primary_photo_url,directory_photo_url,profile_url&order=is_primary.desc.nullslast,created_at.asc&limit=8`).catch(() => []),
+    supabaseRest(`agent_outreach_queue?open_house_id=eq.${encodeURIComponent(openHouseId)}&select=id,open_house_id,agent_name,agent_phone,agent_email,brokerage,agent_photo_url&order=updated_at.desc&limit=8`).catch(() => []),
+    supabaseRest(`agent_listing_inventory?source_listing_id=eq.${encodeURIComponent(openHouseId)}&select=id,source_listing_id,agent_name,phone,email,brokerage&order=updated_at.desc&limit=8`).catch(() => [])
   ]);
-  const baseRows = (listingRows || []).length ? listingRows : [{
+  const fallbackRow = {
     name: fallback.agent_name || fallback.agent || '',
     phone: fallback.agent_phone || '',
     email: fallback.agent_email || '',
     brokerage: fallback.brokerage || '',
     is_primary: true
-  }];
+  };
+  const listingRows = [...(listingRowsRaw || [])]
+    .map((row) => ({ ...row, source: 'listing_agents' }))
+    .sort((left, right) => Number(String(right.id) === String(listingAgentId)) - Number(String(left.id) === String(listingAgentId)));
+  const exactRows = [
+    ...(queueRows || []).map((row) => ({ ...row, source: 'agent_outreach_queue' })),
+    ...(inventoryRows || []).map((row) => ({ ...row, source: 'agent_listing_inventory' })),
+    fallbackRow
+  ];
+  const contacts = [...listingRows, ...exactRows];
+  const phones = [...new Set(contacts.map((row) => normalizedPhone(row.phone || row.agent_phone)).filter(Boolean))];
+  const emails = [...new Set(contacts.map((row) => cleanText(row.email || row.agent_email).toLowerCase()).filter(Boolean))];
+  const filters = [
+    ...phones.map((phone) => `phone_normalized.eq.${encodeURIComponent(phone)}`),
+    ...emails.map((email) => `email.eq.${encodeURIComponent(email)}`)
+  ];
+  const [agentRows, websiteRows] = await Promise.all([
+    filters.length
+      ? supabaseRest(`agents?or=(${filters.join(',')})&select=id,name,phone,email,brokerage,image_url,website&limit=20`).catch(() => [])
+      : Promise.resolve([]),
+    supabaseRest('agent_websites?status=eq.published&select=name,slug,title,brokerage,email,phone,photo_url,custom_domain,status,facebook_url,instagram_url,linkedin_url,zillow_url,realtor_url&order=updated_at.desc&limit=500').catch(() => [])
+  ]);
+  const identityRows = [...exactRows, ...(agentRows || []).map((row) => ({ ...row, source: 'agents' }))];
+  const baseRows = listingRows.length ? listingRows : [resolveAgentIdentity(identityRows)];
 
   return baseRows.filter((agent) => agent.name || agent.phone || agent.email).map((agent) => {
-    const site = matchAgentWebsite(agent, websiteRows);
+    const matchingRows = identityRows.filter((candidate) => sameAgentContact(agent, candidate));
+    const resolved = resolveAgentIdentity([agent, ...matchingRows, ...(!agent.phone && !agent.email ? identityRows : [])]);
+    const site = matchAgentWebsite(resolved, websiteRows);
     return {
-      name: firstPresent(agent.name, site?.name, fallback.agent_name, fallback.agent),
+      name: firstPresent(resolved.name, usableAgentName(site?.name), usableAgentName(fallback.agent_name), usableAgentName(fallback.agent)),
       title: firstPresent(site?.title, 'Listing Agent'),
-      brokerage: firstPresent(agent.brokerage, site?.brokerage, fallback.brokerage),
-      phone: firstPresent(agent.phone, site?.phone, fallback.agent_phone),
-      email: firstPresent(agent.email, site?.email, fallback.agent_email),
-      photo_url: validExternalUrl(firstPresent(agent.primary_photo_url, agent.directory_photo_url, site?.photo_url)),
-      profile_url: validExternalUrl(firstPresent(agent.profile_url, agentWebsiteUrl(site))),
+      brokerage: firstPresent(resolved.brokerage, site?.brokerage, fallback.brokerage),
+      phone: firstPresent(resolved.phone, site?.phone, fallback.agent_phone),
+      email: firstPresent(resolved.email, site?.email, fallback.agent_email),
+      photo_url: validExternalUrl(firstPresent(agent.primary_photo_url, agent.directory_photo_url, matchingRows[0]?.agent_photo_url, matchingRows[0]?.image_url, site?.photo_url)),
+      profile_url: validExternalUrl(firstPresent(agent.profile_url, matchingRows[0]?.website, agentWebsiteUrl(site))),
       website_url: validExternalUrl(agentWebsiteUrl(site)),
       facebook_url: validExternalUrl(site?.facebook_url),
       instagram_url: validExternalUrl(site?.instagram_url),
@@ -604,7 +631,7 @@ async function loadKeepsakeAgents(openHouseId, fallback = {}, listingAgentId = '
       realtor_url: validExternalUrl(site?.realtor_url),
       is_primary: agent.is_primary !== false
     };
-  });
+  }).filter((agent) => agent.name || agent.phone || agent.email);
 }
 
 function visitDistance(visit, targetTime) {
@@ -1264,6 +1291,7 @@ module.exports.__test = {
   loadOneKeyRecord,
   loadPropertyImages,
   loadPropertyProfile,
+  loadKeepsakeAgents,
   loadKeepsakePeople,
   oneKeyImageIdentifiers,
   propertyProfileIsFresh,

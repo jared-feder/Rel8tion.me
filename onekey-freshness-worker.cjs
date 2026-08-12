@@ -334,6 +334,7 @@ function buildOpenHousePatch(openHouse, remote, nowIso) {
       checked_at: nowIso
     },
     brokerage: remote?.brokerage || openHouse.brokerage || null,
+    agent: remote?.agent || openHouse.agent || null,
     beds: remote?.beds ?? openHouse.beds ?? null,
     baths: remote?.baths ?? openHouse.baths ?? null,
     sqft: remote?.sqft ?? openHouse.sqft ?? null,

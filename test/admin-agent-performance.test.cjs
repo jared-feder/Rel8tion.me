@@ -256,3 +256,30 @@ test('Agent Board uses real accepted visits and hosted events as worked-with sig
   assert.equal(rows[0].relationship_category, 'accepted_worked');
   assert.equal(rows[0].accepted_open_house_count, 2);
 });
+
+test('Agent Board never lets a placeholder open-house name replace a contact-matched production identity', () => {
+  const rows = buildAgentPerformance({
+    rankings: [{
+      id: 'ranking-ruth',
+      agent_name: 'Ruth Chalco',
+      phone_normalized: '7188098671',
+      brokerage: 'Compass Greater NY LLC',
+      agent_rank_score: 81
+    }],
+    openHouses: [{
+      id: 'M00000489-1028954',
+      agent: 'Listing Agent',
+      agent_phone: '(718) 809-8671',
+      agent_email: 'ruth.chalco@compass.com',
+      brokerage: 'Compass Greater NY LLC',
+      address: '165 Meister Blvd',
+      open_start: '2099-08-12T17:00:00Z'
+    }]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'Ruth Chalco');
+  assert.equal(rows[0].ranking_id, 'ranking-ruth');
+  assert.equal(rows[0].upcoming_open_house_count, 1);
+  assert.notEqual(rows[0].name, 'Listing Agent');
+});

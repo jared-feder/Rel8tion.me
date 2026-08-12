@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const QRCode = require('qrcode');
 const { adminAuthorized, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { normalizedPhone, resolveAgentIdentity } = require('../../lib/agent-identity');
 
 function clean(value, max = 300) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -84,10 +85,39 @@ async function resolveVisit(openHouseId, requestedVisitId, targetStart) {
 }
 
 async function resolveAttribution(house, profile, visit) {
-  const agent = one(await supabaseRest(`listing_agents?open_house_id=eq.${encodeURIComponent(house.id)}&select=*&order=is_primary.desc.nullslast,created_at.asc&limit=1`).catch(() => []));
-  const participant = visit?.id ? one(await supabaseRest(
-    `field_demo_visit_participants?field_demo_visit_id=eq.${encodeURIComponent(visit.id)}&role=eq.loan_officer&status=neq.cancelled&select=*&order=is_primary.desc,created_at.asc&limit=1`
-  ).catch(() => [])) : null;
+  const [listingRowsRaw, queueRows, inventoryRows, participant] = await Promise.all([
+    supabaseRest(`listing_agents?open_house_id=eq.${encodeURIComponent(house.id)}&select=*&order=is_primary.desc.nullslast,created_at.asc&limit=8`).catch(() => []),
+    supabaseRest(`agent_outreach_queue?open_house_id=eq.${encodeURIComponent(house.id)}&select=id,agent_name,agent_phone,agent_email,brokerage&order=updated_at.desc&limit=8`).catch(() => []),
+    supabaseRest(`agent_listing_inventory?source_listing_id=eq.${encodeURIComponent(house.id)}&select=id,agent_name,phone,email,brokerage&order=updated_at.desc&limit=8`).catch(() => []),
+    visit?.id ? supabaseRest(
+      `field_demo_visit_participants?field_demo_visit_id=eq.${encodeURIComponent(visit.id)}&role=eq.loan_officer&status=neq.cancelled&select=*&order=is_primary.desc,created_at.asc&limit=1`
+    ).then(one).catch(() => null) : Promise.resolve(null)
+  ]);
+  const listingRows = (listingRowsRaw || []).map((row) => ({ ...row, source: 'listing_agents' }));
+  const identityRows = [
+    ...listingRows,
+    ...(queueRows || []).map((row) => ({ ...row, source: 'agent_outreach_queue' })),
+    ...(inventoryRows || []).map((row) => ({ ...row, source: 'agent_listing_inventory' })),
+    {
+      name: profile?.agent_name || house.agent || '',
+      phone: profile?.agent_phone || house.agent_phone || '',
+      email: profile?.agent_email || house.agent_email || '',
+      brokerage: profile?.brokerage || house.brokerage || ''
+    }
+  ];
+  const phones = [...new Set(identityRows.map((row) => normalizedPhone(row.phone || row.agent_phone)).filter(Boolean))];
+  const emails = [...new Set(identityRows.map((row) => clean(row.email || row.agent_email).toLowerCase()).filter(Boolean))];
+  const filters = [
+    ...phones.map((phone) => `phone_normalized.eq.${encodeURIComponent(phone)}`),
+    ...emails.map((email) => `email.eq.${encodeURIComponent(email)}`)
+  ];
+  const knownAgents = filters.length ? await supabaseRest(
+    `agents?or=(${filters.join(',')})&select=id,name,phone,email,brokerage&limit=20`
+  ).catch(() => []) : [];
+  const listingAgent = resolveAgentIdentity([
+    ...identityRows,
+    ...(knownAgents || []).map((row) => ({ ...row, source: 'agents' }))
+  ]);
   const session = !participant && visit?.open_house_event_id ? one(await supabaseRest(
     `event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(visit.open_house_event_id)}&select=*&order=signed_in_at.desc.nullslast,created_at.desc&limit=1`
   ).catch(() => [])) : null;
@@ -100,14 +130,7 @@ async function resolveAttribution(house, profile, visit) {
   ).catch(() => [])) : null;
 
   return {
-    listingAgent: {
-      ...(agent || {}),
-      id: agent?.id || null,
-      name: agent?.name || profile?.agent_name || house.agent || '',
-      phone: agent?.phone || profile?.agent_phone || house.agent_phone || '',
-      email: agent?.email || profile?.agent_email || house.agent_email || '',
-      brokerage: agent?.brokerage || profile?.brokerage || house.brokerage || ''
-    },
+    listingAgent,
     loanOfficer,
     loanOfficerUid: loanOfficer?.uid || loanOfficerUid || null
   };
@@ -243,4 +266,4 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
-module.exports.__test = { attributionKey, homeKeyUrl, publicOrigin, safeFilename };
+module.exports.__test = { attributionKey, homeKeyUrl, publicOrigin, resolveAttribution, safeFilename };

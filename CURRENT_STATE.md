@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-12: Open-house agent identity recovery
+
+- `[IMPLEMENTED]` HomeKey and COMMAND agent-performance assembly no longer treat generic values such as `Listing Agent`, `Agent`, or `Unknown` as a real person. Open-house identity now resolves through exact listing ID plus matching phone/email across `listing_agents`, `agent_outreach_queue`, `agent_listing_inventory`, and canonical `agents` records while preserving the durable HomeKey attribution row.
+- `[IMPLEMENTED]` The OneKey freshness worker now fills `open_houses.agent` when the current OneKey record provides a name and preserves an existing real name when the refreshed source omits it.
+- `[VERIFIED]` Production migration `20260812143000` repaired 3,085 previously blank/placeholder `open_houses.agent` values only where all exact queue and inventory sources agreed on one real name. Conflicting or unresolved rows were skipped. The reported 165 Meister Blvd row now resolves to Ruth Chalco from its exact open-house queue/inventory identity.
+- `[NEEDS VERIFICATION]` Application deployment and live HomeKey/report rendering verification remain pending.
+
 ## 2026-08-10: Outreach opt-out threshold and reply footer
 
 - `[IMPLEMENTED]` The owner-approved rolling seven-day opt-out health threshold is 5%. The COMMAND control API and `send-agent-outreach` use 5% as the code fallback, and production stores the same value in `rel8tion_runtime_settings.key='outreach_guardrails'` without changing the pause, release window, or volume ceilings.
