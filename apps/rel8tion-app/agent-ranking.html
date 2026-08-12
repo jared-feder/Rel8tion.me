@@ -2402,6 +2402,14 @@
 
     function mergeProfileRanking(base, detail) {
       if (!detail) return base;
+      const baseName = String(base?.agent_name || '').trim().toLowerCase();
+      const baseNameIsPlaceholder = [
+        'loading agent profile',
+        'listing agent',
+        'agent',
+        'unknown',
+        'unknown agent'
+      ].includes(baseName);
       const preservedRaw = {};
       [
         'display_dedupe_key',
@@ -2417,6 +2425,7 @@
       return {
         ...detail,
         ...base,
+        agent_name: baseNameIsPlaceholder ? detail.agent_name : (base?.agent_name || detail.agent_name),
         raw_sources: {
           ...(detail.raw_sources || {}),
           ...(base.raw_sources || {}),

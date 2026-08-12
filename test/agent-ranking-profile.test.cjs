@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const agentRankingHandler = require('../api/admin/agent-ranking.js');
 const { scoreRow } = require('../lib/agent-ranking');
 
@@ -15,6 +17,12 @@ const ninaRanking = {
   listings_days_since_last: 3,
   agent_rank_score: 295
 };
+
+test('URL-opened production reports replace their loading or generic agent-name placeholder', () => {
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'apps', 'rel8tion-app', 'agent-ranking.html'), 'utf8');
+  assert.match(html, /'loading agent profile',[\s\S]*'listing agent'/);
+  assert.match(html, /agent_name:\s*baseNameIsPlaceholder\s*\?\s*detail\.agent_name/);
+});
 
 test('profile portrait resolver reuses the identity-matched outreach headshot', () => {
   const candidate = agentRankingHandler.__test.bestProfilePhotoCandidate(ninaRanking, [
