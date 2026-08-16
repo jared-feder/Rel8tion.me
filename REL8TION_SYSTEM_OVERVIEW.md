@@ -215,7 +215,7 @@ Important tables and fields:
 - `[IMPLEMENTED]` Buyer financing outreach only happens after explicit buyer opt-in.
 - `[IMPLEMENTED]` `api/compliance/ny-disclosure.js` generates six-page disclosure previews and signed packets. Signed packets place the captured electronic signature, date, provider identity, brokerage, and applicable seller-representation selections directly onto the official New York agency and housing/anti-discrimination form pages, in addition to the REL8TION cover and courtesy pages.
 - `[IMPLEMENTED]` Corrected disclosure packets use versioned storage filenames and preserve any superseded packet descriptor in `ny_discrimination_disclosure.signed_pdf_history`, so regenerating an older packet does not overwrite the original stored PDF. Official source downloads use explicit PDF request headers, retry transient failures, and fail closed on non-PDF content.
-- `[NEEDS VERIFICATION]` Production deployment, stored-object/history parity, and final legal/form-version review remain required.
+- `[VERIFIED]` Production release `8f3c25ba` was visually verified against both current official signature pages. A bounded legacy regeneration retained two distinct Storage objects, preserved the v1 descriptor in packet history, and linked the corrected v2 supersession metadata. Final legal review remains a business/compliance responsibility.
 - `[RISK]` Outreach and auto-reply behavior can spend money and affect real conversations. Queue filters, quiet hours, opt-outs, provider state, and owner approval matter.
 
 ## Enrichment And Listing Freshness
