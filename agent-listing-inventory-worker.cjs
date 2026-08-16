@@ -92,6 +92,11 @@ function numberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function integerOrNull(value) {
+  const parsed = numberOrNull(value);
+  return parsed === null ? null : Math.round(parsed);
+}
+
 function firstPresent(...values) {
   return values.find((value) => cleanText(value)) || '';
 }
@@ -778,6 +783,23 @@ async function loadInternalListingSources(config, nowIso) {
   };
 }
 
+async function loadOpenHousesByLinks(config, links = []) {
+  const uniqueLinks = [...new Set(links.map((link) => cleanText(link)).filter(Boolean))];
+  const rowsById = new Map();
+  for (let index = 0; index < uniqueLinks.length; index += 20) {
+    const batch = uniqueLinks.slice(index, index + 20);
+    const filter = encodeURIComponent(`(${batch.map((link) => JSON.stringify(link)).join(',')})`);
+    const rows = await supabaseRequestAll(
+      config,
+      'open_houses',
+      `link=in.${filter}&select=id,address,price,beds,baths,open_start,open_end,lat,lng,link,agent,brokerage,sqft,agent_phone,agent_email,image,source,agent_scraped,agent_enriched,updated_at&order=id.asc`,
+      config.relationshipLimit
+    );
+    for (const row of rows) rowsById.set(String(row.id), row);
+  }
+  return [...rowsById.values()];
+}
+
 function openHousePayload(record, match, nowIso) {
   const computed = record.Computed || {};
   const openStart = computed.OpenHousesEarliestStartTime || null;
@@ -798,7 +820,7 @@ function openHousePayload(record, match, nowIso) {
     price: numberOrNull(listing.Price?.ListPrice),
     beds: numberOrNull(structure.BedroomsTotal || computedFacts.BedroomsTotalInteger),
     baths: numberOrNull(structure.BathroomsTotalInteger || computedFacts.BathroomsTotalInteger),
-    sqft: numberOrNull(structure.LivingArea || computedFacts.LivingAreaSquareFeet),
+    sqft: integerOrNull(structure.LivingArea || computedFacts.LivingAreaSquareFeet),
     brokerage: recordBrokerage(record) || profile.brokerage || null,
     agent: profile.agent_name,
     agent_phone: profile.phone || match.candidate.phone || null,
@@ -850,24 +872,34 @@ function mergeCanonicalOpenHouse(existing, discovered, nowIso) {
 
 function reconcileOpenHousePayloads(discoveredRows = [], existingRows = [], nowIso = new Date().toISOString()) {
   const existingById = new Map(existingRows.map((row) => [String(row.id), row]));
+  const existingByLink = new Map();
   const existingByAddress = new Map();
   for (const row of existingRows) {
+    const link = cleanText(row.link);
+    if (link) existingByLink.set(link, row);
     const key = openHouseAddressKey(row.address);
     if (!key) continue;
     if (!existingByAddress.has(key)) existingByAddress.set(key, []);
     existingByAddress.get(key).push(row);
   }
 
-  const rows = [];
+  const rowsById = new Map();
   const usedExistingIds = new Set();
   let matchedById = 0;
+  let matchedByLink = 0;
   let matchedByAddressTime = 0;
   let inserted = 0;
   let attached = 0;
 
   for (const discovered of discoveredRows) {
-    let existing = existingById.get(String(discovered.id));
-    let matchType = existing ? 'id' : '';
+    const discoveredId = String(discovered.id);
+    const discoveredLink = cleanText(discovered.link);
+    const linkMatch = discoveredLink ? existingByLink.get(discoveredLink) : null;
+    const idMatch = existingById.get(discoveredId);
+    let existing = linkMatch || idMatch;
+    let matchType = existing
+      ? (linkMatch && String(linkMatch.id) !== discoveredId ? 'link' : 'id')
+      : '';
     if (!existing) {
       const start = new Date(discovered.open_start).getTime();
       const candidates = existingByAddress.get(openHouseAddressKey(discovered.address)) || [];
@@ -880,13 +912,16 @@ function reconcileOpenHousePayloads(discoveredRows = [], existingRows = [], nowI
     }
 
     if (!existing) {
-      rows.push(discovered);
+      rowsById.set(discoveredId, discovered);
+      existingById.set(discoveredId, discovered);
+      if (discoveredLink) existingByLink.set(discoveredLink, discovered);
       inserted += 1;
       continue;
     }
 
     usedExistingIds.add(String(existing.id));
     if (matchType === 'id') matchedById += 1;
+    else if (matchType === 'link') matchedByLink += 1;
     else matchedByAddressTime += 1;
     const previouslyEnriched = Boolean(
       meaningfulAgentName(existing.agent)
@@ -894,12 +929,15 @@ function reconcileOpenHousePayloads(discoveredRows = [], existingRows = [], nowI
     );
     const merged = mergeCanonicalOpenHouse(existing, discovered, nowIso);
     if (!previouslyEnriched && merged.agent_enriched) attached += 1;
-    rows.push(merged);
+    rowsById.set(String(merged.id), merged);
+    existingById.set(String(merged.id), merged);
+    if (cleanText(merged.link)) existingByLink.set(cleanText(merged.link), merged);
   }
 
   return {
-    rows,
+    rows: [...rowsById.values()],
     matched_by_id: matchedById,
+    matched_by_link: matchedByLink,
     matched_by_address_time: matchedByAddressTime,
     inserted,
     attached
@@ -1378,7 +1416,17 @@ async function run(options = {}) {
 
   const inventory = [...inventoryByKey.values()];
   const openHouses = [...openHousesById.values()];
-  const openHouseReconciliation = reconcileOpenHousePayloads(openHouses, internal.openHouses, nowIso);
+  const linkMatchedOpenHouses = config.promoteOpenHouses
+    ? await loadOpenHousesByLinks(config, openHouses.map((row) => row.link))
+    : [];
+  const canonicalOpenHousesById = new Map(
+    [...internal.openHouses, ...linkMatchedOpenHouses].map((row) => [String(row.id), row])
+  );
+  const openHouseReconciliation = reconcileOpenHousePayloads(
+    openHouses,
+    [...canonicalOpenHousesById.values()],
+    nowIso
+  );
   const inventoryWritten = await upsertRows(
     config,
     'agent_listing_inventory',
@@ -1437,6 +1485,7 @@ async function run(options = {}) {
     open_house_promotion_enabled: config.promoteOpenHouses,
     open_houses_written: openHousesWritten,
     open_houses_matched_by_id: openHouseReconciliation.matched_by_id,
+    open_houses_matched_by_link: openHouseReconciliation.matched_by_link,
     open_houses_matched_by_address_time: openHouseReconciliation.matched_by_address_time,
     open_houses_agents_attached: openHouseReconciliation.attached,
     open_houses_inserted: openHouseReconciliation.inserted,
@@ -1481,6 +1530,7 @@ module.exports = {
   internalInventoryPayload,
   inventorySemanticKey,
   discoverOneKeyListingsForProfile,
+  loadOpenHousesByLinks,
   listingAgentCandidates,
   matchProfiles,
   matchOneKeyAgentProfile,

@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-16: Open-house inventory link-collision repair
+
+- `[IMPLEMENTED]` The protected listing-inventory cron now resolves every discovered OneKey URL against all canonical `open_houses` rows, including historical events, before promotion. When another row already owns the URL, the sync preserves that canonical row ID and source instead of violating `open_houses.unique_link`; duplicate discoveries sharing one URL in the same run also collapse to one upsert.
+- `[IMPLEMENTED]` Fractional OneKey living-area values retain their precision in `agent_listing_inventory` but are rounded only for the integer-backed canonical `open_houses.sqft` field.
+- `[VERIFIED]` Focused regression coverage passes for historical-link ownership, same-run duplicate links, canonical row/source preservation, and fractional square-foot normalization.
+- `[NEEDS VERIFICATION]` Production deployment and a successful live `/api/cron/sync-agent-listing-inventory` completion without the prior PostgreSQL `23505` error remain pending.
+
 ## 2026-08-16: Signed NY disclosure form repair
 
 - `[IMPLEMENTED]` `api/compliance/ny-disclosure.js` now writes the captured electronic signature, signing date, host-agent name, brokerage, and seller-representation selections onto the signature pages of both official New York disclosure forms. The REL8TION cover and courtesy pages remain part of the same six-page packet.

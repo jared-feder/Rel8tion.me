@@ -7,6 +7,7 @@ const {
   inventoryPayload,
   internalInventoryPayload,
   inventorySemanticKey,
+  loadOpenHousesByLinks,
   matchProfiles,
   matchOneKeyAgentProfile,
   mergeInventoryPayload,
@@ -340,6 +341,26 @@ test('inventory and upcoming open-house payloads use trusted relationship contac
   assert.equal(openHouse.agent_enriched, true);
 });
 
+test('canonical open-house payloads round decimal square footage without changing listing inventory precision', () => {
+  const profile = relationshipProfile({
+    id: 'agent-1',
+    name: 'Ruth Chalco',
+    brokerage: 'Example Realty',
+    phone: '516-555-0100'
+  });
+  const record = oneKeyRecord({
+    Structure: {
+      ...oneKeyRecord().Structure,
+      LivingArea: '2866.56'
+    }
+  });
+  const match = matchProfiles(record, [profile])[0];
+  const nowIso = '2026-07-30T00:00:00.000Z';
+
+  assert.equal(inventoryPayload(record, match, nowIso).sqft, 2866.56);
+  assert.equal(openHousePayload(record, match, nowIso).sqft, 2867);
+});
+
 test('reverse discovery attaches an agent to an existing canonical event without changing its source or id', () => {
   const nowIso = '2026-08-04T12:00:00.000Z';
   const existing = [{
@@ -411,6 +432,95 @@ test('reverse discovery inserts a OneKey event when no canonical match exists', 
 
   assert.equal(result.inserted, 1);
   assert.equal(result.rows[0].id, 'M00000489-new');
+});
+
+test('reverse discovery reuses the canonical row that already owns a OneKey listing link', () => {
+  const link = 'https://www.onekeymls.com/home-details/910-e-226th-st-bronx-ny-10466/9dDYYGr6PEf?propertySaleType=Rent';
+  const existing = [{
+    id: 'canonical-event',
+    address: '910 E 226th St, Bronx, NY 10466',
+    open_start: '2026-08-01T16:00:00Z',
+    open_end: '2026-08-01T18:00:00Z',
+    link,
+    source: 'estately',
+    agent: null
+  }];
+  const discovered = [{
+    id: 'M00000489-new-id',
+    address: '910 E 226th St, Bronx, NY 10466',
+    open_start: '2026-08-09T16:00:00Z',
+    open_end: '2026-08-09T18:00:00Z',
+    link,
+    source: 'onekey',
+    agent: 'Ruth Chalco',
+    agent_phone: '516-555-0100'
+  }];
+  const result = reconcileOpenHousePayloads(discovered, existing, '2026-08-06T12:00:00.000Z');
+
+  assert.equal(result.matched_by_link, 1);
+  assert.equal(result.inserted, 0);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].id, 'canonical-event');
+  assert.equal(result.rows[0].source, 'estately');
+  assert.equal(result.rows[0].link, link);
+  assert.equal(result.rows[0].agent, 'Ruth Chalco');
+});
+
+test('canonical link lookup includes historical open houses and deduplicates requested URLs', async () => {
+  const previousFetch = global.fetch;
+  const requested = [];
+  const link = 'https://www.onekeymls.com/home-details/910-e-226th-st-bronx-ny-10466/9dDYYGr6PEf?propertySaleType=Rent';
+  global.fetch = async (url) => {
+    requested.push(String(url));
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify([{ id: 'canonical-event', link }])
+    };
+  };
+
+  try {
+    const rows = await loadOpenHousesByLinks({
+      url: 'https://example.supabase.co',
+      key: 'test-key',
+      relationshipLimit: 100
+    }, [link, link]);
+    assert.equal(requested.length, 1);
+    assert.match(decodeURIComponent(requested[0]), /open_houses\?link=in\.\("https:\/\/www\.onekeymls\.com\/home-details\//);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, 'canonical-event');
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
+test('same-run OneKey discoveries sharing one link collapse to one upsert row', () => {
+  const link = 'https://www.onekeymls.com/home-details/12-main-st-huntington-ny-11743/shared?propertySaleType=Sale';
+  const discovered = [
+    {
+      id: 'onekey-first',
+      address: '12 Main St, Huntington, NY 11743',
+      open_start: '2026-08-09T16:00:00Z',
+      link,
+      source: 'onekey',
+      agent: 'Ruth Chalco'
+    },
+    {
+      id: 'onekey-duplicate',
+      address: '12 Main Street, Huntington, NY 11743',
+      open_start: '2026-08-09T16:00:00Z',
+      link,
+      source: 'onekey',
+      agent: 'Ruth Chalco'
+    }
+  ];
+  const result = reconcileOpenHousePayloads(discovered, [], '2026-08-06T12:00:00.000Z');
+
+  assert.equal(result.inserted, 1);
+  assert.equal(result.matched_by_link, 1);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].id, 'onekey-first');
+  assert.equal(result.rows[0].link, link);
 });
 
 test('OneKey listing payloads derive location and a clickable URL from current search fields', () => {
