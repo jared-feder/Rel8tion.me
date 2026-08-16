@@ -9,7 +9,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` The protected listing-inventory cron now resolves every discovered OneKey URL against all canonical `open_houses` rows, including historical events, before promotion. When another row already owns the URL, the sync preserves that canonical row ID and source instead of violating `open_houses.unique_link`; duplicate discoveries sharing one URL in the same run also collapse to one upsert.
 - `[IMPLEMENTED]` Fractional OneKey living-area values retain their precision in `agent_listing_inventory` but are rounded only for the integer-backed canonical `open_houses.sqft` field.
 - `[VERIFIED]` Focused regression coverage passes for historical-link ownership, same-run duplicate links, canonical row/source preservation, and fractional square-foot normalization.
-- `[NEEDS VERIFICATION]` Production deployment and a successful live `/api/cron/sync-agent-listing-inventory` completion without the prior PostgreSQL `23505` error remain pending.
+- `[VERIFIED]` Production release `2701cd1a` is live through Vercel deployment `dpl_3TLNVoYUUQ65hRQ5Dx4rUFsBsxLX`. A manual production cron run completed with HTTP 200 in 12.3 seconds: 500 profiles scanned, 426 matched, 2,969 listings examined, 65 open houses written, 18 agents attached, 3 events inserted, and the rotation cursor advanced to 432. The prior PostgreSQL `23505` link collision did not recur, and the bounded post-run error scan found no runtime errors.
 
 ## 2026-08-16: Signed NY disclosure form repair
 
