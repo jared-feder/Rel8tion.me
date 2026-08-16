@@ -213,8 +213,9 @@ Important tables and fields:
 - `[IMPLEMENTED]` Twilio inbound outreach replies enter through the public `twilio-inbound-router` Edge Function, which routes replies into the protected `twilio-inbound-reply` handler. Matched replies link to outreach queue rows using tolerant 10/11-digit phone matching; unmatched replies are still stored with `queue_row_id=null`.
 - `[RISK]` Twilio Messaging Service inbound handling must be set to `Send a webhook`, not `Receive the message`, or REL8TION will not see inbound replies. Delivery status callbacks must use `twilio-message-status?token=<TWILIO_STATUS_CALLBACK_TOKEN>`.
 - `[IMPLEMENTED]` Buyer financing outreach only happens after explicit buyer opt-in.
-- `[IMPLEMENTED]` `api/compliance/ny-disclosure.js` generates disclosure packet previews and signed PDFs.
-- `[NEEDS VERIFICATION]` Signed disclosure PDF storage and final legal/form-version review remain unverified.
+- `[IMPLEMENTED]` `api/compliance/ny-disclosure.js` generates six-page disclosure previews and signed packets. Signed packets place the captured electronic signature, date, provider identity, brokerage, and applicable seller-representation selections directly onto the official New York agency and housing/anti-discrimination form pages, in addition to the REL8TION cover and courtesy pages.
+- `[IMPLEMENTED]` Corrected disclosure packets use versioned storage filenames and preserve any superseded packet descriptor in `ny_discrimination_disclosure.signed_pdf_history`, so regenerating an older packet does not overwrite the original stored PDF. Official source downloads use explicit PDF request headers, retry transient failures, and fail closed on non-PDF content.
+- `[NEEDS VERIFICATION]` Production deployment, stored-object/history parity, and final legal/form-version review remain required.
 - `[RISK]` Outreach and auto-reply behavior can spend money and affect real conversations. Queue filters, quiet hours, opt-outs, provider state, and owner approval matter.
 
 ## Enrichment And Listing Freshness

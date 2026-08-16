@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-16: Signed NY disclosure form repair
+
+- `[IMPLEMENTED]` `api/compliance/ny-disclosure.js` now writes the captured electronic signature, signing date, host-agent name, brokerage, and seller-representation selections onto the signature pages of both official New York disclosure forms. The REL8TION cover and courtesy pages remain part of the same six-page packet.
+- `[IMPLEMENTED]` The packet generator now downloads the current official Department of State forms with an explicit PDF request identity, retries transient failures, and rejects HTML or other non-PDF responses instead of storing an incomplete packet.
+- `[IMPLEMENTED]` Corrected packets use version `2026-08-13-official-forms-v2` and a versioned storage filename. When a legacy packet is regenerated, its original object and descriptor are retained in `signed_pdf_history`; the corrected packet records what it supersedes rather than overwriting the historical PDF.
+- `[VERIFIED]` Seven focused regression tests pass for form decoration, source-request headers, invalid-source rejection, version selection, immutable packet history, date handling, and legacy check-in recovery. A real-form visual verification against the current Department of State PDFs is required before production release.
+- `[NEEDS VERIFICATION]` Production deployment, one bounded legacy-packet regeneration, stored-object/history parity, and the post-deploy route/runtime scan remain pending.
+
 ## 2026-08-12: Open-house agent identity recovery
 
 - `[IMPLEMENTED]` HomeKey and COMMAND agent-performance assembly no longer treat generic values such as `Listing Agent`, `Agent`, or `Unknown` as a real person. Open-house identity now resolves through exact listing ID plus matching phone/email across `listing_agents`, `agent_outreach_queue`, `agent_listing_inventory`, and canonical `agents` records while preserving the durable HomeKey attribution row. URL-opened production profiles also replace the temporary `Loading agent profile` stub with the loaded ranking name before rendering the profile or marketing report.

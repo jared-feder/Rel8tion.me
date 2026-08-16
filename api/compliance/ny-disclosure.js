@@ -6,13 +6,18 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
 const SOURCE_PDF_URL = process.env.REL8TION_NYS_DISCLOSURE_PDF_URL
   || process.env.NYS_DISCLOSURE_PDF_URL
-  || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nyhousingantidisc.pdf';
+  || 'https://dos.ny.gov/housinganti-discrimination-form';
 const AGENCY_SOURCE_PDF_URL = process.env.REL8TION_NYS_AGENCY_DISCLOSURE_PDF_URL
-  || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nysellerbuyerdisclosure.pdf';
+  || 'https://dos.ny.gov/buyer-and-seller-disclosure-form-english';
 const OFFICIAL_SOURCE_URL = 'https://dos.ny.gov/housing-and-anti-discrimination-disclosure-form';
 const SIGNED_DISCLOSURE_BUCKET = process.env.SIGNED_DISCLOSURE_BUCKET || 'signed-disclosures';
 const DISCLOSURE_PACKET_TYPE = 'rel8tion_open_house_disclosure_packet';
-const DISCLOSURE_PACKET_VERSION = '2026-05-09-three-step-v1';
+const DISCLOSURE_PACKET_VERSION = '2026-08-13-official-forms-v2';
+const SOURCE_FETCH_TIMEOUT_MS = 10000;
+const SOURCE_REQUEST_HEADERS = Object.freeze({
+  Accept: 'application/pdf,*/*',
+  'User-Agent': 'REL8TION/1.0 (+https://rel8tion.me)'
+});
 const COURTESY_NOTICE_TEXT = [
   'Rel8tion was created to make real estate interactions clearer, faster, and more transparent for everyone involved.',
   'At this open house, the listing agent may currently represent the seller. This does not mean you are alone, unwelcome, or unable to ask questions. It simply means the relationship is being disclosed clearly from the start.',
@@ -130,12 +135,27 @@ function eventDateValue(context, checkin) {
   );
 }
 
-function buildSignedDisclosureFileName(context, checkin) {
+function buildSignedDisclosureFileName(context, checkin, packetVersion = DISCLOSURE_PACKET_VERSION) {
   const date = dateSlug(eventDateValue(context, checkin));
   const address = safeFilenamePart(context.address || 'open-house');
   const buyer = safeFilenamePart(checkin.visitor_name || 'buyer');
   const checkinId = shortToken(checkin.id, 'checkin');
-  return `${date}-${address}-${buyer}-${checkinId}-rel8tion-disclosure-packet.pdf`;
+  const version = safeFilenamePart(packetVersion);
+  return `${date}-${address}-${buyer}-${checkinId}-rel8tion-disclosure-packet-${version}.pdf`;
+}
+
+function formatFormDate(value) {
+  if (!value) return todayLocalDate();
+  const dateOnly = cleanText(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) return `${dateOnly[2]}/${dateOnly[3]}/${dateOnly[1]}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return cleanText(value);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
 }
 
 function buildSignedDisclosureStoragePath(context, checkin, fileName) {
@@ -246,9 +266,39 @@ function drawField(page, { label, value, x, y, width = 500, font, boldFont }) {
 }
 
 async function fetchSourcePdf(url = SOURCE_PDF_URL, label = 'disclosure') {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Unable to fetch ${label} source PDF: ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SOURCE_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        headers: SOURCE_REQUEST_HEADERS,
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        lastError = new Error(`Unable to fetch ${label} source PDF: ${response.status}`);
+        if (response.status < 500 && response.status !== 429) break;
+        continue;
+      }
+
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const contentType = cleanText(response.headers?.get?.('content-type')).toLowerCase();
+      const hasPdfHeader = bytes.length >= 5
+        && Buffer.from(bytes.subarray(0, 5)).toString('ascii') === '%PDF-';
+      if (!contentType.includes('application/pdf') && !hasPdfHeader) {
+        throw new Error(`Unable to fetch ${label} source PDF: received ${contentType || 'unknown content type'}.`);
+      }
+      if (!hasPdfHeader) throw new Error(`Unable to fetch ${label} source PDF: invalid PDF content.`);
+      return bytes;
+    } catch (error) {
+      lastError = error?.name === 'AbortError'
+        ? new Error(`Timed out fetching ${label} source PDF.`)
+        : error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error(`Unable to fetch ${label} source PDF.`);
 }
 
 async function appendSourcePdf(pdf, url, label) {
@@ -256,12 +306,63 @@ async function appendSourcePdf(pdf, url, label) {
   const sourcePdf = await PDFDocument.load(sourceBytes);
   const copiedPages = await pdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
   copiedPages.forEach((page) => pdf.addPage(page));
+  return copiedPages;
+}
+
+function fittedFontSize(font, text, maxWidth, preferredSize = 10, minimumSize = 6.5) {
+  let size = preferredSize;
+  while (size > minimumSize && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.25;
+  return size;
+}
+
+function drawLineValue(page, { value, x, y, maxWidth, font, preferredSize = 10, color = rgb(0.02, 0.06, 0.12) }) {
+  const text = cleanText(value);
+  if (!text) return;
+  page.drawText(text, {
+    x,
+    y,
+    size: fittedFontSize(font, text, maxWidth, preferredSize),
+    font,
+    color
+  });
+}
+
+function decorateAgencyDisclosure(page, context, options, fonts) {
+  const signature = cleanText(options.signature);
+  const signedDate = formatFormDate(firstPresent(options.signedAt, options.signedDate));
+
+  drawLineValue(page, { value: context.agentName, x: 154, y: 619, maxWidth: 198, font: fonts.regular, preferredSize: 9 });
+  drawLineValue(page, { value: context.brokerage, x: 371, y: 619, maxWidth: 217, font: fonts.regular, preferredSize: 9 });
+  drawLineValue(page, { value: signature, x: 53, y: 298, maxWidth: 258, font: fonts.regular, preferredSize: 10 });
+  drawLineValue(page, { value: signature, x: 24, y: 233, maxWidth: 257, font: fonts.signature, preferredSize: 12 });
+  drawLineValue(page, { value: signedDate, x: 44, y: 143, maxWidth: 236, font: fonts.regular, preferredSize: 10 });
+
+  page.drawText('X', { x: 76, y: 554, size: 9, font: fonts.bold, color: rgb(0.02, 0.06, 0.12) });
+  page.drawText('X', { x: 101, y: 533, size: 9, font: fonts.bold, color: rgb(0.02, 0.06, 0.12) });
+  page.drawText('X', { x: 80, y: 252, size: 9, font: fonts.bold, color: rgb(0.02, 0.06, 0.12) });
+}
+
+function decorateHousingDisclosure(page, context, options, fonts) {
+  const signature = cleanText(options.signature);
+  const signedDate = formatFormDate(firstPresent(options.signedAt, options.signedDate));
+
+  drawLineValue(page, { value: context.agentName, x: 198, y: 552, maxWidth: 180, font: fonts.regular, preferredSize: 10 });
+  drawLineValue(page, { value: context.brokerage, x: 77, y: 522, maxWidth: 218, font: fonts.regular, preferredSize: 10 });
+  drawLineValue(page, { value: signature, x: 59, y: 477, maxWidth: 520, font: fonts.regular, preferredSize: 10 });
+  drawLineValue(page, { value: signature, x: 214, y: 402, maxWidth: 257, font: fonts.signature, preferredSize: 12 });
+  drawLineValue(page, { value: signedDate, x: 520, y: 402, maxWidth: 69, font: fonts.regular, preferredSize: 9 });
+}
+
+async function appendOfficialForm(pdf, { url, label, signed, decorate, context, options, fonts }) {
+  const pages = await appendSourcePdf(pdf, url, label);
+  if (signed && pages.length) decorate(pages[pages.length - 1], context, options, fonts);
 }
 
 async function buildDisclosurePdf(context, options = {}) {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const signatureFont = await pdf.embedFont(StandardFonts.HelveticaOblique);
   const agency = options.agency || {};
   const courtesy = options.courtesy || {};
   const agencySignedAt = firstPresent(agency.agency_disclosure_signed_at, options.agencySignedAt);
@@ -351,12 +452,25 @@ async function buildDisclosurePdf(context, options = {}) {
     }) - 18;
   });
 
-  try {
-    await appendSourcePdf(pdf, AGENCY_SOURCE_PDF_URL, 'agency disclosure');
-  } catch (error) {
-    console.log('[ny-disclosure] agency source append skipped', error.message || error);
-  }
-  await appendSourcePdf(pdf, SOURCE_PDF_URL, 'housing and anti-discrimination disclosure');
+  const fonts = { regular: font, bold: boldFont, signature: signatureFont };
+  await appendOfficialForm(pdf, {
+    url: AGENCY_SOURCE_PDF_URL,
+    label: 'agency disclosure',
+    signed: options.signed,
+    decorate: decorateAgencyDisclosure,
+    context,
+    options,
+    fonts
+  });
+  await appendOfficialForm(pdf, {
+    url: SOURCE_PDF_URL,
+    label: 'housing and anti-discrimination disclosure',
+    signed: options.signed,
+    decorate: decorateHousingDisclosure,
+    context,
+    options,
+    fonts
+  });
   return pdf.save();
 }
 
@@ -393,22 +507,117 @@ async function downloadStoredPdf(bucket, path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function patchCheckinMetadata(checkin, signedPdf) {
+function packetIdentity(packet) {
+  return [packet?.storage_bucket, packet?.storage_path, packet?.document_sha256]
+    .filter(Boolean)
+    .join('|');
+}
+
+function buildDisclosureMetadata(checkin, signedPdf) {
   const metadata = checkin.metadata || {};
   const disclosure = metadata.ny_discrimination_disclosure || {};
-  const updatedMetadata = {
+  const previousPacket = disclosure.signed_pdf;
+  const history = Array.isArray(disclosure.signed_pdf_history)
+    ? disclosure.signed_pdf_history.filter(Boolean)
+    : [];
+  const previousIdentity = packetIdentity(previousPacket);
+  const newIdentity = packetIdentity(signedPdf);
+  if (previousIdentity && previousIdentity !== newIdentity
+      && !history.some((packet) => packetIdentity(packet) === previousIdentity)) {
+    history.push(previousPacket);
+  }
+
+  const supersession = previousIdentity && previousIdentity !== newIdentity
+    ? {
+        supersedes_packet_version: previousPacket.packet_version || '',
+        supersedes_storage_path: previousPacket.storage_path || '',
+        supersedes_document_sha256: previousPacket.document_sha256 || '',
+        legacy_packet_preserved: true
+      }
+    : {};
+
+  return {
     ...metadata,
     ny_discrimination_disclosure: {
       ...disclosure,
-      signed_pdf: signedPdf
+      signed_pdf: { ...signedPdf, ...supersession },
+      ...(history.length ? { signed_pdf_history: history } : {})
     }
   };
+}
+
+async function patchCheckinMetadata(checkin, signedPdf) {
+  const updatedMetadata = buildDisclosureMetadata(checkin, signedPdf);
   const rows = await supabaseRest(`event_checkins?id=eq.${enc(checkin.id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ metadata: updatedMetadata })
   }, true);
   return one(rows) || { ...checkin, metadata: updatedMetadata };
+}
+
+function signedPacketOptions(context) {
+  const metadata = context.checkin.metadata || {};
+  const disclosure = metadata.ny_discrimination_disclosure || {};
+  return {
+    signed: true,
+    signature: disclosure.e_signature_value || context.checkin.visitor_name,
+    signedAt: disclosure.signed_at || context.checkin.created_at,
+    signedDate: disclosure.signed_date,
+    consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
+    housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || context.checkin.created_at,
+    agency: metadata.nys_agency_disclosure || {},
+    courtesy: metadata.rel8tion_courtesy_notice || {}
+  };
+}
+
+function hasCompletedDisclosure(context) {
+  const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
+  return disclosure.acknowledged === true && Boolean(disclosure.e_signature_value || context.checkin.visitor_name);
+}
+
+function isCurrentStoredPacket(signedPdf) {
+  return Boolean(signedPdf?.storage_bucket
+    && signedPdf?.storage_path
+    && signedPdf?.document_type === DISCLOSURE_PACKET_TYPE
+    && signedPdf?.packet_version === DISCLOSURE_PACKET_VERSION);
+}
+
+async function generateAndStoreSignedPacket(context) {
+  const checkin = context.checkin;
+  const bytes = await buildDisclosurePdf(context, signedPacketOptions(context));
+  const generatedAt = new Date().toISOString();
+  const fileName = buildSignedDisclosureFileName(context, checkin);
+  const path = buildSignedDisclosureStoragePath(context, checkin, fileName);
+  const signedPdf = {
+    generated: true,
+    document_type: DISCLOSURE_PACKET_TYPE,
+    packet_version: DISCLOSURE_PACKET_VERSION,
+    packet_includes: [
+      'nys_agency_disclosure',
+      'ny_housing_anti_discrimination_disclosure',
+      'rel8tion_courtesy_notice'
+    ],
+    official_forms_completed: true,
+    storage_bucket: SIGNED_DISCLOSURE_BUCKET,
+    storage_path: path,
+    storage_file_name: fileName,
+    download_url: `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1`,
+    generated_at: generatedAt,
+    document_sha256: sha256Hex(bytes),
+    event_id: context.eventId || '',
+    checkin_id: checkin.id,
+    open_house_source_id: context.openHouseSourceId || '',
+    host_agent_slug: context.event?.host_agent_slug || '',
+    property_address: context.address || '',
+    buyer_name: checkin.visitor_name || '',
+    source_pdf_url: SOURCE_PDF_URL,
+    agency_source_pdf_url: AGENCY_SOURCE_PDF_URL,
+    official_source_url: OFFICIAL_SOURCE_URL
+  };
+  await uploadSignedPdf(path, bytes);
+  const updatedCheckin = await patchCheckinMetadata(checkin, signedPdf);
+  return { bytes, signedPdf, updatedCheckin };
 }
 
 async function handlePreview(req, res) {
@@ -425,27 +634,23 @@ async function handleDownloadSigned(req, res) {
   const context = await loadCheckinContext(checkinId);
   const metadata = context.checkin.metadata || {};
   const disclosure = metadata.ny_discrimination_disclosure || {};
-  const agency = metadata.nys_agency_disclosure || {};
-  const courtesy = metadata.rel8tion_courtesy_notice || {};
   const signedPdf = disclosure.signed_pdf || {};
 
   let bytes;
-  if (signedPdf.storage_bucket && signedPdf.storage_path && signedPdf.document_type === DISCLOSURE_PACKET_TYPE) {
+  let filename;
+  if (isCurrentStoredPacket(signedPdf)) {
     bytes = await downloadStoredPdf(signedPdf.storage_bucket, signedPdf.storage_path);
+    filename = signedPdf.storage_file_name;
   } else {
-    bytes = await buildDisclosurePdf(context, {
-      signed: true,
-      signature: disclosure.e_signature_value || context.checkin.visitor_name,
-      signedAt: disclosure.signed_at || context.checkin.created_at,
-      signedDate: disclosure.signed_date,
-      consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
-      housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || context.checkin.created_at,
-      agency,
-      courtesy
-    });
+    if (!hasCompletedDisclosure(context)) {
+      return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
+    }
+    const regenerated = await generateAndStoreSignedPacket(context);
+    bytes = regenerated.bytes;
+    filename = regenerated.signedPdf.storage_file_name;
   }
 
-  const filename = signedPdf.storage_file_name || buildSignedDisclosureFileName(context, context.checkin);
+  filename ||= buildSignedDisclosureFileName(context, context.checkin);
   return sendPdf(res, filename, bytes);
 }
 
@@ -456,61 +661,16 @@ async function handleGenerateSigned(req, res) {
 
   const context = await loadCheckinContext(checkinId);
   const checkin = context.checkin;
-  const metadata = checkin.metadata || {};
-  const disclosure = metadata.ny_discrimination_disclosure || {};
-  const agency = metadata.nys_agency_disclosure || {};
-  const courtesy = metadata.rel8tion_courtesy_notice || {};
-  if (disclosure.acknowledged !== true || !disclosure.e_signature_value) {
+  if (!hasCompletedDisclosure(context)) {
     return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
   }
 
-  const bytes = await buildDisclosurePdf(context, {
-    signed: true,
-    signature: disclosure.e_signature_value || checkin.visitor_name,
-    signedAt: disclosure.signed_at || checkin.created_at,
-    signedDate: disclosure.signed_date,
-    consumerRole: disclosure.consumer_role || checkin.visitor_type || 'Buyer',
-    housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || checkin.created_at,
-    agency,
-    courtesy
-  });
-
-  const generatedAt = new Date().toISOString();
-  const fileName = buildSignedDisclosureFileName(context, checkin);
-  const path = buildSignedDisclosureStoragePath(context, checkin, fileName);
-  const documentSha256 = sha256Hex(bytes);
-  await uploadSignedPdf(path, bytes);
-  const signedPdf = {
-    generated: true,
-    document_type: DISCLOSURE_PACKET_TYPE,
-    packet_version: DISCLOSURE_PACKET_VERSION,
-    packet_includes: [
-      'nys_agency_disclosure',
-      'ny_housing_anti_discrimination_disclosure',
-      'rel8tion_courtesy_notice'
-    ],
-    storage_bucket: SIGNED_DISCLOSURE_BUCKET,
-    storage_path: path,
-    storage_file_name: fileName,
-    download_url: `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1`,
-    generated_at: generatedAt,
-    document_sha256: documentSha256,
-    event_id: context.eventId || '',
-    checkin_id: checkin.id,
-    open_house_source_id: context.openHouseSourceId || '',
-    host_agent_slug: context.event?.host_agent_slug || '',
-    property_address: context.address || '',
-    buyer_name: checkin.visitor_name || '',
-    source_pdf_url: SOURCE_PDF_URL,
-    agency_source_pdf_url: AGENCY_SOURCE_PDF_URL,
-    official_source_url: OFFICIAL_SOURCE_URL
-  };
-  const updatedCheckin = await patchCheckinMetadata(checkin, signedPdf);
+  const generated = await generateAndStoreSignedPacket(context);
 
   return sendJson(res, 200, {
     ok: true,
-    signed_pdf: signedPdf,
-    checkin: updatedCheckin
+    signed_pdf: generated.signedPdf,
+    checkin: generated.updatedCheckin
   });
 }
 
@@ -527,4 +687,20 @@ module.exports = async function handler(req, res) {
     console.error('[ny-disclosure] failed', error);
     return sendJson(res, 500, { ok: false, error: error.message || 'Unable to generate NYS disclosure PDF.' });
   }
+};
+
+module.exports.__test = {
+  AGENCY_SOURCE_PDF_URL,
+  DISCLOSURE_PACKET_TYPE,
+  DISCLOSURE_PACKET_VERSION,
+  SOURCE_PDF_URL,
+  SOURCE_REQUEST_HEADERS,
+  buildDisclosureMetadata,
+  buildDisclosurePdf,
+  buildSignedDisclosureFileName,
+  fetchSourcePdf,
+  formatFormDate,
+  hasCompletedDisclosure,
+  isCurrentStoredPacket,
+  signedPacketOptions
 };
