@@ -13,6 +13,7 @@ const claimFlow = read('apps/rel8tion-app/src/modules/claimStyled/flow.js');
 const claimRenderer = read('apps/rel8tion-app/src/modules/claimStyled/renderer.js');
 const claimStyles = read('apps/rel8tion-app/src/modules/claimStyled/styles.css');
 const passHtml = read('apps/rel8tion-app/pass.html');
+const rootPassHtml = read('pass.html');
 const signHtml = read('apps/rel8tion-app/sign.html');
 const signResolver = read('apps/rel8tion-app/src/modules/signResolver/bootstrap.js');
 const sponsored = read('apps/rel8tion-app/sponsored-pass-activate.html');
@@ -59,9 +60,10 @@ test('sponsored activation keeps consent and the final action fixed on mobile vi
 
 test('cache-busting reaches every module in the claim and resolver chains', () => {
   const version = '20260816-event-pass-mobile';
-  for (const source of [claimHtml, claimBootstrap, claimFlow, passHtml, signHtml]) {
+  for (const source of [claimHtml, claimBootstrap, claimFlow, passHtml, rootPassHtml, signHtml]) {
     assert.match(source, new RegExp(version));
   }
+  assert.match(rootPassHtml, /activation-resolver-shell/);
 });
 
 test('edited inline activation pages remain valid JavaScript', () => {
