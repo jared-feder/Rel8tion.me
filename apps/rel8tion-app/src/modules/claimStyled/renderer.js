@@ -40,9 +40,9 @@ function firstRealAgentName(...values) {
 function render(content) {
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
-      <div class="mb-8">
-        <img src="${ASSETS.rel8tionLogo}" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+    <div class="claim-flow-card w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
+      <div class="claim-flow-logo-wrap mb-8">
+        <img src="${ASSETS.rel8tionLogo}" class="claim-flow-logo h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
       </div>
       ${content}
     </div>
@@ -168,15 +168,15 @@ export function showError(title, message) {
 export function showIntro(notice = '', eventPass = false) {
   if (eventPass) {
     render(`
-      <div class="text-center">
+      <div class="claim-event-pass-intro text-center">
         <div class="inline-flex items-center justify-center mb-4">
           <div class="px-4 py-2 rounded-full bg-white/60 border border-white/80 shadow-sm text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Event Pass • Next Step</div>
         </div>
         <h1 class="font-['Poppins'] text-[34px] md:text-[48px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-3">Find My<br>Open House</h1>
         <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-xl mx-auto mb-5">We use your current location to show the nearby open house. When your phone asks, tap <b>Allow</b>.</p>
-        <img src="/apps/rel8tion-app/assets/locate-my-open-house.webp" alt="Locate my open house" class="w-full rounded-[24px] shadow-[0_18px_42px_rgba(23,34,79,0.13)] mb-5">
         ${notice ? `<div class="mb-5 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
-        <button onclick="startFieldFlow()" class="w-full py-5 rounded-full font-black text-[17px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Allow Location &amp; Find My Open House</button>
+        <button onclick="startFieldFlow()" class="claim-primary-action w-full py-5 rounded-full font-black text-[17px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Allow Location &amp; Find My Open House</button>
+        <img src="/apps/rel8tion-app/assets/locate-my-open-house.webp" alt="Locate my open house" class="claim-guide-image w-full rounded-[24px] shadow-[0_18px_42px_rgba(23,34,79,0.13)] mt-5">
         <div class="mt-4 rounded-[20px] border border-slate-200 bg-white/75 px-5 py-4 text-left text-[13px] leading-relaxed text-slate-600"><b class="text-slate-800">If nothing happens on iPhone:</b><br>Open Settings → Apps → Safari → Location, choose <b>While Using the App</b>, then return and tap the button again.</div>
       </div>
     `);
@@ -205,8 +205,8 @@ export function showBrokerageStep(notice = '') {
     <div>
       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">Select Brokerage</h1>
       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Choose your brokerage to continue.</p>
-      ${notice ? `<div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
-      <div class="space-y-4 text-left">
+      ${notice ? `<div class="claim-form-notice mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+      <div class="claim-profile-fields space-y-4 text-left">
         <select id="brokerage_step_select" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
           ${getBrokerageOptions().map((opt) => {
             const label = opt === '' ? 'Select Brokerage' : (opt === '__other__' ? "Other / My Brokerage Isn't Listed" : opt);
@@ -231,12 +231,12 @@ export function showDetection() {
   const s = getStatus(h);
 
   render(`
-    <div>
+    <div class="claim-detection-screen">
       <h1 class="font-['Poppins'] text-3xl md:text-4xl font-black mb-4 uppercase text-[#1f2a5a]">Is This Your Listing?</h1>
       <p class="text-slate-500 text-lg mb-8">Confirm the listing to continue.</p>
-      <div class="rounded-[34px] overflow-hidden shadow-2xl mb-8 text-left border border-white/70 bg-white/80 backdrop-blur-sm">
-        ${h?.image ? `<img src="${esc(h.image)}" class="h-64 w-full object-cover">` : ''}
-        <div class="p-6 md:p-8">
+      <div class="claim-detection-card rounded-[34px] overflow-hidden shadow-2xl mb-8 text-left border border-white/70 bg-white/80 backdrop-blur-sm">
+        ${h?.image ? `<img src="${esc(h.image)}" class="claim-detection-image h-64 w-full object-cover">` : ''}
+        <div class="claim-detection-copy p-6 md:p-8">
           <div class="inline-block px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest mb-4 shadow-lg text-white" style="background:${s.color}">${esc(s.label)}</div>
           <h3 class="text-2xl md:text-3xl font-black text-[#1F2A5A] leading-tight mb-2">${esc(h?.address || 'Open House')}</h3>
           ${h?.price ? `<div class="text-xl font-black text-blue-600 mb-2">${money(h.price)}</div>` : ''}
@@ -308,16 +308,16 @@ export function showVerifyAgent() {
   const displayBrokerage = state.prefilledAgent?.brokerage || h?.brokerage || '';
 
   render(`
-    <div>
+    <div class="claim-verify-screen">
       ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ''}
       <h1 class="font-['Poppins'] text-4xl font-black mb-4 leading-tight uppercase text-[#1f2a5a]">Is This You?</h1>
       <p class="text-slate-500 text-lg mb-6">Confirm your information to continue.</p>
-      <div class="bg-blue-50/70 backdrop-blur-sm p-8 md:p-10 rounded-[34px] border-2 border-blue-100 mb-6 shadow-inner">
-        ${verifyPhoto ? `<img src="${esc(verifyPhoto)}" class="w-28 h-28 rounded-full object-cover mx-auto shadow-[0_18px_40px_rgba(31,42,90,0.16)] mb-5 bg-white" alt="${esc(displayName)}">` : `<div class="w-28 h-28 rounded-full bg-white border border-blue-100 mx-auto mb-5 shadow-inner flex items-center justify-center text-slate-400 font-black">AGENT</div>`}
-        <h3 class="text-3xl md:text-4xl font-black text-blue-900 leading-tight mb-2">${esc(displayName)}</h3>
+      <div class="claim-agent-card bg-blue-50/70 backdrop-blur-sm p-8 md:p-10 rounded-[34px] border-2 border-blue-100 mb-6 shadow-inner">
+        ${verifyPhoto ? `<img src="${esc(verifyPhoto)}" class="claim-agent-photo w-28 h-28 rounded-full object-cover mx-auto shadow-[0_18px_40px_rgba(31,42,90,0.16)] mb-5 bg-white" alt="${esc(displayName)}">` : `<div class="claim-agent-photo w-28 h-28 rounded-full bg-white border border-blue-100 mx-auto mb-5 shadow-inner flex items-center justify-center text-slate-400 font-black">AGENT</div>`}
+        <div class="claim-agent-copy"><h3 class="text-3xl md:text-4xl font-black text-blue-900 leading-tight mb-2">${esc(displayName)}</h3>
         <p class="text-blue-600 font-black text-sm uppercase tracking-[0.2em] mb-2">${esc(displayBrokerage)}</p>
         ${displayPhone ? `<div class="text-slate-500 font-semibold">${esc(normalizePhone(displayPhone))}</div>` : ''}
-        ${displayEmail ? `<div class="text-slate-500 font-semibold">${esc(displayEmail)}</div>` : ''}
+        ${displayEmail ? `<div class="text-slate-500 font-semibold">${esc(displayEmail)}</div>` : ''}</div>
       </div>
       <div class="space-y-3">
         <button onclick="autoActivate()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Activate Now</button>
@@ -336,7 +336,7 @@ export function showAlreadyClaimed(agent) {
   if (state.uid) activateUrl.searchParams.set('uid', state.uid);
 
   render(`
-    <div>
+    <div class="claim-already-active-screen">
       <h1 class="font-['Poppins'] text-[34px] md:text-[44px] leading-[0.95] font-black tracking-[-0.04em] text-slate-900 mb-4">This Chip Is Already Active</h1>
       <p class="text-slate-500 text-[17px] md:text-[19px] leading-relaxed font-medium max-w-md mx-auto mb-8">We found an existing agent connected to this Rel8tion chip.</p>
       <div class="rounded-[30px] border border-white/70 bg-white/60 backdrop-blur-sm p-6 text-left mb-8">
@@ -405,17 +405,17 @@ export function showFullProfileForm(prefillBrokerage = '', notice = '') {
   const brokerage = prefillBrokerage || p.brokerage || h.brokerage || state.selectedBrokerage || '';
   const bio = p.bio || '';
   const storedImage = p.image_url || state.detectedAgentPhoto || '';
+  const noticeIsError = /failed|could not|unable|error/i.test(notice);
 
   render(`
     <div>
       ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ''}
       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">Complete Your Profile</h1>
       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Enter your details to activate your Rel8tionchip.</p>
-      ${notice ? `<div class="mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
-      <div class="space-y-4 text-left">
+      ${notice && noticeIsError ? `<div class="claim-form-notice mb-6 rounded-[22px] border border-rose-200 bg-rose-50/80 backdrop-blur-sm text-rose-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+      <div class="claim-profile-fields space-y-4 text-left">
         <input id="full_name" value="${esc(name)}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
         <input id="full_phone" value="${esc(phone)}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
-        <input id="full_email" value="${esc(email)}" placeholder="Email" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
         <select id="full_brokerage_select" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
           ${getBrokerageOptions().map((opt) => {
             const selected = ((opt !== '__other__' && opt === brokerage) || (opt === '__other__' && brokerage && !isKnownBrokerage(brokerage))) ? 'selected' : '';
@@ -424,16 +424,21 @@ export function showFullProfileForm(prefillBrokerage = '', notice = '') {
           }).join('')}
         </select>
         <input id="full_brokerage_custom" value="${esc(isKnownBrokerage(brokerage) ? '' : brokerage)}" placeholder="Enter Brokerage Name" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 ${(brokerage && !isKnownBrokerage(brokerage)) ? '' : 'hidden'}">
-        <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all backdrop-blur-sm">
-          <div class="text-slate-900 font-black text-lg mb-1">Add or Update Photo</div>
-          <div class="text-slate-500 text-sm font-semibold">Tap to upload</div>
-          <input type="file" id="full_photo" accept="image/*" hidden>
-        </label>
-        <img id="full_preview" src="${esc(storedImage)}" class="${storedImage ? 'block' : 'hidden'} w-full rounded-[24px] max-h-[280px] object-cover shadow-sm bg-white">
-        <textarea id="full_bio" placeholder="Short Bio" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
-      </div>
-      <div class="mt-6 space-y-3">
         <button onclick="saveFullProfile()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Save and Activate</button>
+        ${notice && !noticeIsError ? `<div class="claim-form-notice rounded-[18px] border border-blue-100 bg-blue-50/70 text-center text-blue-700 px-4 py-3 text-sm font-semibold">${esc(notice)}</div>` : ''}
+        <details class="claim-optional-details rounded-[20px] border border-slate-200 bg-white/65 px-4">
+          <summary class="cursor-pointer py-4 font-black text-slate-600">Add photo, email, or bio (optional)</summary>
+          <div class="space-y-4 border-t border-slate-200 pb-4 pt-4">
+            <input id="full_email" value="${esc(email)}" placeholder="Email" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+            <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all backdrop-blur-sm">
+              <div class="text-slate-900 font-black text-lg mb-1">Add or Update Photo</div>
+              <div class="text-slate-500 text-sm font-semibold">Tap to upload</div>
+              <input type="file" id="full_photo" accept="image/*" hidden>
+            </label>
+            <img id="full_preview" src="${esc(storedImage)}" class="${storedImage ? 'block' : 'hidden'} w-full rounded-[24px] max-h-[280px] object-cover shadow-sm bg-white">
+            <textarea id="full_bio" placeholder="Short Bio" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
+          </div>
+        </details>
       </div>
     </div>
   `);

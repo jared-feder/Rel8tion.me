@@ -13,6 +13,8 @@
     .sign-bg:after{content:"";position:absolute;top:0;left:0;width:200%;height:360px;opacity:.68;pointer-events:none;background-image:url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDYwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnN2ZyI+PHBhdGggZD0iTTEyMCwxNTAgQzgwLDE1MCA2MCwxMzAgNjAsMTAwIEM2MCw4MCA4MCw2MCAxMTAsNjAgQzEyMCwzMCAxNTAsMTAgMTkwLDEwIEMyNDAsMTAgMjcwLDQwIDI4MCw3MCBDMzEwLDcwIDM0MCw5MCAzNDAsMTIwIEMzNDAsMTUwIDMxMCwxNTAgMjgwLDE1MCBaIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjgiLz48cGF0aCBkPSJNNDUwLDEyMCBDNDIwLDEyMCA0MDAsMTA1IDQwMCw4NSBDNDAwLDcwIDQxNSw1NSA0MzUsNTUgQzQ0NSwzNSA0NjUsMjAgNDkwLDIwIEM1MjUsMjAgNTQ1LDQwIDU1NSw2MCBDNTc1LDYwIDU5NSw3NSA1OTUsOTUgQzU5NSwxMjAgNTc1LDEyMCA1NTAsMTIwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNCIvPjwvc3ZnPg==");background-repeat:repeat-x;background-size:800px auto;animation:driftClouds 120s linear infinite}
     #app{position:relative;z-index:1}
     @keyframes driftClouds{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @media (max-width:720px){.sign-bg{align-items:flex-start;padding:10px}.activation-resolver-shell{border-radius:26px!important;padding:20px!important}.activation-resolver-logo-wrap{margin-bottom:18px!important}.activation-resolver-logo{height:52px!important}}
+    @media (max-width:720px) and (max-height:740px){.sign-bg{padding:7px}.activation-resolver-shell{border-radius:20px!important;padding:14px!important}.activation-resolver-logo-wrap{margin-bottom:10px!important}.activation-resolver-logo{height:40px!important}.activation-resolver-shell h1{font-size:28px!important;line-height:1!important;margin-bottom:8px!important}.activation-resolver-shell p{font-size:14px!important;line-height:1.38!important;margin-bottom:12px!important}.activation-resolver-shell a,.activation-resolver-shell button{min-height:50px;padding-top:12px!important;padding-bottom:12px!important;font-size:14px!important;line-height:1.2}.activation-resolver-details{padding:12px!important;border-radius:18px!important}}
     @media (prefers-reduced-motion:reduce){.sign-bg:after{animation:none}}
   </style>
 </head>
@@ -22,7 +24,7 @@
   </main>
 
   <script type="module">
-    import { initSignResolverPage } from '/apps/rel8tion-app/src/modules/signResolver/bootstrap.js?v=20260530-sponsored-seed';
+    import { initSignResolverPage } from '/apps/rel8tion-app/src/modules/signResolver/bootstrap.js?v=20260816-event-pass-mobile';
     initSignResolverPage();
   </script>
 </body>

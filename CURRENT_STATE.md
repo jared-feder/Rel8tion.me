@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-16: Event Pass mobile activation viewport
+
+- `[IMPLEMENTED]` Event Pass activation screens now put the next required action before instructional imagery, metadata, optional listing details, and success details. Short-phone layouts compact the shell, listing cards, form spacing, and agent confirmation cards while retaining 50px-or-larger primary tap targets.
+- `[IMPLEMENTED]` Sponsored Event Pass activation keeps the consent checkbox and final Activate button together in a mobile action dock, so both controls remain visible without scrolling. Optional property, email, brokerage, photo, and bio fields are collapsed below the required path.
+- `[VERIFIED]` Focused source regressions, the existing Event Pass activation suite, module syntax checks, and the route-map guard passed locally. Browser measurements confirmed every tested primary action inside the viewport at 320x568, 360x640, 390x844, and 430x932, including the sponsored-pass consent/action dock at 320x568.
+- `[NEEDS VERIFICATION]` This work is local on `codex/event-pass-mobile-viewport`; it is not committed, deployed, or verified on the production domain.
+
 ## 2026-08-16: Open-house inventory link-collision repair
 
 - `[IMPLEMENTED]` The protected listing-inventory cron now resolves every discovered OneKey URL against all canonical `open_houses` rows, including historical events, before promotion. When another row already owns the URL, the sync preserves that canonical row ID and source instead of violating `open_houses.unique_link`; duplicate discoveries sharing one URL in the same run also collapse to one upsert.

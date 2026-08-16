@@ -265,9 +265,9 @@ function render(html) {
 
 function shell(content) {
   render(`
-    <section class="w-full max-w-3xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-8 md:p-10 text-center shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
-      <div class="mb-6">
-        <img src="${ASSETS.rel8tionLogo}" alt="Rel8tion" class="h-16 md:h-20 mx-auto w-auto">
+    <section class="activation-resolver-shell w-full max-w-3xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-8 md:p-10 text-center shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
+      <div class="activation-resolver-logo-wrap mb-6">
+        <img src="${ASSETS.rel8tionLogo}" alt="Rel8tion" class="activation-resolver-logo h-16 md:h-20 mx-auto w-auto">
       </div>
       ${content}
     </section>
@@ -423,12 +423,12 @@ function inactiveView(sign) {
     <div class="inline-flex items-center px-4 py-2 rounded-full bg-white/50 border border-white/70 text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-5">Smart Sign</div>
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Sign Found</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-8">This sign exists, but it is not attached to an active open house yet.</p>
-    <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto">
+    ${activationCard(sign)}
+    <div class="activation-resolver-details rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mt-6">
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Smart Sign Status</div>
       <div class="text-slate-900 font-black text-xl mb-2">${esc(sign.public_code || '')}</div>
       <div class="text-slate-600 font-semibold">Status: ${esc(sign.status || 'inactive')}</div>
     </div>
-    ${activationCard(sign)}
   `);
 
   attachInactiveHandlers(sign);
@@ -446,15 +446,15 @@ function eventPassInactiveView(sign, inventory) {
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Event Pass Ready</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Rel8tion Event Pass is ready to be activated for a live open house. If you are the host agent, continue setup and tap the NFC chip on this same Event Pass keychain to connect it to today's event.</p>
     <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.</p>
+    <div class="flex flex-col md:flex-row gap-3 justify-center mb-6">
+      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Event Pass</a>
+      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">I'm the Host Agent</a>
+      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
+    </div>
     <div class="rounded-[28px] border border-white/70 bg-white/60 p-6 text-left max-w-xl mx-auto mb-6">
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
       <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
       <div class="text-slate-600 font-semibold">Status: ${esc(sign?.status || 'inactive')}</div>
-    </div>
-    <div class="flex flex-col md:flex-row gap-3 justify-center">
-      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Event Pass</a>
-      <a href="${setupUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">I'm the Host Agent</a>
-      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
     </div>
   `);
 }
@@ -501,6 +501,10 @@ function sponsoredEventPassReadyView(details, inventory) {
     <h1 class="font-['Plus_Jakarta_Sans'] text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-4">Activate Sponsored Event Pass</h1>
     <p class="text-slate-700 text-lg md:text-xl font-medium max-w-2xl mx-auto mb-5">This Event Pass was issued by ${esc(sponsorLabel)} and can be used to activate this open house with live event coverage.</p>
     <p class="text-slate-500 text-sm font-semibold max-w-2xl mx-auto mb-8">A simple open-house technology pass issued by a verified loan officer and used by an agent to activate a paperless, support-ready open house. Financing help is only provided when requested by a buyer.</p>
+    <div class="flex flex-col md:flex-row gap-3 justify-center mb-6">
+      <a href="${activationUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Sponsored Event Pass</a>
+      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
+    </div>
     ${preparedFor ? `
       <div class="rounded-[28px] border border-emerald-100 bg-emerald-50/80 p-6 text-left max-w-xl mx-auto mb-6">
         <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-3">Prepared From Coverage Setup</div>
@@ -512,10 +516,6 @@ function sponsoredEventPassReadyView(details, inventory) {
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-3">Event Pass Status</div>
       <div class="text-slate-900 font-black text-xl mb-2">${esc(code || '')}</div>
       <div class="text-slate-600 font-semibold">Reuse status: ${esc(inventory?.reuse_status || 'active')}</div>
-    </div>
-    <div class="flex flex-col md:flex-row gap-3 justify-center">
-      <a href="${activationUrl}" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg text-white shadow-[0_18px_40px_rgba(59,130,246,0.28)]" style="background:linear-gradient(90deg,#38bdf8,#2563eb);">Activate Sponsored Event Pass</a>
-      <a href="https://rel8tion.me" class="inline-flex items-center justify-center w-full md:w-auto px-8 py-4 rounded-full font-bold text-base md:text-lg bg-white/80 border border-white/80 text-slate-700">Contact Rel8tion</a>
     </div>
   `);
 }

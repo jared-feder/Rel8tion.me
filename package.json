@@ -14,6 +14,7 @@
     "verify:routes": "node scripts/verify-route-map.cjs",
     "verify:property-experience": "node test/open-house-link.test.cjs",
     "verify:event-pass-activation": "node test/event-pass-activation.test.cjs",
+    "verify:event-pass-mobile-viewport": "node test/event-pass-mobile-viewport.test.cjs",
     "verify:admin-qr-batch": "node scripts/verify-admin-qr-batch.cjs",
     "verify:chip-qr-conversion": "node scripts/verify-chip-qr-conversion.cjs",
     "verify:agent-ranking-identity": "node scripts/verify-agent-ranking-identity.cjs",

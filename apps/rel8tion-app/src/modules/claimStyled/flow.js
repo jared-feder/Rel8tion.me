@@ -45,7 +45,7 @@ import {
   showListingSearch,
   showOtherListings,
   showVerifyAgent
-} from './renderer.js?v=20260517-browser-back';
+} from './renderer.js?v=20260816-event-pass-mobile';
 
 const BETA_KEYCHAIN_UID = '7ce5a51b-8202-4178-afc7-40a2e10e2a4d';
 const BETA_AGENT_SLUG = 'main-beta';
