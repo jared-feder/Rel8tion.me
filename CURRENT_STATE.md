@@ -9,7 +9,7 @@ Last cleaned: 2026-06-04.
 - `[IMPLEMENTED]` Event Pass activation screens now put the next required action before instructional imagery, metadata, optional listing details, and success details. Short-phone layouts compact the shell, listing cards, form spacing, and agent confirmation cards while retaining 50px-or-larger primary tap targets.
 - `[IMPLEMENTED]` Sponsored Event Pass activation keeps the consent checkbox and final Activate button together in a mobile action dock, so both controls remain visible without scrolling. Optional property, email, brokerage, photo, and bio fields are collapsed below the required path.
 - `[VERIFIED]` Focused source regressions, the existing Event Pass activation suite, module syntax checks, and the route-map guard passed locally. Browser measurements confirmed every tested primary action inside the viewport at 320x568, 360x640, 390x844, and 430x932, including the sponsored-pass consent/action dock at 320x568.
-- `[NEEDS VERIFICATION]` This work is local on `codex/event-pass-mobile-viewport`; it is not committed, deployed, or verified on the production domain.
+- `[VERIFIED]` Production release `204a1660` is live through Vercel deployment `dpl_4BiQeKXQwvC7fXwTxBqLX5BYJDCE` on `app.rel8tion.me`. Clean-route and browser checks confirmed the updated `/pass` resolver, claim module cache chain, sponsored consent/action dock source, and a fully visible location action at 320x568. The production route suite passed; browser inspection found no application errors (only the existing Tailwind CDN warning).
 
 ## 2026-08-16: Open-house inventory link-collision repair
 
