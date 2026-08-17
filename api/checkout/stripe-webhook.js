@@ -6,7 +6,11 @@ const SIGNATURE_TOLERANCE_SECONDS = Number(process.env.STRIPE_WEBHOOK_TOLERANCE_
 const SUPPORTED_EVENTS = new Set([
   'checkout.session.completed',
   'checkout.session.async_payment_succeeded',
-  'checkout.session.async_payment_failed'
+  'checkout.session.async_payment_failed',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.paid',
+  'invoice.payment_failed'
 ]);
 
 function clean(value, max = 500) {
@@ -262,12 +266,61 @@ async function upsertPricingEntitlement(payload) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+function lifecycleSubscriptionId(event = {}) {
+  const object = event?.data?.object || {};
+  if (String(event.type || '').startsWith('customer.subscription.')) return clean(object.id, 160);
+  return clean(
+    typeof object.subscription === 'string'
+      ? object.subscription
+      : object.subscription?.id
+        || object.parent?.subscription_details?.subscription,
+    160
+  );
+}
+
+function lifecycleEntitlementStatus(event = {}) {
+  const object = event?.data?.object || {};
+  if (event.type === 'invoice.paid') return 'active';
+  if (event.type === 'invoice.payment_failed') return 'payment_failed';
+  if (event.type === 'customer.subscription.deleted') return 'canceled';
+  const subscriptionStatus = clean(object.status, 80);
+  if (['active', 'trialing'].includes(subscriptionStatus)) return 'active';
+  if (['past_due', 'unpaid', 'incomplete'].includes(subscriptionStatus)) return 'payment_failed';
+  if (['canceled', 'incomplete_expired'].includes(subscriptionStatus)) return 'canceled';
+  if (['paused', 'pause_collection'].includes(subscriptionStatus)) return 'inactive';
+  return null;
+}
+
+async function updateEntitlementFromLifecycleEvent(event) {
+  const subscriptionId = lifecycleSubscriptionId(event);
+  const status = lifecycleEntitlementStatus(event);
+  if (!subscriptionId || !status) return null;
+  const rows = await supabaseRest(`pricing_entitlements?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=id,stripe_checkout_session_id,plan_code,status,updated_at`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      status,
+      stripe_event_id: clean(event.id, 160) || null,
+      updated_at: new Date().toISOString()
+    })
+  });
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
 async function handleStripeEvent(event, req) {
   if (!SUPPORTED_EVENTS.has(event.type)) {
     return { ignored: true, reason: 'unsupported_event_type' };
   }
 
   const session = event?.data?.object || null;
+  if (event.type !== 'checkout.session.completed'
+    && event.type !== 'checkout.session.async_payment_succeeded'
+    && event.type !== 'checkout.session.async_payment_failed') {
+    const entitlement = await updateEntitlementFromLifecycleEvent(event);
+    return entitlement
+      ? { ignored: false, reason: 'subscription_entitlement_updated', entitlement }
+      : { ignored: true, reason: 'subscription_entitlement_not_found' };
+  }
   if (!session?.id || session.object !== 'checkout.session') {
     return { ignored: true, reason: 'not_checkout_session' };
   }
@@ -335,3 +388,7 @@ module.exports.config = {
 };
 
 module.exports.pricingEntitlementPayload = pricingEntitlementPayload;
+module.exports.upsertPricingEntitlement = upsertPricingEntitlement;
+module.exports.lifecycleSubscriptionId = lifecycleSubscriptionId;
+module.exports.lifecycleEntitlementStatus = lifecycleEntitlementStatus;
+module.exports.updateEntitlementFromLifecycleEvent = updateEntitlementFromLifecycleEvent;

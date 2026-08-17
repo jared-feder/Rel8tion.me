@@ -63,7 +63,7 @@ async function claimedSubject(slug, uid) {
   const key = one(await supabaseRest(`keys?uid=eq.${enc(uid)}&agent_slug=eq.${enc(slug)}&claimed=eq.true&select=uid,agent_slug,device_role&limit=1`));
   if (!key) { const error = new Error('This NFC chip is not claimed by this agent.'); error.status = 403; throw error; }
   const role = String(key.device_role || '').trim().toLowerCase();
-  if (role && !['keychain', 'chip'].includes(role)) {
+  if (role && !['keychain', 'chip', 'event_pass_keychain'].includes(role)) {
     const error = new Error('This NFC device is not an agent dashboard keychain.'); error.status = 403; throw error;
   }
   const agent = one(await supabaseRest(`agents?slug=eq.${enc(slug)}&select=slug,name,phone,phone_normalized&limit=1`));

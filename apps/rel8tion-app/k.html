@@ -367,12 +367,13 @@
       window.location.href = `${window.location.origin}/agent-dashboard?${next.toString()}`;
     }
 
-    function goToAgentHome({ agentSlug, activeEventId = '' }) {
+    function goToAgentHome({ agentSlug, activeEventId = '', eventPassCode = '' }) {
       if (!agentSlug) return;
       const next = new URLSearchParams();
       next.set('agent', agentSlug);
       if (uid) next.set('uid', uid);
       if (activeEventId) next.set('active_event', activeEventId);
+      if (eventPassCode) next.set('event_pass_code', eventPassCode);
       window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
       window.location.href = `${window.location.origin}/agent-home?${next.toString()}`;
     }
@@ -435,12 +436,6 @@
     async function findEventPassSignByActivationUid(chipUid) {
       if (!chipUid) return null;
       const rows = await request(`smart_signs?activation_uid_primary=eq.${encodeURIComponent(chipUid)}&activation_method=eq.event_pass_keychain&select=id,public_code,owner_agent_slug,active_event_id,status,created_at&order=created_at.desc&limit=1`).catch(() => []);
-      return Array.isArray(rows) ? rows[0] || null : null;
-    }
-
-    async function findRecentEventBySignId(signId) {
-      if (!signId) return null;
-      const rows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(signId)}&select=id,status,ended_at,created_at&order=created_at.desc&limit=1`).catch(() => []);
       return Array.isArray(rows) ? rows[0] || null : null;
     }
 
@@ -1383,30 +1378,15 @@
 
           const eventPassSign = await findEventPassSignByActivationUid(uid);
           if (eventPassSign?.public_code) {
-            const priorEvent = await findRecentEventBySignId(eventPassSign.id);
-            if (priorEvent?.id) {
-              window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
-              saveHostSession({ agentSlug: record.agent_slug, uid, source: 'event-pass-history-dashboard' });
-              setStatus('Event Pass Dashboard', 'Opening the event dashboard for this Event Pass.');
-              goToAgentDashboard({
-                agentSlug: priorEvent.host_agent_slug || record.agent_slug,
-                eventId: priorEvent.id,
-                signId: eventPassSign.id
-              });
-              return;
-            }
-            setStatus('Event Pass Ready', 'Opening setup for the next open house.');
-            continueSignActivation({
-              uid,
-              agent: record.agent_slug,
-              code: eventPassSign.public_code,
-              sign_id: eventPassSign.id,
-              source: 'event_pass'
-            });
+            window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+            saveHostSession({ agentSlug: record.agent_slug, uid, source: 'event-pass-rel8tionchip-home' });
+            setStatus('Rel8tionChip Ready', 'Opening your digital business card and Open House controls.');
+            goToAgentHome({ agentSlug: record.agent_slug, eventPassCode: eventPassSign.public_code });
             return;
           }
 
-          setStatus('Event Pass Inactive', 'Scan the Event Pass QR first, then tap this chip to activate it.');
+          setStatus('Rel8tionChip Ready', 'Opening your digital business card. Pair the Event Pass QR before starting another open house.');
+          goToAgentHome({ agentSlug: record.agent_slug });
           return;
         }
 

@@ -323,6 +323,20 @@
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .actions { width: 100%; }
     }
+
+    @media (max-width: 420px) {
+      .brand { margin-bottom: 10px; }
+      .brand img { height: 44px; }
+      .hero { padding: 18px; border-radius: 28px; }
+      .hero-grid { gap: 16px; }
+      .profile { gap: 12px; align-items: flex-start; }
+      .avatar { width: 72px; height: 72px; border-radius: 22px; }
+      h1 { font-size: 34px; }
+      .badge { padding: 7px 9px; font-size: 9px; letter-spacing: .08em; }
+      .meta { margin-top: 7px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+      .btn { min-height: 50px; padding-inline: 12px; }
+      .panel { border-radius: 26px; }
+    }
   </style>
 </head>
 <body>
@@ -341,7 +355,10 @@
     const agentSlug = params.get('agent') || params.get('agent_slug') || '';
     const uid = params.get('uid') || '';
     const activeEventId = params.get('active_event') || params.get('event') || '';
+    const eventPassCode = params.get('event_pass_code') || '';
     const profileSaved = params.get('profile_saved') === '1';
+    const membershipNotice = params.get('membership') || '';
+    const membershipError = params.get('membership_error') || '';
     const app = document.getElementById('app');
     const PHONE_LOCK_PREFIX = 'rel8tion_agent_phone_lock_v1';
     const PHONE_UNLOCK_PREFIX = 'rel8tion_agent_phone_unlocked_v1';
@@ -548,8 +565,11 @@
       if (!rows.length) throw new Error('This NFC chip is not claimed by this agent. Tap the correct Rel8tionChip or contact REL8TION.');
       const role = String(rows[0]?.device_role || '').trim().toLowerCase();
       if (role && !['keychain', 'chip'].includes(role)) {
-        throw new Error('This NFC device opens an event experience, not the private agent dashboard. Tap your agent Rel8tionChip instead.');
+        if (role !== 'event_pass_keychain') {
+          throw new Error('This NFC device opens an event experience, not the private agent dashboard. Tap your agent Rel8tionChip instead.');
+        }
       }
+      return rows[0];
     }
 
     async function requirePhoneUnlock(agentName) {
@@ -682,6 +702,84 @@
       }
     }
 
+    async function loadAgentMembership() {
+      const response = await fetch(`/api/agent-membership?agent_slug=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`, {
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'Membership status could not be verified.');
+      return payload;
+    }
+
+    function eventPassStartRoute(code) {
+      if (!code) return '';
+      const next = new URLSearchParams({ agent: agentSlug, uid, code, source: 'event_pass' });
+      return `/sign-demo-activate?${next.toString()}`;
+    }
+
+    async function startEventPassMembershipCheckout() {
+      const button = document.getElementById('membershipCheckoutButton');
+      const status = document.getElementById('membershipCheckoutStatus');
+      if (button) button.disabled = true;
+      if (status) status.textContent = 'Opening secure checkout...';
+      try {
+        const agentRows = await safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=email&limit=1`);
+        const response = await fetch('/api/checkout/plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plan_code: 'rel8tion_agent_monthly',
+            source: 'event_pass_rel8tionchip',
+            agent_slug: agentSlug,
+            uid,
+            email: agentRows[0]?.email || '',
+            return_path: `/agent-home?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.url) throw new Error(payload.error || 'Checkout could not be started.');
+        window.location.href = payload.url;
+      } catch (error) {
+        if (button) button.disabled = false;
+        if (status) status.textContent = error.message || 'Checkout could not be started.';
+      }
+    }
+
+    window.startEventPassMembershipCheckout = startEventPassMembershipCheckout;
+
+    function renderMembershipGate(agent, membership) {
+      const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+      app.className = '';
+      app.innerHTML = `
+        <section class="hero">
+          <div class="hero-grid">
+            <div class="profile">
+              <img class="avatar" src="${esc(agentPhotoUrl(agent) || 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png')}" alt="${esc(agent.name || 'Agent')}">
+              <div>
+                <div class="badge">Your Event Pass is now a Rel8tionChip</div>
+                <h1>${esc(agent.name || agentSlug)}</h1>
+                <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="membershipCheckoutButton" class="btn" type="button" onclick="startEventPassMembershipCheckout()">Continue for ${esc(membership.checkout_label || 'monthly membership')}</button>
+              <a class="btn secondary" href="${esc(publicProfile)}">Open Digital Business Card</a>
+              <a class="btn secondary" href="/pricing?role=agent">Compare Plans</a>
+              <p id="membershipCheckoutStatus" class="sub" style="margin:0;"></p>
+            </div>
+          </div>
+        </section>
+        <section class="layout" style="grid-template-columns:1fr;">
+          <div class="panel">
+            <h2>Keep using this Event Pass</h2>
+            <p class="empty">REL8TION Agent membership turns this same NFC device into your digital business card and reusable Event Pass. No Open House Kit or separate Rel8tionChip purchase is required.</p>
+            ${membershipNotice === 'canceled' ? '<p class="empty" style="color:#b45309;">Checkout was canceled. Nothing was charged.</p>' : ''}
+            ${membershipError ? `<p class="empty" style="color:#b91c1c;">${esc(membershipError)}</p>` : ''}
+          </div>
+        </section>
+      `;
+    }
+
     function eventAddress(event, houseMap = {}) {
       const ctx = event?.setup_context || {};
       const house = houseMap[event?.open_house_source_id] || {};
@@ -736,7 +834,7 @@
 
     window.linkKeychainQr = linkKeychainQr;
 
-    function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard }) {
+    function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard, membership }) {
       const checkinsByEvent = checkins.reduce((map, row) => {
         const key = row.open_house_event_id || '';
         if (!map[key]) map[key] = [];
@@ -749,7 +847,10 @@
       const photo = agentPhotoUrl(agent) || fallbackPhoto;
       const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
       const onboarding = `/onboarding?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
-      const activateSign = `/sign-demo-activate?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
+      const resolvedEventPassCode = eventPassCode || membership?.event_pass_code || '';
+      const activateSign = membership?.event_pass_device
+        ? eventPassStartRoute(resolvedEventPassCode)
+        : `/sign-demo-activate?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
       const editProfile = uid ? `/claim?uid=${encodeURIComponent(uid)}&edit=profile` : '';
       const pendingQrCode = readPendingChipQrCode();
       let qrLinkError = '';
@@ -765,15 +866,16 @@
             <div class="profile">
               <img class="avatar" src="${esc(photo)}" onerror="this.onerror=null;this.src='${esc(fallbackPhoto)}';" alt="${esc(agent.name || 'Agent')}">
               <div>
-                <div class="badge">Personal Agent Dashboard</div>
+                <div class="badge">${membership?.event_pass_device ? 'Rel8tionChip Digital Business Card' : 'Personal Agent Dashboard'}</div>
                 <h1>${esc(agent.name || agentSlug || 'Agent')}</h1>
                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
               </div>
             </div>
             <div class="actions">
-              <a class="btn" href="${esc(publicProfile)}">Open Public QR Profile</a>
+              ${membership?.event_pass_device && activateSign ? `<a class="btn" href="${esc(activateSign)}">Start Open House</a>` : ''}
+              <a class="btn${membership?.event_pass_device ? ' secondary' : ''}" href="${esc(publicProfile)}">Open Digital Business Card</a>
               ${editProfile ? `<a class="btn secondary" href="${esc(editProfile)}">Edit Profile</a>` : ''}
-              <a class="btn secondary" href="${esc(activateSign)}">Activate Smart Sign</a>
+              ${!membership?.event_pass_device ? `<a class="btn secondary" href="${esc(activateSign)}">Activate Smart Sign</a>` : ''}
               <a class="btn secondary" href="${esc(onboarding)}">Manage Setup</a>
             </div>
           </div>
@@ -889,10 +991,17 @@
         return;
       }
 
-      await verifyClaimedAgentChip();
+      const keyRecord = await verifyClaimedAgentChip();
+      const keyRole = String(keyRecord?.device_role || '').trim().toLowerCase();
 
       const identityRows = await safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=slug,name&limit=1`);
-      await ensureVerifiedPhoneSession();
+      const membership = await loadAgentMembership();
+      if (keyRole === 'event_pass_keychain' && !membership.active) {
+        const agentRows = await safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=*&limit=1`);
+        renderMembershipGate(await hydrateAgentPhoto(agentRows[0] || { slug: agentSlug, name: agentSlug }), membership);
+        return;
+      }
+      if (keyRole !== 'event_pass_keychain') await ensureVerifiedPhoneSession();
       await requirePhoneUnlock(identityRows[0]?.name || agentSlug);
 
       const [agents, events, leads] = await Promise.all([
@@ -912,7 +1021,7 @@
         loadKitDashboardLink(uid)
       ]);
       const houseMap = Object.fromEntries(houses.map((house) => [house.id, house]));
-      renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard });
+      renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard, membership });
     }
 
     init().catch((error) => {

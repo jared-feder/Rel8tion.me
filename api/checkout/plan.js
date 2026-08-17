@@ -1,6 +1,8 @@
+const crypto = require('crypto');
 const { getProduct, readPricingCatalog } = require('../../lib/pricing-catalog');
+const { supabaseRest } = require('../../lib/admin-auth');
 
-const STRIPE_API_VERSION = '2026-02-25.clover';
+const STRIPE_API_VERSION = '2026-06-24.dahlia';
 const PUBLIC_PLAN_CODES = new Set(['rel8tion_agent_monthly', 'rel8tion_agent_annual']);
 
 function sendJson(res, status, payload) {
@@ -11,6 +13,26 @@ function sendJson(res, status, payload) {
 
 function clean(value, max = 450) {
   return String(value || '').trim().slice(0, max);
+}
+
+function localReturnPath(value, fallback = '/pricing') {
+  const candidate = clean(value, 700);
+  return candidate.startsWith('/') && !candidate.startsWith('//') ? candidate : fallback;
+}
+
+function integrationIdentifier() {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+  const bytes = crypto.randomBytes(8);
+  const suffix = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+  return `rel8tion_agent_${suffix}`;
+}
+
+async function verifyClaimedCheckoutSubject(agentSlug, uid) {
+  if (!agentSlug || !uid) return false;
+  const rows = await supabaseRest(
+    `keys?uid=eq.${encodeURIComponent(uid)}&agent_slug=eq.${encodeURIComponent(agentSlug)}&claimed=eq.true&select=uid&limit=1`
+  );
+  return Boolean(Array.isArray(rows) && rows[0]?.uid);
 }
 
 async function stripeRequest(path, secretKey, options = {}) {
@@ -66,6 +88,12 @@ module.exports = async function handler(req, res) {
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     const origin = `${proto}://${host}`;
+    const agentSlug = clean(body.agent_slug, 120);
+    const uid = clean(body.uid, 200);
+    const eventPassMembership = clean(body.source, 120) === 'event_pass_rel8tionchip';
+    if (eventPassMembership && !(await verifyClaimedCheckoutSubject(agentSlug, uid))) {
+      return sendJson(res, 403, { ok: false, error: 'Tap the claimed Event Pass NFC before starting membership checkout.' });
+    }
     const metadata = {
       plan_code: product.code,
       role: product.role,
@@ -74,14 +102,26 @@ module.exports = async function handler(req, res) {
       content_tools_included: String(product.content_tools_entitlement),
       entitlement_codes: product.entitlement_codes.join(','),
       source: clean(body.source || 'pricing_page', 120),
-      agent_slug: clean(body.agent_slug, 120)
+      agent_slug: agentSlug,
+      uid
     };
+    const returnPath = localReturnPath(
+      body.return_path,
+      agentSlug && uid
+        ? `/agent-home?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
+        : '/pricing'
+    );
+    const successUrl = eventPassMembership
+      ? `${origin}/api/checkout/agent-membership-return?session_id={CHECKOUT_SESSION_ID}&agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
+      : `${origin}/pricing?success=1&plan=${encodeURIComponent(planCode)}&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelJoiner = returnPath.includes('?') ? '&' : '?';
     const params = new URLSearchParams({
       mode: 'subscription',
       'line_items[0][price]': price.id,
       'line_items[0][quantity]': '1',
-      success_url: `${origin}/pricing?success=1&plan=${encodeURIComponent(planCode)}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/pricing?canceled=1&plan=${encodeURIComponent(planCode)}`
+      integration_identifier: integrationIdentifier(),
+      success_url: successUrl,
+      cancel_url: `${origin}${returnPath}${cancelJoiner}membership=canceled`
     });
     for (const [key, value] of Object.entries(metadata)) {
       params.set(`metadata[${key}]`, value);
@@ -95,3 +135,7 @@ module.exports = async function handler(req, res) {
     return sendJson(res, error.status || 502, { ok: false, error: error.message || 'Stripe Checkout is temporarily unavailable.' });
   }
 };
+
+module.exports.localReturnPath = localReturnPath;
+module.exports.integrationIdentifier = integrationIdentifier;
+module.exports.verifyClaimedCheckoutSubject = verifyClaimedCheckoutSubject;

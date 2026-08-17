@@ -102,7 +102,8 @@ async function run() {
   const builderRelativePath = 'apps/v0-real-estate-agent-template/app/get-started/page.tsx';
   if (fs.existsSync(path.join(ROOT, builderRelativePath))) {
     const builderPage = read(builderRelativePath);
-    assert.match(builderPage, /https:\/\/getrel8tion\.com\/kit-intake\?plan=annual&source=website-builder/);
+    assert.match(builderPage, /https:\/\/app\.rel8tion\.me\/pricing\?role=agent&billing=annual&checkout=system&source=website-builder/);
+    assert.doesNotMatch(builderPage, /getrel8tion\.com\/kit-intake\?plan=/);
     assert.doesNotMatch(builderPage, /setSelectedPlan\([^)]*bundle/i);
   }
 
