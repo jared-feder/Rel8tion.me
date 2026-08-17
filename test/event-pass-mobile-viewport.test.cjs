@@ -54,7 +54,10 @@ test('sponsored activation keeps consent and the final action fixed on mobile vi
   assert.match(sponsored, /\.activation-action-dock\s*\{[\s\S]*position:\s*fixed;[\s\S]*bottom:\s*max\(7px, env\(safe-area-inset-bottom\)\)/);
   assert.match(sponsored, /class="activation-action-consent"/);
   assert.match(sponsored, /class="activation-primary-action btn btn-primary w-full"/);
-  assert.match(sponsored, /\.activation-form\s*\{\s*padding-bottom:\s*calc\(138px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(sponsored, /\.activation-form\s*\{\s*padding-bottom:\s*calc\(196px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(sponsored, /id="supportingListingAgent"[\s\S]*id="consentCheck"[\s\S]*id="activateBtn"/);
+  assert.match(signDemo, /\.confirm-actions\s*\{[\s\S]*position:fixed;[\s\S]*bottom:max\(7px,env\(safe-area-inset-bottom\)\)/);
+  assert.match(signDemo, /#app\.card\s*\{\s*animation:none;transform:none;backdrop-filter:none;-webkit-backdrop-filter:none\}/);
   assert.match(sponsored, /\.activation-shell\s*\{[^}]*backdrop-filter:\s*none;/);
 });
 

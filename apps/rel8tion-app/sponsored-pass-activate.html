@@ -74,7 +74,7 @@
       .activation-house-card { display: grid; grid-template-columns: 104px minmax(0, 1fr); }
       .activation-house-image { width: 104px !important; height: 100% !important; min-height: 112px; }
       .activation-selected-house-image { max-height: 210px; }
-      .activation-form { padding-bottom: calc(138px + env(safe-area-inset-bottom)); }
+      .activation-form { padding-bottom: calc(196px + env(safe-area-inset-bottom)); }
       .activation-action-dock {
         position: fixed;
         left: 50%;
@@ -379,6 +379,10 @@
           ${state.notice ? `<div class="rounded-[18px] border border-sky-200 bg-sky-50 p-4 font-black text-sky-700">${esc(state.notice)}</div>` : ''}
           <div class="activation-action-dock">
             <label class="activation-action-consent">
+              <input id="supportingListingAgent" type="checkbox" class="mt-1 h-5 w-5 shrink-0 rounded border-emerald-300">
+              <span class="text-slate-800 font-black">If I am not the listing agent, I confirm that I work for the same brokerage and am hosting for the listing agent who is not present.</span>
+            </label>
+            <label class="activation-action-consent">
               <input id="consentCheck" type="checkbox" class="mt-1 h-5 w-5 shrink-0 rounded border-emerald-300">
               <span class="text-slate-800 font-black">I agree to activate this Event Pass with live loan officer coverage.</span>
             </label>
@@ -499,6 +503,7 @@
             open_house_id: house.id || '',
             open_house: house,
             agent: state.agent,
+            supporting_listing_agent: document.getElementById('supportingListingAgent')?.checked === true,
             consent_accepted: true
           })
         });

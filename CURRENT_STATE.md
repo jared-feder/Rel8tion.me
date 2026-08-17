@@ -370,6 +370,10 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/k` is the universal NFC router and its routing priority is critical.
 - `[IMPLEMENTED]` Printed Event Pass QR source of truth is `smart_sign_inventory.public_code`.
 - `[IMPLEMENTED]` `open_house_events.host_agent_slug` is the current event host field.
+- `[IMPLEMENTED 2026-08-16]` Normal Event Pass activation now calls `/api/event-pass/action`; the server derives the host from the claimed keychain, requires a verified `open_houses` row, and authorizes only the listing agent or an existing same-brokerage agent who explicitly confirms they are substituting for the absent listing agent. Sponsored Event Pass activation applies the same listing/company rule before event creation. The pass sign and inventory are locked to the authorized host agent, and the event records the authorization basis.
+- `[IMPLEMENTED 2026-08-16]` Every newly registered Event Pass open house attempts an event-idempotent owner email to `OPEN_HOUSE_REGISTRATION_NOTIFICATION_EMAIL` or the existing booking-calendar notification recipient using the configured REL8TION SMTP account, with Resend fallback. Sent/failed delivery state is retained in `open_house_events.setup_context`; notification failure does not delete the valid event.
+- `[IMPLEMENTED 2026-08-16]` `20260816235025_enforce_event_pass_host_authorization.sql` was applied to the linked production project. The trigger and hardened function permissions were read back; the security advisor reports no warning for the new functions. The pre-existing project-wide advisor still reports that `open_house_events` does not have RLS enabled.
+- `[NEEDS VERIFICATION]` Confirm the first real Event Pass registration email reaches `jared@rel8tion.me`; no fake registration was created for an email smoke test.
 - `[RISK]` Root wrapper files and app files are not identical.
 
 ## Active Route State
@@ -382,6 +386,7 @@ Status labels used in this file:
 - `[IMPLEMENTED]` `/s` and `/sign` resolve smart sign public codes and route to activation or live event state.
 - `[IMPLEMENTED]` `/pass` resolves printed Event Pass QR inventory from `smart_sign_inventory.public_code`.
 - `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes and records per-event agent consent before sponsor visibility.
+- `[IMPLEMENTED 2026-08-16]` Event Pass confirmation controls remain fixed at the bottom of small mobile viewports while the agent confirms same-brokerage substitute status when applicable. Normal and Sponsored Event Pass controls were browser-verified at 320×568 with the checkboxes and activation buttons fully visible and no page errors.
 - `[IMPLEMENTED]` `/lo-sign`, `/lo-sign-setup`, and `/lo-sign-activate` support Loan Officer Coverage Sign setup, activation, and live routing.
 - `[IMPLEMENTED]` `/event` is the buyer smart sign check-in page with guided disclosures, optional financing-help routing, and SMS after local validation.
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
