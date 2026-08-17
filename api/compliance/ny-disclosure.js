@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const net = require('net');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -12,7 +13,9 @@ const AGENCY_SOURCE_PDF_URL = process.env.REL8TION_NYS_AGENCY_DISCLOSURE_PDF_URL
 const OFFICIAL_SOURCE_URL = 'https://dos.ny.gov/housing-and-anti-discrimination-disclosure-form';
 const SIGNED_DISCLOSURE_BUCKET = process.env.SIGNED_DISCLOSURE_BUCKET || 'signed-disclosures';
 const DISCLOSURE_PACKET_TYPE = 'rel8tion_open_house_disclosure_packet';
-const DISCLOSURE_PACKET_VERSION = '2026-08-13-official-forms-v2';
+const DISCLOSURE_PACKET_VERSION = '2026-08-17-immutable-audit-v3';
+const DISCLOSURE_CONSENT_VERSION = '2026-08-17-v1';
+const DISCLOSURE_CONSENT_TEXT = 'I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.';
 const SOURCE_FETCH_TIMEOUT_MS = 10000;
 const SOURCE_REQUEST_HEADERS = Object.freeze({
   Accept: 'application/pdf,*/*',
@@ -166,8 +169,34 @@ function buildSignedDisclosureStoragePath(context, checkin, fileName) {
   return `${agentSlug}/${date}-${address}-${eventId}/${fileName}`;
 }
 
+function buildWriteOnceStoragePath(context, checkin, fileName, auditEventId, documentSha256) {
+  const legacyPath = buildSignedDisclosureStoragePath(context, checkin, fileName);
+  const directory = legacyPath.slice(0, Math.max(0, legacyPath.length - fileName.length));
+  return `${directory}${safeFilenamePart(DISCLOSURE_PACKET_VERSION)}/${auditEventId}/${documentSha256}/${fileName}`;
+}
+
 function sha256Hex(bytes) {
   return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+}
+
+function requestHeader(req, name) {
+  const value = req?.headers?.[name] ?? req?.headers?.[name.toLowerCase()];
+  return cleanText(Array.isArray(value) ? value[0] : value);
+}
+
+function readRequestEvidence(req) {
+  const forwarded = firstPresent(
+    requestHeader(req, 'x-vercel-forwarded-for'),
+    requestHeader(req, 'x-forwarded-for'),
+    requestHeader(req, 'x-real-ip'),
+    req?.socket?.remoteAddress
+  );
+  const requestIp = cleanText(forwarded).split(',')[0].trim();
+  return {
+    requestIp: net.isIP(requestIp) ? requestIp : null,
+    serverUserAgent: requestHeader(req, 'user-agent') || null,
+    requestId: requestHeader(req, 'x-vercel-id') || null
+  };
 }
 
 function firstPresent(...values) {
@@ -360,6 +389,13 @@ async function appendOfficialForm(pdf, { url, label, signed, decorate, context, 
 
 async function buildDisclosurePdf(context, options = {}) {
   const pdf = await PDFDocument.create();
+  pdf.setCreator('REL8TION');
+  pdf.setProducer('REL8TION disclosure service');
+  const recordDate = new Date(firstPresent(options.signedAt, context.checkin?.created_at));
+  if (!Number.isNaN(recordDate.getTime())) {
+    pdf.setCreationDate(recordDate);
+    pdf.setModificationDate(recordDate);
+  }
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const signatureFont = await pdf.embedFont(StandardFonts.HelveticaOblique);
@@ -419,6 +455,15 @@ async function buildDisclosurePdf(context, options = {}) {
     });
   }
 
+  if (options.signed && options.auditEventId) {
+    cover.drawText(`Audit receipt: ${options.auditEventId} | ${DISCLOSURE_PACKET_VERSION}`, {
+      x: 42,
+      y: 116,
+      size: 7.5,
+      font,
+      color: rgb(0.28, 0.35, 0.45)
+    });
+  }
   cover.drawText('Source references:', { x: 42, y: 96, size: 8, font: boldFont, color: rgb(0.28, 0.35, 0.45) });
   cover.drawText(AGENCY_SOURCE_PDF_URL, { x: 42, y: 82, size: 8, font, color: rgb(0.03, 0.42, 0.72) });
   cover.drawText(OFFICIAL_SOURCE_URL, { x: 42, y: 69, size: 8, font, color: rgb(0.03, 0.42, 0.72) });
@@ -487,7 +532,7 @@ async function uploadSignedPdf(path, bytes) {
       apikey: SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/pdf',
-      'x-upsert': 'true'
+      'x-upsert': 'false'
     },
     body: Buffer.from(bytes)
   });
@@ -505,6 +550,26 @@ async function downloadStoredPdf(bucket, path) {
   });
   if (!response.ok) throw new Error(`Signed disclosure download failed: ${response.status}`);
   return new Uint8Array(await response.arrayBuffer());
+}
+
+async function loadCurrentSigningEvent(checkinId) {
+  const rows = await supabaseRest(
+    `disclosure_signing_events?checkin_id=eq.${enc(checkinId)}&packet_version=eq.${enc(DISCLOSURE_PACKET_VERSION)}&select=*&order=created_at.asc&limit=1`,
+    {},
+    true
+  );
+  return one(rows);
+}
+
+async function insertSigningEvent(event) {
+  const rows = await supabaseRest('disclosure_signing_events?select=*', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(event)
+  }, true);
+  const inserted = one(rows);
+  if (!inserted) throw new Error('Disclosure signing audit event was not recorded.');
+  return inserted;
 }
 
 function packetIdentity(packet) {
@@ -556,7 +621,7 @@ async function patchCheckinMetadata(checkin, signedPdf) {
   return one(rows) || { ...checkin, metadata: updatedMetadata };
 }
 
-function signedPacketOptions(context) {
+function signedPacketOptions(context, overrides = {}) {
   const metadata = context.checkin.metadata || {};
   const disclosure = metadata.ny_discrimination_disclosure || {};
   return {
@@ -567,7 +632,8 @@ function signedPacketOptions(context) {
     consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
     housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || context.checkin.created_at,
     agency: metadata.nys_agency_disclosure || {},
-    courtesy: metadata.rel8tion_courtesy_notice || {}
+    courtesy: metadata.rel8tion_courtesy_notice || {},
+    ...overrides
   };
 }
 
@@ -580,15 +646,114 @@ function isCurrentStoredPacket(signedPdf) {
   return Boolean(signedPdf?.storage_bucket
     && signedPdf?.storage_path
     && signedPdf?.document_type === DISCLOSURE_PACKET_TYPE
-    && signedPdf?.packet_version === DISCLOSURE_PACKET_VERSION);
+    && signedPdf?.packet_version === DISCLOSURE_PACKET_VERSION
+    && signedPdf?.audit_event_id
+    && signedPdf?.write_once === true);
 }
 
-async function generateAndStoreSignedPacket(context) {
+function isRecentSigning(context, nowMs = Date.now()) {
+  const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
+  if (disclosure.esign_consent !== true
+      || disclosure.esign_consent_text !== DISCLOSURE_CONSENT_TEXT
+      || disclosure.esign_consent_version !== DISCLOSURE_CONSENT_VERSION
+      || !disclosure.signed_at) return false;
+  const signedAt = new Date(disclosure.signed_at);
+  if (Number.isNaN(signedAt.getTime())) return false;
+  const ageMs = nowMs - signedAt.getTime();
+  return ageMs >= -60000 && ageMs <= 30 * 60 * 1000;
+}
+
+async function recoverAuditedPacket(context, auditEvent) {
   const checkin = context.checkin;
-  const bytes = await buildDisclosurePdf(context, signedPacketOptions(context));
+  if (!auditEvent?.signed_pdf?.storage_bucket || !auditEvent?.signed_pdf?.storage_path) {
+    throw new Error('Disclosure signing audit event does not reference a stored packet.');
+  }
+  const recoveredPdf = {
+    ...auditEvent.signed_pdf,
+    audit_event_id: auditEvent.id,
+    audit_event_hash: auditEvent.event_hash,
+    audit_recorded_at: auditEvent.server_received_at,
+    write_once: true
+  };
+  const bytes = await downloadStoredPdf(recoveredPdf.storage_bucket, recoveredPdf.storage_path);
+  const actualHash = sha256Hex(bytes);
+  if (actualHash !== recoveredPdf.document_sha256) {
+    throw new Error('Stored disclosure packet hash does not match its immutable audit event.');
+  }
+  const updatedCheckin = await patchCheckinMetadata(checkin, recoveredPdf);
+  return { bytes, signedPdf: recoveredPdf, updatedCheckin, reused: true };
+}
+
+function buildSigningEvent(context, signedPdf, auditEventId, requestEvidence, recordSource) {
+  const metadata = context.checkin.metadata || {};
+  const disclosure = metadata.ny_discrimination_disclosure || {};
+  const agency = metadata.nys_agency_disclosure || {};
+  const courtesy = metadata.rel8tion_courtesy_notice || {};
+  const serverObserved = recordSource === 'server_request';
+  return {
+    id: auditEventId,
+    checkin_id: context.checkin.id,
+    event_id: context.eventId,
+    record_source: recordSource,
+    packet_version: DISCLOSURE_PACKET_VERSION,
+    document_type: DISCLOSURE_PACKET_TYPE,
+    signature_type: disclosure.e_signature_type || 'checkbox_plus_prefilled_name',
+    signature_value: disclosure.e_signature_value || context.checkin.visitor_name,
+    esign_consent: disclosure.esign_consent === true,
+    consent_text: serverObserved ? DISCLOSURE_CONSENT_TEXT : null,
+    consent_text_version: serverObserved ? DISCLOSURE_CONSENT_VERSION : 'legacy-unversioned',
+    consumer_role: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
+    client_signed_at: disclosure.signed_at || context.checkin.created_at,
+    request_ip: serverObserved ? requestEvidence.requestIp : null,
+    client_user_agent: disclosure.user_agent || agency.user_agent || courtesy.user_agent || null,
+    server_user_agent: serverObserved ? requestEvidence.serverUserAgent : null,
+    request_id: serverObserved ? requestEvidence.requestId : null,
+    provided_by_agent_name: disclosure.provided_by_agent_name || context.agentName || null,
+    provided_by_brokerage: disclosure.provided_by_brokerage || context.brokerage || null,
+    source_forms: [
+      {
+        form: 'nys_agency_disclosure',
+        version: agency.agency_disclosure_version || 'DOS-1736-f-09/21',
+        url: signedPdf.agency_source_pdf_url
+      },
+      {
+        form: 'ny_housing_anti_discrimination_disclosure',
+        version: disclosure.form_version || '11/25',
+        url: signedPdf.source_pdf_url
+      },
+      {
+        form: 'rel8tion_courtesy_notice',
+        version: '2026-05-09-v1',
+        url: null
+      }
+    ],
+    storage_bucket: signedPdf.storage_bucket,
+    storage_path: signedPdf.storage_path,
+    storage_file_name: signedPdf.storage_file_name,
+    document_sha256: signedPdf.document_sha256,
+    signed_pdf: signedPdf,
+    evidence: {
+      audit_schema_version: '1',
+      client_evidence_source: 'event_checkins.metadata',
+      server_evidence_source: serverObserved ? 'vercel_request_headers' : null,
+      legacy_evidence: !serverObserved,
+      client_consent_version: disclosure.esign_consent_version || null,
+      client_consent_text_matches: disclosure.esign_consent_text === DISCLOSURE_CONSENT_TEXT
+    }
+  };
+}
+
+async function generateAndStoreSignedPacket(context, requestEvidence = {}, recordSource = 'legacy_import') {
+  const checkin = context.checkin;
+  const existingEvent = await loadCurrentSigningEvent(checkin.id);
+  if (existingEvent) return recoverAuditedPacket(context, existingEvent);
+
+  const auditEventId = crypto.randomUUID();
+  const bytes = await buildDisclosurePdf(context, signedPacketOptions(context, { auditEventId }));
   const generatedAt = new Date().toISOString();
   const fileName = buildSignedDisclosureFileName(context, checkin);
-  const path = buildSignedDisclosureStoragePath(context, checkin, fileName);
+  const documentSha256 = sha256Hex(bytes);
+  const path = buildWriteOnceStoragePath(context, checkin, fileName, auditEventId, documentSha256);
   const signedPdf = {
     generated: true,
     document_type: DISCLOSURE_PACKET_TYPE,
@@ -604,7 +769,9 @@ async function generateAndStoreSignedPacket(context) {
     storage_file_name: fileName,
     download_url: `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1`,
     generated_at: generatedAt,
-    document_sha256: sha256Hex(bytes),
+    document_sha256: documentSha256,
+    audit_event_id: auditEventId,
+    write_once: true,
     event_id: context.eventId || '',
     checkin_id: checkin.id,
     open_house_source_id: context.openHouseSourceId || '',
@@ -616,8 +783,23 @@ async function generateAndStoreSignedPacket(context) {
     official_source_url: OFFICIAL_SOURCE_URL
   };
   await uploadSignedPdf(path, bytes);
-  const updatedCheckin = await patchCheckinMetadata(checkin, signedPdf);
-  return { bytes, signedPdf, updatedCheckin };
+  let auditEvent;
+  try {
+    auditEvent = await insertSigningEvent(
+      buildSigningEvent(context, signedPdf, auditEventId, requestEvidence, recordSource)
+    );
+  } catch (error) {
+    const winningEvent = await loadCurrentSigningEvent(checkin.id);
+    if (!winningEvent) throw error;
+    return recoverAuditedPacket(context, winningEvent);
+  }
+  const auditedPdf = {
+    ...signedPdf,
+    audit_event_hash: auditEvent.event_hash,
+    audit_recorded_at: auditEvent.server_received_at
+  };
+  const updatedCheckin = await patchCheckinMetadata(checkin, auditedPdf);
+  return { bytes, signedPdf: auditedPdf, updatedCheckin, reused: false };
 }
 
 async function handlePreview(req, res) {
@@ -665,12 +847,18 @@ async function handleGenerateSigned(req, res) {
     return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
   }
 
-  const generated = await generateAndStoreSignedPacket(context);
+  const recordSource = isRecentSigning(context) ? 'server_request' : 'legacy_import';
+  const generated = await generateAndStoreSignedPacket(
+    context,
+    recordSource === 'server_request' ? readRequestEvidence(req) : {},
+    recordSource
+  );
 
   return sendJson(res, 200, {
     ok: true,
     signed_pdf: generated.signedPdf,
-    checkin: generated.updatedCheckin
+    checkin: generated.updatedCheckin,
+    audit_reused: generated.reused
   });
 }
 
@@ -691,6 +879,8 @@ module.exports = async function handler(req, res) {
 
 module.exports.__test = {
   AGENCY_SOURCE_PDF_URL,
+  DISCLOSURE_CONSENT_TEXT,
+  DISCLOSURE_CONSENT_VERSION,
   DISCLOSURE_PACKET_TYPE,
   DISCLOSURE_PACKET_VERSION,
   SOURCE_PDF_URL,
@@ -698,9 +888,14 @@ module.exports.__test = {
   buildDisclosureMetadata,
   buildDisclosurePdf,
   buildSignedDisclosureFileName,
+  buildSigningEvent,
+  buildWriteOnceStoragePath,
   fetchSourcePdf,
   formatFormDate,
+  generateAndStoreSignedPacket,
   hasCompletedDisclosure,
+  isRecentSigning,
   isCurrentStoredPacket,
+  readRequestEvidence,
   signedPacketOptions
 };

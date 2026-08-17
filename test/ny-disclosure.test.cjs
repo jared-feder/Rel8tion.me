@@ -52,6 +52,7 @@ test('signed packet writes names, signature, date, and agency role onto both off
       address: '123 Main Street, Farmingdale, NY'
     }, {
       signed: true,
+      auditEventId: '00000000-0000-4000-8000-000000000001',
       signature: 'Jordan Buyer',
       signedAt: '2026-08-13T18:12:00.000Z',
       signedDate: '2026-08-13',
@@ -62,6 +63,7 @@ test('signed packet writes names, signature, date, and agency role onto both off
     const pdf = await PDFDocument.load(bytes);
 
     assert.equal(pdf.getPageCount(), 6);
+    const coverPage = decodedPageContent(pdf, 0);
     const agencyPage = decodedPageContent(pdf, 3);
     const housingPage = decodedPageContent(pdf, 5);
     for (const page of [agencyPage, housingPage]) {
@@ -73,6 +75,8 @@ test('signed packet writes names, signature, date, and agency role onto both off
     assert.ok((agencyPage.match(new RegExp(`<${pdfHex('X')}>`, 'g')) || []).length >= 3);
     assert.match(agencyPage, /Helvetica-Oblique/);
     assert.match(housingPage, /Helvetica-Oblique/);
+    assert.match(coverPage, new RegExp(pdfHex('00000000-0000-4000-8000-000000000001')));
+    assert.match(coverPage, new RegExp(pdfHex(disclosure.DISCLOSURE_PACKET_VERSION)));
     assert.equal(requests.length, 2);
     for (const request of requests) {
       assert.equal(request.options.headers.Accept, 'application/pdf,*/*');
@@ -106,7 +110,118 @@ test('only the corrected packet version is reused from storage', () => {
     document_type: disclosure.DISCLOSURE_PACKET_TYPE
   };
   assert.equal(disclosure.isCurrentStoredPacket({ ...common, packet_version: '2026-05-09-three-step-v1' }), false);
-  assert.equal(disclosure.isCurrentStoredPacket({ ...common, packet_version: disclosure.DISCLOSURE_PACKET_VERSION }), true);
+  assert.equal(disclosure.isCurrentStoredPacket({ ...common, packet_version: disclosure.DISCLOSURE_PACKET_VERSION }), false);
+  assert.equal(disclosure.isCurrentStoredPacket({
+    ...common,
+    packet_version: disclosure.DISCLOSURE_PACKET_VERSION,
+    audit_event_id: '00000000-0000-4000-8000-000000000001',
+    write_once: true
+  }), true);
+});
+
+test('write-once storage paths bind packet version, audit event, and PDF hash', () => {
+  const auditEventId = '00000000-0000-4000-8000-000000000001';
+  const hash = 'a'.repeat(64);
+  const fileName = 'signed-packet.pdf';
+  const path = disclosure.buildWriteOnceStoragePath({
+    address: '123 Main St',
+    eventId: '11111111-1111-4111-8111-111111111111',
+    event: { host_agent_slug: 'alex-agent' }
+  }, {
+    id: '22222222-2222-4222-8222-222222222222',
+    created_at: '2026-08-17T12:00:00Z'
+  }, fileName, auditEventId, hash);
+
+  assert.match(path, new RegExp(disclosure.DISCLOSURE_PACKET_VERSION));
+  assert.match(path, new RegExp(auditEventId));
+  assert.match(path, new RegExp(hash));
+  assert.match(path, new RegExp(`${fileName}$`));
+});
+
+test('server request evidence prefers Vercel trusted forwarding headers', () => {
+  const evidence = disclosure.readRequestEvidence({
+    headers: {
+      'x-vercel-forwarded-for': '203.0.113.12',
+      'x-forwarded-for': '198.51.100.4',
+      'user-agent': 'Audit Browser/1.0',
+      'x-vercel-id': 'iad1::abc'
+    }
+  });
+  assert.deepEqual(evidence, {
+    requestIp: '203.0.113.12',
+    serverUserAgent: 'Audit Browser/1.0',
+    requestId: 'iad1::abc'
+  });
+  assert.equal(disclosure.readRequestEvidence({ headers: { 'x-forwarded-for': 'not-an-ip' } }).requestIp, null);
+});
+
+test('historical packet conversion never presents downloader headers as signer evidence', () => {
+  const context = {
+    checkin: {
+      id: '22222222-2222-4222-8222-222222222222',
+      visitor_name: 'Jordan Buyer',
+      visitor_type: 'Buyer',
+      created_at: '2026-08-01T12:00:00Z',
+      metadata: {
+        ny_discrimination_disclosure: {
+          acknowledged: true,
+          esign_consent: true,
+          e_signature_value: 'Jordan Buyer',
+          signed_at: '2026-08-01T12:00:00Z',
+          user_agent: 'Original Browser/1.0'
+        }
+      }
+    },
+    eventId: '11111111-1111-4111-8111-111111111111',
+    agentName: 'Alex Agent',
+    brokerage: 'Example Realty'
+  };
+  const signedPdf = {
+    storage_bucket: 'signed-disclosures',
+    storage_path: 'write-once.pdf',
+    storage_file_name: 'write-once.pdf',
+    document_sha256: 'a'.repeat(64),
+    source_pdf_url: disclosure.SOURCE_PDF_URL,
+    agency_source_pdf_url: disclosure.AGENCY_SOURCE_PDF_URL
+  };
+  const event = disclosure.buildSigningEvent(
+    context,
+    signedPdf,
+    '00000000-0000-4000-8000-000000000001',
+    { requestIp: '203.0.113.12', serverUserAgent: 'Downloader/1.0', requestId: 'request' },
+    'legacy_import'
+  );
+  assert.equal(event.request_ip, null);
+  assert.equal(event.server_user_agent, null);
+  assert.equal(event.request_id, null);
+  assert.equal(event.client_user_agent, 'Original Browser/1.0');
+  assert.equal(event.consent_text, null);
+  assert.equal(event.evidence.legacy_evidence, true);
+});
+
+test('only a recent signing is eligible for server-observed request evidence', () => {
+  const now = Date.parse('2026-08-17T12:10:00Z');
+  const context = (signedAt) => ({
+    checkin: {
+      created_at: signedAt,
+      metadata: {
+        ny_discrimination_disclosure: {
+          signed_at: signedAt,
+          esign_consent: true,
+          esign_consent_text: disclosure.DISCLOSURE_CONSENT_TEXT,
+          esign_consent_version: disclosure.DISCLOSURE_CONSENT_VERSION
+        }
+      }
+    }
+  });
+  assert.equal(disclosure.isRecentSigning(context('2026-08-17T12:00:00Z'), now), true);
+  assert.equal(disclosure.isRecentSigning(context('2026-08-17T10:00:00Z'), now), false);
+  const missingConsent = context('2026-08-17T12:00:00Z');
+  missingConsent.checkin.metadata.ny_discrimination_disclosure.esign_consent = false;
+  assert.equal(disclosure.isRecentSigning(missingConsent, now), false);
+  const mismatchedText = context('2026-08-17T12:00:00Z');
+  mismatchedText.checkin.metadata.ny_discrimination_disclosure.esign_consent_text = 'Different wording';
+  assert.equal(disclosure.isRecentSigning(mismatchedText, now), false);
 });
 
 test('corrected packet uses a versioned path and preserves the prior packet descriptor', () => {

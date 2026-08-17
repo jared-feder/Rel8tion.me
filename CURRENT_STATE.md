@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-17: Immutable disclosure signing audit test branch
+
+- `[PARTIAL]` Test branch `codex/disclosure-immutable-audit` upgrades newly generated signed disclosure packets to `2026-08-17-immutable-audit-v3`. Each packet receives a unique audit receipt printed on its cover, a SHA-256 document hash, and a version/audit/hash-bound Storage path uploaded with upsert disabled. The existing v2 production packet remains unchanged until this branch and its migration are intentionally released.
+- `[IMPLEMENTED]` New browser signings persist the exact consent wording and version. The server records a recent consenting signing request's Vercel-observed IP, user agent, and request ID in a service-role-only `disclosure_signing_events` ledger; historical packet conversion is explicitly labeled `legacy_import` and never attributes the downloader's request evidence to the original signer.
+- `[IMPLEMENTED]` The proposed ledger enables and forces RLS, grants only `SELECT`/`INSERT` to `service_role`, rejects every update or delete through a database trigger, computes an event hash inside PostgreSQL, and permits only one canonical packet per check-in and packet version. Concurrent retries reuse and hash-check the winning audited packet rather than replacing it.
+- `[VERIFIED]` Sixteen focused code, PDF, audit, and migration-contract tests pass. A disposable PostgreSQL 18 database applied the migration and proved a 64-character database-computed hash, forced RLS, service-role update/delete denial, and owner-level update/delete rejection by the append-only trigger. A fresh six-page packet built from the current official source forms was rendered; its audit receipt, typed signatures, dates, and provider fields were aligned and legible with no clipping or overlap.
+- `[NEEDS VERIFICATION]` The migration has not been applied to linked production Supabase, the branch has not been merged to `main`, and no production disclosure, Storage object, or signing-event row was changed. A release still requires reviewed migration application, production deployment, a real consenting test signing, hash/read-back verification, route verification, and bounded post-deploy logs. Final legal and retention-policy review remains a business/compliance responsibility.
+
 ## 2026-08-17: Paying-agent Event Pass becomes a reusable Rel8tionChip
 
 - `[IMPLEMENTED]` A claimed Event Pass now has two NFC states. While its open-house event is active, `/k` opens that event dashboard. After the event ends, the same NFC opens `/agent-home` as the agent's Rel8tionChip and digital-business-card owner surface instead of reopening historical event results or immediately forcing another activation.

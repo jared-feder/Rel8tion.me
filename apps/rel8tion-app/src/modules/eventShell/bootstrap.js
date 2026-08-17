@@ -30,6 +30,8 @@ const NY_DISCRIMINATION_DISCLOSURE = Object.freeze({
 const NYS_AGENCY_DISCLOSURE_PDF_URL = 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/compliance/nysellerbuyerdisclosure.pdf';
 const NYS_AGENCY_DISCLOSURE_VERSION = 'nys-dos-buyer-seller-disclosure-v1';
 const NYS_AGENCY_DISCLOSURE_TYPE = 'seller_representation_open_house';
+const NYS_DISCLOSURE_ESIGN_CONSENT_VERSION = '2026-08-17-v1';
+const NYS_DISCLOSURE_ESIGN_CONSENT_TEXT = 'I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.';
 
 const pageState = {
   eventRow: null,
@@ -726,7 +728,7 @@ function renderDisclosureBlock() {
 
       <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4 text-slate-700 font-semibold">
         <input type="checkbox" name="ny_disclosure_acknowledged" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300">
-        <span>I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.</span>
+        <span>${esc(NYS_DISCLOSURE_ESIGN_CONSENT_TEXT)}</span>
       </label>
     </div>
   `;
@@ -957,7 +959,7 @@ function renderGuidedDisclosuresModal() {
           </div>
           <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4 text-slate-700 font-semibold">
             <input type="checkbox" id="ny-disclosure-final-checkbox" form="checkin-form" name="ny_disclosure_acknowledged" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
-            <span>I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.</span>
+            <span>${esc(NYS_DISCLOSURE_ESIGN_CONSENT_TEXT)}</span>
           </label>
           <button id="guided-complete-checkin" type="submit" form="checkin-form" class="${primaryButtonClass()} hidden w-full" style="background:var(--event-gradient);">Complete Check-In</button>
         </div>
@@ -1095,6 +1097,8 @@ function buildNyDisclosureMetadata(values, signedAt = new Date()) {
     reviewed_at: normalizeValue(values.ny_housing_disclosure_reviewed_at) || signedAt.toISOString(),
     reviewed_pdf_url: getDisclosurePreviewUrl(pageState.eventRow?.id) || NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL,
     esign_consent: true,
+    esign_consent_text: NYS_DISCLOSURE_ESIGN_CONSENT_TEXT,
+    esign_consent_version: NYS_DISCLOSURE_ESIGN_CONSENT_VERSION,
     e_signature_type: 'checkbox_plus_prefilled_name',
     e_signature_value: signatureValue,
     signed_date: signedDate,
