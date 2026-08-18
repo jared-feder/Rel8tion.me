@@ -69,6 +69,10 @@ test('Event Pass activation hands the agent directly to one live-dashboard actio
 test('visitor check-in opens with a mobile Start Check-In action that reveals the form', () => {
   assert.match(eventShell, /id="mobile-checkin-prompt"/);
   assert.match(eventShell, /id="start-checkin-button"[^>]*aria-controls="visitor-checkin"/);
+  assert.match(eventShell, /id="inline-start-checkin-button"[^>]*aria-controls="visitor-checkin"/);
+  assert.match(eventShell, /document\.querySelectorAll\('\.start-checkin-action'\)/);
+  assert.match(eventShell, /left:50%;width:calc\(100% - 24px\);max-width:430px;transform:translateX\(-50%\)/);
+  assert.doesNotMatch(eventShell, /rel8tion-mobile-checkin-prompt[^>]*md:hidden/);
   assert.ok(eventShell.includes('Start Check-In <span aria-hidden="true">↓</span>'));
   assert.match(eventShell, /id="visitor-checkin"/);
   assert.match(eventShell, /<h2[^>]*>Begin Your Check-In<\/h2>/);
@@ -78,7 +82,7 @@ test('visitor check-in opens with a mobile Start Check-In action that reveals th
   assert.match(eventShell, /const firstFieldVisible = firstFieldTop <= window\.innerHeight - promptHeight - 12/);
   assert.match(eventShell, /checkinPrompt\.classList\.toggle\('hidden', promptDismissed \|\| firstFieldVisible\)/);
   assert.match(eventShell, /promptDismissed = true;[\s\S]*checkinPrompt\.classList\.add\('hidden'\)/);
-  assert.match(eventHtml, /bootstrap\.js\?v=20260818-checkin-cta2/);
+  assert.match(eventHtml, /bootstrap\.js\?v=20260818-checkin-cta3/);
 });
 
 test('visitor check-in enables grouped mobile browser autofill without persisting sensitive answers', () => {

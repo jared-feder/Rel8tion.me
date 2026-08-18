@@ -126,7 +126,7 @@ The agent owner dashboard validates the claimed NFC UID/agent pairing before loa
 
 ### Buyer Check-In And Dashboards
 
-- `[IMPLEMENTED]` `/event` is the buyer check-in page. On mobile, a first-viewport **Start Check-In** action stays fixed until the visitor reaches the form, then reveals the **Buyer / With Agent / Agent** path and contact fields. Contact fields opt into grouped native browser autofill; financing answers and disclosure acknowledgements are not persisted locally.
+- `[IMPLEMENTED]` `/event` is the buyer check-in page. It presents a permanent **Start Check-In** action directly below the property/host card and a first-viewport fixed action until the visitor reaches the form; either reveals the **Buyer / With Agent / Agent** path and contact fields. Contact fields opt into grouped native browser autofill; financing answers and disclosure acknowledgements are not persisted locally.
 - `[IMPLEMENTED]` `/event-chat` is the buyer return chat page for dashboard-triggered SMS links.
 - `[IMPLEMENTED]` `/agent-dashboard` is the host-agent live event dashboard.
 - `[IMPLEMENTED]` `/api/agent-event-dashboard` is the private data and closeout boundary. It requires the short-lived NFC session, revalidates the claimed key, checks `open_house_events.host_agent_slug`, and verifies the sign/event pairing before using the service role. The browser dashboard contains no direct `event_checkins`, `open_house_events`, or `smart_signs` Data API calls.

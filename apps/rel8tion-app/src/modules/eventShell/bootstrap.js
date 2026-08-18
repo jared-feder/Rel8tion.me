@@ -1286,9 +1286,9 @@ function attachEventHandlers() {
   }
 
   const checkinPrompt = document.getElementById('mobile-checkin-prompt');
-  const startCheckinButton = document.getElementById('start-checkin-button');
+  const startCheckinButtons = document.querySelectorAll('.start-checkin-action');
   const checkinSection = document.getElementById('visitor-checkin');
-  if (checkinPrompt && startCheckinButton && checkinSection) {
+  if (checkinPrompt && startCheckinButtons.length && checkinSection) {
     if (checkinPrompt.parentElement !== document.body) document.body.appendChild(checkinPrompt);
     const firstCheckinField = checkinSection.querySelector('#checkin-form input:not([type="hidden"])');
     let promptDismissed = false;
@@ -1298,11 +1298,13 @@ function attachEventHandlers() {
       const firstFieldVisible = firstFieldTop <= window.innerHeight - promptHeight - 12;
       checkinPrompt.classList.toggle('hidden', promptDismissed || firstFieldVisible);
     };
-    startCheckinButton.addEventListener('click', () => {
-      promptDismissed = true;
-      checkinPrompt.classList.add('hidden');
-      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-      checkinSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    startCheckinButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        promptDismissed = true;
+        checkinPrompt.classList.add('hidden');
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+        checkinSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      });
     });
     window.addEventListener('scroll', checkinPromptScrollHandler, { passive: true });
     checkinPromptScrollHandler();
@@ -1771,8 +1773,8 @@ function renderEventShell() {
     <div style="${themeStyle()}">
     ${renderSubmittingOverlay()}
     ${pageState.mode === 'checkin' ? `
-      <div id="mobile-checkin-prompt" class="rel8tion-mobile-checkin-prompt fixed inset-x-3 z-[80] rounded-[22px] border border-white/90 bg-white/95 p-2 shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur md:hidden" style="bottom:max(10px, env(safe-area-inset-bottom));">
-        <button id="start-checkin-button" type="button" aria-controls="visitor-checkin" class="flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[17px] px-5 py-4 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]" style="background:${eventTheme().gradient};">
+      <div id="mobile-checkin-prompt" class="rel8tion-mobile-checkin-prompt fixed z-[80] rounded-[22px] border border-white/90 bg-white/95 p-2 shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur" style="left:50%;width:calc(100% - 24px);max-width:430px;transform:translateX(-50%);bottom:max(10px, env(safe-area-inset-bottom));">
+        <button id="start-checkin-button" type="button" aria-controls="visitor-checkin" class="start-checkin-action flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[17px] px-5 py-4 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]" style="background:${eventTheme().gradient};">
           Start Check-In <span aria-hidden="true">↓</span>
         </button>
       </div>
@@ -1797,6 +1799,14 @@ function renderEventShell() {
         </div>
       </div>
     </section>
+
+    ${pageState.mode === 'checkin' ? `
+      <div class="mb-5 rounded-[24px] border border-white/90 bg-white/90 p-3 shadow-[0_16px_36px_rgba(31,42,90,0.14)]">
+        <button id="inline-start-checkin-button" type="button" aria-controls="visitor-checkin" class="start-checkin-action flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[18px] px-5 py-4 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)]" style="background:${eventTheme().gradient};">
+          Start Check-In <span aria-hidden="true">↓</span>
+        </button>
+      </div>
+    ` : ''}
 
     <section id="visitor-checkin" class="mb-5 scroll-mt-3">
       <article class="rounded-[28px] border border-sky-100 bg-white/82 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
