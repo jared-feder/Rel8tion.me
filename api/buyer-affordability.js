@@ -1,4 +1,5 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
+const { requireSession } = require('../lib/agent-nfc-session');
 
 const DISCLAIMER =
   'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
@@ -638,6 +639,9 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       const mode = clean(req.query?.mode || 'event_fit_data', 80);
+      if (mode === 'event_fit_data') {
+        await requireSession(req, clean(req.query?.agent_slug || req.query?.agent, 180));
+      }
       const data = mode === 'lo_form'
         ? await loadLoForm(req.query || {})
         : await loadEventFitData(req.query || {});

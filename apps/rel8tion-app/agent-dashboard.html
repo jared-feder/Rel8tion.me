@@ -31,9 +31,7 @@
     </section>
   </main>
 
-  <script type="module">
-    import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js?v=20260430-agent-dashboard';
-
+  <script>
     const params = new URLSearchParams(window.location.search);
     const state = {
       agent: params.get('agent') || '',
@@ -65,7 +63,6 @@
       return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     };
     const labelSlug = (slug) => String(slug || '').split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
-    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
@@ -89,81 +86,36 @@
       return `/get-open-house-kit?${kitParams.toString()}`;
     }
 
-    async function request(path, options = {}) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-        ...options,
-        headers: {
-          ...headers,
-          ...(options.headers || {})
-        }
-      });
-      const raw = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(raw || `Request failed: ${res.status}`);
-      return raw ? JSON.parse(raw) : null;
+    function dashboardParams(action = 'snapshot') {
+      return {
+        action,
+        agent_slug: state.agent,
+        event_id: state.event?.id || state.eventId,
+        sign_id: state.sign?.id || state.signId,
+        code: state.sign?.public_code || state.code
+      };
     }
 
-    async function loadSign() {
-      if (state.signId) {
-        const rows = await request(`smart_signs?id=eq.${encodeURIComponent(state.signId)}&select=*&limit=1`);
-        return Array.isArray(rows) ? rows[0] : null;
+    async function dashboardApi(action = 'snapshot', method = 'GET') {
+      const input = dashboardParams(action);
+      const options = { method, credentials: 'same-origin', cache: 'no-store' };
+      let url = '/api/agent-event-dashboard';
+      if (method === 'GET') {
+        url += `?${new URLSearchParams(input).toString()}`;
+      } else {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(input);
       }
-      if (state.code) {
-        const rows = await request(`smart_signs?public_code=eq.${encodeURIComponent(state.code)}&select=*&limit=1`);
-        if (Array.isArray(rows) && rows[0]) return rows[0];
-        const inventoryRows = await request(`smart_sign_inventory?public_code=eq.${encodeURIComponent(state.code)}&select=id,public_code,smart_sign_id&limit=1`).catch(() => []);
-        const inventory = Array.isArray(inventoryRows) ? inventoryRows[0] : null;
-        if (inventory?.smart_sign_id) {
-          const aliasRows = await request(`smart_signs?id=eq.${encodeURIComponent(inventory.smart_sign_id)}&select=*&limit=1`);
-          return Array.isArray(aliasRows) ? aliasRows[0] : null;
-        }
-      }
-      return null;
-    }
-
-    async function loadEvent() {
-      if (state.eventId) {
-        const rows = await request(`open_house_events?id=eq.${encodeURIComponent(state.eventId)}&select=*&limit=1`);
-        return Array.isArray(rows) ? rows[0] : null;
-      }
-      if (state.sign?.active_event_id) {
-        const rows = await request(`open_house_events?id=eq.${encodeURIComponent(state.sign.active_event_id)}&select=*&limit=1`);
-        return Array.isArray(rows) ? rows[0] : null;
-      }
-      if (state.sign?.id) {
-        const rows = await request(`open_house_events?smart_sign_id=eq.${encodeURIComponent(state.sign.id)}&ended_at=is.null&select=*&order=created_at.desc&limit=1`);
-        return Array.isArray(rows) ? rows[0] : null;
-      }
-      return null;
-    }
-
-    async function loadHouse(openHouseId) {
-      if (!openHouseId) return null;
-      const rows = await request(`open_houses?id=eq.${encodeURIComponent(openHouseId)}&select=*&limit=1`);
-      return Array.isArray(rows) ? rows[0] : null;
-    }
-
-    async function loadCheckins(eventId) {
-      if (!eventId) return [];
-      const rows = await request(`event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=*&order=created_at.desc&limit=50`);
-      return Array.isArray(rows) ? rows : [];
-    }
-
-    async function loadOutreach(openHouseId) {
-      if (!openHouseId) return [];
-      const rows = await request(`agent_outreach_queue?open_house_id=eq.${encodeURIComponent(openHouseId)}&select=*&order=created_at.desc&limit=10`);
-      return Array.isArray(rows) ? rows : [];
-    }
-
-    async function loadLoanOfficer(eventId) {
-      if (!eventId) return null;
-      const rows = await request(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(eventId)}&status=eq.live&select=*&order=signed_in_at.desc&limit=1`);
-      return Array.isArray(rows) ? rows[0] : null;
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Private dashboard request failed.');
+      return data;
     }
 
     async function loadAffordability(eventId, agentSlug) {
       if (!eventId || !agentSlug) return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
       const url = `/api/buyer-affordability?mode=event_fit_data&event_id=${encodeURIComponent(eventId)}&agent_slug=${encodeURIComponent(agentSlug)}`;
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) throw new Error(data.error || 'Property fit data unavailable.');
       const guidanceByBuyerId = {};
@@ -615,42 +567,7 @@
         : 'End this open house now? Buyer check-ins already captured will stay saved.');
       if (!ok) return;
 
-      const now = new Date().toISOString();
-      await request(`open_house_events?id=eq.${encodeURIComponent(state.event.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'ended',
-          ended_at: now,
-          last_activity_at: now
-        })
-      });
-      await request(`smart_signs?active_event_id=eq.${encodeURIComponent(state.event.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          active_event_id: null,
-          status: 'inactive',
-          deactivated_at: now
-        })
-      });
-      await request(`event_loan_officer_sessions?open_house_event_id=eq.${encodeURIComponent(state.event.id)}&status=eq.live`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'ended',
-          signed_out_at: now,
-          updated_at: now,
-          last_seen_at: now
-        })
-      }).catch(() => null);
-      await request(`loan_officer_coverage_signs?active_event_id=eq.${encodeURIComponent(state.event.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          active_event_id: null,
-          active_event_pass_inventory_id: null,
-          active_smart_sign_id: null,
-          status: 'assigned',
-          updated_at: now
-        })
-      }).catch(() => null);
+      const result = await dashboardApi('close_event', 'POST');
 
       if (move) {
         const params = new URLSearchParams();
@@ -661,8 +578,8 @@
         return;
       }
 
-      state.event = { ...state.event, status: 'ended', ended_at: now, last_activity_at: now };
-      state.sign = { ...state.sign, active_event_id: null, status: 'inactive', deactivated_at: now };
+      state.event = result.event;
+      state.sign = result.sign;
       renderEndedSummary();
     }
 
@@ -707,15 +624,15 @@
 
     async function init() {
       if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
-      state.sign = await loadSign();
-      state.event = await loadEvent();
-      if (!state.event?.id) throw new Error('This sign is not attached to a live event yet. Activate it to an open house first.');
+      const snapshot = await dashboardApi();
+      state.sign = snapshot.sign;
+      state.event = snapshot.event;
+      state.house = snapshot.house;
+      state.checkins = snapshot.checkins || [];
+      state.outreach = snapshot.outreach || [];
+      state.loanOfficer = snapshot.loan_officer || null;
       const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
       if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
-      state.house = await loadHouse(state.event.open_house_source_id);
-      state.checkins = await loadCheckins(state.event.id).catch(() => []);
-      state.outreach = await loadOutreach(state.event.open_house_source_id).catch(() => []);
-      state.loanOfficer = await loadLoanOfficer(state.event.id).catch(() => null);
       state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
         console.log('affordability fit data skipped', error);
         return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };

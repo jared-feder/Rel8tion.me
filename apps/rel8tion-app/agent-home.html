@@ -984,6 +984,19 @@
       `;
     }
 
+    async function loadPrivateEventHistory() {
+      const query = new URLSearchParams({ action: 'agent_home', agent_slug: agentSlug });
+      const response = await fetch(`/api/agent-event-dashboard?${query.toString()}`, {
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || 'Tap the claimed NFC device again to load private event history.');
+      }
+      return { events: payload.events || [], checkins: payload.checkins || [] };
+    }
+
     async function init() {
       if (!agentSlug) {
         app.className = 'panel';
@@ -1004,16 +1017,16 @@
       if (keyRole !== 'event_pass_keychain') await ensureVerifiedPhoneSession();
       await requirePhoneUnlock(identityRows[0]?.name || agentSlug);
 
-      const [agents, events, leads] = await Promise.all([
+      const [agents, privateHistory, leads] = await Promise.all([
         safeRows(`agents?slug=eq.${encodeURIComponent(agentSlug)}&select=*&limit=1`),
-        safeRows(`open_house_events?host_agent_slug=eq.${encodeURIComponent(agentSlug)}&select=*&order=created_at.desc&limit=80`),
+        loadPrivateEventHistory(),
         safeRows(`leads?agent_slug=eq.${encodeURIComponent(agentSlug)}&select=*&order=created_at.desc&limit=100`)
       ]);
+      const events = privateHistory.events;
+      const checkins = privateHistory.checkins;
       const agent = await hydrateAgentPhoto(agents[0] || { slug: agentSlug, name: agentSlug });
-      const eventIds = events.map((event) => event.id).filter(Boolean);
       const houseIds = [...new Set(events.map((event) => event.open_house_source_id).filter(Boolean))];
-      const [checkins, houses, scenarios, guidance, qrLinks, kitDashboard] = await Promise.all([
-        eventIds.length ? safeRows(`event_checkins?open_house_event_id=in.(${eventIds.map((id) => encodeURIComponent(id)).join(',')})&select=*&order=created_at.desc&limit=300`) : [],
+      const [houses, scenarios, guidance, qrLinks, kitDashboard] = await Promise.all([
         houseIds.length ? safeRows(`open_houses?id=in.(${houseIds.map((id) => encodeURIComponent(id)).join(',')})&select=id,address,image_url,city,state,zip&limit=120`) : [],
         safeRows(`buyer_property_fit_scenarios?agent_slug=eq.${encodeURIComponent(agentSlug)}&select=id,buyer_id,result_status,created_at&order=created_at.desc&limit=200`),
         safeRows(`buyer_affordability_guidance?agent_slug=eq.${encodeURIComponent(agentSlug)}&status=eq.active&select=id,buyer_id,status,updated_at&order=updated_at.desc&limit=200`),

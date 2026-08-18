@@ -355,8 +355,27 @@
       window.location.href = `${window.location.origin}/s?code=${encodeURIComponent(publicCode)}`;
     }
 
-    function goToAgentDashboard({ agentSlug, eventId, signId, publicCode }) {
+    async function establishAgentNfcSession(agentSlug) {
+      const current = await fetch(`/api/agent-nfc-session?agent=${encodeURIComponent(agentSlug)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }).then((response) => response.ok).catch(() => false);
+      if (current) return;
+      const response = await fetch('/api/agent-nfc-session', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_slug: agentSlug, uid })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || 'This NFC device could not open the private agent dashboard.');
+      }
+    }
+
+    async function goToAgentDashboard({ agentSlug, eventId, signId, publicCode }) {
       if (!agentSlug) return;
+      await establishAgentNfcSession(agentSlug);
       const next = new URLSearchParams();
       next.set('agent', agentSlug);
       if (uid) next.set('uid', uid);
@@ -367,8 +386,9 @@
       window.location.href = `${window.location.origin}/agent-dashboard?${next.toString()}`;
     }
 
-    function goToAgentHome({ agentSlug, activeEventId = '', eventPassCode = '' }) {
+    async function goToAgentHome({ agentSlug, activeEventId = '', eventPassCode = '' }) {
       if (!agentSlug) return;
+      await establishAgentNfcSession(agentSlug);
       const next = new URLSearchParams();
       next.set('agent', agentSlug);
       if (uid) next.set('uid', uid);
@@ -659,7 +679,7 @@
       await activateLoanOfficerSession(pendingLoanOfficer, profile);
       window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
       setStatus('Loan Officer Live', 'Returning to the agent event dashboard.');
-      goToAgentDashboard({
+      await goToAgentDashboard({
         agentSlug: pendingLoanOfficer.agentSlug,
         eventId: pendingLoanOfficer.eventId,
         signId: pendingLoanOfficer.signId,
@@ -1084,7 +1104,7 @@
           window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
           saveHostSession({ agentSlug: activeSign.owner_agent_slug || '', uid, source: 'event-pass-keychain-dashboard' });
           setStatus('Event Pass Dashboard', 'Opening the dashboard for this Event Pass event.');
-          goToAgentDashboard({
+          await goToAgentDashboard({
             agentSlug: activeSign.owner_agent_slug || '',
             eventId: activeSign.active_event_id || '',
             signId: activeSign.id || '',
@@ -1245,7 +1265,7 @@
           }
           saveHostSession({ agentSlug: record.agent_slug, uid, source: 'agent-dashboard-keychain' });
           setStatus('Keychain Verified', 'Opening the live event dashboard.');
-          goToAgentDashboard({
+          await goToAgentDashboard({
             agentSlug: record.agent_slug,
             eventId: pendingAgentDashboard.eventId,
             signId: pendingAgentDashboard.signId,
@@ -1368,7 +1388,7 @@
             const dashboardAgentSlug = eventPassEvent.host_agent_slug || record.agent_slug;
             saveHostSession({ agentSlug: dashboardAgentSlug, uid, source: 'event-pass-keychain-dashboard' });
             setStatus('Event Pass Dashboard', 'Opening the dashboard for this Event Pass event.');
-            goToAgentDashboard({
+            await goToAgentDashboard({
               agentSlug: dashboardAgentSlug,
               eventId: eventPassEvent.id,
               signId: eventPassEvent.smart_sign_id || ''
@@ -1381,12 +1401,12 @@
             window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
             saveHostSession({ agentSlug: record.agent_slug, uid, source: 'event-pass-rel8tionchip-home' });
             setStatus('Rel8tionChip Ready', 'Opening your digital business card and Open House controls.');
-            goToAgentHome({ agentSlug: record.agent_slug, eventPassCode: eventPassSign.public_code });
+            await goToAgentHome({ agentSlug: record.agent_slug, eventPassCode: eventPassSign.public_code });
             return;
           }
 
           setStatus('Rel8tionChip Ready', 'Opening your digital business card. Pair the Event Pass QR before starting another open house.');
-          goToAgentHome({ agentSlug: record.agent_slug });
+          await goToAgentHome({ agentSlug: record.agent_slug });
           return;
         }
 
@@ -1402,7 +1422,7 @@
         if (activeAgentEvent?.id) {
           saveHostSession({ agentSlug: record.agent_slug, uid, source: 'claimed-chip-dashboard' });
           setStatus('Agent Dashboard', 'Opening your permanent Rel8tion dashboard.');
-          goToAgentHome({
+          await goToAgentHome({
             agentSlug: record.agent_slug,
             activeEventId: activeAgentEvent.id
           });
@@ -1410,7 +1430,7 @@
         }
 
         setStatus('Agent Dashboard', 'Opening your permanent Rel8tion dashboard.');
-        goToAgentHome({ agentSlug: record.agent_slug });
+        await goToAgentHome({ agentSlug: record.agent_slug });
         return;
       }
 

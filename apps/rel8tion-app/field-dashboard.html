@@ -395,9 +395,9 @@
       for (const visit of visits) {
         if (!visit.open_house_event_id) continue;
         const eventId = visit.open_house_event_id;
-        next[eventId] = await request(
-          `event_checkins?open_house_event_id=eq.${encodeURIComponent(eventId)}&select=id,open_house_event_id,buyer_id,visitor_name,visitor_phone,visitor_email,pre_approved,metadata,created_at&order=created_at.desc&limit=50`
-        ).catch((error) => {
+        next[eventId] = await api('/api/field-demo/buyer-requests', {
+          event_id: eventId
+        }).then((payload) => payload.checkins || []).catch((error) => {
           console.log('buyer request load skipped', eventId, error);
           return [];
         });

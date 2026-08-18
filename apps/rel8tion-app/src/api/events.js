@@ -83,10 +83,10 @@ export async function createOpenHouseEvent(payload) {
 }
 
 export async function createCheckin(payload) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/event_checkins`, {
+  const res = await fetch('/api/event-checkin', {
     method: 'POST',
-    headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
-    body: JSON.stringify(payload)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'create', checkin: payload })
   });
 
   const raw = await res.text().catch(() => '');
@@ -94,15 +94,15 @@ export async function createCheckin(payload) {
 
   let created = null;
   try { created = raw ? JSON.parse(raw) : null; } catch {}
-  return Array.isArray(created) && created.length ? created[0] : null;
+  return created?.checkin || null;
 }
 
 export async function updateCheckinMetadata(checkinId, metadata) {
   if (!checkinId) return null;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/event_checkins?id=eq.${encodeURIComponent(checkinId)}`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders(KEY), Prefer: 'return=representation' },
-    body: JSON.stringify({ metadata })
+  const res = await fetch('/api/event-checkin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'update_metadata', checkin_id: checkinId, metadata })
   });
 
   const raw = await res.text().catch(() => '');
@@ -110,7 +110,7 @@ export async function updateCheckinMetadata(checkinId, metadata) {
 
   let updated = null;
   try { updated = raw ? JSON.parse(raw) : null; } catch {}
-  return Array.isArray(updated) && updated.length ? updated[0] : null;
+  return updated?.checkin || null;
 }
 
 export function getDisclosurePreviewUrl(eventId) {

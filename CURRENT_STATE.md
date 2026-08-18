@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-18: Event Pass private-dashboard NFC boundary
+
+- `[IMPLEMENTED]` `/k` now exchanges a currently claimed agent NFC UID for a signed, Secure, HttpOnly, SameSite=Strict session before opening `/agent-dashboard` or `/agent-home`. The session expires after 30 minutes and is revalidated against the current `keys` owner on every private request, so an agent slug, event id, copied dashboard URL, or browser-local declaration is not sufficient.
+- `[IMPLEMENTED]` `/agent-dashboard` no longer reads buyer check-ins, event state, sign state, outreach context, or live loan-officer context through the public Supabase browser key. `/api/agent-event-dashboard` verifies the NFC session, the current claimed device, the event host, and the sign/event pairing before returning the event snapshot or performing closeout with the service role. Property-fit data now requires the same session.
+- `[IMPLEMENTED]` Buyer check-in create/update now uses `/api/event-checkin`; the field loan-officer buyer-request view uses an assigned-account or host-NFC server route; paid-agent history uses the NFC-protected server snapshot. Migration `20260818143000_lock_event_pass_private_rows.sql` enables RLS and blocks anonymous Event Pass check-in reads/writes plus Event Pass event/sign mutations while preserving the still-legacy non-Event-Pass browser flows.
+- `[VERIFIED LOCAL]` The seven-case Event Pass security suite, existing Event Pass activation suite, route-map verification, server syntax checks, and generated inline-script parsing pass. Production deployment, migration application, anonymous-denial checks, exact live SHA confirmation, and a physical NFC/dashboard/closeout pass remain `[NEEDS VERIFICATION]` until this release is intentionally completed.
+
 ## 2026-08-17: Paying-agent Event Pass becomes a reusable Rel8tionChip
 
 - `[IMPLEMENTED]` A claimed Event Pass now has two NFC states. While its open-house event is active, `/k` opens that event dashboard. After the event ends, the same NFC opens `/agent-home` as the agent's Rel8tionChip and digital-business-card owner surface instead of reopening historical event results or immediately forcing another activation.
