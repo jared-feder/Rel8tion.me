@@ -8,18 +8,8 @@ const html = fs.readFileSync(activationPath, 'utf8');
 const routerPath = path.join(__dirname, '../apps/rel8tion-app/k.html');
 const routerHtml = fs.readFileSync(routerPath, 'utf8');
 
-function extractFunction(name, nextName) {
-  const start = html.indexOf(`function ${name}(`);
-  const end = html.indexOf(`\n    ${nextName}`, start);
-  assert.notEqual(start, -1, `${name} must exist`);
-  assert.notEqual(end, -1, `${name} must end before ${nextName}`);
-  return html.slice(start, end);
-}
-
-const rebindSource = extractFunction('canRebindFreshenedEventPass', 'function matchingEventPassBackingSign');
-const canRebindFreshenedEventPass = new Function(`${rebindSource}; return canRebindFreshenedEventPass;`)();
-const matcherSource = extractFunction('matchingEventPassBackingSign', 'async function rebindFreshenedEventPass');
-const matchingEventPassBackingSign = new Function(`${matcherSource}; return matchingEventPassBackingSign;`)();
+const registration = require('../lib/event-pass-registration');
+const { canRebindFreshenedEventPass, matchingEventPassBackingSign } = registration;
 
 test('only an explicitly Freshened inactive and unowned pass may replace a stale UID', () => {
   const inventory = {
@@ -79,19 +69,63 @@ test('Event Pass backing-sign recovery rejects crossed QR and NFC records', () =
   assert.throws(() => matchingEventPassBackingSign(inventory, 'chip-1', otherCode, otherChip), /QR and NFC do not match/);
 });
 
-test('activation page parses and handles duplicate insert races without exposing raw 23505', () => {
+test('activation page delegates Event Pass backing-sign creation to the protected server route', () => {
   for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
     if (match[1].trim()) new Function(match[1]);
   }
 
-  const createStart = html.indexOf('async function createEventPassBackingSign(');
-  const createEnd = html.indexOf('\n    async function linkInventoryToSign', createStart);
-  const createSource = html.slice(createStart, createEnd);
-  assert.match(createSource, /getSignByPublicCode\(inventory\.public_code\)/);
-  assert.match(createSource, /canRebindFreshenedEventPass\(inventory,byUid,byCode\)/);
-  assert.match(createSource, /rebindFreshenedEventPass\(inventory,byCode\)/);
-  assert.match(createSource, /includes\('23505'\)/);
-  assert.match(createSource, /linkInventoryToSign\(inventory,raced\)/);
+  assert.doesNotMatch(html, /createEventPassBackingSign/);
+  assert.match(html, /const pendingSign=\{id:'',public_code:publicCode,uid_primary:state\.uid,inventory_pending:true\}/);
+  assert.match(html, /fetch\('\/api\/event-pass\/action'/);
+  assert.match(html, /sign_id:sign\?\.id\|\|''/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../lib/event-pass-registration.js'), 'utf8'), /ensureEventPassBackingSign/);
+});
+
+test('protected server route creates a fresh Event Pass backing sign with the claimed NFC and agent', async () => {
+  const originalFetch = global.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let inserted = null;
+  try {
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test';
+    delete require.cache[require.resolve('../lib/admin-auth')];
+    delete require.cache[require.resolve('../lib/event-pass-registration')];
+    const freshRegistration = require('../lib/event-pass-registration');
+    global.fetch = async (_url, options = {}) => {
+      if (options.method === 'POST') {
+        inserted = JSON.parse(options.body);
+        return new Response(JSON.stringify([{ id: 'sign-new', ...inserted }]), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const sign = await freshRegistration.ensureEventPassBackingSign({
+      inventory: { id: 'inventory-1', public_code: 'ep-fresh', metadata: {} },
+      uid: 'chip-fresh',
+      agentSlug: 'agent-fresh'
+    });
+    assert.equal(sign.id, 'sign-new');
+    assert.deepEqual(inserted, {
+      public_code: 'ep-fresh',
+      uid_primary: 'chip-fresh',
+      owner_agent_slug: 'agent-fresh',
+      status: 'inactive',
+      activation_uid_primary: 'chip-fresh',
+      primary_device_type: 'event_pass_keychain',
+      activation_method: 'event_pass_keychain',
+      setup_confirmed_at: inserted.setup_confirmed_at
+    });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+    delete require.cache[require.resolve('../lib/admin-auth')];
+    delete require.cache[require.resolve('../lib/event-pass-registration')];
+  }
 });
 
 test('completed Event Pass history never creates a one-time-use activation lock', () => {
