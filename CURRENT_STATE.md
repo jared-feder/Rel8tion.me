@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-18: Event Pass admin freshen boundary
+
+- `[VERIFIED]` Production Event Pass `ep-00b289ccff24` had been partially detached through the Smart Sign action: the backing `smart_signs` row appeared inactive/unassigned while `smart_sign_inventory` and its `keys` NFC row remained assigned to `rel8tion-event-pass-qa`. The full freshen repair cleared inventory assignment, NFC ownership, stale host/event metadata, and pending activation sessions while preserving the printed code, physical UID, and one ended historical event. Read-back found zero pending sessions and zero active events.
+- `[IMPLEMENTED]` REL8TION COMMAND now classifies Event Pass backing rows separately from regular Smart Signs, removes them from Smart Sign detach controls, and renders normal Event Pass inventory in its own table with truthful inventory/NFC/event state and the full Freshen action.
+- `[IMPLEMENTED]` `/api/admin/sign-action` rejects `detach_sign` for any row identified by Event Pass device markers or linked Event Pass inventory. Cached or direct callers therefore cannot reproduce the partial reset; they must use `reset_event_pass` or `freshen_event_pass`, which clear every ownership layer together and preserve history.
+- `[VERIFIED]` The focused three-case admin Event Pass management suite, seven-case activation suite, app architecture check, route-map check, and server-module syntax checks pass locally. Production deployment and live admin rendering remain `[NEEDS VERIFICATION]` until this scoped change is intentionally released.
+
 ## 2026-08-18: COMMAND cross-agent listing and photo identity repair
 
 - `[VERIFIED]` The reported Lisa Luttinger/Lisa Pellegrino mix-up was real and was not isolated. Lisa Pellegrino's ranking and listing inventory carried Lisa Luttinger's canonical agent UUID, so COMMAND's multi-source projection relabeled Pellegrino opportunities as Luttinger. The same unsafe low-confidence/shared-contact linkage existed across 71 ranking rows, 61 inventory rows, and 417 retained import rows involving 34 canonical agent IDs.

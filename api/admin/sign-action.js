@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { isEventPassBackingSign } = require('../../lib/sign-product');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -202,13 +203,9 @@ async function cancelPendingActivationSessionsForCode(publicCode, now) {
   ).catch((error) => ({ warning: error.message || String(error) }));
 }
 
-function isEventPassSign(sign) {
-  return /event_pass/i.test(`${sign?.activation_method || ''} ${sign?.primary_device_type || ''}`);
-}
-
-async function resetEventPassNfcKey(sign) {
+async function resetEventPassNfcKey(sign, inventoryTypes = []) {
   const uid = String(sign?.activation_uid_primary || sign?.uid_primary || '').trim();
-  if (!uid || !isEventPassSign(sign)) return null;
+  if (!uid || !isEventPassBackingSign(sign, inventoryTypes)) return null;
 
   const rows = await list(
     `keys?uid=eq.${enc(uid)}&device_role=eq.event_pass_keychain&select=uid,agent_slug,claimed,device_role,assigned_slot&limit=1`
@@ -264,6 +261,13 @@ async function detachSign(signId, confirmation) {
   }
 
   const sign = await loadSign(signId);
+  const linkedInventory = await list(
+    `smart_sign_inventory?smart_sign_id=eq.${enc(sign.id)}&select=inventory_type&limit=100`
+  );
+  const inventoryTypes = linkedInventory.map((row) => row.inventory_type).filter(Boolean);
+  if (isEventPassBackingSign(sign, inventoryTypes)) {
+    throw httpError(400, 'This is an Event Pass backing record. Use Freshen Event Pass so inventory, NFC ownership, activation sessions, and the backing sign are cleared together.');
+  }
   const now = new Date().toISOString();
   const events = await loadEventsForSign(sign);
   const endedEvents = [];
@@ -356,7 +360,10 @@ async function resetEventPass({
       })
     });
 
-    nfcKeyReset = await resetEventPassNfcKey(sign);
+    nfcKeyReset = await resetEventPassNfcKey(
+      sign,
+      aliases.map((row) => row.inventory_type).filter(Boolean)
+    );
     sessionCleanup = await cancelPendingActivationSessions(sign, now);
   } else {
     sessionCleanup = await cancelPendingActivationSessionsForCode(inventory.public_code, now);
