@@ -19,6 +19,7 @@
             <div id="agentLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Verifying...</div>
           </div>
         </div>
+        <a id="supportLink" href="mailto:jared@rel8tion.me?subject=REL8TION%20live%20event%20support" class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-white/85 px-4 py-3 text-sm font-black text-[#1f2a5a] shadow-sm ring-1 ring-white/90 md:w-auto">Get Support</a>
       </header>
 
       <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
@@ -51,6 +52,7 @@
 
     const app = document.getElementById('app');
     const agentLabel = document.getElementById('agentLabel');
+    const supportLink = document.getElementById('supportLink');
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const money = (value) => {
       const number = Number(value || 0);
@@ -66,6 +68,12 @@
     const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
     const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
     const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+    function liveSupportHref() {
+      const address = state.house?.address || state.event?.setup_context?.address || 'Active Open House';
+      const agent = state.event?.host_agent_slug || state.agent || 'Agent';
+      const body = `I need support with my live REL8TION open house.\n\nAgent: ${labelSlug(agent)}\nProperty: ${address}\nEvent: ${state.event?.id || 'not loaded'}`;
+      return mailtoHref('jared@rel8tion.me', `REL8TION live event support - ${address}`, body);
+    }
     const FIT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
     function openHouseKitHref(address = '') {
       const kitParams = new URLSearchParams();
@@ -471,6 +479,7 @@
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
 
       agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
+      supportLink.href = liveSupportHref();
       app.innerHTML = `
         <section class="mb-6">
           <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Live Event</div>

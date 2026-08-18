@@ -18,6 +18,10 @@ test('agent Event Pass dashboard has no direct public-table reads or writes', ()
   assert.doesNotMatch(source, /SUPABASE_URL|Authorization:\s*`Bearer \$\{KEY\}`/);
   assert.doesNotMatch(source, /rest\/v1\/(?:event_checkins|open_house_events|smart_signs)/);
   assert.match(source, /dashboardApi\('close_event', 'POST'\)/);
+  assert.match(source, /id="supportLink"[^>]*>Get Support<\/a>/);
+  assert.match(source, /mailtoHref\('jared@rel8tion\.me', `REL8TION live event support - \$\{address\}`/);
+  assert.match(source, /supportLink\.href = liveSupportHref\(\)/);
+  assert.doesNotMatch(source.slice(source.indexOf('function liveSupportHref'), source.indexOf('const FIT_DISCLAIMER')), /state\.uid|public_code/);
 });
 
 test('NFC router establishes a server session before private agent routes', () => {

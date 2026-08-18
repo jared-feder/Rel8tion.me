@@ -50,6 +50,20 @@ test('resolver and success states expose their primary actions before metadata',
   assert.match(signDemo, /\.success-screen \.success-meta,\.success-screen \.success-details\{order:2\}/);
 });
 
+test('Event Pass activation hands the agent directly to one live-dashboard action', () => {
+  const handoff = signDemo.slice(signDemo.indexOf('const renderEventPassHandoff'), signDemo.indexOf('const renderSuccess'));
+  assert.match(handoff, /<div class="pill">Success<\/div><h1>Your Open House Is Live<\/h1>/);
+  assert.match(handoff, /Visitors scan the QR code to check in\./);
+  assert.match(handoff, /You—the agent—tap the Event Pass to your phone anytime to open your dashboard\./);
+  assert.match(handoff, /class="live-use-guide"/);
+  assert.match(handoff, />Visitor scans QR<\/span>[\s\S]*>Check in<\/p>/);
+  assert.match(handoff, />Agent taps pass<\/span>[\s\S]*>Open dashboard<\/p>/);
+  assert.match(handoff, />Open Live Dashboard<\/a>/);
+  assert.doesNotMatch(handoff, /Event Pass Code|Event ID|Open Buyer Check-In|Start Another Activation|Open Event Pass Route/);
+  assert.equal((handoff.match(/class="button/g) || []).length, 1);
+  assert.match(signDemo, /await createOrJoinSharedCoverageEvent\(\);finishActivation\(\)/);
+});
+
 test('sponsored activation keeps consent and the final action fixed on mobile viewports', () => {
   assert.match(sponsored, /\.activation-action-dock\s*\{[\s\S]*position:\s*fixed;[\s\S]*bottom:\s*max\(7px, env\(safe-area-inset-bottom\)\)/);
   assert.match(sponsored, /class="activation-action-consent"/);
