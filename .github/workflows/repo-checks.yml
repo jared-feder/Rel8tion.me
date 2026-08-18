@@ -19,6 +19,9 @@ jobs:
       - name: Verify Vercel route map
         run: npm run verify:routes
 
+      - name: Prevent legacy loan-officer keychain assignment
+        run: npm run verify:agent-lo-assignment
+
       - name: Check critical admin scripts
         run: |
           node --check api/admin/outreach-search.js

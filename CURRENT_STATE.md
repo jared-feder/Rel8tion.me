@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-18: Agent dashboard loan-officer assignment regression guard
+
+- `[IMPLEMENTED]` The live agent event dashboard sends Add/Assign/Replace Loan Officer actions to the authenticated REL8TION COMMAND Open Houses workspace. It does not ask the loan officer to tap a keychain or create browser-local pending sign-in state; event coverage remains sourced only from the event's real `event_loan_officer_sessions` assignment.
+- `[IMPLEMENTED]` A focused source regression test rejects the retired keychain handler, prompt, and local-storage marker and is part of GitHub's required repository checks so this legacy flow cannot silently return through a future pull request.
+
 ## 2026-08-18: Event Pass private-dashboard NFC boundary
 
 - `[IMPLEMENTED]` `/k` now exchanges a currently claimed agent NFC UID for a signed, Secure, HttpOnly, SameSite=Strict session before opening `/agent-dashboard` or `/agent-home`. The session expires after 30 minutes and is revalidated against the current `keys` owner on every private request, so an agent slug, event id, copied dashboard URL, or browser-local declaration is not sufficient.
