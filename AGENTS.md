@@ -238,3 +238,5 @@ There is no confirmed full automated test suite for the main static REL8TION app
 ## Documentation Rule
 
 When changing a production flow, update `CURRENT_STATE.md` immediately and update `REL8TION_SYSTEM_OVERVIEW.md` when routes, schema expectations, NFC behavior, SMS behavior, dashboard behavior, compliance behavior, or deployment/source-of-truth status changes.
+
+Every completed REL8TION work log must include an explicit `AGENTS.md` disposition so durable operating knowledge is not lost between agents. Update `AGENTS.md` in the same change whenever the work adds or changes a source of truth, production guardrail, dangerous-file warning, verification boundary, route priority, security rule, or "do not regress" behavior. When no durable operating rule changed, record `AGENTS.md reviewed - no durable rule change` in the completion handoff instead of silently omitting it. Keep one-time deployment ids, transient status, and daily evidence in `CURRENT_STATE.md`; keep `AGENTS.md` focused on reusable instructions for future agents.
