@@ -1,5 +1,6 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
 const { buildAgentPerformance } = require('../../lib/admin-agent-performance');
+const { classifySignProduct } = require('../../lib/sign-product');
 
 const OUTREACH_FOLLOWUPS_DISABLED = true;
 
@@ -226,13 +227,23 @@ function buildCrm({ agents, keys, outreach, inbox, leads }) {
 
 function buildSigns({ signs, inventory, events }) {
   const inventoryBySign = countBy(inventory.filter((row) => row.smart_sign_id), (row) => row.smart_sign_id);
+  const inventoryTypesBySign = new Map();
+  for (const row of inventory || []) {
+    if (!row.smart_sign_id || !row.inventory_type) continue;
+    const types = inventoryTypesBySign.get(row.smart_sign_id) || new Set();
+    types.add(row.inventory_type);
+    inventoryTypesBySign.set(row.smart_sign_id, types);
+  }
   const eventById = new Map(events.map((event) => [event.id, event]));
 
   return signs.map((sign) => {
     const activeEvent = sign.active_event_id ? eventById.get(sign.active_event_id) || null : null;
+    const inventoryTypes = [...(inventoryTypesBySign.get(sign.id) || [])];
     return {
       ...sign,
       inventory_alias_count: inventoryBySign[sign.id] || 0,
+      inventory_types: inventoryTypes,
+      product_type: classifySignProduct(sign, inventoryTypes),
       active_event_status: activeEvent?.status || '',
       active_event_host: activeEvent?.host_agent_slug || '',
       active_event_start: activeEvent?.start_time || ''

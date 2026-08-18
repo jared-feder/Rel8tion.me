@@ -6462,6 +6462,21 @@ ${rowsHtml}
       return 'Fresh / unassigned';
     }
 
+    function eventPassAssignmentLabel(row) {
+      const assigned = row.assigned_agent_slug || row.active_event_host || row.nfc_agent_slug || '';
+      if (assigned) return `Assigned to ${assigned}`;
+      if (row.nfc_claimed) return 'NFC claimed / agent unavailable';
+      if (row.linked_sign_id) return 'Backing sign linked / no agent';
+      return 'Fresh / unassigned';
+    }
+
+    function eventPassStateLabel(row) {
+      if (row.active_event_id) return 'Live';
+      if (row.assigned_agent_slug || row.nfc_claimed || row.active_event_host) return 'Assigned';
+      if (row.linked_sign_id) return 'Linked';
+      return 'Fresh';
+    }
+
     function renderSignActions(row) {
       const endKey = `end_event:${row.active_event_id}`;
       const detachKey = `detach_sign:${row.id}`;
@@ -6890,7 +6905,8 @@ ${rowsHtml}
     }
 
     function renderSigns() {
-      const signs = filterByQuery(state.command?.signs || []);
+      const signs = filterByQuery((state.command?.signs || []).filter((row) => row.product_type !== 'event_pass'));
+      const eventPasses = filterByQuery((state.command?.event_passes || []).filter((row) => row.pass_model !== 'sponsored_agent_pass'));
       const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
       const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
       const freshened = state.eventPassFreshenerResult;
@@ -6964,7 +6980,17 @@ ${rowsHtml}
           <div class="secondary">agent-qr-batch.csv, smart-sign-qr-batch.csv, or event-pass-qr-batch.csv | images/&lt;code&gt;.png | README.txt</div>
           <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Smart Sign generation creates only new regular smart_sign inventory. Event Pass export only reserves fresh, unclaimed single-event inventory. Exporting marks rows printed so the next batch cannot duplicate them.</div>
         </div>
-        ${renderRows('Smart signs', `${signs.length} signs in inventory`, signs.slice(0, 80), (row) => `
+        ${renderRows('Event Passes', `${eventPasses.length} normal passes; use Freshen here instead of detaching the backing sign`, eventPasses.slice(0, 80), (row) => `
+          <div>
+            <div class="primary">${esc(row.public_code || row.id)}</div>
+            <div class="secondary">${esc(eventPassAssignmentLabel(row))}</div>
+          </div>
+          <div>${badge(eventPassStateLabel(row), row.active_event_id ? 'ok' : row.assigned_agent_slug || row.nfc_claimed || row.linked_sign_id ? 'warn' : 'info')}</div>
+          <div>${badge(row.nfc_claimed ? `NFC: ${row.nfc_agent_slug || 'claimed'}` : 'NFC unclaimed', row.nfc_claimed ? 'warn' : 'info')}</div>
+          <div>${badge(row.active_event_host || 'No live event', row.active_event_host ? 'ok' : 'info')}</div>
+          <div>${renderEventPassActions(row)}</div>
+        `)}
+        ${renderRows('Smart signs', `${signs.length} regular Smart Signs; Event Pass backing records are managed above`, signs.slice(0, 80), (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>
             <div class="secondary">${esc(signAssignmentLabel(row))}</div>

@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { isEventPassBackingSign } = require('../../lib/sign-product');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -264,6 +265,13 @@ async function detachSign(signId, confirmation) {
   }
 
   const sign = await loadSign(signId);
+  const linkedInventory = await list(
+    `smart_sign_inventory?smart_sign_id=eq.${enc(sign.id)}&select=inventory_type&limit=100`
+  );
+  const inventoryTypes = linkedInventory.map((row) => row.inventory_type).filter(Boolean);
+  if (isEventPassBackingSign(sign, inventoryTypes)) {
+    throw httpError(400, 'This is an Event Pass backing record. Use Freshen Event Pass so inventory, NFC ownership, activation sessions, and the backing sign are cleared together.');
+  }
   const now = new Date().toISOString();
   const events = await loadEventsForSign(sign);
   const endedEvents = [];
