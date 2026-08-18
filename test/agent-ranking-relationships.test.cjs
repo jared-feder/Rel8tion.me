@@ -121,3 +121,26 @@ test('relationship ids are deterministic for profile drill-down', () => {
     stableRelationshipId(`agent:${obeeAgent.id}`)
   );
 });
+
+test('relationship-only rows stay separate when agents share an office phone', () => {
+  const rows = buildRelationshipOnlyRankings({
+    existingRankings: [],
+    historyData: { agents: [], events: [], visits: [] },
+    inventory: [{
+      agent_name: 'Perry Pappas',
+      phone_normalized: '5167667900',
+      relationship_status: 'accepted_open_house',
+      source_listing_id: 'perry-listing'
+    }, {
+      agent_name: 'David W. Holmes',
+      phone_normalized: '5167667900',
+      relationship_status: 'accepted_open_house',
+      source_listing_id: 'david-listing'
+    }],
+    queueRows: [],
+    now
+  });
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.agent_name).sort(), ['David W. Holmes', 'Perry Pappas']);
+});

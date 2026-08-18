@@ -1,4 +1,5 @@
 const cheerio = require('cheerio');
+const { agentNameAnchor, compatibleAgentNames } = require('./lib/agent-name-identity');
 
 const ONEKEY = 'https://www.onekeymls.com';
 const BUCKET = process.env.SUPABASE_HEADSHOT_BUCKET || 'enriched-photos';
@@ -27,10 +28,7 @@ function normalizeName(value) {
 }
 
 function namesMatch(left, right) {
-  const a = normalizeName(left).split(' ').filter(Boolean);
-  const b = normalizeName(right).split(' ').filter(Boolean);
-  if (a.join(' ') === b.join(' ')) return true;
-  return a.length >= 2 && b.length >= 2 && a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
+  return compatibleAgentNames(left, right);
 }
 
 function normalizePhone(value) {
@@ -90,23 +88,26 @@ async function upcomingTargets({ days = 14, limit = 8, dryRun = false } = {}) {
     '&order=open_start.asc&limit=200'
   );
 
-  const byPhone = new Map();
+  const byIdentity = new Map();
   for (const row of rows) {
     const phone = normalizePhone(row.agent_phone_normalized || row.agent_phone);
-    if (!phone) continue;
-    if (!byPhone.has(phone)) {
-      byPhone.set(phone, { name: row.agent_name, phone, brokerage: row.brokerage || '', queueIds: [] });
+    const nameAnchor = agentNameAnchor(row.agent_name);
+    if (!phone || !nameAnchor) continue;
+    const identityKey = `${phone}|${nameAnchor}`;
+    if (!byIdentity.has(identityKey)) {
+      byIdentity.set(identityKey, { name: row.agent_name, phone, brokerage: row.brokerage || '', queueIds: [] });
     }
-    byPhone.get(phone).queueIds.push(row.id);
+    byIdentity.get(identityKey).queueIds.push(row.id);
   }
 
   const targets = [];
   const cooldown = new Date(now.getTime() - 24 * 3600000);
-  for (const target of byPhone.values()) {
-    const agents = await rest(
+  for (const target of byIdentity.values()) {
+    const phoneAgents = await rest(
       `listing_agents?phone_normalized=eq.${encodeURIComponent(target.phone)}` +
-      '&select=id,primary_photo_url,directory_photo_url,photo_last_checked_at&order=photo_last_checked_at.desc.nullslast&limit=10'
+      '&select=id,name,primary_photo_url,directory_photo_url,photo_last_checked_at&order=photo_last_checked_at.desc.nullslast&limit=100'
     );
+    const agents = phoneAgents.filter((agent) => namesMatch(agent.name, target.name));
     target.agentIds = agents.map((agent) => agent.id);
     const existing = agents.find((agent) => agent.primary_photo_url || agent.directory_photo_url);
     if (existing) {
@@ -243,4 +244,4 @@ async function run(options = {}) {
   return result;
 }
 
-module.exports = { run };
+module.exports = { namesMatch, run };

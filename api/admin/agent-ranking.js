@@ -25,6 +25,7 @@ const {
   historySignalForRanking
 } = require('../../lib/agent-ranking-history');
 const { buildRelationshipOnlyRankings } = require('../../lib/agent-ranking-relationships');
+const { agentNameAnchor } = require('../../lib/agent-name-identity');
 const { inferCountyFromRow, mergeBestLocation, normalizeCounty, normalizeZip } = require('../../lib/location-intelligence');
 const {
   createOrResolveAgentRecord,
@@ -897,6 +898,8 @@ function inventoryCountsForRankings(rankings = [], inventory = []) {
   const byAgentId = new Map();
   const byRelationship = new Map();
   const byName = new Map();
+  const byPhoneName = new Map();
+  const byEmailName = new Map();
   const add = (map, key, listingId, hasUpcoming) => {
     if (!key || !listingId) return;
     if (!map.has(key)) map.set(key, { listings: new Set(), upcoming: new Set() });
@@ -915,16 +918,22 @@ function inventoryCountsForRankings(rankings = [], inventory = []) {
     add(byAgentId, String(item.agent_id || ''), listingId, hasUpcoming);
     add(byRelationship, item.relationship_key, listingId, hasUpcoming);
     add(byName, normalizeName(item.agent_name_normalized || item.agent_name), listingId, hasUpcoming);
+    const nameAnchor = agentNameAnchor(item.agent_name);
+    const phone = normalizePhone(item.phone_normalized || item.phone);
+    const email = normalizeEmail(item.email);
+    if (phone && nameAnchor) add(byPhoneName, `${phone}|${nameAnchor}`, listingId, hasUpcoming);
+    if (email && nameAnchor) add(byEmailName, `${email}|${nameAnchor}`, listingId, hasUpcoming);
   }
 
   return (rankings || []).map((ranking) => {
     const agentId = String(ranking.agent_id || '');
     const phone = normalizePhone(ranking.phone_normalized || ranking.phone);
     const email = normalizeEmail(ranking.email);
+    const nameAnchor = agentNameAnchor(ranking.agent_name);
     const direct = (agentId && byAgentId.get(agentId))
-      || (phone && byRelationship.get(`phone:${phone}`))
-      || (email && byRelationship.get(`email:${email}`))
-      || ((!phone && !email) ? byName.get(normalizeName(ranking.agent_name)) : null);
+      || (phone && nameAnchor && byPhoneName.get(`${phone}|${nameAnchor}`))
+      || (email && nameAnchor && byEmailName.get(`${email}|${nameAnchor}`))
+      || byName.get(normalizeName(ranking.agent_name));
     return {
       ...ranking,
       database_current_listing_count: direct?.listings.size || 0,

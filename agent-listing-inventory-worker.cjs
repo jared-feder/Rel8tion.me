@@ -16,6 +16,7 @@ const HISTORICAL_OUTREACH_STATUSES = new Set(['sent', 'manual_text_sent']);
 const RANKING_RELATIONSHIP_STATUS = 'ranking_only';
 const PRIOR_OUTREACH_RELATIONSHIP_STATUS = 'prior_outreach';
 const ONEKEY_AGENT_CURSOR_KEY = 'agent_listing_inventory_onekey_agent_cursor';
+const { agentNameAnchor } = require('./lib/agent-name-identity');
 const ONEKEY_BOXES = [
   { topLeft: '[-73.96,40.80]', bottomRight: '[-73.70,40.54]' },
   { topLeft: '[-73.80,40.92]', bottomRight: '[-73.40,40.55]' },
@@ -194,11 +195,12 @@ async function supabaseRequestAll(config, table, query, limit) {
 }
 
 function relationshipKey(profile = {}) {
-  const phone = normalizePhone(profile.phone_normalized || profile.phone);
-  if (phone) return `phone:${phone}`;
-  const email = normalizeEmail(profile.email);
-  if (email) return `email:${email}`;
   const name = normalizeName(profile.agent_name || profile.name);
+  const nameAnchor = agentNameAnchor(profile.agent_name || profile.name) || name;
+  const phone = normalizePhone(profile.phone_normalized || profile.phone);
+  if (phone) return nameAnchor ? `phone:${phone}|agent:${nameAnchor}` : '';
+  const email = normalizeEmail(profile.email);
+  if (email) return nameAnchor ? `email:${email}|agent:${nameAnchor}` : '';
   const brokerage = normalizeBrokerage(profile.brokerage);
   return name ? `name:${name}|${brokerage}` : '';
 }

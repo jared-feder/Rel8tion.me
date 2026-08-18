@@ -88,6 +88,29 @@ test('future confirmed visits and unrelated agents are not counted as prior work
   assert.equal(annotated.rel8tion_open_house_history_count, 0);
 });
 
+test('a shared office phone cannot transfer another agent history', () => {
+  const signal = historySignalForRanking({
+    ...ranking,
+    agent_name: 'Perry Pappas',
+    phone_normalized: '5167667900',
+    email: ''
+  }, {
+    agents: [],
+    events: [],
+    visits: [{
+      id: 'visit-david',
+      open_house_id: 'oh-david',
+      agent_name: 'David W. Holmes',
+      agent_phone: '5167667900',
+      scheduled_start: '2026-07-01T18:00:00Z',
+      scheduled_end: '2026-07-01T20:00:00Z',
+      status: 'confirmed'
+    }]
+  }, new Date('2026-07-30T12:00:00Z'));
+
+  assert.equal(signal.has_prior_rel8tion_open_house, false);
+});
+
 test('manual reminder copy uses the real address/date and says again only for prior work', () => {
   const listing = {
     address: '12 Main Street, Huntington, NY 11743',
