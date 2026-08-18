@@ -17,6 +17,8 @@ const rootPassHtml = read('pass.html');
 const signHtml = read('apps/rel8tion-app/sign.html');
 const signResolver = read('apps/rel8tion-app/src/modules/signResolver/bootstrap.js');
 const sponsored = read('apps/rel8tion-app/sponsored-pass-activate.html');
+const eventHtml = read('apps/rel8tion-app/event.html');
+const eventShell = read('apps/rel8tion-app/src/modules/eventShell/bootstrap.js');
 
 function expectBefore(source, first, second, message) {
   const firstIndex = source.indexOf(first);
@@ -62,6 +64,27 @@ test('Event Pass activation hands the agent directly to one live-dashboard actio
   assert.doesNotMatch(handoff, /Event Pass Code|Event ID|Open Buyer Check-In|Start Another Activation|Open Event Pass Route/);
   assert.equal((handoff.match(/class="button/g) || []).length, 1);
   assert.match(signDemo, /await createOrJoinSharedCoverageEvent\(\);finishActivation\(\)/);
+});
+
+test('visitor check-in opens with a mobile Start Check-In action that reveals the form', () => {
+  assert.match(eventShell, /id="mobile-checkin-prompt"/);
+  assert.match(eventShell, /id="start-checkin-button"[^>]*aria-controls="visitor-checkin"/);
+  assert.ok(eventShell.includes('Start Check-In <span aria-hidden="true">↓</span>'));
+  assert.match(eventShell, /id="visitor-checkin"/);
+  assert.match(eventShell, /<h2[^>]*>Begin Your Check-In<\/h2>/);
+  assert.match(eventShell, />Who is checking in\?<\/div>/);
+  assert.match(eventShell, /checkinSection\.scrollIntoView\(\{ behavior: reduceMotion \? 'auto' : 'smooth', block: 'start' \}\)/);
+  assert.match(eventShell, /checkinPrompt\.classList\.toggle\('hidden', sectionTop <= window\.innerHeight \* 0\.62\)/);
+  assert.match(eventHtml, /bootstrap\.js\?v=20260818-checkin-cta/);
+});
+
+test('visitor check-in enables grouped mobile browser autofill without persisting sensitive answers', () => {
+  assert.match(eventShell, /<form id="checkin-form" name="open-house-checkin" autocomplete="on"/);
+  assert.match(eventShell, /section \? `section-\$\{section\}`/);
+  assert.match(eventShell, /buyer_agent_name: 'name'/);
+  assert.match(eventShell, /field\('Your Name', 'visitor_name',[\s\S]*'visitor'\)/);
+  assert.match(eventShell, /field\('Buyer Agent Name', 'buyer_agent_name',[\s\S]*'buyer-agent'\)/);
+  assert.doesNotMatch(eventShell, /localStorage|sessionStorage/);
 });
 
 test('sponsored activation keeps consent and the final action fixed on mobile viewports', () => {

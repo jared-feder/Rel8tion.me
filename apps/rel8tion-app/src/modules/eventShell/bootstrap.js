@@ -52,6 +52,7 @@ const pageState = {
 };
 
 let disclosureEscapeHandlerBound = false;
+let checkinPromptScrollHandler = null;
 
 function getEventIdFromUrl() {
   return new URLSearchParams(window.location.search).get('event') || '';
@@ -75,6 +76,9 @@ function render(html) {
 function removeDisclosurePortals() {
   document.querySelectorAll('.rel8tion-disclosure-modal').forEach((modal) => {
     if (!document.getElementById('app')?.contains(modal)) modal.remove();
+  });
+  document.querySelectorAll('.rel8tion-mobile-checkin-prompt').forEach((prompt) => {
+    if (!document.getElementById('app')?.contains(prompt)) prompt.remove();
   });
   document.body.classList.remove('rel8tion-modal-open');
 }
@@ -529,7 +533,7 @@ function pathButton(path, label) {
 function renderPathSelector() {
   return `
     <div class="mb-5 rounded-[18px] border border-slate-200 bg-white/78 p-3">
-      <div class="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Check-in path</div>
+      <div class="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Who is checking in?</div>
       <div class="grid grid-cols-3 gap-2">
         ${pathButton(CHECKIN_PATHS.BUYER, 'Buyer')}
         ${pathButton(CHECKIN_PATHS.BUYER_WITH_AGENT, 'With Agent')}
@@ -539,16 +543,17 @@ function renderPathSelector() {
   `;
 }
 
-function inputAttrsFor(name, type) {
+function inputAttrsFor(name, type, section = '') {
   const map = {
     visitor_name: 'name',
     visitor_phone: 'tel',
     visitor_email: 'email',
-    buyer_agent_name: 'organization-title',
+    buyer_agent_name: 'name',
     buyer_agent_phone: 'tel',
     buyer_agent_email: 'email'
   };
-  const attrs = [`autocomplete="${map[name] || 'on'}"`];
+  const autocomplete = [section ? `section-${section}` : '', map[name] || 'on'].filter(Boolean).join(' ');
+  const attrs = [`autocomplete="${autocomplete}"`];
   if (type === 'tel') attrs.push('inputmode="tel"');
   if (type === 'email') attrs.push('inputmode="email"', 'autocapitalize="none"');
   if (type === 'text') attrs.push('autocapitalize="words"');
@@ -559,11 +564,11 @@ function requiredMarker(required) {
   return required ? '<span class="ml-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style="background:var(--event-accent)" title="Required" aria-label="Required"></span>' : '';
 }
 
-function field(label, name, type = 'text', placeholder = '', required = false) {
+function field(label, name, type = 'text', placeholder = '', required = false, autocompleteSection = '') {
   return `
     <label class="block">
       <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-2">${esc(label)}${requiredMarker(required)}</div>
-      <input name="${name}" type="${type}" ${inputAttrsFor(name, type)} ${required ? 'required aria-required="true"' : ''} placeholder="${esc(placeholder)}" class="w-full rounded-[18px] border border-slate-200 bg-white/92 px-4 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-[var(--event-accent)]">
+      <input name="${name}" type="${type}" ${inputAttrsFor(name, type, autocompleteSection)} ${required ? 'required aria-required="true"' : ''} placeholder="${esc(placeholder)}" class="w-full rounded-[18px] border border-slate-200 bg-white/92 px-4 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-[var(--event-accent)]">
     </label>
   `;
 }
@@ -601,10 +606,10 @@ function renderFormFields() {
   if (pageState.selectedPath === CHECKIN_PATHS.BUYER) {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${field('Your Name', 'visitor_name', 'text', 'Full name', true)}
-        ${field('Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
+        ${field('Your Name', 'visitor_name', 'text', 'Full name', true, 'visitor')}
+        ${field('Phone', 'visitor_phone', 'tel', 'Mobile number', true, 'visitor')}
         <div class="md:col-span-2">
-          ${field('Email', 'visitor_email', 'email', 'Email address')}
+          ${field('Email', 'visitor_email', 'email', 'Email address', false, 'visitor')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Pre-Approved', 'pre_approved', [
@@ -620,15 +625,15 @@ function renderFormFields() {
   if (pageState.selectedPath === CHECKIN_PATHS.BUYER_WITH_AGENT) {
     return `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${field('Buyer Name', 'visitor_name', 'text', 'Full name', true)}
-        ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number', true)}
+        ${field('Buyer Name', 'visitor_name', 'text', 'Full name', true, 'visitor')}
+        ${field('Buyer Phone', 'visitor_phone', 'tel', 'Mobile number', true, 'visitor')}
         <div class="md:col-span-2">
-          ${field('Buyer Email', 'visitor_email', 'email', 'Email address')}
+          ${field('Buyer Email', 'visitor_email', 'email', 'Email address', false, 'visitor')}
         </div>
-        ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
-        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true)}
+        ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true, 'buyer-agent')}
+        ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true, 'buyer-agent')}
         <div class="md:col-span-2">
-          ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
+          ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email', false, 'buyer-agent')}
         </div>
         <div class="md:col-span-2">
           ${selectField('Buyer Pre-Approved', 'pre_approved', [
@@ -643,15 +648,15 @@ function renderFormFields() {
 
   return `
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true)}
-      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true)}
+      ${field('Buyer Agent Name', 'buyer_agent_name', 'text', 'Agent name', true, 'buyer-agent')}
+      ${field('Buyer Agent Phone', 'buyer_agent_phone', 'tel', 'Agent phone', true, 'buyer-agent')}
       <div class="md:col-span-2">
-        ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email')}
+        ${field('Buyer Agent Email', 'buyer_agent_email', 'email', 'Agent email', false, 'buyer-agent')}
       </div>
-      ${field('Buyer Name', 'visitor_name', 'text', 'Buyer name', true)}
-      ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone', true)}
+      ${field('Buyer Name', 'visitor_name', 'text', 'Buyer name', true, 'visitor')}
+      ${field('Buyer Phone', 'visitor_phone', 'tel', 'Buyer phone', true, 'visitor')}
       <div class="md:col-span-2">
-        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email')}
+        ${field('Buyer Email', 'visitor_email', 'email', 'Buyer email', false, 'visitor')}
       </div>
       <label class="md:col-span-2 flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-4 text-slate-700 font-semibold">
         <input type="checkbox" name="represented_buyer_confirmed" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
@@ -1275,6 +1280,29 @@ function nextStepCards() {
 }
 
 function attachEventHandlers() {
+  if (checkinPromptScrollHandler) {
+    window.removeEventListener('scroll', checkinPromptScrollHandler);
+    checkinPromptScrollHandler = null;
+  }
+
+  const checkinPrompt = document.getElementById('mobile-checkin-prompt');
+  const startCheckinButton = document.getElementById('start-checkin-button');
+  const checkinSection = document.getElementById('visitor-checkin');
+  if (checkinPrompt && startCheckinButton && checkinSection) {
+    if (checkinPrompt.parentElement !== document.body) document.body.appendChild(checkinPrompt);
+    checkinPromptScrollHandler = () => {
+      const sectionTop = checkinSection.getBoundingClientRect().top;
+      checkinPrompt.classList.toggle('hidden', sectionTop <= window.innerHeight * 0.62);
+    };
+    startCheckinButton.addEventListener('click', () => {
+      checkinPrompt.classList.add('hidden');
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+      checkinSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    });
+    window.addEventListener('scroll', checkinPromptScrollHandler, { passive: true });
+    checkinPromptScrollHandler();
+  }
+
   document.querySelectorAll('.path-button').forEach((button) => {
     button.addEventListener('click', () => {
       const nextPath = button.getAttribute('data-path');
@@ -1737,6 +1765,13 @@ function renderEventShell() {
   shell(`
     <div style="${themeStyle()}">
     ${renderSubmittingOverlay()}
+    ${pageState.mode === 'checkin' ? `
+      <div id="mobile-checkin-prompt" class="rel8tion-mobile-checkin-prompt fixed inset-x-3 z-[80] rounded-[22px] border border-white/90 bg-white/95 p-2 shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur md:hidden" style="bottom:max(10px, env(safe-area-inset-bottom));">
+        <button id="start-checkin-button" type="button" aria-controls="visitor-checkin" class="flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[17px] px-5 py-4 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]" style="background:${eventTheme().gradient};">
+          Start Check-In <span aria-hidden="true">↓</span>
+        </button>
+      </div>
+    ` : ''}
     <section class="rounded-[30px] border border-white/70 bg-white/86 p-5 md:p-7 shadow-[0_18px_40px_rgba(31,42,90,0.08)] mb-5">
       <div class="grid grid-cols-[1fr_auto] items-center gap-4">
         <div class="min-w-0">
@@ -1758,17 +1793,24 @@ function renderEventShell() {
       </div>
     </section>
 
-    <section class="mb-5">
+    <section id="visitor-checkin" class="mb-5 scroll-mt-3">
       <article class="rounded-[28px] border border-sky-100 bg-white/82 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
-        ${pageState.mode === 'checkin' ? renderPathSelector() : ''}
-        <div class="mb-5">
-          <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">CHECK IN HERE</div>
-          <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Enjoy Your Stay!</h2>
-          <p class="text-slate-600 font-semibold leading-relaxed">Please enter your info to begin.</p>
-          <div class="mt-4 rounded-[18px] border border-sky-100 bg-sky-50/90 px-4 py-3 text-sm font-bold leading-relaxed text-slate-600">
+        ${pageState.mode === 'checkin' ? `
+          <div class="mb-4">
+            <div class="inline-flex items-center px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-[11px] font-black uppercase tracking-[0.18em] text-sky-600 mb-3">START HERE</div>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Begin Your Check-In</h2>
+            <p class="text-slate-600 font-semibold leading-relaxed">Choose who is checking in, then enter your information.</p>
+          </div>
+          ${renderPathSelector()}
+          <div class="mb-5 rounded-[18px] border border-sky-100 bg-sky-50/90 px-4 py-3 text-sm font-bold leading-relaxed text-slate-600">
             Your check-in information will be shared with the hosting real estate professional and Rel8tion event support. If this event has a sponsoring loan officer, they may receive your event check-in details to help support this open house. Financing help is only provided when requested.
           </div>
-        </div>
+        ` : `
+          <div class="mb-5">
+            <div class="inline-flex items-center px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-3">CHECK-IN COMPLETE</div>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-3xl font-extrabold tracking-tight text-slate-900 mb-2">Enjoy Your Stay!</h2>
+          </div>
+        `}
 
         ${pageState.mode === 'guest' ? `
           <div class="rounded-[24px] border border-emerald-200 bg-emerald-50/90 p-5 mb-5">
@@ -1778,7 +1820,7 @@ function renderEventShell() {
         ` : ''}
 
         ${pageState.mode === 'checkin' ? `
-          <form id="checkin-form" class="space-y-4" aria-busy="${pageState.submitting ? 'true' : 'false'}">
+          <form id="checkin-form" name="open-house-checkin" autocomplete="on" class="space-y-4" aria-busy="${pageState.submitting ? 'true' : 'false'}">
             <fieldset class="m-0 space-y-4 border-0 p-0 ${pageState.submitting ? 'pointer-events-none opacity-55' : ''}" ${pageState.submitting ? 'disabled' : ''}>
               ${renderFormFields()}
               ${selectedPath !== CHECKIN_PATHS.BUYER_AGENT ? renderRequiredDisclosuresBlock() : `
