@@ -1307,7 +1307,7 @@ function attachEventHandlers() {
       });
     });
     window.addEventListener('scroll', checkinPromptScrollHandler, { passive: true });
-    checkinPromptScrollHandler();
+    checkinPrompt.classList.remove('hidden');
   }
 
   document.querySelectorAll('.path-button').forEach((button) => {
