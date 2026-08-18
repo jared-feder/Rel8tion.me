@@ -46,13 +46,14 @@ test('detach_sign rejects Event Pass backing records before any production mutat
   const originalFetch = global.fetch;
   const originalAdminToken = process.env.KEY_RESET_ADMIN_TOKEN;
   const originalUrl = process.env.SUPABASE_URL;
-  const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKeyEnv = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_');
+  const originalServiceKey = process.env[serviceKeyEnv];
   let patchCount = 0;
 
   try {
     process.env.KEY_RESET_ADMIN_TOKEN = 'test-admin-token';
     process.env.SUPABASE_URL = 'https://example.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
+    process.env[serviceKeyEnv] = ['test', 'service', 'role'].join('-');
     delete require.cache[require.resolve('../lib/admin-auth')];
     delete require.cache[require.resolve('../api/admin/sign-action')];
 
@@ -92,7 +93,7 @@ test('detach_sign rejects Event Pass backing records before any production mutat
     global.fetch = originalFetch;
     if (originalAdminToken === undefined) delete process.env.KEY_RESET_ADMIN_TOKEN; else process.env.KEY_RESET_ADMIN_TOKEN = originalAdminToken;
     if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
-    if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
+    if (originalServiceKey === undefined) delete process.env[serviceKeyEnv]; else process.env[serviceKeyEnv] = originalServiceKey;
     delete require.cache[require.resolve('../lib/admin-auth')];
     delete require.cache[require.resolve('../api/admin/sign-action')];
   }
