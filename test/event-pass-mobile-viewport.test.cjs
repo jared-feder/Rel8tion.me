@@ -74,8 +74,11 @@ test('visitor check-in opens with a mobile Start Check-In action that reveals th
   assert.match(eventShell, /<h2[^>]*>Begin Your Check-In<\/h2>/);
   assert.match(eventShell, />Who is checking in\?<\/div>/);
   assert.match(eventShell, /checkinSection\.scrollIntoView\(\{ behavior: reduceMotion \? 'auto' : 'smooth', block: 'start' \}\)/);
-  assert.match(eventShell, /checkinPrompt\.classList\.toggle\('hidden', sectionTop <= window\.innerHeight \* 0\.62\)/);
-  assert.match(eventHtml, /bootstrap\.js\?v=20260818-checkin-cta/);
+  assert.match(eventShell, /const firstCheckinField = checkinSection\.querySelector\('#checkin-form input:not\(\[type="hidden"\]\)'\)/);
+  assert.match(eventShell, /const firstFieldVisible = firstFieldTop <= window\.innerHeight - promptHeight - 12/);
+  assert.match(eventShell, /checkinPrompt\.classList\.toggle\('hidden', promptDismissed \|\| firstFieldVisible\)/);
+  assert.match(eventShell, /promptDismissed = true;[\s\S]*checkinPrompt\.classList\.add\('hidden'\)/);
+  assert.match(eventHtml, /bootstrap\.js\?v=20260818-checkin-cta2/);
 });
 
 test('visitor check-in enables grouped mobile browser autofill without persisting sensitive answers', () => {

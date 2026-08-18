@@ -1290,11 +1290,16 @@ function attachEventHandlers() {
   const checkinSection = document.getElementById('visitor-checkin');
   if (checkinPrompt && startCheckinButton && checkinSection) {
     if (checkinPrompt.parentElement !== document.body) document.body.appendChild(checkinPrompt);
+    const firstCheckinField = checkinSection.querySelector('#checkin-form input:not([type="hidden"])');
+    let promptDismissed = false;
     checkinPromptScrollHandler = () => {
-      const sectionTop = checkinSection.getBoundingClientRect().top;
-      checkinPrompt.classList.toggle('hidden', sectionTop <= window.innerHeight * 0.62);
+      const promptHeight = checkinPrompt.getBoundingClientRect().height || 78;
+      const firstFieldTop = firstCheckinField?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      const firstFieldVisible = firstFieldTop <= window.innerHeight - promptHeight - 12;
+      checkinPrompt.classList.toggle('hidden', promptDismissed || firstFieldVisible);
     };
     startCheckinButton.addEventListener('click', () => {
+      promptDismissed = true;
       checkinPrompt.classList.add('hidden');
       const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
       checkinSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
