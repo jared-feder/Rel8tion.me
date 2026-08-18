@@ -1,7 +1,8 @@
 const assert = require('node:assert/strict');
 const {
   dedupeRowsByIdentityKey,
-  identityKeyForAgentRanking
+  identityKeyForAgentRanking,
+  matchImportedRows
 } = require('../lib/agent-ranking');
 
 const nassau = {
@@ -62,5 +63,64 @@ assert.equal(
   'import:aaleyah allen|9292454568',
   'stale brokerage/location-based keys must be replaced before upsert'
 );
+
+const fuzzySameFirstName = matchImportedRows([{
+  agent_name: 'Lisa Pellegrino',
+  brokerage: 'Douglas Elliman Real Estate',
+  phone_normalized: '6312417117'
+}], [{
+  id: 'lisa-luttinger-id',
+  name: 'Lisa Luttinger',
+  brokerage: 'Douglas Elliman Real Estate',
+  phone_normalized: '5166063511'
+}])[0];
+assert.equal(fuzzySameFirstName.match_reason, 'needs_review');
+assert.equal(fuzzySameFirstName.needs_review, true);
+assert.equal(fuzzySameFirstName.matched_agent_id, null, 'low-confidence fuzzy matches must never claim an agent UUID');
+
+const exactPhone = matchImportedRows([{
+  agent_name: 'Lisa Luttinger',
+  brokerage: 'Douglas Elliman Real Estate',
+  phone_normalized: '5166063511'
+}], [{
+  id: 'lisa-luttinger-id',
+  name: 'Lisa Luttinger',
+  brokerage: 'Douglas Elliman Real Estate',
+  phone_normalized: '5166063511'
+}])[0];
+assert.equal(exactPhone.matched_agent_id, 'lisa-luttinger-id');
+assert.equal(exactPhone.needs_review, false);
+
+const sharedOfficePhoneConflict = matchImportedRows([{
+  agent_name: 'Alicia Parenty',
+  brokerage: 'Coldwell Banker American Homes',
+  phone_normalized: '5162232525'
+}], [{
+  id: 'generic-office-agent-id',
+  name: 'Different Person',
+  brokerage: 'Coldwell Banker American Homes',
+  phone_normalized: '5162232525'
+}])[0];
+assert.equal(sharedOfficePhoneConflict.match_reason, 'phone_name_conflict');
+assert.equal(sharedOfficePhoneConflict.needs_review, true);
+assert.equal(sharedOfficePhoneConflict.matched_agent_id, null, 'shared office phones must not claim another person UUID');
+
+const sharedPhoneCorrectPerson = matchImportedRows([{
+  agent_name: 'Perry Pappas',
+  brokerage: 'Signature Premier Properties',
+  phone_normalized: '5167667900'
+}], [{
+  id: 'perry-agent',
+  name: 'Perry Pappas',
+  brokerage: 'Signature Premier Properties',
+  phone_normalized: '5167667900'
+}, {
+  id: 'david-agent',
+  name: 'David W. Holmes',
+  brokerage: 'Signature Premier Properties',
+  phone_normalized: '5167667900'
+}])[0];
+assert.equal(sharedPhoneCorrectPerson.matched_agent_id, 'perry-agent');
+assert.equal(sharedPhoneCorrectPerson.match_reason, 'phone');
 
 console.log('Agent ranking canonical identity checks passed.');

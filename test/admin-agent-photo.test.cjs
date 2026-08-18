@@ -175,3 +175,52 @@ test('shared-phone rows with a conflicting agent name are not treated as the sam
     brokerage: 'Example Realty'
   }, identity, spec), false);
 });
+
+test('an explicitly supplied queue ID cannot override a conflicting agent name', () => {
+  const { identityMatches, normalizeIdentity } = require('../lib/admin-agent-photo');
+  const queueId = '22222222-2222-4222-8222-222222222222';
+  const identity = normalizeIdentity({
+    name: 'Perry Pappas',
+    phone: '5167667900',
+    brokerage: 'Signature Premier Properties',
+    queue_row_ids: [queueId]
+  });
+  const spec = {
+    queueId: 'id',
+    name: 'agent_name',
+    phone: 'agent_phone',
+    phoneNormalized: 'agent_phone_normalized',
+    email: 'agent_email',
+    brokerage: 'brokerage'
+  };
+  assert.equal(identityMatches({
+    id: queueId,
+    agent_name: 'David W Holmes',
+    agent_phone_normalized: '5167667900',
+    brokerage: 'Signature Premier Properties'
+  }, identity, spec), false);
+});
+
+test('harmless middle initials do not block an otherwise matching photo identity', () => {
+  const { identityMatches, normalizeIdentity } = require('../lib/admin-agent-photo');
+  const identity = normalizeIdentity({
+    agent_id: '11111111-1111-4111-8111-111111111111',
+    name: 'Teresa DeDonato',
+    phone: '5163684369',
+    brokerage: 'Signature Premier Properties'
+  });
+  const spec = {
+    agentId: 'id',
+    name: 'name',
+    phone: 'phone',
+    phoneNormalized: 'phone_normalized',
+    email: 'email',
+    brokerage: 'brokerage'
+  };
+  assert.equal(identityMatches({
+    id: identity.agentId,
+    name: 'Teresa A. DeDonato CBR',
+    phone_normalized: '5163684369',
+    brokerage: 'Signature Premier Properties'
+  }, identity, spec), true);
+});

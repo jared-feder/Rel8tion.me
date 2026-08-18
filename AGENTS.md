@@ -64,6 +64,8 @@ Before production-flow edits, inspect the relevant current files:
 - `[IMPLEMENTED]` `open_house_events.host_agent_slug` is the current event host field. Do not reintroduce `open_house_events.agent_slug` writes.
 - `[IMPLEMENTED]` Agent and loan-officer printed QR behavior is public/profile oriented; NFC behavior is private owner/operator oriented.
 - `[INTENDED]` Buyer-facing chips should never expose sign activation, claim, admin, or dashboard controls.
+- `[IMPLEMENTED]` Agent identity is person-specific across COMMAND, Agent Ranking, listing inventory, relationships, history, and photos. A shared brokerage/office phone, email, stale UUID, explicit row id, or fuzzy same-first-name match must never merge records when usable first-and-last names conflict. Low-confidence imports remain review-only with no canonical `agent_id`; harmless middle initials and credential suffixes may still match.
+- `[IMPLEMENTED]` Agent-photo propagation must match the person name as well as any contact or stored ID. Shared office phones may be used to find candidates, but never to copy one headshot to every agent at that number. If one photo URL is attached to incompatible person names, quarantine the ambiguous references and preserve only a same-name manually verified owner.
 
 ## `/k` Routing Guardrails
 

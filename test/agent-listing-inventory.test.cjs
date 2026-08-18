@@ -68,7 +68,22 @@ test('queue relationship profiles do not treat the queue id as an agent id', () 
 
   assert.equal(profile.agent_id, null);
   assert.equal(profile.queue_row_id, 'queue-row-id');
-  assert.equal(profile.relationship_key, 'phone:5165550100');
+  assert.equal(profile.relationship_key, 'phone:5165550100|agent:ruth|chalco');
+});
+
+test('shared office phones cannot merge two different agent identities', () => {
+  const perry = relationshipProfile({
+    name: 'Perry Pappas',
+    phone: '516-766-7900'
+  });
+  const david = relationshipProfile({
+    name: 'David W. Holmes',
+    phone: '516-766-7900'
+  });
+
+  assert.notEqual(perry.relationship_key, david.relationship_key);
+  assert.equal(perry.relationship_key, 'phone:5167667900|agent:perry|pappas');
+  assert.equal(david.relationship_key, 'phone:5167667900|agent:david|holmes');
 });
 
 test('historical outreach includes sent rows but excludes untouched pending rows', () => {

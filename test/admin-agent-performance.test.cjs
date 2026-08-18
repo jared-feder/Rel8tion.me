@@ -283,3 +283,70 @@ test('Agent Board never lets a placeholder open-house name replace a contact-mat
   assert.equal(rows[0].upcoming_open_house_count, 1);
   assert.notEqual(rows[0].name, 'Listing Agent');
 });
+
+test('Agent Board rejects a stale shared agent id when the actual agent names conflict', () => {
+  const rows = buildAgentPerformance({
+    agents: [{
+      id: 'claimed-lisa',
+      slug: 'lisa-luttinger',
+      name: 'Lisa Luttinger',
+      phone_normalized: '5166063511',
+      brokerage: 'Douglas Elliman Real Estate'
+    }],
+    rankings: [{
+      id: 'ranking-pellegrino',
+      agent_id: 'claimed-lisa',
+      agent_name: 'Lisa Pellegrino',
+      phone_normalized: '6312417117',
+      brokerage: 'Douglas Elliman Real Estate'
+    }],
+    listingInventory: [{
+      id: 'inventory-pellegrino',
+      source_listing_id: 'listing-pellegrino',
+      agent_id: 'claimed-lisa',
+      agent_name: 'Lisa Pellegrino',
+      phone_normalized: '6312417117',
+      brokerage: 'Douglas Elliman Real Estate',
+      address: '1992 Merrick Ave',
+      open_start: '2099-08-18T22:00:00Z'
+    }]
+  });
+
+  const luttinger = rows.find((row) => row.name === 'Lisa Luttinger');
+  const pellegrino = rows.find((row) => row.name === 'Lisa Pellegrino');
+  assert.ok(luttinger);
+  assert.ok(pellegrino);
+  assert.equal(luttinger.upcoming_open_house_count, 0);
+  assert.equal(pellegrino.upcoming_open_house_count, 1);
+  assert.equal(pellegrino.upcoming_open_houses[0].address, '1992 Merrick Ave');
+});
+
+test('Agent Board still merges harmless middle initials and credential suffixes', () => {
+  const rows = buildAgentPerformance({
+    agents: [{
+      id: 'teresa-agent',
+      name: 'Teresa A. DeDonato',
+      phone_normalized: '5163684369',
+      brokerage: 'Signature Premier Properties'
+    }],
+    rankings: [{
+      id: 'teresa-ranking',
+      agent_id: 'teresa-agent',
+      agent_name: 'Teresa DeDonato',
+      phone_normalized: '5163684369',
+      brokerage: 'Signature Premier Properties'
+    }],
+    listingInventory: [{
+      id: 'teresa-listing',
+      agent_id: 'teresa-agent',
+      agent_name: 'Teresa A. DeDonato CBR',
+      phone_normalized: '5163684369',
+      brokerage: 'Signature Premier Properties',
+      address: '188 1st Ave'
+    }]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'Teresa A. DeDonato');
+  assert.equal(rows[0].listing_count, 1);
+});
