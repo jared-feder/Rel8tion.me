@@ -80,7 +80,9 @@ test('first Event Pass event is free but later reuse fails closed without paid m
     history = [{ id: 'ended-event' }];
     await assert.rejects(
       () => freshRegistration.requireReusableEventPassMembership('agent-one', 'sign-one'),
-      (error) => error.status === 402 && /membership is required/i.test(error.message)
+      (error) => error.status === 402
+        && error.code === 'event_pass_membership_required'
+        && /sponsorship or REL8TION Agent membership/i.test(error.message)
     );
     entitlements = [{ status: 'active', role: 'real_estate_agent', entitlement_codes: ['agent_dashboard', 'digital_card'] }];
     await freshRegistration.requireReusableEventPassMembership('agent-one', 'sign-one');
@@ -145,7 +147,8 @@ test('Event Pass membership checkout binds Stripe metadata to the claimed NFC ow
         source: 'event_pass_rel8tionchip',
         agent_slug: 'agent-one',
         uid: 'event-pass-uid',
-        email: 'agent@example.test'
+        email: 'agent@example.test',
+        return_path: '/event-pass-reuse?uid=event-pass-uid&agent=agent-one&code=ep-one&open_house_id=house-one'
       }
     };
     const result = await new Promise((resolve) => {
@@ -161,6 +164,9 @@ test('Event Pass membership checkout binds Stripe metadata to the claimed NFC ow
     const params = new URLSearchParams(checkoutBody);
     assert.equal(params.get('metadata[agent_slug]'), 'agent-one');
     assert.equal(params.get('metadata[uid]'), 'event-pass-uid');
+    assert.equal(params.get('metadata[return_path]'), '/event-pass-reuse?uid=event-pass-uid&agent=agent-one&code=ep-one&open_house_id=house-one');
+    assert.match(params.get('cancel_url'), /\/event-pass-reuse\?/);
+    assert.match(params.get('cancel_url'), /membership=canceled/);
     assert.match(params.get('success_url'), /\/api\/checkout\/agent-membership-return\?session_id=\{CHECKOUT_SESSION_ID\}/);
     assert.match(params.get('integration_identifier'), /^rel8tion_agent_[a-z]{8}$/);
     assert.equal(params.has('payment_method_types[0]'), false);
