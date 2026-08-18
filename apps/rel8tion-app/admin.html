@@ -6463,7 +6463,7 @@ ${rowsHtml}
     }
 
     function eventPassAssignmentLabel(row) {
-      const assigned = row.assigned_agent_slug || row.active_event_host || row.nfc_agent_slug || '';
+      const assigned = row.assigned_agent_slug || (row.pass_state === 'live' ? row.active_event_host : '') || row.nfc_agent_slug || '';
       if (assigned) return `Assigned to ${assigned}`;
       if (row.nfc_claimed) return 'NFC claimed / agent unavailable';
       if (row.linked_sign_id) return 'Backing sign linked / no agent';
@@ -6471,8 +6471,8 @@ ${rowsHtml}
     }
 
     function eventPassStateLabel(row) {
-      if (row.active_event_id) return 'Live';
-      if (row.assigned_agent_slug || row.nfc_claimed || row.active_event_host) return 'Assigned';
+      if (row.pass_state === 'live') return 'Live';
+      if (row.assigned_agent_slug || row.nfc_claimed) return 'Assigned';
       if (row.linked_sign_id) return 'Linked';
       return 'Fresh';
     }
@@ -6985,9 +6985,9 @@ ${rowsHtml}
             <div class="primary">${esc(row.public_code || row.id)}</div>
             <div class="secondary">${esc(eventPassAssignmentLabel(row))}</div>
           </div>
-          <div>${badge(eventPassStateLabel(row), row.active_event_id ? 'ok' : row.assigned_agent_slug || row.nfc_claimed || row.linked_sign_id ? 'warn' : 'info')}</div>
+          <div>${badge(eventPassStateLabel(row), row.pass_state === 'live' ? 'ok' : row.assigned_agent_slug || row.nfc_claimed || row.linked_sign_id ? 'warn' : 'info')}</div>
           <div>${badge(row.nfc_claimed ? `NFC: ${row.nfc_agent_slug || 'claimed'}` : 'NFC unclaimed', row.nfc_claimed ? 'warn' : 'info')}</div>
-          <div>${badge(row.active_event_host || 'No live event', row.active_event_host ? 'ok' : 'info')}</div>
+          <div>${badge(row.pass_state === 'live' ? row.active_event_host || 'Live event' : 'No live event', row.pass_state === 'live' ? 'ok' : 'info')}</div>
           <div>${renderEventPassActions(row)}</div>
         `)}
         ${renderRows('Smart signs', `${signs.length} regular Smart Signs; Event Pass backing records are managed above`, signs.slice(0, 80), (row) => `
