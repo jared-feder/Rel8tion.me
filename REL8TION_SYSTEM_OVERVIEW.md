@@ -67,6 +67,7 @@ REL8TION is deliberately lightweight:
 - `[IMPLEMENTED]` The private relationship schedule feed reads confirmed field visits for a requested time range and collapses duplicate visit rows by open-house identity, scheduled window, and agent identity without altering source records.
 - `[IMPLEMENTED]` Supabase REST/RPC calls from browser code where allowed by anon policies.
 - `[IMPLEMENTED]` Supabase Edge Functions under `supabase/functions`.
+- `[IMPLEMENTED]` Backend-only historical, OneKey, relationship-link, open-house-support, outreach-log, and legacy scan-event tables are forced-RLS and service-role-only. Operational outreach/OneKey views use security-invoker and are service-role-only, and outreach queue-staging RPC execution is limited to the service role. Public `brokerages`, `open_houses`, and `listing_agents` catalogs now use explicit RLS read policies: browser SELECT remains compatible while browser insert/update/delete is removed. Outreach, sign-inventory, and loan-officer compatibility surfaces are being hardened separately because active browser flows still depend on them.
 - `[PARTIAL]` Android SMS Gateway as a temporary outreach-volume provider fallback while Twilio paths remain intact.
 - `[PARTIAL]` A separate website-builder app under `apps/agent-website-builder`.
 - `[PARTIAL]` WordPress-side local tracking files under `wordpress/`, not automatically synced to production.
