@@ -8,6 +8,8 @@
     { "source": "/claim", "destination": "/claim.html" },
     { "source": "/onboarding", "destination": "/onboarding.html" },
     { "source": "/sign-demo-activate", "destination": "/sign-demo-activate.html" },
+    { "source": "/event-pass-reuse", "destination": "/event-pass-reuse.html" },
+    { "source": "/event-pass-reuse.html", "destination": "/event-pass-reuse.html" },
     { "source": "/k", "destination": "/k.html" },
     { "source": "/key-reset", "destination": "/key-reset.html" },
     { "source": "/s", "destination": "/sign.html" },

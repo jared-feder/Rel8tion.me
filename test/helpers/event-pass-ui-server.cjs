@@ -33,6 +33,32 @@ http.createServer((req, res) => {
       plan_code: null
     });
   }
+  if (url.pathname === '/api/event-pass/reuse-options') {
+    return json(res, {
+      ok: true,
+      agent: { slug: 'preview-agent', name: 'Preview Agent', email: 'preview@example.test' },
+      inventory: { id: 'preview-inventory', public_code: 'preview-pass' },
+      sign: { id: 'preview-sign' },
+      house: { id: 'preview-house', address: '123 REL8TION Way, Preview, NY' },
+      authorization: { basis: 'listing_agent' },
+      membership_active: false,
+      reuse_required: true,
+      sponsor: {
+        id: 'preview-lo',
+        uid: 'preview-lo',
+        name: 'Jordan Taylor',
+        title: 'Mortgage Loan Officer',
+        company: 'Neighborhood Mortgage Bank',
+        photo_url: '/preview-lo.svg'
+      },
+      sponsor_source: 'agent_loan_officer_relationship',
+      plan: { code: 'rel8tion_agent_monthly', label: '$29/month', amount_cents: 2900 }
+    });
+  }
+  if (url.pathname === '/preview-lo.svg') {
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' });
+    return res.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="34" fill="#dceeff"/><circle cx="80" cy="61" r="31" fill="#5b7fb2"/><path d="M28 151c5-38 24-56 52-56s47 18 52 56" fill="#34598d"/></svg>');
+  }
   if (url.pathname === '/rest/v1/keys') {
     return json(res, [{ uid: 'preview-event-pass', agent_slug: 'preview-agent', claimed: true, device_role: 'event_pass_keychain' }]);
   }
@@ -58,7 +84,9 @@ http.createServer((req, res) => {
 
   const relative = url.pathname === '/agent-home'
     ? 'apps/rel8tion-app/agent-home.html'
-    : url.pathname.replace(/^\/+/, '');
+    : url.pathname === '/event-pass-reuse'
+      ? 'apps/rel8tion-app/event-pass-reuse.html'
+      : url.pathname.replace(/^\/+/, '');
   const file = path.resolve(root, relative);
   if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
