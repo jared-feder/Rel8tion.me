@@ -4,6 +4,12 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-18: Event Pass address/MLS search input repair
+
+- `[IMPLEMENTED]` The Event Pass listing-search handler now reads and preserves the typed address or MLS/source id before replacing the form with its loading screen. Previously `renderLoading()` removed `listingSearchInput` first, so every search became an empty term and immediately failed in the browser without producing a Vercel runtime error.
+- `[VERIFIED]` Production runtime-error grouping for the activation page showed no server failure, consistent with the client-only ordering bug. A focused source regression check now proves the input read occurs before the loading render.
+- `[VERIFIED]` Production Event Pass `ep-00b289ccff24` was freshened at `2026-08-19T01:35:54Z` for another physical test. Read-back confirms its inventory and backing sign are unassigned/inactive, its NFC key is unclaimed with no agent slug, zero pending activation sessions and zero active events remain, and its one ended historical event is preserved.
+
 ## 2026-08-18: Event Pass reuse choice page and NFC-loop repair
 
 - `[IMPLEMENTED]` Event Pass listing/host authorization failures now carry a stable server error code and open a dedicated full-screen recovery page showing the selected open house and verified agent, with prominent actions to choose another open house, search by address/MLS, or start over. The API logs only bounded operational identifiers and the rejection code/status so a future field failure can be identified without guessing or exposing request secrets.
