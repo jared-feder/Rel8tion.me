@@ -6462,8 +6462,38 @@ ${rowsHtml}
       return 'Fresh / unassigned';
     }
 
+    function eventPassAssignedAgentSlug(row) {
+      return row?.assigned_agent_slug || (row?.pass_state === 'live' ? row?.active_event_host : '') || (row?.nfc_claimed ? row?.nfc_agent_slug : '') || '';
+    }
+
+    function eventPassIsAssigned(row) {
+      return Boolean(row?.assigned_agent_slug || row?.nfc_claimed || row?.pass_state === 'live');
+    }
+
+    function assignedEventPassSortValue(row) {
+      if (row?.pass_state === 'live') return 3;
+      if (row?.nfc_claimed) return 2;
+      if (row?.assigned_agent_slug) return 1;
+      return 0;
+    }
+
+    function assignedEventPassTime(row) {
+      const value = row?.last_activated_at || row?.claimed_at || row?.active_event_start || row?.created_at || '';
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function compareAssignedEventPasses(left, right) {
+      return assignedEventPassSortValue(right) - assignedEventPassSortValue(left)
+        || assignedEventPassTime(right) - assignedEventPassTime(left)
+        || String(left?.public_code || '').localeCompare(String(right?.public_code || ''));
+    }
+
     function eventPassAssignmentLabel(row) {
-      const assigned = row.assigned_agent_slug || (row.pass_state === 'live' ? row.active_event_host : '') || row.nfc_agent_slug || '';
+      const assigned = eventPassAssignedAgentSlug(row);
+      const profile = assigned ? findAgentByLookup(assigned) : null;
+      const name = profile?.name || profile?.agent_name || '';
+      if (assigned && name && normalizedAgentValue(name) !== normalizedAgentValue(assigned)) return `Assigned to ${name} (${assigned})`;
       if (assigned) return `Assigned to ${assigned}`;
       if (row.nfc_claimed) return 'NFC claimed / agent unavailable';
       if (row.linked_sign_id) return 'Backing sign linked / no agent';
@@ -6906,7 +6936,9 @@ ${rowsHtml}
 
     function renderSigns() {
       const signs = filterByQuery((state.command?.signs || []).filter((row) => row.product_type !== 'event_pass'));
-      const eventPasses = filterByQuery((state.command?.event_passes || []).filter((row) => row.pass_model !== 'sponsored_agent_pass'));
+      const assignedEventPasses = filterByQuery((state.command?.event_passes || [])
+        .filter((row) => row.pass_model !== 'sponsored_agent_pass' && eventPassIsAssigned(row))
+        .sort(compareAssignedEventPasses));
       const sponsoredPasses = filterByQuery(state.command?.sponsored_event_passes || []);
       const coverageSigns = filterByQuery(state.command?.loan_officer_coverage_signs || []);
       const freshened = state.eventPassFreshenerResult;
@@ -6980,7 +7012,7 @@ ${rowsHtml}
           <div class="secondary">agent-qr-batch.csv, smart-sign-qr-batch.csv, or event-pass-qr-batch.csv | images/&lt;code&gt;.png | README.txt</div>
           <div class="secondary" style="margin-top:8px;">The CSV image_file value exactly matches each PNG filename for STL production. Smart Sign generation creates only new regular smart_sign inventory. Event Pass export only reserves fresh, unclaimed single-event inventory. Exporting marks rows printed so the next batch cannot duplicate them.</div>
         </div>
-        ${renderRows('Event Passes', `${eventPasses.length} normal passes; use Freshen here instead of detaching the backing sign`, eventPasses.slice(0, 80), (row) => `
+        ${renderRows('Assigned Event Passes', `${assignedEventPasses.length} assigned or activated passes; fresh unassigned inventory is hidden`, assignedEventPasses, (row) => `
           <div>
             <div class="primary">${esc(row.public_code || row.id)}</div>
             <div class="secondary">${esc(eventPassAssignmentLabel(row))}</div>

@@ -4,6 +4,11 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-08-18: COMMAND assigned Event Pass focus
+
+- `[IMPLEMENTED]` The Signs tab now hides fresh unassigned normal Event Pass inventory instead of rendering the first 80 rows from the roughly 600-row admin payload. It shows only passes with an explicit agent assignment, a claimed Event Pass NFC owner, or a live event; live passes appear first, followed by claimed and assigned passes ordered by their latest activation/assignment time.
+- `[IMPLEMENTED]` The full inventory remains loaded for the Freshen scanner and QR-batch reservation workflows, so narrowing the operator table does not weaken reset recovery, reuse safety, or printing controls. Assigned rows resolve the agent's display name from COMMAND CRM when available while retaining the slug for exact identity.
+
 ## 2026-08-18: Event Pass reuse choice page and NFC-loop repair
 
 - `[IMPLEMENTED]` Event Pass listing/host authorization failures now carry a stable server error code and open a dedicated full-screen recovery page showing the selected open house and verified agent, with prominent actions to choose another open house, search by address/MLS, or start over. The API logs only bounded operational identifiers and the rejection code/status so a future field failure can be identified without guessing or exposing request secrets.
