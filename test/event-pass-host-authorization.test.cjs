@@ -69,13 +69,21 @@ test('different-company agents and manual listings are denied', () => {
     agent: { slug: 'other-agent', name: 'Other Agent', phone: '5165550197', brokerage: 'Douglas Elliman' },
     identityVerified: true,
     supportingListingAgent: true
-  }), /only be activated/);
+  }), (error) => {
+    assert.match(error.message, /only be activated/);
+    assert.equal(error.code, 'event_pass_listing_authorization_failed');
+    return true;
+  });
   assert.throws(() => authorizeListingHost({
     house: { address: 'Manual address' },
     listingAgents: [],
     agent: { slug: 'listing-agent' },
     identityVerified: true
-  }), /verified listing/);
+  }), (error) => {
+    assert.match(error.message, /verified listing/);
+    assert.equal(error.code, 'event_pass_listing_authorization_failed');
+    return true;
+  });
 });
 
 test('brokerage normalization ignores legal suffixes but not the company identity', () => {
@@ -94,6 +102,15 @@ test('normal Event Pass UI activates through the server route and records substi
   assert.match(activation, /supporting_listing_agent/);
   assert.match(activation, /open_house_id:house\.id/);
   assert.doesNotMatch(activation, /open_house_events|smart_signs\?/);
+});
+
+test('listing authorization failures render a dedicated recovery screen instead of a small inline error', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../apps/rel8tion-app/sign-demo-activate.html'), 'utf8');
+  assert.match(source, /We Can’t Verify This Open House/);
+  assert.match(source, /Choose Another Open House/);
+  assert.match(source, /event_pass_listing_authorization_failed/);
+  assert.match(source, /renderEventPassAuthorizationIssue\(err\.message\)/);
+  assert.doesNotMatch(source, /event_pass_listing_authorization_failed'\|\|err\?\.status===403/);
 });
 
 test('database migration guards ordinary and Sponsored Event Pass inserts', () => {
