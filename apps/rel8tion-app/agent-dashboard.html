@@ -46,6 +46,7 @@
       checkins: [],
       outreach: [],
       loanOfficer: null,
+      membershipActive: false,
       affordability: { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: '' },
       error: ''
     };
@@ -91,6 +92,11 @@
         || '';
       if (sponsor) kitParams.set('sponsor', sponsor);
       kitParams.set('source', isSponsoredEventPassEvent() ? 'sponsored_event_pass' : isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
+      if (state.membershipActive) {
+        kitParams.set('plan', 'member_hardware');
+        kitParams.set('source', 'member_dashboard_hardware');
+        return `/kit-intake?${kitParams.toString()}`;
+      }
       return `/get-open-house-kit?${kitParams.toString()}`;
     }
 
@@ -547,13 +553,19 @@
       const passLabel = sponsored ? 'Sponsored Event Pass' : isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
       const kitUrl = openHouseKitHref(address);
+      const recapEmail = state.event?.setup_context?.event_recap_email || {};
+      const recapStatus = recapEmail.status === 'sent'
+        ? `REL8TION emailed this event-only recap to ${recapEmail.recipient || 'the email on your agent profile'}.`
+        : recapEmail.status === 'failed' || recapEmail.status === 'missing_recipient'
+          ? `REL8TION could not deliver the automatic recap yet: ${recapEmail.warning || 'check the email on your agent profile or contact support.'}`
+          : 'REL8TION is preparing the event-only recap for the email on your agent profile.';
       const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
       const loPhone = state.loanOfficer?.loan_officer_phone || '';
       const secondaryCta = loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody);
       app.innerHTML = `<div class="py-10">
         <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
-        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. Check-ins and disclosure evidence remain saved.</p>
+        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. ${sponsored ? 'Required compliance and audit evidence remains preserved internally.' : 'Your check-in and disclosure history remains available in your permanent dashboard.'}</p>
 
         <div class="mt-6 grid gap-3 md:grid-cols-3">
           ${stat('Buyers checked in', stats.checkins, 'blue')}
@@ -563,11 +575,12 @@
 
         <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
-          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${sponsored ? 'Your Sponsored Event Pass made this open house easier.' : 'Keep the keychain. The next activation is sponsored by the loan officer.'}</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${sponsored ? 'Check-ins were captured, event records stayed organized, disclosure records stayed together, and live loan officer support was available with no apps, no passwords, and no technical setup.' : 'For the next open house, the agent keeps the keychain on their keys and calls the sponsoring loan officer to activate the next Event Pass or service kit.'}</p>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${sponsored ? 'Your sponsored event copy is delivered by email.' : 'Add permanent branded hardware to your membership.'}</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${sponsored ? `${recapStatus} This event-only version will not remain in your agent dashboard, disclosure library, analytics, or reports. Activate REL8TION Agent for $29/month to keep permanent records from future events.` : 'Your membership keeps the dashboard, permanent check-in and disclosure records, analytics, reporting, and assisted follow-up active. The $199 Open House Kit is a separate one-time purchase with a reusable Smart Sign and custom company-branded Rel8tionChips—no second membership charge.'}</p>
           <div class="mt-4 grid gap-2 md:grid-cols-2">
-            <a href="${esc(summaryMail)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Email Summary</a>
-            <a href="${esc(kitUrl)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Get My Rel8tion Open House Kit</a>
+            ${sponsored
+              ? '<a href="/pricing?role=agent" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">See Permanent REL8TION Agent Access · $29/Month</a>'
+              : `<a href="${esc(kitUrl)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Add My Branded Open House Kit · $199 One Time</a><a href="${esc(summaryMail)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Another Summary</a>`}
             <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
             <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
           </div>
@@ -629,6 +642,7 @@
       state.checkins = snapshot.checkins || [];
       state.outreach = snapshot.outreach || [];
       state.loanOfficer = snapshot.loan_officer || null;
+      state.membershipActive = snapshot.membership_active === true;
       const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
       if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
       state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {

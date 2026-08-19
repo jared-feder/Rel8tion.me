@@ -756,7 +756,7 @@
             <div class="profile">
               <img class="avatar" src="${esc(agentPhotoUrl(agent) || 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png')}" alt="${esc(agent.name || 'Agent')}">
               <div>
-                <div class="badge">Your Event Pass is now a Rel8tionChip</div>
+                <div class="badge">Event Pass · Membership Available</div>
                 <h1>${esc(agent.name || agentSlug)}</h1>
                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
               </div>
@@ -771,8 +771,8 @@
         </section>
         <section class="layout" style="grid-template-columns:1fr;">
           <div class="panel">
-            <h2>Keep using this Event Pass</h2>
-            <p class="empty">REL8TION Agent membership turns this same NFC device into your digital business card and reusable Event Pass. No Open House Kit or separate Rel8tionChip purchase is required.</p>
+            <h2>Keep every event in your dashboard</h2>
+            <p class="empty">REL8TION Agent is the ${esc(membership.checkout_label || '$29/month')} software membership for permanent check-in and disclosure records, event analytics and reporting, your digital profile, and assisted follow-up. The Event Pass remains event hardware. After membership, you can add the reusable $199 Open House Kit with a Smart Sign and custom company-branded Rel8tionChips as a separate one-time hardware purchase.</p>
             ${membershipNotice === 'canceled' ? '<p class="empty" style="color:#b45309;">Checkout was canceled. Nothing was charged.</p>' : ''}
             ${membershipError ? `<p class="empty" style="color:#b91c1c;">${esc(membershipError)}</p>` : ''}
           </div>
@@ -846,6 +846,7 @@
       const fallbackPhoto = 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png';
       const photo = agentPhotoUrl(agent) || fallbackPhoto;
       const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+      const memberHardware = `/kit-intake?plan=member_hardware&source=agent_dashboard&uid=${encodeURIComponent(uid)}&agent=${encodeURIComponent(agentSlug)}`;
       const onboarding = `/onboarding?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
       const resolvedEventPassCode = eventPassCode || membership?.event_pass_code || '';
       const activateSign = membership?.event_pass_device
@@ -866,7 +867,7 @@
             <div class="profile">
               <img class="avatar" src="${esc(photo)}" onerror="this.onerror=null;this.src='${esc(fallbackPhoto)}';" alt="${esc(agent.name || 'Agent')}">
               <div>
-                <div class="badge">${membership?.event_pass_device ? 'Rel8tionChip Digital Business Card' : 'Personal Agent Dashboard'}</div>
+                <div class="badge">${membership?.event_pass_device ? 'REL8TION Agent · Event Pass Connected' : 'Personal Agent Dashboard'}</div>
                 <h1>${esc(agent.name || agentSlug || 'Agent')}</h1>
                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
               </div>
@@ -929,6 +930,13 @@
                   <p class="title">Open House Kit Setup</p>
                   <p class="sub">This Rel8tionChip is connected to a paid Open House Kit order.</p>
                   <div class="mini-actions"><a class="mini" href="${esc(kitDashboard.dashboard_url)}">Open Kit Dashboard</a></div>
+                </div>
+              ` : ''}
+              ${membership?.event_pass_device && !kitDashboard?.dashboard_url ? `
+                <div class="event-card">
+                  <p class="title">Make it your permanent branded system</p>
+                  <p class="sub">Your $29/month membership keeps the software, history, analytics, and reporting active. Add the reusable Smart Sign and custom company-branded Rel8tionChips for $199 one time—no second membership charge.</p>
+                  <div class="mini-actions"><a class="mini" href="${esc(memberHardware)}">Get My Branded Open House Kit</a></div>
                 </div>
               ` : ''}
               <div class="event-card">

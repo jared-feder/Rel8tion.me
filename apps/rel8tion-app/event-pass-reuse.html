@@ -60,10 +60,10 @@
       const membershipActive = data.membership_active || value('membership') === 'active';
       const sponsorCard = sponsor ? `
         <article class="card primary">
-          <div class="option-label">Option 1 · Sponsored open house</div>
+          <div class="option-label">Option 1 · Sponsored open house · Free and event-only</div>
           <div class="officer">${officerPhoto(sponsor)}<div><h2>${esc(sponsor.name || 'Your loan officer')}</h2><p>${esc([sponsor.title,sponsor.company].filter(Boolean).join(' · ') || 'Loan officer sponsor')}</p></div></div>
           <p class="copy"><strong>Your loan officer will sponsor this open house as well.</strong> Just make sure you thank them and stay in contact so you can continue building a lasting REL8TIONship.</p>
-          <div class="notice">This is a limited version of REL8TION. ${esc(sponsor.name || 'Your loan officer')} will appear as the sponsoring loan officer for this open house and receive event check-in visibility. Financing help is shared only when a buyer requests it.</div>
+          <div class="notice"><strong>Free, event-only version:</strong> This is a limited version of REL8TION. Use the live dashboard during this open house, then REL8TION emails the event recap to the email on your agent profile. It will not remain in your permanent dashboard, disclosure library, analytics, or reports. REL8TION still preserves required compliance and audit evidence internally. ${esc(sponsor.name || 'Your loan officer')} will appear as the sponsor and receive event check-in visibility. Financing help is shared only when a buyer requests it.</div>
           <label class="consent"><input id="sponsorConsent" type="checkbox"><span>I authorize ${esc(sponsor.name || 'this loan officer')} to sponsor and support this open house.</span></label>
           <button id="sponsorButton" class="btn" type="button" disabled>Continue With ${esc(sponsor.name || 'My Loan Officer')} Sponsoring</button>
           <p id="sponsorStatus" class="status"></p>
@@ -73,8 +73,9 @@
           <h2 style="margin-top:14px">No loan officer is assigned yet</h2>
           <p class="copy">REL8TION could not verify an active loan officer relationship for this open house. Choose full REL8TION Agent membership below or contact support to assign coverage.</p>
         </article>`;
+      const memberHardwareUrl = `/kit-intake?plan=member_hardware&source=event_pass_membership&uid=${encodeURIComponent(value('uid'))}&agent=${encodeURIComponent(state.context?.agent?.slug || value('agent'))}`;
       const membershipAction = membershipActive
-        ? `<button id="memberContinueButton" class="btn" type="button">Continue With Full REL8TION</button>`
+        ? `<button id="memberContinueButton" class="btn" type="button">Continue With Full REL8TION</button><a class="btn secondary" href="${esc(memberHardwareUrl)}">Add My Branded Open House Kit · $199 One Time</a>`
         : `<button id="membershipCheckoutButton" class="btn" type="button">Enroll for ${esc(data.plan.label)}</button>`;
       app.innerHTML = `
         <section class="hero">
@@ -87,17 +88,18 @@
         <section class="options">
           ${sponsorCard}
           <article class="card membership-card">
-            <div class="option-label">Option 2 · Full REL8TION</div>
-            <h2 style="margin-top:14px">Remove the sponsorship message and unlock everything.</h2>
+            <div class="option-label">Option 2 · Full REL8TION · Paid membership and permanent records</div>
+            <h2 style="margin-top:14px">Keep every event record and unlock the full agent system.</h2>
             <div class="price"><strong>${esc(data.plan.label.replace('/month',''))}</strong><span>/month</span></div>
-            <p class="copy">Full REL8TION transforms this same Rel8tionChip into your digital business card and networking tool.</p>
+            <p class="copy">REL8TION Agent is the ${esc(data.plan.label)} software membership. Your Event Pass remains event hardware; membership unlocks your permanent dashboard, digital profile, and networking tools.</p>
             <ul class="features">
-              <li>Your permanent agent dashboard</li>
+              <li>Permanent check-in records from current and future events</li>
+              <li>Permanent signed disclosure records</li>
+              <li>Event analytics and reporting</li>
               <li>Your public profile and digital business card</li>
-              <li>Current and future open-house check-ins</li>
-              <li>Event history and signed disclosure records</li>
               <li>Automated and REL8TION-assisted follow-up</li>
             </ul>
+            <div class="notice"><strong>Hardware is separate:</strong> after membership, add the reusable REL8TION Open House Kit with a Smart Sign and custom company-branded Rel8tionChips for <strong>$199 one time</strong>. It does not add another membership charge.</div>
             ${membershipAction}
             <p id="membershipStatus" class="status">${membershipActive ? 'Your membership is active. Continue to register the selected open house.' : 'Secure monthly subscription. Current catalog price: ' + esc(data.plan.label) + '.'}</p>
           </article>
