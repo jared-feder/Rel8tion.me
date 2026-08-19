@@ -37,12 +37,21 @@ test('Event Pass backing signs remain classified as Event Passes after either li
 
 test('COMMAND separates normal Event Pass management from Smart Sign detach controls', () => {
   assert.match(adminSource, /row\.product_type !== 'event_pass'/);
-  assert.match(adminSource, /renderRows\('Event Passes'/);
-  assert.match(adminSource, /use Freshen here instead of detaching the backing sign/);
+  assert.match(adminSource, /renderRows\('Assigned Event Passes'/);
   assert.match(adminSource, /renderEventPassActions\(row\)/);
   assert.match(adminSource, /Event Pass backing records are managed above/);
   assert.match(adminSource, /if \(row\.pass_state === 'live'\) return 'Live'/);
   assert.match(adminSource, /row\.pass_state === 'live' \? row\.active_event_host \|\| 'Live event' : 'No live event'/);
+});
+
+test('COMMAND only renders assigned normal Event Passes with live and recently activated passes first', () => {
+  assert.match(adminSource, /function eventPassIsAssigned\(row\)/);
+  assert.match(adminSource, /row\?\.assigned_agent_slug \|\| row\?\.nfc_claimed \|\| row\?\.pass_state === 'live'/);
+  assert.match(adminSource, /pass_model !== 'sponsored_agent_pass' && eventPassIsAssigned\(row\)/);
+  assert.match(adminSource, /\.sort\(compareAssignedEventPasses\)/);
+  assert.match(adminSource, /assignedEventPassSortValue\(right\) - assignedEventPassSortValue\(left\)/);
+  assert.match(adminSource, /fresh unassigned inventory is hidden/);
+  assert.doesNotMatch(adminSource, /eventPasses\.slice\(0, 80\)/);
 });
 
 test('detach_sign rejects Event Pass backing records before any production mutation', async () => {
