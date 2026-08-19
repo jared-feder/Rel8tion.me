@@ -15,6 +15,30 @@ function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
 }
 
+async function withFreshRegistration(run) {
+  const originalFetch = global.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const serviceRoleEnv = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_');
+  const originalKey = process.env[serviceRoleEnv];
+  try {
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env[serviceRoleEnv] = 'test-value';
+    delete require.cache[require.resolve('../lib/admin-auth')];
+    delete require.cache[require.resolve('../lib/event-pass-registration')];
+    return await run(require('../lib/event-pass-registration'));
+  } finally {
+    global.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env[serviceRoleEnv]; else process.env[serviceRoleEnv] = originalKey;
+    delete require.cache[require.resolve('../lib/admin-auth')];
+    delete require.cache[require.resolve('../lib/event-pass-registration')];
+  }
+}
+
+function jsonResponse(body) {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
 test('membership-required activation preserves the selected Event Pass context', () => {
   const route = eventPassAction.membershipRoute({
     uid: 'physical-pass-uid',
@@ -76,6 +100,51 @@ test('sponsor authorization is re-resolved and recorded on the server before a p
   const sessionIndex = registration.indexOf('const session = await upsertSponsoredReuseSession');
   const signLiveIndex = registration.indexOf('const signRows = await supabaseRest', consentIndex);
   assert.ok(consentIndex >= 0 && sessionIndex > consentIndex && signLiveIndex > sessionIndex);
+});
+
+test('reused Event Pass keeps the initial event loan officer and otherwise defaults to Brian Puls', async () => {
+  await withFreshRegistration(async (freshRegistration) => {
+    const originalUid = '11111111-1111-4111-8111-111111111111';
+    global.fetch = async (url) => {
+      const target = String(url);
+      if (target.includes('/open_house_events?')) {
+        return jsonResponse([{ id: 'initial-event', setup_context: {}, created_at: '2026-08-01T12:00:00Z' }]);
+      }
+      if (target.includes('/event_loan_officer_sessions?')) {
+        return jsonResponse([{ open_house_event_id: 'initial-event', verified_profile_uid: originalUid }]);
+      }
+      if (target.includes(`/verified_profiles?uid=eq.${originalUid}`)) {
+        return jsonResponse([{ uid: originalUid, full_name: 'Original Loan Officer', is_active: true }]);
+      }
+      assert.fail(`Unexpected request: ${target}`);
+    };
+
+    const original = await freshRegistration.resolveReusableEventPassSponsor({ signId: 'sign-one' });
+    assert.equal(original.source, 'initial_event_loan_officer');
+    assert.equal(original.profile.uid, originalUid);
+
+    global.fetch = async (url) => {
+      const target = String(url);
+      if (target.includes('/open_house_events?')) {
+        return jsonResponse([{ id: 'initial-event', setup_context: {}, created_at: '2026-08-01T12:00:00Z' }]);
+      }
+      if (target.includes('/event_loan_officer_sessions?')) return jsonResponse([]);
+      if (target.includes(`/verified_profiles?uid=eq.${freshRegistration.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID}`)) {
+        return jsonResponse([{
+          uid: freshRegistration.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID,
+          full_name: 'Brian Puls',
+          company_name: 'NMB',
+          is_active: true
+        }]);
+      }
+      assert.fail(`Unexpected request: ${target}`);
+    };
+
+    const fallback = await freshRegistration.resolveReusableEventPassSponsor({ signId: 'sign-one' });
+    assert.equal(fallback.source, 'default_brian_puls');
+    assert.equal(fallback.profile.full_name, 'Brian Puls');
+    assert.equal(fallback.profile.uid, '7e05fcf5-18de-4ba1-b689-b944602ed4ca');
+  });
 });
 
 test('checkout can safely resume the interrupted Event Pass registration', () => {
