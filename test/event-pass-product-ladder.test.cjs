@@ -191,6 +191,32 @@ test('paid Event Pass activation hands the verified agent into profile completio
   assert.match(claimFlow, /url\.searchParams\.set\('profile_saved', '1'\)/);
 });
 
+test('ended Event Pass offers member hardware only after active membership is confirmed', () => {
+  const dashboard = fs.readFileSync(path.join(root, 'apps/rel8tion-app/agent-dashboard.html'), 'utf8');
+  assert.match(dashboard, /const member = state\.membershipActive === true/);
+  assert.match(dashboard, /const primaryActions = member && !sponsored/);
+  assert.match(dashboard, /Member-only Open House Kit pricing appears after membership is active/);
+  assert.match(dashboard, /Activate REL8TION Agent · \$29\/Month/);
+});
+
+test('sponsored closeout keeps the event active until check-ins load and the recap is delivered', () => {
+  const source = fs.readFileSync(path.join(root, 'api/agent-event-dashboard.js'), 'utf8');
+  const closeStart = source.indexOf('async function closeEvent');
+  const closeEnd = source.indexOf('\nmodule.exports = async function handler', closeStart);
+  const closeSource = source.slice(closeStart, closeEnd);
+  const checkinQuery = closeSource.indexOf('event_checkins?open_house_event_id=eq.');
+  const recapSend = closeSource.indexOf('await sendSponsoredEventRecap');
+  const recapPersist = closeSource.indexOf('event_recap_email: recapEmail');
+  const eventEnd = closeSource.indexOf("body: JSON.stringify({ status: 'ended'");
+
+  assert.ok(checkinQuery >= 0);
+  assert.doesNotMatch(closeSource.slice(checkinQuery, recapSend), /\.catch\(\(\) => \[\]\)/);
+  assert.ok(recapSend < recapPersist && recapPersist < eventEnd, 'recap must be delivered and recorded before ending the event');
+  assert.match(closeSource, /existingRecap\.status === 'sent'/);
+  assert.match(closeSource, /if \(recapEmail\.status !== 'sent'\)/);
+  assert.match(closeSource, /open house is still active; (?:try ending it again|confirm the agent email and try ending it again)/);
+});
+
 test('changed product-ladder browser scripts parse', () => {
   for (const file of [
     'apps/rel8tion-app/event-pass-reuse.html',

@@ -131,22 +131,62 @@ async function closeEvent(input, session) {
     throw error;
   }
   const sponsoredEventOnly = isSponsoredEventOnly(event);
+  const existingRecap = safeObject(safeObject(event.setup_context).event_recap_email);
   const [house, checkins, agent] = sponsoredEventOnly
     ? await Promise.all([
       event.open_house_source_id
         ? supabaseRest(`open_houses?id=eq.${enc(event.open_house_source_id)}&select=*&limit=1`).then(one).catch(() => null)
         : null,
-      supabaseRest(`event_checkins?open_house_event_id=eq.${enc(event.id)}&select=*&order=created_at.asc&limit=500`).then(rows).catch(() => []),
+      supabaseRest(`event_checkins?open_house_event_id=eq.${enc(event.id)}&select=*&order=created_at.asc&limit=500`).then(rows),
       supabaseRest(`agents?slug=eq.${enc(session.slug)}&select=slug,name,email&limit=1`).then(one).catch(() => null)
     ])
     : [null, [], null];
   const now = new Date().toISOString();
+  let recapEmail = { status: 'not_required' };
+  let eventReadyToClose = event;
+  if (sponsoredEventOnly) {
+    recapEmail = existingRecap.status === 'sent'
+      ? existingRecap
+      : await sendSponsoredEventRecap({
+        event: { ...event, status: 'ended', ended_at: now, last_activity_at: now },
+        house,
+        agent: agent || {},
+        checkins
+      }).catch((error) => {
+        console.error('[agent-event-dashboard] sponsored event recap failed before close', clean(error.message || error, 1000));
+        const deliveryError = new Error('The event recap could not be delivered. The open house is still active; try ending it again.');
+        deliveryError.status = 503;
+        throw deliveryError;
+      });
+    if (recapEmail.status !== 'sent') {
+      console.error('[agent-event-dashboard] sponsored event recap was not deliverable before close', clean(recapEmail.warning || recapEmail.status, 1000));
+      const deliveryError = new Error('The event recap could not be delivered. The open house is still active; confirm the agent email and try ending it again.');
+      deliveryError.status = 503;
+      throw deliveryError;
+    }
+    const setupContext = {
+      ...safeObject(event.setup_context),
+      event_recap_email: recapEmail
+    };
+    const recapPatchedEvents = await supabaseRest(`open_house_events?id=eq.${enc(event.id)}&host_agent_slug=eq.${enc(session.slug)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ setup_context: setupContext })
+    });
+    eventReadyToClose = one(recapPatchedEvents);
+    if (!eventReadyToClose) {
+      const error = new Error('The event recap status could not be saved. The open house is still active; try ending it again.');
+      error.status = 409;
+      throw error;
+    }
+  }
   const updatedEvents = await supabaseRest(`open_house_events?id=eq.${enc(event.id)}&host_agent_slug=eq.${enc(session.slug)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ status: 'ended', ended_at: now, last_activity_at: now })
   });
-  if (!rows(updatedEvents).length) {
+  const endedEvent = one(updatedEvents);
+  if (!endedEvent) {
     const error = new Error('The event could not be closed for this host agent.');
     error.status = 409;
     throw error;
@@ -162,30 +202,7 @@ async function closeEvent(input, session) {
       method: 'PATCH', body: JSON.stringify({ active_event_id: null, active_event_pass_inventory_id: null, active_smart_sign_id: null, status: 'assigned', updated_at: now })
     }).catch(() => null)
   ]);
-  let recapEmail = { status: 'not_required' };
-  let closedEvent = { ...event, status: 'ended', ended_at: now, last_activity_at: now };
-  if (sponsoredEventOnly) {
-    try {
-      recapEmail = await sendSponsoredEventRecap({ event: closedEvent, house, agent: agent || {}, checkins });
-    } catch (error) {
-      recapEmail = {
-        status: 'failed',
-        attempted_at: new Date().toISOString(),
-        warning: clean(error.message || error, 1000)
-      };
-      console.error('[agent-event-dashboard] sponsored event recap failed', recapEmail.warning);
-    }
-    const setupContext = {
-      ...safeObject(closedEvent.setup_context),
-      event_recap_email: recapEmail
-    };
-    const patchedEvents = await supabaseRest(`open_house_events?id=eq.${enc(event.id)}&host_agent_slug=eq.${enc(session.slug)}`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ setup_context: setupContext })
-    }).catch(() => []);
-    closedEvent = one(patchedEvents) || { ...closedEvent, setup_context: setupContext };
-  }
+  const closedEvent = { ...eventReadyToClose, ...endedEvent, status: 'ended', ended_at: now, last_activity_at: now };
   return {
     event: closedEvent,
     sign: { ...sign, active_event_id: null, status: 'inactive', deactivated_at: now },

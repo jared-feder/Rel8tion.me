@@ -550,6 +550,8 @@
       const stats = eventSummaryStats();
       const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
       const sponsored = isSponsoredEventPassEvent();
+      const member = state.membershipActive === true;
+      const unpaidNormalPass = !sponsored && !member;
       const passLabel = sponsored ? 'Sponsored Event Pass' : isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
       const kitUrl = openHouseKitHref(address);
@@ -562,10 +564,28 @@
       const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
       const loPhone = state.loanOfficer?.loan_officer_phone || '';
       const secondaryCta = loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody);
+      const historyCopy = sponsored
+        ? 'Required compliance and audit evidence remains preserved internally.'
+        : member
+          ? 'Your check-in and disclosure history remains available in your permanent dashboard.'
+          : 'This event is complete. Activate REL8TION Agent to keep permanent records from future events.';
+      const nextHeading = sponsored
+        ? 'Your sponsored event copy is delivered by email.'
+        : member
+          ? 'Add permanent branded hardware to your membership.'
+          : 'Keep future open-house records in your dashboard.';
+      const nextCopy = sponsored
+        ? `${recapStatus} This event-only version will not remain in your agent dashboard, disclosure library, analytics, or reports. Activate REL8TION Agent for $29/month to keep permanent records from future events.`
+        : member
+          ? 'Your membership keeps the dashboard, permanent check-in and disclosure records, analytics, reporting, and assisted follow-up active. The $199 Open House Kit is a separate one-time purchase with a reusable Smart Sign and custom company-branded Rel8tionChips—no second membership charge.'
+          : 'REL8TION Agent is $29/month and unlocks permanent check-in and disclosure history, analytics, reporting, your digital profile, and assisted follow-up. Member-only Open House Kit pricing appears after membership is active.';
+      const primaryActions = member && !sponsored
+        ? `<a href="${esc(kitUrl)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Add My Branded Open House Kit · $199 One Time</a><a href="${esc(summaryMail)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Another Summary</a>`
+        : '<a href="/pricing?role=agent" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Activate REL8TION Agent · $29/Month</a>';
       app.innerHTML = `<div class="py-10">
         <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
-        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. ${sponsored ? 'Required compliance and audit evidence remains preserved internally.' : 'Your check-in and disclosure history remains available in your permanent dashboard.'}</p>
+        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. ${esc(historyCopy)}</p>
 
         <div class="mt-6 grid gap-3 md:grid-cols-3">
           ${stat('Buyers checked in', stats.checkins, 'blue')}
@@ -575,13 +595,11 @@
 
         <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
-          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${sponsored ? 'Your sponsored event copy is delivered by email.' : 'Add permanent branded hardware to your membership.'}</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${sponsored ? `${recapStatus} This event-only version will not remain in your agent dashboard, disclosure library, analytics, or reports. Activate REL8TION Agent for $29/month to keep permanent records from future events.` : 'Your membership keeps the dashboard, permanent check-in and disclosure records, analytics, reporting, and assisted follow-up active. The $199 Open House Kit is a separate one-time purchase with a reusable Smart Sign and custom company-branded Rel8tionChips—no second membership charge.'}</p>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(nextHeading)}</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${esc(nextCopy)}</p>
           <div class="mt-4 grid gap-2 md:grid-cols-2">
-            ${sponsored
-              ? '<a href="/pricing?role=agent" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">See Permanent REL8TION Agent Access · $29/Month</a>'
-              : `<a href="${esc(kitUrl)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Add My Branded Open House Kit · $199 One Time</a><a href="${esc(summaryMail)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Another Summary</a>`}
-            <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
+            ${primaryActions}
+            <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : unpaidNormalPass ? 'Ask About Sponsored Coverage' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
             <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
           </div>
         </div>
