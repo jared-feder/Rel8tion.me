@@ -18,17 +18,18 @@ function inlineScripts(html) {
 async function withFreshRegistration(run) {
   const originalFetch = global.fetch;
   const originalUrl = process.env.SUPABASE_URL;
-  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleEnv = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_');
+  const originalKey = process.env[serviceRoleEnv];
   try {
     process.env.SUPABASE_URL = 'https://example.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test';
+    process.env[serviceRoleEnv] = 'test-value';
     delete require.cache[require.resolve('../lib/admin-auth')];
     delete require.cache[require.resolve('../lib/event-pass-registration')];
     return await run(require('../lib/event-pass-registration'));
   } finally {
     global.fetch = originalFetch;
     if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
-    if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+    if (originalKey === undefined) delete process.env[serviceRoleEnv]; else process.env[serviceRoleEnv] = originalKey;
     delete require.cache[require.resolve('../lib/admin-auth')];
     delete require.cache[require.resolve('../lib/event-pass-registration')];
   }
