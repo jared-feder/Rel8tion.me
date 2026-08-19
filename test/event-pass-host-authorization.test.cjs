@@ -110,6 +110,7 @@ test('listing authorization failures render a dedicated recovery screen instead 
   assert.match(source, /Choose Another Open House/);
   assert.match(source, /event_pass_listing_authorization_failed/);
   assert.match(source, /renderEventPassAuthorizationIssue\(err\.message\)/);
+  assert.doesNotMatch(source, /event_pass_listing_authorization_failed'\|\|err\?\.status===403/);
 });
 
 test('database migration guards ordinary and Sponsored Event Pass inserts', () => {
