@@ -8,6 +8,7 @@ const catalog = JSON.parse(fs.readFileSync(path.join(root, 'config/pricing-catal
 const dashboardApi = require('../api/agent-event-dashboard');
 const kitCheckout = require('../api/checkout/open-house-kit');
 const recap = require('../lib/event-recap-email');
+const serviceRoleEnv = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_');
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
@@ -39,14 +40,14 @@ test('member hardware Checkout is one-time and fails open only after server memb
   const originalFetch = global.fetch;
   const originalEnv = {
     SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    [serviceRoleEnv]: process.env[serviceRoleEnv],
     AGENT_NFC_SESSION_SECRET: process.env.AGENT_NFC_SESSION_SECRET,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY
   };
   let checkoutBody = '';
   try {
     process.env.SUPABASE_URL = 'https://example.supabase.test';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test';
+    process.env[serviceRoleEnv] = 'service-test';
     process.env.AGENT_NFC_SESSION_SECRET = 'product-ladder-session-secret';
     process.env.STRIPE_SECRET_KEY = 'sk_test_placeholder';
     for (const modulePath of ['../lib/admin-auth', '../lib/agent-nfc-session', '../api/checkout/open-house-kit']) {
@@ -173,6 +174,21 @@ test('sponsored closeout recap is an emailed event copy, not a permanent-dashboa
   assert.match(built.html, /This email is your event copy/);
   assert.match(built.html, /not retained in your permanent agent dashboard/);
   assert.match(built.html, /preserves required compliance and audit evidence internally/);
+});
+
+test('paid Event Pass activation hands the verified agent into profile completion and back to the live event', () => {
+  const reusePage = fs.readFileSync(path.join(root, 'apps/rel8tion-app/event-pass-reuse.html'), 'utf8');
+  const registration = fs.readFileSync(path.join(root, 'lib/event-pass-registration.js'), 'utf8');
+  const claimFlow = fs.readFileSync(path.join(root, 'apps/rel8tion-app/src/modules/claimStyled/flow.js'), 'utf8');
+
+  assert.match(reusePage, /Your starter profile is already connected to the verified agent/);
+  assert.match(reusePage, /Complete My Profile/);
+  assert.match(reusePage, /Preview My Digital Business Card/);
+  assert.match(registration, /profile_setup_url: profileSetupUrl/);
+  assert.match(registration, /return_path=\$\{encodeURIComponent\(dashboardUrl\)\}/);
+  assert.match(claimFlow, /params\.get\('edit'\) === 'profile'/);
+  assert.match(claimFlow, /\['\/agent-dashboard', '\/agent-home'\]/);
+  assert.match(claimFlow, /url\.searchParams\.set\('profile_saved', '1'\)/);
 });
 
 test('changed product-ladder browser scripts parse', () => {

@@ -60,6 +60,23 @@ function onboardingRoute(slug) {
   return `${url.pathname}${url.search}`;
 }
 
+function requestedProfileReturnRoute() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('edit') !== 'profile') return '';
+  const requested = params.get('return_path') || '';
+  if (!requested.startsWith('/') || requested.startsWith('//')) return '';
+
+  try {
+    const url = new URL(requested, window.location.origin);
+    if (url.origin !== window.location.origin) return '';
+    if (!['/agent-dashboard', '/agent-home'].includes(url.pathname)) return '';
+    url.searchParams.set('profile_saved', '1');
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch (_) {
+    return '';
+  }
+}
+
 function isBetaKeychain() {
   return state.uid === BETA_KEYCHAIN_UID;
 }
@@ -161,6 +178,9 @@ function routeAfterVerifiedAgent(slug, source = 'claim') {
     }
     return `${url.pathname}${url.search}`;
   }
+
+  const profileReturnRoute = requestedProfileReturnRoute();
+  if (profileReturnRoute) return profileReturnRoute;
 
   return onboardingRoute(slug);
 }
@@ -825,6 +845,15 @@ export async function init() {
       return;
     }
     if (state.keyRecord?.claimed === true && state.keyRecord?.agent_slug) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('edit') === 'profile' && state.prefilledAgent) {
+        showFullProfileFormWithHistory(
+          state.prefilledAgent.brokerage || '',
+          'Your REL8TION profile is already connected. Add or update your photo, brokerage, contact information, and bio below.',
+          'replace'
+        );
+        return;
+      }
       const nextRoute = routeAfterVerifiedAgent(state.keyRecord.agent_slug, 'claimed-chip-scan');
       if (nextRoute !== onboardingRoute(state.keyRecord.agent_slug)) {
         window.location.href = nextRoute;

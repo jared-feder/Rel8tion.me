@@ -77,6 +77,9 @@
       const membershipAction = membershipActive
         ? `<button id="memberContinueButton" class="btn" type="button">Continue With Full REL8TION</button><a class="btn secondary" href="${esc(memberHardwareUrl)}">Add My Branded Open House Kit · $199 One Time</a>`
         : `<button id="membershipCheckoutButton" class="btn" type="button">Enroll for ${esc(data.plan.label)}</button>`;
+      const paidReturnNotice = membershipActive && value('membership') === 'active'
+        ? '<div class="notice"><strong>Your $29 membership is active.</strong> Your starter profile is already connected to the verified agent on this Event Pass. Start the selected open house now; after it is live, tap <strong>Complete My Profile</strong> to add or update your photo, brokerage, contact information, and bio.</div>'
+        : '';
       app.innerHTML = `
         <section class="hero">
           <div class="eyebrow">Event Pass reuse</div>
@@ -100,6 +103,7 @@
               <li>Automated and REL8TION-assisted follow-up</li>
             </ul>
             <div class="notice"><strong>Hardware is separate:</strong> after membership, add the reusable REL8TION Open House Kit with a Smart Sign and custom company-branded Rel8tionChips for <strong>$199 one time</strong>. It does not add another membership charge.</div>
+            ${paidReturnNotice}
             ${membershipAction}
             <p id="membershipStatus" class="status">${membershipActive ? 'Your membership is active. Continue to register the selected open house.' : 'Secure monthly subscription. Current catalog price: ' + esc(data.plan.label) + '.'}</p>
           </article>
@@ -130,7 +134,11 @@
         const sponsorLine = result.limited_sponsored && state.context?.sponsor
           ? `<p class="copy">${esc(state.context.sponsor.name)} is now sponsoring this open house. Thank them and keep building the relationship.</p>`
           : '<p class="copy">Your full REL8TION Agent membership is active for this open house.</p>';
-        app.innerHTML = `<section class="hero success"><div class="eyebrow">Success</div><h1>Your Open House Is Live</h1>${sponsorLine}<a class="btn" href="${esc(result.dashboard_url || '/agent-dashboard')}">Open Live Dashboard</a></section>`;
+        const paidProfileActions = result.limited_sponsored ? '' : `
+          <div class="notice"><strong>Your starter profile is ready.</strong> It uses the verified agent already connected to this Event Pass, so you do not need to create another account. Complete it now or after the open house starts; your live event will stay connected.</div>
+          <a class="btn secondary" href="${esc(result.profile_setup_url || '')}">Complete My Profile</a>
+          <a class="btn secondary" href="${esc(result.profile_url || '')}">Preview My Digital Business Card</a>`;
+        app.innerHTML = `<section class="hero success"><div class="eyebrow">Success</div><h1>Your Open House Is Live</h1>${sponsorLine}<a class="btn" href="${esc(result.dashboard_url || '/agent-dashboard')}">Open Live Dashboard</a>${paidProfileActions}</section>`;
       } catch (error) {
         state.busy = false;
         renderOptions();
