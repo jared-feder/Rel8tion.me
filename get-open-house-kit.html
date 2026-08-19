@@ -769,6 +769,10 @@
 
       <div class="split" aria-label="Choose your Open House Kit path">
         <section class="choice">
+          <p><strong>Already paying for REL8TION Agent?</strong> Add the reusable Smart Sign and custom company-branded Rel8tionChips for $199 one time. Your existing $29/month membership stays unchanged.</p>
+          <button id="scan-member-keychain" class="btn" type="button">Member Hardware · $199 One Time</button>
+        </section>
+        <section class="choice">
           <p>Tap or scan your Event Pass so REL8TION can pull agent, company, sponsor, and kit context before checkout.</p>
           <button id="scan-keychain" class="btn" type="button">I Have an Event Pass Keychain</button>
         </section>
@@ -795,13 +799,14 @@
       ? window.location.origin
       : 'https://irel8.me';
 
-    function armOpenHouseKitScan() {
+    function armOpenHouseKitScan(plan = '') {
       if (window.location.origin !== NFC_ROUTER_ORIGIN) {
         const handoffUrl = new URL('/get-open-house-kit', NFC_ROUTER_ORIGIN);
         new URLSearchParams(window.location.search).forEach((value, key) => {
           if (key !== 'arm') handoffUrl.searchParams.set(key, value);
         });
         handoffUrl.searchParams.set('arm', 'event-pass');
+        if (plan) handoffUrl.searchParams.set('plan', plan);
         window.location.href = handoffUrl.toString();
         return;
       }
@@ -809,6 +814,7 @@
       const now = Date.now();
       const payload = {
         purpose: 'open_house_kit_confirm',
+        plan,
         startedAt: new Date(now).toISOString(),
         expiresAt: new Date(now + 10 * 60 * 1000).toISOString(),
         sourceHost: window.location.host,
@@ -905,7 +911,8 @@
       window.location.href = `/pricing?${qs.toString()}`;
     }
 
-    document.getElementById('scan-keychain').addEventListener('click', armOpenHouseKitScan);
+    document.getElementById('scan-keychain').addEventListener('click', () => armOpenHouseKitScan());
+    document.getElementById('scan-member-keychain').addEventListener('click', () => armOpenHouseKitScan('member_hardware'));
     document.getElementById('manual-intake').addEventListener('click', () => {
       startPaymentFirstCheckout();
     });
@@ -917,7 +924,7 @@
     });
     loadCurrentPricing();
     if (new URLSearchParams(window.location.search).get('arm') === 'event-pass') {
-      armOpenHouseKitScan();
+      armOpenHouseKitScan(new URLSearchParams(window.location.search).get('plan') || '');
     }
   </script>
 </body>

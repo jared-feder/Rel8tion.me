@@ -74,17 +74,24 @@ test('reuse page puts the loan-officer-sponsored option first and clearly descri
   assert.match(page, /lasting REL8TIONship/);
   assert.match(page, /This is a limited version of REL8TION/);
   assert.match(page, /receive event check-in visibility/);
+  assert.match(page, /Free, event-only version/);
+  assert.match(page, /emails the event recap/);
+  assert.match(page, /not remain in your permanent dashboard, disclosure library, analytics, or reports/);
   assert.match(page, /type="checkbox"/);
   assert.match(page, /officer\?\.photo_url/);
 });
 
-test('full membership uses the $29 catalog price and lists the unlocked product value', () => {
+test('full membership uses the $29 catalog price and separates permanent software from one-time hardware', () => {
   const monthly = catalog.products.rel8tion_agent_monthly;
   assert.equal(monthly.amount_cents, 2900);
-  assert.match(page, /Remove the sponsorship message and unlock everything/);
-  assert.match(page, /digital business card and networking tool/);
-  assert.match(page, /permanent agent dashboard/);
+  assert.match(page, /Keep every event record and unlock the full agent system/);
+  assert.match(page, /Your Event Pass remains event hardware/);
+  assert.match(page, /Permanent check-in records/);
+  assert.match(page, /Permanent signed disclosure records/);
+  assert.match(page, /Event analytics and reporting/);
   assert.match(page, /automated and REL8TION-assisted follow-up/i);
+  assert.match(page, /\$199 one time/);
+  assert.doesNotMatch(page, /transforms this same Rel8tionChip/i);
   assert.match(page, /data\.plan\.label/);
 });
 
@@ -96,6 +103,8 @@ test('sponsor authorization is re-resolved and recorded on the server before a p
   assert.match(registration, /The selected loan officer is not the server-assigned sponsor/);
   assert.match(registration, /recordSponsoredReuseConsent\(\{/);
   assert.match(registration, /upsertSponsoredReuseSession\(\{/);
+  assert.match(registration, /event_access_mode: eventAccessMode/);
+  assert.match(registration, /agent_dashboard_retention: sponsor \? 'event_only' : 'permanent'/);
   const consentIndex = registration.indexOf('const consent = await recordSponsoredReuseConsent');
   const sessionIndex = registration.indexOf('const session = await upsertSponsoredReuseSession');
   const signLiveIndex = registration.indexOf('const signRows = await supabaseRest', consentIndex);

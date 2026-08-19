@@ -1,7 +1,9 @@
 const { getOffer, getProduct, readPricingCatalog } = require('../../lib/pricing-catalog');
+const { supabaseRest } = require('../../lib/admin-auth');
+const { requireSession } = require('../../lib/agent-nfc-session');
 const publicPricingHandler = require('../public/pricing');
 
-const STRIPE_API_VERSION = '2026-02-25.clover';
+const STRIPE_API_VERSION = '2026-06-24.dahlia';
 const REL8TION_LOGO_URL = 'https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png';
 const FULFILLMENT_MESSAGE = 'Includes the REL8TION Smart Sign and custom company-branded Rel8tionChips. Branding may be supplied now or after purchase. REL8TION will confirm fulfillment and shipping details before production.';
 
@@ -32,9 +34,35 @@ function appendQuery(path, query) {
 }
 
 function selectedOfferCode(value) {
-  return ['annual', 'year', 'yearly', 'open_house_system_annual'].includes(clean(value, 80).toLowerCase())
+  const selected = clean(value, 80).toLowerCase();
+  if (['member_hardware', 'hardware', 'open_house_kit_member_hardware'].includes(selected)) return 'open_house_kit_member_hardware';
+  return ['annual', 'year', 'yearly', 'open_house_system_annual'].includes(selected)
     ? 'open_house_system_annual'
     : 'open_house_system_monthly';
+}
+
+function activeAgentMembership(row = {}) {
+  const codes = Array.isArray(row.entitlement_codes) ? row.entitlement_codes : [];
+  return row.status === 'active'
+    && row.role === 'real_estate_agent'
+    && codes.includes('agent_dashboard')
+    && codes.includes('digital_card');
+}
+
+async function requireMemberHardwareEligibility(req, body) {
+  const requestedAgent = clean(body.agent_slug, 160);
+  const session = await requireSession(req, requestedAgent);
+  const entitlements = await supabaseRest(
+    `pricing_entitlements?subject_slug=eq.${encodeURIComponent(session.slug)}&role=eq.real_estate_agent&status=eq.active&select=role,status,entitlement_codes&order=updated_at.desc&limit=10`
+  );
+  if (!(Array.isArray(entitlements) ? entitlements : []).some(activeAgentMembership)) {
+    const error = new Error('The one-time member hardware price requires an active REL8TION Agent membership.');
+    error.status = 403;
+    throw error;
+  }
+  body.agent_slug = session.slug;
+  body.uid = body.uid || session.uid;
+  return session;
 }
 
 async function readBody(req) {
@@ -100,8 +128,8 @@ function metadataForOffer(offer, body) {
   const values = {
     plan_code: offer.code,
     role: offer.role,
-    plan: offer.billing_interval === 'year' ? 'annual' : 'monthly',
-    product: 'complete_open_house_system',
+    plan: offer.billing_interval === 'one_time' ? 'member_hardware' : offer.billing_interval === 'year' ? 'annual' : 'monthly',
+    product: offer.billing_interval === 'one_time' ? 'open_house_kit_member_hardware' : 'complete_open_house_system',
     source: clean(body.source || 'open_house_kit', 120),
     flow: clean(body.flow, 80),
     uid: clean(body.uid, 120),
@@ -118,10 +146,10 @@ function metadataForOffer(offer, body) {
     branding_status: brandingStatus,
     branded_rel8tionchips: 'true',
     kit_included: 'true',
-    website_included: 'true',
-    website_builder_included: 'true',
-    digital_card_included: 'true',
-    content_tools_included: 'true',
+    website_included: String(offer.website_entitlement === true),
+    website_builder_included: String(offer.website_entitlement === true),
+    digital_card_included: String(offer.digital_card_entitlement === true),
+    content_tools_included: String(offer.content_tools_entitlement === true),
     trial_days: String(offer.trial_days || 0),
     annual_renewal_cents: offer.billing_interval === 'year' ? String(offer.renewal_cents) : '',
     entitlement_codes: offer.entitlement_codes.join(','),
@@ -155,6 +183,7 @@ module.exports = async function handler(req, res) {
     const body = await readBody(req);
     const catalog = readPricingCatalog();
     const offer = getOffer(catalog, selectedOfferCode(body.plan));
+    if (offer.code === 'open_house_kit_member_hardware') await requireMemberHardwareEligibility(req, body);
     const products = offer.line_items.map((code) => getProduct(catalog, code));
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) return sendJson(res, 501, { ok: false, error: 'Stripe Checkout is not configured.' });
@@ -162,7 +191,7 @@ module.exports = async function handler(req, res) {
 
     const origin = getOrigin(req);
     const returnPath = cleanReturnPath(body.return_path, '/kit-intake');
-    const interval = offer.billing_interval === 'year' ? 'annual' : 'monthly';
+    const interval = offer.billing_interval === 'one_time' ? 'member_hardware' : offer.billing_interval === 'year' ? 'annual' : 'monthly';
     const params = new URLSearchParams();
     params.set('mode', offer.checkout_mode);
     stripePrices.forEach((price, index) => {
@@ -182,8 +211,10 @@ module.exports = async function handler(req, res) {
 
     const metadata = metadataForOffer(offer, body);
     addMetadata(params, 'metadata', metadata);
-    addMetadata(params, 'subscription_data[metadata]', metadata);
-    if (offer.trial_days) params.set('subscription_data[trial_period_days]', String(offer.trial_days));
+    if (offer.checkout_mode === 'subscription') {
+      addMetadata(params, 'subscription_data[metadata]', metadata);
+      if (offer.trial_days) params.set('subscription_data[trial_period_days]', String(offer.trial_days));
+    }
     if (body.email) params.set('customer_email', clean(body.email, 160));
     const referenceParts = [clean(body.agent, 80), clean(body.event, 80)].filter(Boolean);
     if (referenceParts.length) params.set('client_reference_id', referenceParts.join(':'));
@@ -205,3 +236,7 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports.activeAgentMembership = activeAgentMembership;
+module.exports.requireMemberHardwareEligibility = requireMemberHardwareEligibility;
+module.exports.selectedOfferCode = selectedOfferCode;

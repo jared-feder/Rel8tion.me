@@ -134,6 +134,19 @@ test('completed Event Pass history never creates a one-time-use activation lock'
   assert.match(html, /already live for another open house\. End its current event before activating it again\./);
 });
 
+test('address or MLS search captures the term before replacing the search form with loading state', () => {
+  const start = html.indexOf('window.searchListings=async()=>');
+  const end = html.indexOf('; window.useManualListing=', start);
+  assert.notEqual(start, -1, 'search handler must exist');
+  assert.notEqual(end, -1, 'search handler must end before manual listing handler');
+  const handler = html.slice(start, end);
+  const inputRead = handler.indexOf("document.getElementById('listingSearchInput')");
+  const loadingRender = handler.indexOf("renderLoading('Searching open house feed...')");
+  assert.ok(inputRead >= 0, 'search handler must read the address or MLS input');
+  assert.ok(loadingRender >= 0, 'search handler must render its loading state');
+  assert.ok(inputRead < loadingRender, 'search input must be captured before renderLoading removes the form');
+});
+
 test('NFC router blocks only a currently active Event Pass, not an inactive pass with history', async () => {
   const start = routerHtml.indexOf('async function eventPassInventoryCurrentlyActive(');
   const end = routerHtml.indexOf('\n    async function findRemoteEventPassActivationSession', start);

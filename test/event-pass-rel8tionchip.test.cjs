@@ -13,7 +13,7 @@ const checkoutPlan = require('../api/checkout/plan');
 const stripeWebhook = require('../api/checkout/stripe-webhook');
 const eventPassRegistration = require('../lib/event-pass-registration');
 
-test('inactive Event Pass NFC opens the Rel8tionChip home while a live pass opens its event dashboard', () => {
+test('inactive Event Pass NFC opens the membership home while a live pass opens its event dashboard', () => {
   const start = router.indexOf('if (isEventPassKeychain(record))');
   const end = router.indexOf("if (await maybeOpenLoanOfficerDashboard(record))", start);
   assert.notEqual(start, -1);
@@ -32,6 +32,10 @@ test('Event Pass owner home is membership-gated and starts reuse from the same N
   assert.match(home, /source: 'event_pass_rel8tionchip'/);
   assert.match(home, /Start Open House/);
   assert.match(home, /source: 'event_pass'/);
+  assert.match(home, /Event Pass remains event hardware/);
+  assert.match(home, /\$199 Open House Kit/);
+  assert.doesNotMatch(home, /Your Event Pass is now a Rel8tionChip/);
+  assert.doesNotMatch(home, /No Open House Kit or separate Rel8tionChip purchase is required/);
   assert.match(home, /if \(keyRole !== 'event_pass_keychain'\) await ensureVerifiedPhoneSession\(\)/);
 });
 
