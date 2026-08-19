@@ -39,6 +39,13 @@ module.exports = async function handler(req, res) {
     const result = await activateNormalEventPass(body, req);
     sendJson(res, 200, { ok: true, action: 'activate_event_pass', ...result });
   } catch (error) {
+    console.warn('[event-pass-action] activation rejected', {
+      status: error.status || 500,
+      code: error.code || null,
+      public_code: String(body.public_code || body.code || '').slice(0, 80),
+      agent_slug: String(body.agent_slug || '').slice(0, 160),
+      open_house_id: String(body.open_house_id || body.open_house?.id || '').slice(0, 160)
+    });
     sendJson(res, error.status || 500, {
       ok: false,
       error: error.message || 'Event Pass activation failed.',
