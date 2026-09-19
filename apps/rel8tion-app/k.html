@@ -1400,12 +1400,12 @@
           if (eventPassSign?.public_code) {
             window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
             saveHostSession({ agentSlug: record.agent_slug, uid, source: 'event-pass-rel8tionchip-home' });
-            setStatus('Rel8tionChip Ready', 'Opening your digital business card and Open House controls.');
+            setStatus('Event Pass Ready', 'Opening your REL8TION Agent dashboard, digital profile, and Open House controls.');
             await goToAgentHome({ agentSlug: record.agent_slug, eventPassCode: eventPassSign.public_code });
             return;
           }
 
-          setStatus('Rel8tionChip Ready', 'Opening your digital business card. Pair the Event Pass QR before starting another open house.');
+          setStatus('Event Pass Ready', 'Opening your REL8TION Agent dashboard and digital profile. Pair the Event Pass QR before starting another open house.');
           await goToAgentHome({ agentSlug: record.agent_slug });
           return;
         }

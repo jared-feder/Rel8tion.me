@@ -1,10 +1,12 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
 const { requireSession } = require('../lib/agent-nfc-session');
+const { sendSponsoredEventRecap } = require('../lib/event-recap-email');
 
 function clean(value, max = 300) { return String(value || '').trim().slice(0, max); }
 function enc(value) { return encodeURIComponent(clean(value)); }
 function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 function rows(value) { return Array.isArray(value) ? value : []; }
+function safeObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
 function parseBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'object') return req.body;
@@ -41,16 +43,49 @@ function assertHost(event, session) {
   }
 }
 
+function isActiveAgentMembership(row = {}) {
+  const codes = Array.isArray(row.entitlement_codes) ? row.entitlement_codes : [];
+  return row.status === 'active'
+    && row.role === 'real_estate_agent'
+    && codes.includes('agent_dashboard')
+    && codes.includes('digital_card');
+}
+
+function isSponsoredEventOnly(event = {}) {
+  const context = safeObject(event.setup_context);
+  return context.event_access_mode === 'sponsored_event_only'
+    || (context.limited_rel8tion_version === true && context.flow === 'event-pass-sponsored-reuse');
+}
+
+async function hasActiveAgentMembership(agentSlug) {
+  const entitlements = rows(await supabaseRest(
+    `pricing_entitlements?subject_slug=eq.${enc(agentSlug)}&role=eq.real_estate_agent&status=eq.active&select=role,status,entitlement_codes&order=updated_at.desc&limit=10`
+  ));
+  return entitlements.some(isActiveAgentMembership);
+}
+
+function visibleAgentEvents(events = [], membershipActive = false) {
+  return membershipActive ? events : events.filter((event) => !isSponsoredEventOnly(event));
+}
+
 async function snapshot(input, session) {
   const sign = await loadSign(input);
   const event = await loadEvent(input, sign);
   assertHost(event, session);
+  if (isSponsoredEventOnly(event) && (event.ended_at || event.status === 'ended')) {
+    const membershipActive = await hasActiveAgentMembership(session.slug);
+    if (!membershipActive) {
+      const error = new Error('This sponsored Event Pass ended. Its event recap was emailed to the agent; permanent dashboard history requires REL8TION Agent membership.');
+      error.status = 402;
+      throw error;
+    }
+  }
   if (sign?.id && event.smart_sign_id && sign.id !== event.smart_sign_id) {
     const error = new Error('The requested sign is not attached to this open-house event.');
     error.status = 403;
     throw error;
   }
-  const [house, checkins, outreach, loanOfficer] = await Promise.all([
+  const [house, checkins, outreach, loanOfficer, membershipActive] = await Promise.all([
     event.open_house_source_id
       ? supabaseRest(`open_houses?id=eq.${enc(event.open_house_source_id)}&select=*&limit=1`).then(one)
       : null,
@@ -58,20 +93,32 @@ async function snapshot(input, session) {
     event.open_house_source_id
       ? supabaseRest(`agent_outreach_queue?open_house_id=eq.${enc(event.open_house_source_id)}&select=*&order=created_at.desc&limit=10`).then(rows).catch(() => [])
       : [],
-    supabaseRest(`event_loan_officer_sessions?open_house_event_id=eq.${enc(event.id)}&status=eq.live&select=*&order=signed_in_at.desc&limit=1`).then(one).catch(() => null)
+    supabaseRest(`event_loan_officer_sessions?open_house_event_id=eq.${enc(event.id)}&status=eq.live&select=*&order=signed_in_at.desc&limit=1`).then(one).catch(() => null),
+    hasActiveAgentMembership(session.slug)
   ]);
-  return { sign, event, house, checkins, outreach, loan_officer: loanOfficer };
+  return { sign, event, house, checkins, outreach, loan_officer: loanOfficer, membership_active: membershipActive };
 }
 
 async function agentHomeSnapshot(session) {
-  const events = rows(await supabaseRest(
+  const [allEvents, membershipActive] = await Promise.all([
+    supabaseRest(
     `open_house_events?host_agent_slug=eq.${enc(session.slug)}&select=*&order=created_at.desc&limit=80`
-  ));
+    ).then(rows),
+    hasActiveAgentMembership(session.slug)
+  ]);
+  const events = visibleAgentEvents(allEvents, membershipActive);
   const eventIds = events.map((event) => event.id).filter(Boolean);
   const checkins = eventIds.length
     ? rows(await supabaseRest(`event_checkins?open_house_event_id=in.(${eventIds.map(enc).join(',')})&select=*&order=created_at.desc&limit=300`))
     : [];
-  return { events, checkins };
+  return {
+    events,
+    checkins,
+    history_access: {
+      membership_active: membershipActive,
+      hidden_event_only_count: allEvents.length - events.length
+    }
+  };
 }
 
 async function closeEvent(input, session) {
@@ -83,13 +130,63 @@ async function closeEvent(input, session) {
     error.status = 409;
     throw error;
   }
+  const sponsoredEventOnly = isSponsoredEventOnly(event);
+  const existingRecap = safeObject(safeObject(event.setup_context).event_recap_email);
+  const [house, checkins, agent] = sponsoredEventOnly
+    ? await Promise.all([
+      event.open_house_source_id
+        ? supabaseRest(`open_houses?id=eq.${enc(event.open_house_source_id)}&select=*&limit=1`).then(one).catch(() => null)
+        : null,
+      supabaseRest(`event_checkins?open_house_event_id=eq.${enc(event.id)}&select=*&order=created_at.asc&limit=500`).then(rows),
+      supabaseRest(`agents?slug=eq.${enc(session.slug)}&select=slug,name,email&limit=1`).then(one).catch(() => null)
+    ])
+    : [null, [], null];
   const now = new Date().toISOString();
+  let recapEmail = { status: 'not_required' };
+  let eventReadyToClose = event;
+  if (sponsoredEventOnly) {
+    recapEmail = existingRecap.status === 'sent'
+      ? existingRecap
+      : await sendSponsoredEventRecap({
+        event: { ...event, status: 'ended', ended_at: now, last_activity_at: now },
+        house,
+        agent: agent || {},
+        checkins
+      }).catch((error) => {
+        console.error('[agent-event-dashboard] sponsored event recap failed before close', clean(error.message || error, 1000));
+        const deliveryError = new Error('The event recap could not be delivered. The open house is still active; try ending it again.');
+        deliveryError.status = 503;
+        throw deliveryError;
+      });
+    if (recapEmail.status !== 'sent') {
+      console.error('[agent-event-dashboard] sponsored event recap was not deliverable before close', clean(recapEmail.warning || recapEmail.status, 1000));
+      const deliveryError = new Error('The event recap could not be delivered. The open house is still active; confirm the agent email and try ending it again.');
+      deliveryError.status = 503;
+      throw deliveryError;
+    }
+    const setupContext = {
+      ...safeObject(event.setup_context),
+      event_recap_email: recapEmail
+    };
+    const recapPatchedEvents = await supabaseRest(`open_house_events?id=eq.${enc(event.id)}&host_agent_slug=eq.${enc(session.slug)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ setup_context: setupContext })
+    });
+    eventReadyToClose = one(recapPatchedEvents);
+    if (!eventReadyToClose) {
+      const error = new Error('The event recap status could not be saved. The open house is still active; try ending it again.');
+      error.status = 409;
+      throw error;
+    }
+  }
   const updatedEvents = await supabaseRest(`open_house_events?id=eq.${enc(event.id)}&host_agent_slug=eq.${enc(session.slug)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ status: 'ended', ended_at: now, last_activity_at: now })
   });
-  if (!rows(updatedEvents).length) {
+  const endedEvent = one(updatedEvents);
+  if (!endedEvent) {
     const error = new Error('The event could not be closed for this host agent.');
     error.status = 409;
     throw error;
@@ -105,9 +202,11 @@ async function closeEvent(input, session) {
       method: 'PATCH', body: JSON.stringify({ active_event_id: null, active_event_pass_inventory_id: null, active_smart_sign_id: null, status: 'assigned', updated_at: now })
     }).catch(() => null)
   ]);
+  const closedEvent = { ...eventReadyToClose, ...endedEvent, status: 'ended', ended_at: now, last_activity_at: now };
   return {
-    event: { ...event, status: 'ended', ended_at: now, last_activity_at: now },
-    sign: { ...sign, active_event_id: null, status: 'inactive', deactivated_at: now }
+    event: closedEvent,
+    sign: { ...sign, active_event_id: null, status: 'inactive', deactivated_at: now },
+    recap_email: recapEmail
   };
 }
 
@@ -138,3 +237,7 @@ module.exports = async function handler(req, res) {
     return sendJson(res, error.status || 500, { ok: false, error: error.message || 'Private event dashboard request failed.' });
   }
 };
+
+module.exports.isActiveAgentMembership = isActiveAgentMembership;
+module.exports.isSponsoredEventOnly = isSponsoredEventOnly;
+module.exports.visibleAgentEvents = visibleAgentEvents;

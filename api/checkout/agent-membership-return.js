@@ -19,6 +19,16 @@ function redirect(res, location) {
   return res.end();
 }
 
+function localReturnPath(value, fallback) {
+  const candidate = clean(value, 700);
+  return candidate.startsWith('/') && !candidate.startsWith('//') ? candidate : fallback;
+}
+
+function withNotice(path, key, value) {
+  const joiner = path.includes('?') ? '&' : '?';
+  return `${path}${joiner}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
 async function loadCheckoutSession(sessionId, secretKey) {
   const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
     headers: {
@@ -53,6 +63,7 @@ module.exports = async function handler(req, res) {
   }
 
   let subject = null;
+  let returnPath = '';
   try {
     const sessionId = clean(req.query?.session_id, 200);
     const secretKey = clean(process.env.STRIPE_SECRET_KEY, 1000);
@@ -60,6 +71,7 @@ module.exports = async function handler(req, res) {
 
     const session = await loadCheckoutSession(sessionId, secretKey);
     const metadata = session.metadata || {};
+    returnPath = localReturnPath(metadata.return_path, '');
     if (session.object !== 'checkout.session'
       || session.mode !== 'subscription'
       || !['paid', 'no_payment_required'].includes(clean(session.payment_status, 80))
@@ -79,16 +91,20 @@ module.exports = async function handler(req, res) {
     if (!entitlement) throw Object.assign(new Error('Stripe did not return the required membership entitlement.'), { status: 409 });
     await stripeWebhook.upsertPricingEntitlement(entitlement);
 
-    return redirect(res, `/agent-home?agent=${encodeURIComponent(subject.agentSlug)}&uid=${encodeURIComponent(subject.uid)}&membership=active`);
+    const destination = returnPath || `/agent-home?agent=${encodeURIComponent(subject.agentSlug)}&uid=${encodeURIComponent(subject.uid)}`;
+    return redirect(res, withNotice(destination, 'membership', 'active'));
   } catch (error) {
     const agentSlug = subject?.agentSlug || clean(req.query?.agent, 160);
     const uid = subject?.uid || clean(req.query?.uid, 200);
     if (agentSlug && uid) {
-      return redirect(res, `/agent-home?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}&membership_error=${encodeURIComponent(error.message || 'Checkout verification failed.')}`);
+      const destination = returnPath || `/agent-home?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`;
+      return redirect(res, withNotice(destination, 'membership_error', error.message || 'Checkout verification failed.'));
     }
     return sendJson(res, error.status || 500, { ok: false, error: error.message || 'Membership checkout could not be verified.' });
   }
 };
 
 module.exports.loadCheckoutSession = loadCheckoutSession;
+module.exports.localReturnPath = localReturnPath;
 module.exports.verifyClaimSubject = verifyClaimSubject;
+module.exports.withNotice = withNotice;

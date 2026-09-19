@@ -111,6 +111,7 @@ module.exports = async function handler(req, res) {
         ? `/agent-home?agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
         : '/pricing'
     );
+    metadata.return_path = returnPath;
     const successUrl = eventPassMembership
       ? `${origin}/api/checkout/agent-membership-return?session_id={CHECKOUT_SESSION_ID}&agent=${encodeURIComponent(agentSlug)}&uid=${encodeURIComponent(uid)}`
       : `${origin}/pricing?success=1&plan=${encodeURIComponent(planCode)}&session_id={CHECKOUT_SESSION_ID}`;

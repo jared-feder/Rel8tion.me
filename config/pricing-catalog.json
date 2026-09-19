@@ -1,6 +1,6 @@
 {
-  "version": "2026-08-02-private-sales",
-  "updated_at": "2026-08-02T14:30:00-04:00",
+  "version": "2026-08-19-event-pass-product-ladder",
+  "updated_at": "2026-08-19T12:00:00-04:00",
   "currency": "usd",
   "products": {
     "rel8tion_agent_monthly": {
@@ -19,6 +19,7 @@
         "Permanent REL8TION agent dashboard",
         "Check-ins from current and future REL8TION events",
         "Signed disclosure records",
+        "Permanent event analytics and reporting",
         "Buyer relationship history",
         "REL8TION-assisted follow-up",
         "Follow-up reminders and suggested next actions",
@@ -36,7 +37,7 @@
       "content_tools_entitlement": true,
       "outreach_entitlement": false,
       "company_branded_rel8tionchips_entitlement": false,
-      "entitlement_codes": ["agent_dashboard", "event_history", "disclosures", "buyer_relationship_history", "assisted_follow_up", "follow_up_guidance", "digital_you", "digital_card", "public_profile", "content_tools"],
+      "entitlement_codes": ["agent_dashboard", "event_history", "disclosures", "event_analytics", "event_reporting", "buyer_relationship_history", "assisted_follow_up", "follow_up_guidance", "digital_you", "digital_card", "public_profile", "content_tools"],
       "stripe_lookup_key": "rel8tion_agent_monthly",
       "active": true,
       "public": true
@@ -57,6 +58,7 @@
         "Permanent REL8TION agent dashboard",
         "Check-ins from current and future REL8TION events",
         "Signed disclosure records",
+        "Permanent event analytics and reporting",
         "Buyer relationship history",
         "REL8TION-assisted follow-up",
         "Follow-up reminders and suggested next actions",
@@ -74,7 +76,7 @@
       "content_tools_entitlement": true,
       "outreach_entitlement": false,
       "company_branded_rel8tionchips_entitlement": false,
-      "entitlement_codes": ["agent_dashboard", "event_history", "disclosures", "buyer_relationship_history", "assisted_follow_up", "follow_up_guidance", "digital_you", "digital_card", "public_profile", "content_tools"],
+      "entitlement_codes": ["agent_dashboard", "event_history", "disclosures", "event_analytics", "event_reporting", "buyer_relationship_history", "assisted_follow_up", "follow_up_guidance", "digital_you", "digital_card", "public_profile", "content_tools"],
       "stripe_lookup_key": "rel8tion_agent_annual",
       "active": true,
       "public": true
@@ -256,6 +258,30 @@
     }
   },
   "offers": {
+    "open_house_kit_member_hardware": {
+      "display_name": "REL8TION Open House Kit - Member Hardware",
+      "short_description": "One-time physical Open House Kit for an agent who already has an active REL8TION Agent membership.",
+      "role": "real_estate_agent",
+      "checkout_mode": "payment",
+      "line_items": ["open_house_kit"],
+      "billing_interval": "one_time",
+      "trial_days": 0,
+      "due_today_cents": 19900,
+      "renewal_cents": 0,
+      "annual_savings_cents": 0,
+      "eligibility": "server_verified_active_agent_membership",
+      "included_features": ["REL8TION Smart Sign", "Custom company-branded Rel8tionChips", "QR and NFC buyer access", "Agent private NFC dashboard access", "Initial setup and onboarding"],
+      "physical_fulfillment_required": true,
+      "shipping_required": true,
+      "website_entitlement": false,
+      "digital_card_entitlement": false,
+      "content_tools_entitlement": false,
+      "outreach_entitlement": false,
+      "company_branded_rel8tionchips_entitlement": true,
+      "entitlement_codes": ["open_house_kit", "smart_sign", "company_branded_rel8tionchips"],
+      "active": true,
+      "public": false
+    },
     "open_house_system_monthly": {
       "display_name": "Complete REL8TION Open House System",
       "short_description": "Physical Open House Kit plus REL8TION Agent, with the recurring service beginning after 31 days.",
@@ -353,7 +379,8 @@
       "role": "real_estate_agent",
       "price_label": "Provided by a loan officer for a specific open house",
       "stripe_checkout": false,
-      "included_features": ["That event's check-ins", "Signed disclosures", "Event dashboard"],
+      "included_features": ["That event's live check-ins", "That event's signed disclosures", "Temporary event dashboard", "Event recap emailed to the agent"],
+      "limitations": ["No permanent agent-dashboard history", "No permanent disclosure library", "No ongoing analytics or reporting", "Required compliance and audit evidence remains preserved internally"],
       "eligibility": "provided_and_activated_with_consented_loan_officer",
       "active": true,
       "public": true

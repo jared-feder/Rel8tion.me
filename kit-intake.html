@@ -180,6 +180,8 @@
       box-shadow: 0 0 0 4px rgba(66,200,244,0.18);
     }
 
+    [hidden] { display: none !important; }
+
     .product-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -414,17 +416,23 @@
         <section class="section">
           <h2>Product</h2>
           <div class="product-grid">
-            <label class="product">
+            <label id="monthly-product" class="product">
               <input type="radio" name="plan" value="monthly" checked>
               <strong>Complete Open House System — Monthly</strong>
               <span id="monthly-plan-price" class="plan-price">Loading current price...</span>
               <span id="monthly-plan-detail">Pay for the physical kit today. REL8TION Agent begins recurring billing after the included 31-day period.</span>
             </label>
-            <label class="product">
+            <label id="annual-product" class="product">
               <input type="radio" name="plan" value="annual">
               <strong>Complete Open House System — Annual</strong>
               <span id="annual-plan-price" class="plan-price">Loading current price...</span>
               <span id="annual-plan-detail">Pay today for the physical kit and first year of REL8TION Agent. Annual renewal is clearly disclosed.</span>
+            </label>
+            <label id="member-hardware-product" class="product" hidden>
+              <input type="radio" name="plan" value="member_hardware">
+              <strong>Member Open House Kit · Hardware Only</strong>
+              <span id="member-hardware-price" class="plan-price">Loading current price...</span>
+              <span>Your existing $29/month REL8TION Agent membership stays unchanged. This is one payment for the reusable Smart Sign and custom company-branded Rel8tionChips.</span>
             </label>
           </div>
         </section>
@@ -483,6 +491,7 @@
 
     const prefill = getStoredPrefill();
     const requestedPlan = String(params.get('plan') || params.get('product') || '').toLowerCase();
+    const memberHardwareOnly = ['member_hardware', 'hardware', 'open_house_kit_member_hardware'].includes(requestedPlan);
     const incomingSource = String(params.get('source') || '').toLowerCase();
     const hasFieldSetupContext = Boolean(params.get('uid') || params.get('prefill') || params.get('update') || prefill.uid || prefill.agent_id);
     if (incomingSource === 'wordpress' && !params.get('success') && !params.get('canceled') && !hasFieldSetupContext) {
@@ -514,6 +523,7 @@
         const currency = pricing.currency || 'usd';
         const monthly = pricing.offers?.open_house_system_monthly;
         const annual = pricing.offers?.open_house_system_annual;
+        const memberHardware = pricing.products?.open_house_kit;
         const monthlyToday = money(monthly?.due_today_cents, currency);
         const annualToday = money(annual?.due_today_cents, currency);
         const monthlyService = money(monthly?.renewal_cents, currency);
@@ -521,6 +531,7 @@
         const trialDays = Number(monthly?.trial_days || 0);
         document.getElementById('monthly-plan-price').textContent = `${monthlyToday} today · ${trialDays} included days · then ${monthlyService}/month`;
         document.getElementById('annual-plan-price').textContent = `${annualToday} today · renews ${annualService}/year`;
+        document.getElementById('member-hardware-price').textContent = `${money(memberHardware?.due_today_cents, currency)} one time · no additional membership`;
       } catch (_) {
         document.getElementById('monthly-plan-price').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
         document.getElementById('annual-plan-price').textContent = 'Pricing is temporarily unavailable. Please try again shortly.';
@@ -659,7 +670,7 @@
       data.uid = params.get('uid') || prefill.uid || '';
       data.flow = data.uid || params.get('prefill') || params.get('update') ? 'keychain_prefill' : 'manual_intake';
       data.agent_id = confirmedMatch?.id || prefill.agent_id || '';
-      data.agent_slug = confirmedMatch?.slug || prefill.agent_slug || '';
+      data.agent_slug = confirmedMatch?.slug || prefill.agent_slug || params.get('agent') || '';
       data.sponsor_profile_id = prefill.sponsor_profile_id || '';
       return data;
     }
@@ -701,9 +712,11 @@
       if (checkoutStarted) return;
       checkoutStarted = true;
       setNotice('Starting secure checkout with Stripe.', 'success');
-      const selectedProduct = data.plan === 'annual'
-        ? 'open_house_kit_annual_service'
-        : 'open_house_kit_monthly_service';
+      const selectedProduct = data.plan === 'member_hardware'
+        ? 'open_house_kit_member_hardware'
+        : data.plan === 'annual'
+          ? 'open_house_kit_annual_service'
+          : 'open_house_kit_monthly_service';
       const payload = {
         plan: data.plan,
         source: params.get('source') || 'getrel8tion_open_house_kit',
@@ -751,7 +764,14 @@
     }
 
     function applyPrefill() {
-      if (['annual', 'yearly', 'year'].includes(requestedPlan)) {
+      if (memberHardwareOnly) {
+        selectPlan('member_hardware');
+        document.getElementById('monthly-product').hidden = true;
+        document.getElementById('annual-product').hidden = true;
+        document.getElementById('member-hardware-product').hidden = false;
+        document.getElementById('intake-intro').textContent = 'Confirm company branding and shipping for your one-time member hardware purchase. Your existing REL8TION Agent membership will not be added or changed.';
+        document.getElementById('notice').textContent = 'Member hardware only: $199 one time for the reusable REL8TION Smart Sign and custom company-branded Rel8tionChips. Permanent dashboard history, analytics, reporting, and follow-up continue under your existing $29/month membership.';
+      } else if (['annual', 'yearly', 'year'].includes(requestedPlan)) {
         selectPlan('annual');
       } else if (requestedPlan === 'monthly') {
         selectPlan('monthly');

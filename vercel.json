@@ -103,6 +103,8 @@
     { "source": "/onboarding.html", "destination": "/apps/rel8tion-app/onboarding.html" },
     { "source": "/sign-demo-activate", "destination": "/apps/rel8tion-app/sign-demo-activate.html" },
     { "source": "/sign-demo-activate.html", "destination": "/apps/rel8tion-app/sign-demo-activate.html" },
+    { "source": "/event-pass-reuse", "destination": "/apps/rel8tion-app/event-pass-reuse.html" },
+    { "source": "/event-pass-reuse.html", "destination": "/apps/rel8tion-app/event-pass-reuse.html" },
     { "source": "/k", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k.html", "destination": "/apps/rel8tion-app/k.html" },
     { "source": "/k-test.html", "destination": "/apps/rel8tion-app/k.html" },

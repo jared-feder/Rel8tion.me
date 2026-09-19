@@ -278,6 +278,8 @@
     const profileEl = document.getElementById('profile');
     const STORAGE_KEY = 'rel8tion_open_house_kit_prefill';
     const PENDING_KEY = 'rel8tion_open_house_kit_pending';
+    let pending = {};
+    try { pending = JSON.parse(window.localStorage.getItem(PENDING_KEY) || '{}'); } catch (_) {}
     let resolved = { uid };
 
     function esc(value) {
@@ -396,6 +398,17 @@
         resolved.agent_slug = firstPresent(resolved.agent_slug, keyRow.agent_slug);
         resolved.kit_status = firstPresent(resolved.kit_status, keyRow.device_role, resolved.key_status);
         mergeAgent(await loadAgent(keyRow.agent_slug));
+        if (keyRow.claimed && keyRow.agent_slug) {
+          await fetch('/api/agent-nfc-session', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid, agent_slug: keyRow.agent_slug })
+          }).then((response) => {
+            if (!response.ok) throw new Error('The member NFC session could not be verified.');
+            return response;
+          });
+        }
       }
 
       const verifiedProfile = await firstRow(`verified_profiles?uid=eq.${encodeURIComponent(uid)}&select=*&limit=1`);
@@ -463,6 +476,7 @@
       const next = new URLSearchParams();
       next.set(mode === 'confirm' ? 'prefill' : 'update', '1');
       if (uid) next.set('uid', uid);
+      if (pending.plan) next.set('plan', pending.plan);
       window.location.href = `/kit-intake?${next.toString()}`;
     }
 
