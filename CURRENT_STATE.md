@@ -6,6 +6,9 @@ Last cleaned: 2026-06-04.
 
 ## 2026-09-21: COMMAND release-window date-reversion repair
 
+- [IMPLEMENTED] PR #50 pre-deployment review repair: failed control refreshes retain the entire last successful snapshot (pause, sender, guardrails, stats, protections, and release window), preserve the draft/revision, and show an escaped refresh warning with STATUS UNVERIFIED rather than a default sending-allowed claim. A successful control read or setting save clears the refresh warning.
+- [VERIFIED] Reproduced the failed-refresh snapshot-loss regression before the review patch. All 24 editor/control API tests pass afterward, including six new refresh/render/recovery cases; tests use mocks, not production settings.
+
 - [IMPLEMENTED] Fixed saveOutreachReleaseWindow reading date/reason inputs after refreshAreaContent rebuilt them from old settings. The handler now captures every value and expected_updated_at before confirmation or rendering.
 - [IMPLEMENTED] Raw in-memory drafts survive background refresh, cancellation, validation errors, and API errors. The editor shows the error, prevents duplicate in-flight saves, and provides an explicit confirmed Reload saved dates action. A stale control GET cannot roll a successfully saved release window back to an older revision.
 - [VERIFIED] The new mocked form suite reproduces the original date-reversion failure before the patch and passes after it; the existing outreach-control API suite, route map, and agent-loan-officer assignment checks also pass in the isolated repair runner. These checks do not contact an SMS provider or write runtime settings.

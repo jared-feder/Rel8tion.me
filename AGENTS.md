@@ -258,3 +258,5 @@ Every completed REL8TION work log must include an explicit `AGENTS.md` dispositi
 - [IMPLEMENTED] Capture release-window dates, checkbox, reason, and the saved revision before confirmation prompts, asynchronous work, or any form render. Keep unsaved raw input and its original revision separate from refreshed server state.
 - [IMPLEMENTED] Rejected or cancelled saves must retain the draft. Clear it only after a successful save or an explicitly confirmed successful reload. Older background reads must not overwrite a newer saved release-window revision.
 - [IMPLEMENTED] Keep the mocked regression suite in test/outreach-release-window-form.test.cjs passing. Testing a date-saving fix must not enable a production override, unpause outreach, alter recipient protections, or send real messages.
+
+- [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.

@@ -217,3 +217,93 @@ test('all inline COMMAND scripts remain syntactically valid', () => {
   }
   assert.ok(count > 0);
 });
+
+
+function renderControlForRefreshTest(h) {
+  Object.assign(h.context, {
+    esc: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
+    badge: label => String(label),
+    fmtDate: value => String(value || ''),
+    localDateTimeValue: local,
+    renderOutreachModeControls: () => ''
+  });
+  vm.runInContext(functionSource('renderOutreachControl'), h.context);
+  return h.context.renderOutreachControl();
+}
+
+test('failed control refresh preserves the whole verified snapshot and draft', () => {
+  const h = harness();
+  Object.assign(h.state.outreachControl, {
+    paused: true,
+    sender: { health_blocked: true, provider: 'android_gateway', operator_mode: 'away' },
+    guardrails: { value: { max_per_run: 3, max_per_day: 25, max_opt_out_rate: 0.05 } },
+    stats: { queue_pending: 123 },
+    locked_protections: ['STOP suppression']
+  });
+  const previous = h.state.outreachControl;
+  h.edit();
+  const draft = h.state.outreachReleaseDraft;
+  h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Control GET failed' });
+  assert.equal(h.state.outreachControl, previous);
+  assert.equal(h.state.outreachReleaseDraft, draft);
+  assert.equal(h.state.outreachControl.paused, true);
+  assert.equal(h.state.outreachControl.stats.queue_pending, 123);
+  assert.equal(h.state.outreachControl.guardrails.value.max_per_day, 25);
+  assert.equal(h.state.outreachControlReadError, 'Control GET failed');
+  h.context.refreshAreaContent();
+  assert.deepEqual(h.values(), newValues);
+});
+
+test('failed control refresh renders an escaped warning instead of claiming sending is allowed', () => {
+  const h = harness();
+  h.state.outreachControl.paused = false;
+  h.edit();
+  h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: '<offline>' });
+  const rendered = renderControlForRefreshTest(h);
+  assert.match(rendered, /STATUS UNVERIFIED/);
+  assert.match(rendered, /&lt;offline&gt;/);
+  assert.match(rendered, /last-known/i);
+  assert.doesNotMatch(rendered, /SENDING ALLOWED|Automatic outreach is allowed/);
+  assert.match(rendered, /New owner-approved dates/);
+});
+
+test('failed control refresh clears only after a successful control read', () => {
+  const h = harness(); h.edit();
+  h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Offline' });
+  const draft = h.state.outreachReleaseDraft;
+  const next = stored(oldValues, newVersion);
+  next.paused = true;
+  h.state.outreachControl = h.context.acceptOutreachControlRead(next);
+  assert.equal(h.state.outreachControl, next);
+  assert.equal(h.state.outreachControlReadError, '');
+  assert.equal(h.state.outreachReleaseDraft, draft);
+  assert.equal(draft.expected_updated_at, oldVersion);
+});
+
+test('failed control refresh without a prior good snapshot stays unavailable', () => {
+  const h = harness();
+  h.state.outreachControl = null;
+  h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Initial load failed' });
+  assert.equal(h.state.outreachControl.ok, false);
+  assert.match(renderControlForRefreshTest(h), /Outreach Control unavailable/);
+  h.edit();
+  const rendered = renderControlForRefreshTest(h);
+  assert.match(rendered, /STATUS UNVERIFIED/);
+  assert.doesNotMatch(rendered, /SENDING ALLOWED|Automatic outreach is allowed/);
+});
+
+test('failed control refresh does not replace a missing response with empty controls', () => {
+  const h = harness();
+  const previous = h.state.outreachControl;
+  h.state.outreachControl = h.context.acceptOutreachControlRead(null);
+  assert.equal(h.state.outreachControl, previous);
+  assert.match(h.state.outreachControlReadError, /refresh/);
+});
+
+test('successful release-window save clears a previous refresh warning', async () => {
+  const h = harness(); h.edit();
+  h.state.outreachControlReadError = 'Offline earlier';
+  await h.context.saveOutreachReleaseWindow();
+  assert.equal(h.state.outreachControlReadError, '');
+  assert.equal(h.state.outreachReleaseDraft, null);
+});

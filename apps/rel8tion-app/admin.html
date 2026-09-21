@@ -3714,6 +3714,7 @@ ${rowsHtml}
           })
         });
         state.outreachControl = result;
+        state.outreachControlReadError = '';
         state.actionKey = '';
         showToast(paused ? 'Automatic outreach stopped.' : 'Automatic outreach started.');
         refreshAreaContent();
@@ -3776,6 +3777,7 @@ ${rowsHtml}
           })
         });
         state.outreachControl = result;
+        state.outreachControlReadError = '';
         state.actionKey = '';
         showToast('Outreach guardrails saved.');
         refreshAreaContent();
@@ -3813,7 +3815,15 @@ ${rowsHtml}
     }
 
     function acceptOutreachControlRead(next) {
-      if (!next || ['outreach_control:release', 'outreach_control:reload_release'].includes(state.actionKey)) return state.outreachControl;
+      if (['outreach_control:release', 'outreach_control:reload_release'].includes(state.actionKey)) return state.outreachControl;
+      if (!next || next.ok === false) {
+        state.outreachControlReadError = next?.error || 'Unable to refresh outreach controls.';
+        // A failed refresh is not a new sender/pause/guardrail snapshot.
+        return state.outreachControl?.ok === true
+          ? state.outreachControl
+          : next || { ok: false, error: state.outreachControlReadError };
+      }
+      state.outreachControlReadError = '';
       const previous = state.outreachControl?.release_window;
       const previousTime = Date.parse(previous?.updated_at || '');
       const nextTime = Date.parse(next.release_window?.updated_at || '');
@@ -3869,6 +3879,7 @@ ${rowsHtml}
         });
         if (!result?.release_window?.value) throw new Error('The server did not return the saved release window. Reload saved dates to verify; your edits have been kept.');
         state.outreachControl = result;
+        state.outreachControlReadError = '';
         state.outreachReleaseDraft = null;
         state.outreachReleaseError = '';
         state.actionKey = '';
@@ -3891,6 +3902,7 @@ ${rowsHtml}
         const result = await api('/api/admin/outreach-control');
         if (!result?.release_window?.value) throw new Error('The server did not return the saved release window. Your edits have been kept.');
         state.outreachControl = result;
+        state.outreachControlReadError = '';
         state.outreachReleaseDraft = null;
         state.outreachReleaseError = '';
         showToast('Saved release dates reloaded.');
@@ -5522,6 +5534,7 @@ ${rowsHtml}
 
     function renderOutreachControl() {
       const control = state.outreachControl || {};
+      const controlReadError = state.outreachControlReadError || (control.ok === false ? control.error || 'Unable to refresh outreach controls.' : '');
       if (control.ok === false && !state.outreachReleaseDraft) {
         return `<div class="glass-card" style="padding:18px;display:grid;gap:10px;"><div class="mini-title">Outreach Control unavailable</div><div class="error small">${esc(control.error || 'Unable to load sender controls.')}</div><button class="btn soft" id="outreachControlRetry"><i data-lucide="refresh-cw"></i><span>Try again</span></button></div>`;
       }
@@ -5549,7 +5562,7 @@ ${rowsHtml}
           <div class="mini-title">${esc(label)}</div>
           <strong>${esc(value)}</strong>
           <div class="small">${esc(detail)}</div>
-          <div style="margin-top:8px;">${badge(tone === 'bad' ? 'Needs attention' : tone === 'ok' ? 'Healthy' : 'Live', tone)}</div>
+          <div style="margin-top:8px;">${badge(controlReadError ? 'Last known' : tone === 'bad' ? 'Needs attention' : tone === 'ok' ? 'Healthy' : 'Live', controlReadError ? 'warn' : tone)}</div>
         </div>
       `;
       const field = (id, label, value, attrs, help) => `
@@ -5567,7 +5580,7 @@ ${rowsHtml}
             <div class="sub">One protected control surface for sender state, live guardrails, queue volume, and outreach health.</div>
           </div>
           <div class="header-actions">
-            ${badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}
+            ${controlReadError ? badge('STATUS UNVERIFIED', 'warn') : badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}
             ${badge(provider === 'twilio' ? 'TWILIO ROUTE' : 'ANDROID FALLBACK ROUTE', provider === 'twilio' ? 'ok' : 'warn')}
             ${badge(operatorMode === 'away' ? 'AUTOMATIC HANDLING' : 'MANUAL HANDLING', operatorMode === 'away' ? 'ok' : 'info')}
             ${sender.health_gate_override ? badge('HEALTH OVERRIDE ACTIVE', 'warn') : ''}
@@ -5575,6 +5588,7 @@ ${rowsHtml}
         </div>
 
         <div class="outreach-control-grid">
+          ${controlReadError ? `<div class="glass-card error small" role="alert" style="padding:18px;">Refresh failed: ${esc(controlReadError)} Showing last-known controls; current sending status is unverified. Your date edits have been kept.</div>` : ''}
           <section class="glass-card" style="padding:18px;display:grid;gap:14px;">
             <div class="reply-footer">
               <div>
@@ -5599,8 +5613,8 @@ ${rowsHtml}
             <div class="reply-footer">
               <div>
                 <div class="mini-title">Master sender switch</div>
-                <div class="address">${paused ? 'Automatic outreach is stopped' : healthStopped ? 'Health stop is blocking outreach' : 'Automatic outreach is allowed'}</div>
-                <div class="small">${paused
+                <div class="address">${controlReadError ? 'Current sender status is unverified' : paused ? 'Automatic outreach is stopped' : healthStopped ? 'Health stop is blocking outreach' : 'Automatic outreach is allowed'}</div>
+                <div class="small">${controlReadError ? 'Refresh failed. Values below are last-known, not a live sending confirmation.' : paused
                   ? `Paused ${control.pause_setting?.updated_at ? fmtDate(control.pause_setting.updated_at) : ''} by ${updatedBy}. Cron can still inspect rows but cannot send.`
                   : healthStopped
                     ? `The rolling opt-out rate is at or above the configured ${Math.round(maxRate * 10000) / 100}% threshold.`
