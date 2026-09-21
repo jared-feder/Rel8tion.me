@@ -2737,7 +2737,7 @@
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
-        state.outreachControl = outreachControl;
+        state.outreachControl = acceptOutreachControlRead(outreachControl);
         rebuildCommandIndexes();
         state.loadedAt = inbox.loaded_at || dashboard.loaded_at || new Date().toISOString();
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
@@ -2786,7 +2786,7 @@
         state.inbox = inbox.inbox || [];
         state.counts = inbox.counts || state.counts;
         state.health = health;
-        state.outreachControl = outreachControl || state.outreachControl;
+        state.outreachControl = acceptOutreachControlRead(outreachControl);
         state.loadedAt = inbox.loaded_at || new Date().toISOString();
         if (state.area === 'outreach' || state.area === 'outreachControl') refreshAreaContent();
       } catch (_) {
@@ -3786,42 +3786,120 @@ ${rowsHtml}
       }
     }
 
+    function readOutreachReleaseDraft() {
+      const enabled = document.getElementById('releaseWindowEnabled');
+      if (!enabled) return null;
+      return {
+        enabled: enabled.checked === true,
+        from_open_start: document.getElementById('releaseWindowFrom')?.value || '',
+        through_open_start: document.getElementById('releaseWindowThrough')?.value || '',
+        expires_at: document.getElementById('releaseWindowExpires')?.value || '',
+        reason: document.getElementById('releaseWindowReason')?.value || '',
+        expected_updated_at: state.outreachReleaseDraft?.expected_updated_at ?? outreachControlValue('release_window.updated_at', '')
+      };
+    }
+
+    function rememberOutreachReleaseDraft() {
+      if (state.actionKey) return;
+      const draft = readOutreachReleaseDraft();
+      if (draft) state.outreachReleaseDraft = draft;
+    }
+
+    function releaseDraftIso(value) {
+      if (!value) return null;
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) throw new Error('Enter a valid date and time. Your edits have been kept.');
+      return date.toISOString();
+    }
+
+    function acceptOutreachControlRead(next) {
+      if (!next || ['outreach_control:release', 'outreach_control:reload_release'].includes(state.actionKey)) return state.outreachControl;
+      const previous = state.outreachControl?.release_window;
+      const previousTime = Date.parse(previous?.updated_at || '');
+      const nextTime = Date.parse(next.release_window?.updated_at || '');
+      // A GET started before a save must not put the older release dates back.
+      if (Number.isFinite(previousTime) && (!Number.isFinite(nextTime) || nextTime < previousTime)) {
+        return { ...next, release_window: previous };
+      }
+      return next;
+    }
+
     async function saveOutreachReleaseWindow() {
-      const enabled = document.getElementById('releaseWindowEnabled')?.checked === true;
+      if (state.actionKey) return;
+      const draft = readOutreachReleaseDraft();
+      if (!draft) return showToast('Open Outreach Control before saving release dates.');
+      state.outreachReleaseDraft = draft;
+      state.outreachReleaseError = '';
+
+      // Capture every submitted value and its revision before prompts or renders.
+      let payload;
+      try {
+        payload = {
+          action: 'update_release_window',
+          expected_updated_at: draft.expected_updated_at,
+          release_window: {
+            enabled: draft.enabled,
+            from_open_start: releaseDraftIso(draft.from_open_start),
+            through_open_start: releaseDraftIso(draft.through_open_start),
+            expires_at: releaseDraftIso(draft.expires_at),
+            reason: draft.reason.trim()
+          }
+        };
+      } catch (error) {
+        state.outreachReleaseError = error.message;
+        showToast(error.message);
+        refreshAreaContent();
+        return;
+      }
+
       let confirmation = '';
-      if (enabled) {
+      if (draft.enabled) {
         confirmation = window.prompt('This window bypasses only the rolling opt-out health stop for the selected event dates. STOP suppression and all locked protections remain active. Type REL8TION to enable:') || '';
         if (confirmation !== 'REL8TION') return showToast('Override window change cancelled.');
       } else if (!window.confirm('Disable the current outreach health override window?')) {
         return;
       }
-
+      payload.confirmation = confirmation;
       state.actionKey = 'outreach_control:release';
       refreshAreaContent();
       try {
         const result = await api('/api/admin/outreach-control', {
           method: 'POST',
-          body: JSON.stringify({
-            action: 'update_release_window',
-            confirmation,
-            expected_updated_at: outreachControlValue('release_window.updated_at', ''),
-            release_window: {
-              enabled,
-              from_open_start: isoFromLocalInput('releaseWindowFrom'),
-              through_open_start: isoFromLocalInput('releaseWindowThrough'),
-              expires_at: isoFromLocalInput('releaseWindowExpires'),
-              reason: document.getElementById('releaseWindowReason')?.value?.trim() || ''
-            }
-          })
+          body: JSON.stringify(payload)
         });
+        if (!result?.release_window?.value) throw new Error('The server did not return the saved release window. Reload saved dates to verify; your edits have been kept.');
         state.outreachControl = result;
+        state.outreachReleaseDraft = null;
+        state.outreachReleaseError = '';
         state.actionKey = '';
-        showToast(enabled ? 'Health override window enabled.' : 'Health override window disabled.');
+        showToast(draft.enabled ? 'Health override window enabled.' : 'Health override window disabled.');
         refreshAreaContent();
       } catch (error) {
         state.actionKey = '';
-        showToast(error.message || 'Unable to save the release window.');
-        await loadAll({ showLoading: false });
+        state.outreachReleaseError = error.message || 'Unable to save the release window.';
+        showToast(state.outreachReleaseError);
+        refreshAreaContent();
+      }
+    }
+
+    async function reloadOutreachReleaseDraft() {
+      if (state.actionKey) return;
+      if (state.outreachReleaseDraft && !window.confirm('Discard your unsaved release-window edits and load the currently saved dates?')) return;
+      state.actionKey = 'outreach_control:reload_release';
+      refreshAreaContent();
+      try {
+        const result = await api('/api/admin/outreach-control');
+        if (!result?.release_window?.value) throw new Error('The server did not return the saved release window. Your edits have been kept.');
+        state.outreachControl = result;
+        state.outreachReleaseDraft = null;
+        state.outreachReleaseError = '';
+        showToast('Saved release dates reloaded.');
+      } catch (error) {
+        state.outreachReleaseError = error.message || 'Unable to reload saved dates.';
+        showToast(state.outreachReleaseError);
+      } finally {
+        state.actionKey = '';
+        refreshAreaContent();
       }
     }
 
@@ -5088,7 +5166,15 @@ ${rowsHtml}
       document.getElementById('outreachStopAll')?.addEventListener('click', () => setOutreachPaused(true));
       document.getElementById('outreachStartAll')?.addEventListener('click', () => setOutreachPaused(false));
       document.getElementById('saveOutreachGuardrails')?.addEventListener('click', saveOutreachGuardrails);
+      for (const id of ['releaseWindowEnabled', 'releaseWindowFrom', 'releaseWindowThrough', 'releaseWindowExpires', 'releaseWindowReason']) {
+        const input = document.getElementById(id);
+        if (!input) continue;
+        input.disabled = Boolean(state.actionKey);
+        input.addEventListener('input', rememberOutreachReleaseDraft);
+        input.addEventListener('change', rememberOutreachReleaseDraft);
+      }
       document.getElementById('saveOutreachReleaseWindow')?.addEventListener('click', saveOutreachReleaseWindow);
+      document.getElementById('reloadOutreachReleaseDraft')?.addEventListener('click', reloadOutreachReleaseDraft);
       document.getElementById('outreachControlRetry')?.addEventListener('click', () => loadAll({ showLoading: false }));
       document.querySelectorAll('[data-coverage-choice]').forEach((button) => {
         button.addEventListener('click', () => confirmCoverageChoice(Number(button.dataset.coverageChoice)));
@@ -5436,14 +5522,14 @@ ${rowsHtml}
 
     function renderOutreachControl() {
       const control = state.outreachControl || {};
-      if (control.ok === false) {
+      if (control.ok === false && !state.outreachReleaseDraft) {
         return `<div class="glass-card" style="padding:18px;display:grid;gap:10px;"><div class="mini-title">Outreach Control unavailable</div><div class="error small">${esc(control.error || 'Unable to load sender controls.')}</div><button class="btn soft" id="outreachControlRetry"><i data-lucide="refresh-cw"></i><span>Try again</span></button></div>`;
       }
 
       const guardrails = control.guardrails?.value || {};
       const stats = control.stats || {};
       const sender = control.sender || {};
-      const release = control.release_window?.value || {};
+      const release = state.outreachReleaseDraft || control.release_window?.value || {};
       const paused = control.paused === true;
       const healthStopped = sender.health_blocked === true && sender.health_gate_override !== true;
       const sendingStopped = paused || healthStopped;
@@ -5577,16 +5663,19 @@ ${rowsHtml}
               </div>
               ${badge(control.release_window?.active ? 'ACTIVE' : release.enabled ? 'CONFIGURED / INACTIVE' : 'OFF', control.release_window?.active ? 'warn' : 'info')}
             </div>
+            ${state.outreachReleaseError ? `<div class="error small" role="alert">${esc(state.outreachReleaseError)}</div>` : ''}
+            ${state.outreachReleaseDraft ? '<div class="small" role="status">Unsaved release-window edits are kept until you save or reload saved dates.</div>' : ''}
             <label class="btn soft" style="justify-content:flex-start;"><input id="releaseWindowEnabled" type="checkbox" ${release.enabled ? 'checked' : ''}><span>Enable bounded health override</span></label>
             <div class="outreach-control-form">
-              <div class="outreach-control-field"><label for="releaseWindowFrom">Event date from (optional)</label><input id="releaseWindowFrom" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.from_open_start))}"><div class="small">Inclusive lower bound for open_start.</div></div>
-              <div class="outreach-control-field"><label for="releaseWindowThrough">Event date through</label><input id="releaseWindowThrough" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.through_open_start))}"><div class="small">Exclusive upper bound; must be in the future.</div></div>
-              <div class="outreach-control-field"><label for="releaseWindowExpires">Override expires</label><input id="releaseWindowExpires" class="field" type="datetime-local" value="${esc(localDateTimeValue(release.expires_at))}"><div class="small">Automatic fail-closed expiration.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowFrom">Event date from (optional)</label><input id="releaseWindowFrom" class="field" type="datetime-local" value="${esc(state.outreachReleaseDraft ? release.from_open_start : localDateTimeValue(release.from_open_start))}"><div class="small">Inclusive lower bound for open_start.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowThrough">Event date through</label><input id="releaseWindowThrough" class="field" type="datetime-local" value="${esc(state.outreachReleaseDraft ? release.through_open_start : localDateTimeValue(release.through_open_start))}"><div class="small">Exclusive upper bound; must be in the future.</div></div>
+              <div class="outreach-control-field"><label for="releaseWindowExpires">Override expires</label><input id="releaseWindowExpires" class="field" type="datetime-local" value="${esc(state.outreachReleaseDraft ? release.expires_at : localDateTimeValue(release.expires_at))}"><div class="small">Automatic fail-closed expiration.</div></div>
               <div class="outreach-control-field"><label for="releaseWindowReason">Reason</label><input id="releaseWindowReason" class="field" maxlength="240" value="${esc(release.reason || '')}" placeholder="Owner-approved release scope"><div class="small">Stored with the runtime setting for operator context.</div></div>
             </div>
             <div class="reply-footer">
               <div class="small">A global pause always wins. This override never bypasses STOP suppression, cooldown, volume limits, quiet hours, phone validity, or readiness checks.</div>
               <button class="btn ${release.enabled ? 'bad' : 'soft'}" id="saveOutreachReleaseWindow" ${busy ? 'disabled' : ''}><i data-lucide="shield-alert"></i><span>${state.actionKey === 'outreach_control:release' ? 'Saving...' : release.enabled ? 'Update override' : 'Save override setting'}</span></button>
+              <button class="btn soft" id="reloadOutreachReleaseDraft" ${busy ? 'disabled' : ''}>Reload saved dates</button>
             </div>
           </section>
 
