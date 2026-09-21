@@ -1,0 +1,53 @@
+name: Isolated COMMAND date repair
+
+on:
+  push:
+    branches: [work/command-date-repair-20260921]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.repository == 'jared-feder/Rel8tion.me' && github.event.head_commit.message == 'Prepare isolated COMMAND date-saving repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Reproduce original date-reversion bug without sending
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          git status --short
+          if node --test --test-name-pattern='submits edited dates' test/outreach-release-window-form.test.cjs > /tmp/command-date-before.log 2>&1; then
+            cat /tmp/command-date-before.log
+            echo 'Expected the original source to fail the date regression.'
+            exit 1
+          fi
+          cat /tmp/command-date-before.log
+          grep -q 'ERR_ASSERTION' /tmp/command-date-before.log
+      - name: Apply exact-source browser-only repair
+        run: node scripts/apply-command-release-window-fix.cjs
+      - name: Verify repaired editor and existing control API with mocks
+        run: node --test test/outreach-release-window-form.test.cjs test/outreach-control.test.cjs
+      - name: Verify repository safeguards
+        run: |
+          npm run verify:routes
+          npm run verify:agent-lo-assignment
+          git diff --check
+      - name: Commit only repaired source and documentation to isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'work/command-date-repair-20260921'
+          git status --short
+          git add apps/rel8tion-app/admin.html AGENTS.md CURRENT_STATE.md REL8TION_SYSTEM_OVERVIEW.md
+          git -c user.name='REL8TION repair runner' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Fix COMMAND release-window date saving and verify draft preservation'
+          git push origin HEAD:refs/heads/work/command-date-repair-20260921
+          git rev-parse HEAD
