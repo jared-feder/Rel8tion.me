@@ -1,0 +1,201 @@
+name: Verify COMMAND refresh review repair
+on:
+  push:
+    branches: [work/command-refresh-review-20260921]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Reproduce and repair failed-refresh status without production access
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          test "$(git rev-parse HEAD^)" = '44ce2d937ab1986c496b9ebb4a5d4166596adaac'
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const { spawnSync } = require('node:child_process');
+          const page = 'apps/rel8tion-app/admin.html';
+          const tests = 'test/outreach-release-window-form.test.cjs';
+          const extraTests = String.raw`
+
+          function renderControlForRefreshTest(h) {
+            Object.assign(h.context, {
+              esc: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
+              badge: label => String(label),
+              fmtDate: value => String(value || ''),
+              localDateTimeValue: local,
+              renderOutreachModeControls: () => ''
+            });
+            vm.runInContext(functionSource('renderOutreachControl'), h.context);
+            return h.context.renderOutreachControl();
+          }
+
+          test('failed control refresh preserves the whole verified snapshot and draft', () => {
+            const h = harness();
+            Object.assign(h.state.outreachControl, {
+              paused: true,
+              sender: { health_blocked: true, provider: 'android_gateway', operator_mode: 'away' },
+              guardrails: { value: { max_per_run: 3, max_per_day: 25, max_opt_out_rate: 0.05 } },
+              stats: { queue_pending: 123 },
+              locked_protections: ['STOP suppression']
+            });
+            const previous = h.state.outreachControl;
+            h.edit();
+            const draft = h.state.outreachReleaseDraft;
+            h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Control GET failed' });
+            assert.equal(h.state.outreachControl, previous);
+            assert.equal(h.state.outreachReleaseDraft, draft);
+            assert.equal(h.state.outreachControl.paused, true);
+            assert.equal(h.state.outreachControl.stats.queue_pending, 123);
+            assert.equal(h.state.outreachControl.guardrails.value.max_per_day, 25);
+            assert.equal(h.state.outreachControlReadError, 'Control GET failed');
+            h.context.refreshAreaContent();
+            assert.deepEqual(h.values(), newValues);
+          });
+
+          test('failed control refresh renders an escaped warning instead of claiming sending is allowed', () => {
+            const h = harness();
+            h.state.outreachControl.paused = false;
+            h.edit();
+            h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: '<offline>' });
+            const rendered = renderControlForRefreshTest(h);
+            assert.match(rendered, /STATUS UNVERIFIED/);
+            assert.match(rendered, /&lt;offline&gt;/);
+            assert.match(rendered, /last-known/i);
+            assert.doesNotMatch(rendered, /SENDING ALLOWED|Automatic outreach is allowed/);
+            assert.match(rendered, /New owner-approved dates/);
+          });
+
+          test('failed control refresh clears only after a successful control read', () => {
+            const h = harness(); h.edit();
+            h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Offline' });
+            const draft = h.state.outreachReleaseDraft;
+            const next = stored(oldValues, newVersion);
+            next.paused = true;
+            h.state.outreachControl = h.context.acceptOutreachControlRead(next);
+            assert.equal(h.state.outreachControl, next);
+            assert.equal(h.state.outreachControlReadError, '');
+            assert.equal(h.state.outreachReleaseDraft, draft);
+            assert.equal(draft.expected_updated_at, oldVersion);
+          });
+
+          test('failed control refresh without a prior good snapshot stays unavailable', () => {
+            const h = harness();
+            h.state.outreachControl = null;
+            h.state.outreachControl = h.context.acceptOutreachControlRead({ ok: false, error: 'Initial load failed' });
+            assert.equal(h.state.outreachControl.ok, false);
+            assert.match(renderControlForRefreshTest(h), /Outreach Control unavailable/);
+            h.edit();
+            const rendered = renderControlForRefreshTest(h);
+            assert.match(rendered, /STATUS UNVERIFIED/);
+            assert.doesNotMatch(rendered, /SENDING ALLOWED|Automatic outreach is allowed/);
+          });
+
+          test('failed control refresh does not replace a missing response with empty controls', () => {
+            const h = harness();
+            const previous = h.state.outreachControl;
+            h.state.outreachControl = h.context.acceptOutreachControlRead(null);
+            assert.equal(h.state.outreachControl, previous);
+            assert.match(h.state.outreachControlReadError, /refresh/);
+          });
+
+          test('successful release-window save clears a previous refresh warning', async () => {
+            const h = harness(); h.edit();
+            h.state.outreachControlReadError = 'Offline earlier';
+            await h.context.saveOutreachReleaseWindow();
+            assert.equal(h.state.outreachControlReadError, '');
+            assert.equal(h.state.outreachReleaseDraft, null);
+          });
+          `;
+          fs.appendFileSync(tests, extraTests);
+          const before = spawnSync(process.execPath, ['--test', '--test-name-pattern=failed control refresh preserves the whole', tests], { encoding: 'utf8' });
+          console.log(before.stdout, before.stderr);
+          assert.notEqual(before.status, 0, 'The reviewed source must reproduce the regression.');
+          assert.match(before.stdout + before.stderr, /ERR_ASSERTION/);
+          let html = fs.readFileSync(page, 'utf8');
+          function replaceOnce(source, oldText, newText) {
+            assert.equal(source.split(oldText).length, 2, 'Expected exactly one source anchor: ' + oldText.slice(0, 90));
+            return source.replace(oldText, newText);
+          }
+          html = replaceOnce(html,
+            "      if (!next || ['outreach_control:release', 'outreach_control:reload_release'].includes(state.actionKey)) return state.outreachControl;",
+            "      if (['outreach_control:release', 'outreach_control:reload_release'].includes(state.actionKey)) return state.outreachControl;\n      if (!next || next.ok === false) {\n        state.outreachControlReadError = next?.error || 'Unable to refresh outreach controls.';\n        // A failed refresh is not a new sender/pause/guardrail snapshot.\n        return state.outreachControl?.ok === true\n          ? state.outreachControl\n          : next || { ok: false, error: state.outreachControlReadError };\n      }\n      state.outreachControlReadError = '';"
+          );
+          const savedAnchor = '        state.outreachControl = result;\n';
+          assert.equal(html.split(savedAnchor).length - 1, 4);
+          html = html.replaceAll(savedAnchor, savedAnchor + "        state.outreachControlReadError = '';\n");
+          const renderPattern = /^    function renderOutreachControl\([^]*?^    \}/m;
+          const oldRender = html.match(renderPattern)?.[0];
+          assert.ok(oldRender);
+          let render = replaceOnce(oldRender,
+            '      const control = state.outreachControl || {};',
+            "      const control = state.outreachControl || {};\n      const controlReadError = state.outreachControlReadError || (control.ok === false ? control.error || 'Unable to refresh outreach controls.' : '');"
+          );
+          render = replaceOnce(render,
+            "${badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}",
+            "${controlReadError ? badge('STATUS UNVERIFIED', 'warn') : badge(sendingStopped ? 'SENDING STOPPED' : 'SENDING ALLOWED', sendingStopped ? 'bad' : 'ok')}"
+          );
+          render = replaceOnce(render,
+            '<div class="outreach-control-grid">',
+            '<div class="outreach-control-grid">\n          ${controlReadError ? `<div class="glass-card error small" role="alert" style="padding:18px;">Refresh failed: ${esc(controlReadError)} Showing last-known controls; current sending status is unverified. Your date edits have been kept.</div>` : \'\'}'
+          );
+          render = replaceOnce(render,
+            "${paused ? 'Automatic outreach is stopped' : healthStopped ? 'Health stop is blocking outreach' : 'Automatic outreach is allowed'}",
+            "${controlReadError ? 'Current sender status is unverified' : paused ? 'Automatic outreach is stopped' : healthStopped ? 'Health stop is blocking outreach' : 'Automatic outreach is allowed'}"
+          );
+          render = replaceOnce(render,
+            '<div class="small">${paused\n',
+            '<div class="small">${controlReadError ? \'Refresh failed. Values below are last-known, not a live sending confirmation.\' : paused\n'
+          );
+          render = replaceOnce(render,
+            "${badge(tone === 'bad' ? 'Needs attention' : tone === 'ok' ? 'Healthy' : 'Live', tone)}",
+            "${badge(controlReadError ? 'Last known' : tone === 'bad' ? 'Needs attention' : tone === 'ok' ? 'Healthy' : 'Live', controlReadError ? 'warn' : tone)}"
+          );
+          html = html.replace(oldRender, render);
+          fs.writeFileSync(page, html);
+          const after = spawnSync(process.execPath, ['--test', tests, 'test/outreach-control.test.cjs'], { encoding: 'utf8' });
+          console.log(after.stdout, after.stderr);
+          assert.equal(after.status, 0, 'All new and existing control tests must pass.');
+          let current = fs.readFileSync('CURRENT_STATE.md', 'utf8');
+          current = replaceOnce(current,
+            '## 2026-09-21: COMMAND release-window date-reversion repair\n',
+            '## 2026-09-21: COMMAND release-window date-reversion repair\n\n- [IMPLEMENTED] PR #50 pre-deployment review repair: failed control refreshes retain the entire last successful snapshot (pause, sender, guardrails, stats, protections, and release window), preserve the draft/revision, and show an escaped refresh warning with STATUS UNVERIFIED rather than a default sending-allowed claim. A successful control read or setting save clears the refresh warning.\n- [VERIFIED] Reproduced the failed-refresh snapshot-loss regression before the review patch. All 24 editor/control API tests pass afterward, including six new refresh/render/recovery cases; tests use mocks, not production settings.\n'
+          );
+          fs.writeFileSync('CURRENT_STATE.md', current);
+          fs.appendFileSync('AGENTS.md', '\n- [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.\n');
+          fs.appendFileSync('REL8TION_SYSTEM_OVERVIEW.md', '\n[IMPLEMENTED] Failed COMMAND control refreshes retain the complete last successful control snapshot and display an unverified-status warning while preserving release-window drafts. Only successful reads or setting saves clear the refresh warning.\n');
+          console.log('Review correction and 24 mocked tests complete. No production API or SMS provider was called.');
+          NODE
+      - name: Verify routes, regressions and whitespace
+        run: |
+          npm run verify:routes
+          npm run verify:agent-lo-assignment
+          git diff --check
+      - name: Publish only reviewed source, tests and documentation to result branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'work/command-refresh-review-20260921'
+          git add apps/rel8tion-app/admin.html test/outreach-release-window-form.test.cjs CURRENT_STATE.md AGENTS.md REL8TION_SYSTEM_OVERVIEW.md
+          git rm --cached .github/workflows/command-review-repair.yml
+          tree=$(git write-tree)
+          export GIT_AUTHOR_NAME='REL8TION repair runner'
+          export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          clean=$(printf '%s\n' 'Preserve complete COMMAND controls on failed refreshes' | git commit-tree "$tree" -p 44ce2d937ab1986c496b9ebb4a5d4166596adaac)
+          git diff --stat 44ce2d937ab1986c496b9ebb4a5d4166596adaac "$clean"
+          test "$(git diff --name-only 44ce2d937ab1986c496b9ebb4a5d4166596adaac "$clean" | wc -l)" -eq 5
+          git push origin "$clean":refs/heads/work/command-refresh-result-20260921
+          echo "RESULT_COMMIT=$clean"
+          echo "RESULT_TREE=$tree"
