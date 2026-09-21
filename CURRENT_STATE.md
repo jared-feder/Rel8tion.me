@@ -4,6 +4,14 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-09-21: COMMAND release-window date-reversion repair
+
+- [IMPLEMENTED] Fixed saveOutreachReleaseWindow reading date/reason inputs after refreshAreaContent rebuilt them from old settings. The handler now captures every value and expected_updated_at before confirmation or rendering.
+- [IMPLEMENTED] Raw in-memory drafts survive background refresh, cancellation, validation errors, and API errors. The editor shows the error, prevents duplicate in-flight saves, and provides an explicit confirmed Reload saved dates action. A stale control GET cannot roll a successfully saved release window back to an older revision.
+- [VERIFIED] The new mocked form suite reproduces the original date-reversion failure before the patch and passes after it; the existing outreach-control API suite, route map, and agent-loan-officer assignment checks also pass in the isolated repair runner. These checks do not contact an SMS provider or write runtime settings.
+- [NEEDS VERIFICATION] Not merged or deployed by this repair. Live authenticated browser persistence and the production deployment SHA have not been verified. No production pause, release dates, guardrail values, provider settings, or queued messages were changed.
+- AGENTS.md disposition: updated with the durable capture-before-render, draft/revision preservation, stale-read protection, and no-live-send test rules.
+
 ## 2026-08-19: Event Pass product ladder and sponsored event-only retention
 
 - `[IMPLEMENTED]` The Event Pass reuse page now presents the commercial choice explicitly. Loan-officer sponsorship is free and event-only: the agent gets the live dashboard for that open house and an automatic recap at the stored agent email after closeout, but no permanent agent-dashboard event, disclosure library, analytics, or reporting history. The paid `$29/month` REL8TION Agent choice promises permanent check-in and signed-disclosure records, event analytics/reporting, the digital profile/card, and assisted follow-up.
