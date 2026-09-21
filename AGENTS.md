@@ -252,3 +252,11 @@ There is no confirmed full automated test suite for the main static REL8TION app
 When changing a production flow, update `CURRENT_STATE.md` immediately and update `REL8TION_SYSTEM_OVERVIEW.md` when routes, schema expectations, NFC behavior, SMS behavior, dashboard behavior, compliance behavior, or deployment/source-of-truth status changes.
 
 Every completed REL8TION work log must include an explicit `AGENTS.md` disposition so durable operating knowledge is not lost between agents. Update `AGENTS.md` in the same change whenever the work adds or changes a source of truth, production guardrail, dangerous-file warning, verification boundary, route priority, security rule, or "do not regress" behavior. When no durable operating rule changed, record `AGENTS.md reviewed - no durable rule change` in the completion handoff instead of silently omitting it. Keep one-time deployment ids, transient status, and daily evidence in `CURRENT_STATE.md`; keep `AGENTS.md` focused on reusable instructions for future agents.
+
+## COMMAND Release-Window Form State
+
+- [IMPLEMENTED] Capture release-window dates, checkbox, reason, and the saved revision before confirmation prompts, asynchronous work, or any form render. Keep unsaved raw input and its original revision separate from refreshed server state.
+- [IMPLEMENTED] Rejected or cancelled saves must retain the draft. Clear it only after a successful save or an explicitly confirmed successful reload. Older background reads must not overwrite a newer saved release-window revision.
+- [IMPLEMENTED] Keep the mocked regression suite in test/outreach-release-window-form.test.cjs passing. Testing a date-saving fix must not enable a production override, unpause outreach, alter recipient protections, or send real messages.
+
+- [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.

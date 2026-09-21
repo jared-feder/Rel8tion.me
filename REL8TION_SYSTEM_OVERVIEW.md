@@ -369,3 +369,9 @@ For backward compatibility, an authenticated user may receive a loan-officer wor
 The existing REL8TION COMMAND tool remains separate at `/command` and retains its dedicated token or allowlisted admin NFC UID boundary on every privileged API call. Existing admin NFC scans that include the verified UID continue through `/admin?uid=...` and are redirected to COMMAND only after server verification.
 
 The administration shell itself embeds no platform data. A direct request that does not pass the data API authorization receives no administrative payload.
+
+## COMMAND release-window editing - 2026-09-21
+
+[IMPLEMENTED] The COMMAND release-window editor keeps unsaved date/checkbox/reason values and their original saved revision in in-memory draft state, separate from refreshed control data. Save snapshots the payload before prompts or renders. Failed saves retain the draft and show the returned error; Reload saved dates discards it only after confirmation and a successful read. Stale background reads cannot restore an older saved release-window revision. This is a browser form-state repair, not a change to server authorization, date rules, outreach eligibility, or delivery. Deployment and live-browser behavior remain [NEEDS VERIFICATION].
+
+[IMPLEMENTED] Failed COMMAND control refreshes retain the complete last successful control snapshot and display an unverified-status warning while preserving release-window drafts. Only successful reads or setting saves clear the refresh warning.
