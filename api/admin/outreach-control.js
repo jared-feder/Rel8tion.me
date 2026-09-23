@@ -7,9 +7,9 @@ const TIME_ZONE = 'America/New_York';
 const CONFIRMATION = 'REL8TION';
 
 const DEFAULT_GUARDRAILS = Object.freeze({
-  max_per_run: 7,
-  max_per_hour: 20,
-  max_per_day: 150,
+  max_per_run: 25,
+  max_per_hour: 100,
+  max_per_day: 500,
   duplicate_phone_cooldown_days: 30,
   missed_open_house_max_age_days: 7,
   health_window_days: 7,
@@ -19,9 +19,9 @@ const DEFAULT_GUARDRAILS = Object.freeze({
 });
 
 const GUARDRAIL_RULES = Object.freeze({
-  max_per_run: { min: 1, max: 7, integer: true },
-  max_per_hour: { min: 1, max: 20, integer: true },
-  max_per_day: { min: 1, max: 150, integer: true },
+  max_per_run: { min: 1, max: 25, integer: true },
+  max_per_hour: { min: 1, max: 100, integer: true },
+  max_per_day: { min: 1, max: 500, integer: true },
   duplicate_phone_cooldown_days: { min: 1, max: 365, integer: true },
   missed_open_house_max_age_days: { min: 1, max: 30, integer: true },
   health_window_days: { min: 1, max: 30, integer: true },
