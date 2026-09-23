@@ -4,6 +4,13 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-09-23: Outreach capacity increase
+
+- [IMPLEMENTED] Owner-approved automatic outreach ceilings are raised from 7/run, 20/rolling hour, and 150/rolling 24 hours to 25/run, 100/rolling hour, and 500/rolling 24 hours across the Vercel cron wrapper, the Supabase sender hard caps/defaults, and REL8TION COMMAND guardrail limits.
+- [IMPLEMENTED] This capacity increase does not remove recipient or provider protections: STOP/opt-out suppression, invalid-mobile handling, duplicate-phone cooldown, provider-health gating, 8:00 AM-9:00 PM Eastern send hours, future-event eligibility, listing/photo/render readiness, and release-window boundaries remain enforced.
+- [VERIFIED] The isolated preview deployment for branch `hotfix/outreach-capacity-20260923` reached READY after the sender, COMMAND, cron-wrapper, test, and documentation updates. Production remains on `main` until the change is merged and promoted.
+- [VERIFIED] A separate non-destructive production smoke test confirmed the Open House Kit flow from armed Event Pass/keychain intent through `/k`, `/kit-confirm`, intake/pricing, and Stripe-hosted Checkout. The monthly Complete Open House System checkout displayed $199 due today and $29/month after the 31-day included period; no payment was submitted.
+
 ## 2026-09-21: COMMAND release-window date-reversion repair
 
 - [IMPLEMENTED] PR #50 pre-deployment review repair: failed control refreshes retain the entire last successful snapshot (pause, sender, guardrails, stats, protections, and release window), preserve the draft/revision, and show an escaped refresh warning with STATUS UNVERIFIED rather than a default sending-allowed claim. A successful control read or setting save clears the refresh warning.
