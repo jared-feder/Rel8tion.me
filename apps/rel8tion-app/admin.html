@@ -5653,9 +5653,9 @@ ${rowsHtml}
               ${badge(control.guardrails?.source === 'runtime' ? 'COMMAND runtime' : 'Sender environment', control.guardrails?.source === 'runtime' ? 'ok' : 'info')}
             </div>
             <div class="outreach-control-form">
-              ${field('guardrailMaxPerRun', 'Maximum per run', guardrails.max_per_run || 7, 'min="1" max="7" step="1"', 'Hard cap: 7 messages per cron run.')}
-              ${field('guardrailMaxPerHour', 'Maximum per hour', guardrails.max_per_hour || 20, 'min="1" max="20" step="1"', 'Rolling 60-minute maximum; hard cap 20.')}
-              ${field('guardrailMaxPerDay', 'Maximum per 24 hours', guardrails.max_per_day || 150, 'min="1" max="150" step="1"', 'Rolling 24-hour maximum; hard cap 150.')}
+              ${field('guardrailMaxPerRun', 'Maximum per run', guardrails.max_per_run || 25, 'min="1" max="25" step="1"', 'Hard cap: 25 messages per cron run.')}
+              ${field('guardrailMaxPerHour', 'Maximum per hour', guardrails.max_per_hour || 100, 'min="1" max="100" step="1"', 'Rolling 60-minute maximum; hard cap 100.')}
+              ${field('guardrailMaxPerDay', 'Maximum per 24 hours', guardrails.max_per_day || 500, 'min="1" max="500" step="1"', 'Rolling 24-hour maximum; hard cap 500.')}
               ${field('guardrailCooldownDays', 'Same-phone cooldown days', guardrails.duplicate_phone_cooldown_days || 30, 'min="1" max="365" step="1"', 'Blocks another initial outreach to the same normalized phone.')}
               ${field('guardrailMissedAgeDays', 'Missed-event max age days', guardrails.missed_open_house_max_age_days || 7, 'min="1" max="30" step="1"', 'Maximum age for any missed-open-house recovery copy.')}
               ${field('guardrailSendHorizonDays', 'Upcoming send horizon days', guardrails.send_horizon_days || 7, 'min="1" max="21" step="1"', 'Only future open houses inside this rolling window are eligible; soonest date/time goes first.')}
