@@ -115,13 +115,13 @@ test('guardrails clamp to hard safety ceilings and detect less restrictive chang
   const next = normalizeGuardrails({
     ...current,
     max_per_run: 99,
-    max_per_hour: 99,
+    max_per_hour: 999,
     max_per_day: 999,
     max_opt_out_rate: 0.06
   });
-  assert.equal(next.max_per_run, 7);
-  assert.equal(next.max_per_hour, 20);
-  assert.equal(next.max_per_day, 150);
+  assert.equal(next.max_per_run, 25);
+  assert.equal(next.max_per_hour, 100);
+  assert.equal(next.max_per_day, 500);
   assert.equal(isLooseningGuardrails(current, next), true);
 });
 
