@@ -194,6 +194,9 @@ test('COMMAND exposes the master switch, stats, editable limits, and locked prot
   assert.match(admin, /At desk: manual/);
   assert.match(admin, /Away: automatic/);
   assert.match(admin, /Locked recipient protections/);
+  assert.match(admin, /guardrailMaxPerRun[\s\S]*max=\\"25\\"/);
+  assert.match(admin, /guardrailMaxPerHour[\s\S]*max=\\"100\\"/);
+  assert.match(admin, /guardrailMaxPerDay[\s\S]*max=\\"500\\"/);
   assert.match(sender, /loadOutreachGuardrails/);
   assert.match(sender, /\.eq\("key", "outreach_guardrails"\)/);
   assert.match(sender, /DEFAULT_MAX_OPT_OUT_RATE = 0\.05/);
