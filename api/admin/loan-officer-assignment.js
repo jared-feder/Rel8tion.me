@@ -1,4 +1,5 @@
 const { adminAuthorized, assertAdminConfig, sendJson, supabaseRest } = require('../../lib/admin-auth');
+const { contactUrl, assignmentContext } = require('../../lib/assignment-contact');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -82,7 +83,7 @@ function assignmentLinks(visit) {
   calendar.searchParams.set('dates', `${stamp(start)}/${stamp(end)}`);
   calendar.searchParams.set('location', address);
   calendar.searchParams.set('details', 'Loan officer coverage assigned through REL8TION.');
-  return { address, calendar:calendar.toString(), dashboard:'https://app.rel8tion.me/loan-officer' };
+  return { address, calendar:calendar.toString(), dashboard:`https://app.rel8tion.me/loan-officer?visit=${enc(visit.id)}` };
 }
 
 async function sendAssignmentSms(to, name, message, metadata) {
@@ -93,7 +94,9 @@ async function sendAssignmentSms(to, name, message, metadata) {
   const response = await fetch(`${url}/functions/v1/send-lead-sms`, { method:'POST', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({ agent_phone:phone, buyer_phone:phone, buyer_name:name || 'Open house contact', category:'event_transactional', message, metadata }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error) throw new Error(payload?.error || `Assignment SMS failed: ${response.status}`);
-  return { status:'sent', id:payload.sid || payload.id || null };
+  const sms = payload.sms || payload;
+  if (sms.ok === false || ['failed', 'blocked'].includes(sms.status)) throw new Error(sms.error || 'Assignment SMS was blocked or failed.');
+  return { status:sms.status || 'accepted', id:sms.sid || sms.externalId || sms.id || null };
 }
 
 async function sendAssignmentEmail(to, subject, html) {
@@ -105,18 +108,27 @@ async function sendAssignmentEmail(to, subject, html) {
   return { status:'sent', id:payload.id || null };
 }
 
-async function notifyConfirmedAssignment(visit, profile) {
-  const links = assignmentLinks(visit);
-  const when = new Date(visit.scheduled_start).toLocaleString('en-US', { timeZone:'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short' });
-  const loMessage = `REL8TION assignment confirmed: ${links.address}, ${when}. Hosting agent: ${visit.agent_name || 'Agent'}${visit.agent_phone ? `, ${visit.agent_phone}` : ''}. Dashboard: ${links.dashboard} Add to calendar: ${links.calendar}`;
-  const agentMessage = `REL8TION coverage confirmed for ${links.address}, ${when}. Your assigned loan officer is ${profile.full_name || 'your REL8TION loan officer'}${profile.phone ? `, ${profile.phone}` : ''}.`;
-  const results = await Promise.allSettled([
-    sendAssignmentSms(profile.phone, profile.full_name, loMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'loan_officer' }),
-    sendAssignmentSms(visit.agent_phone, visit.agent_name, agentMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'agent' }),
-    sendAssignmentEmail(profile.email, `REL8TION open house assignment - ${links.address}`, `<p>${htmlEscape(loMessage)}</p>`),
-    sendAssignmentEmail(visit.agent_email, 'Your REL8TION loan officer coverage is confirmed', `<p>${htmlEscape(agentMessage)}</p>`)
-  ]);
-  return results.map((result) => result.status === 'fulfilled' ? result.value : { status:'warning', warning:result.reason?.message || String(result.reason) });
+async function notifyConfirmedAssignment(visit, profile, options = {}) {
+  try {
+    // Property context must not replace the host identity saved on the assignment.
+    visit = await assignmentContext(visit);
+    const links = assignmentLinks(visit);
+    const when = new Date(visit.scheduled_start).toLocaleString('en-US', { timeZone:'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short' });
+    const card = contactUrl(visit.id, profile.uid);
+    const publicProfile = profile.slug ? `https://app.rel8tion.me/nmb-verified?slug=${enc(profile.slug)}` : '';
+    const loMessage = `REL8TION assignment confirmed: ${links.address}, ${when}.\nHosting agent: ${visit.agent_name || 'Agent'}${visit.agent_phone ? `, ${visit.agent_phone}` : ''}.\nSave agent contact: ${card}\nOpen house, photos + directions: ${links.dashboard}${publicProfile ? `\nYour profile: ${publicProfile}` : ''}`;
+    const agentMessage = `REL8TION coverage confirmed for ${links.address}, ${when}. Your assigned loan officer is ${profile.full_name || 'your REL8TION loan officer'}${profile.phone ? `, ${profile.phone}` : ''}.`;
+    const results = await Promise.allSettled([
+      sendAssignmentSms(profile.phone, profile.full_name, loMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'loan_officer' }),
+      options.loanOfficerOnly ? Promise.resolve({ status:'skipped' }) : sendAssignmentSms(visit.agent_phone, visit.agent_name, agentMessage, { mode:'loan_officer_assignment', visit_id:visit.id, recipient_role:'agent' }),
+      options.smsOnly ? Promise.resolve({ status:'skipped' }) : sendAssignmentEmail(profile.email, `REL8TION open house assignment - ${links.address}`, `<p>${htmlEscape(loMessage)}</p>`),
+      options.loanOfficerOnly ? Promise.resolve({ status:'skipped' }) : sendAssignmentEmail(visit.agent_email, 'Your REL8TION loan officer coverage is confirmed', `<p>${htmlEscape(agentMessage)}</p>`)
+    ]);
+    return results.map((result) => result.status === 'fulfilled' ? result.value : { status:'warning', warning:result.reason?.message || String(result.reason) });
+  } catch (error) {
+    // Assignment writes have already succeeded; a notification failure must not imply rollback.
+    return [{ status:'warning', warning:error.message || 'Assignment notification failed.' }];
+  }
 }
 
 async function blockConfirmedAvailability(visit, profile) {
@@ -357,7 +369,8 @@ async function upsertFieldVisitAssignment(event, profile, source = 'manual_admin
         }).then((rows) => (Array.isArray(rows) ? rows[0] || null : null));
 
     const availability_block = await blockConfirmedAvailability(visit, profile);
-    return { visit, participant, availability_block };
+    const notifications = await notifyConfirmedAssignment(visit, profile, { loanOfficerOnly:true, smsOnly:true });
+    return { visit, participant, availability_block, notifications };
   } catch (error) {
     return { visit: null, participant: null, warning: error.message || String(error) };
   }

@@ -4,6 +4,8 @@ Human architecture and product overview for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+- `[IMPLEMENTED]` Local loan-officer assignment notifications include a downloadable hosting-agent vCard, a public LO profile link when available, and `/loan-officer?visit=<id>`. Sign-in carries that visit into the field dashboard, which focuses the property card with photo, calendar, contact, and platform-aware directions. Contact-download capabilities expire after 30 days and require a current primary financing assignment; they never unlock the dashboard or buyer data. Production SMS delivery and physical iPhone/Android contact import remain `[NEEDS VERIFICATION]`.
+
 This document explains how the product fits together. Use `CURRENT_STATE.md` for daily status and verification needs. Use `AGENTS.md` for Codex operating rules and dangerous-file guidance.
 
 Status labels used in this file:
