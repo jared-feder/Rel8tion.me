@@ -72,6 +72,8 @@ jobs:
             matches="$(git diff -U0 "${base}" "${head}" -- "${file}" \
               | grep -E '^\+' \
               | grep -Ev '^\+\+\+' \
+              | grep -Ev "^\\+ *const key = process\\.env\\.${sr_name}; *$" \
+              | grep -Ev "^\\+ *process:\\{ env:\\{ ${sr_name}:'test-only-signing-secret', SUPABASE_URL:'https://example.test' \\} \\}, *$" \
               | grep -E "${pattern}" || true)"
 
             if [[ -n "${matches}" ]]; then

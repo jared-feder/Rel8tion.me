@@ -4,6 +4,8 @@ Repo operating guide for Codex sessions working on REL8TION.
 
 Last cleaned: 2026-06-04.
 
+- `[IMPLEMENTED]` Loan-officer assignment texts use transactional SMS with a visit-specific `/loan-officer?visit=...` link. Preserve the visit through sign-in and dashboard unlock. Agent contact downloads use signed, 30-day, assignment-scoped `/api/assignment-contact` links; verify the current primary financing assignment on every download, return only host business contact fields, and never expose buyer data or grant dashboard access through the contact token. A queued SMS is not proof of delivery; physical iPhone/Android import remains a separate verification step.
+
 This file is for operating rules, dangerous files, route priorities, and "do not break" instructions. Use `CURRENT_STATE.md` for the daily implementation status and `REL8TION_SYSTEM_OVERVIEW.md` for the human architecture/product overview.
 
 Status labels used in this repo:
@@ -260,3 +262,5 @@ Every completed REL8TION work log must include an explicit `AGENTS.md` dispositi
 - [IMPLEMENTED] Keep the mocked regression suite in test/outreach-release-window-form.test.cjs passing. Testing a date-saving fix must not enable a production override, unpause outreach, alter recipient protections, or send real messages.
 
 - [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.
+
+- [IMPLEMENTED] Loan-officer setup/recovery SMS must carry a validated assignment visit through the fixed app.rel8tion.me callback and password setup. Only preserve visits belonging to the unique approved profile. Shared or duplicate active profile emails fail closed for account access and contact capability issuance; email equality must not aggregate people.

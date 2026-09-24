@@ -1,5 +1,7 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
 const crypto = require('crypto');
+const { assignmentContext, contactUrl } = require('../lib/assignment-contact');
+const { accountProfile } = require('../lib/loan-officer-account-identity');
 
 const clean = (value, max = 2000) => String(value || '').trim().slice(0, max);
 const enc = (value) => encodeURIComponent(clean(value));
@@ -40,13 +42,8 @@ async function uploadHeadshot(dataUrl, profileUid, url, key) {
 
 async function profileForEmail(email) {
   const rows = await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=*&order=updated_at.desc&limit=20`);
-  const profile = Array.isArray(rows) ? rows[0] || null : null;
-  if (!profile?.uid || !/loan|mortgage/i.test(`${profile.industry || ''} ${profile.title || ''}`)) {
-    const error = new Error('No approved loan officer profile matches this email.');
-    error.status = 403;
-    throw error;
-  }
-  return { profile, profiles:rows };
+  const profile = accountProfile(rows, email);
+  return { profile, profiles:[profile] };
 }
 
 async function visitContexts(profiles, rawIds) {
@@ -54,14 +51,14 @@ async function visitContexts(profiles, rawIds) {
   if (!ids.length) return [];
   const profileUids = [...new Set((profiles || []).map((row) => row?.uid).filter(Boolean))];
   if (!profileUids.length) return [];
-  const participants = await supabaseRest(`field_demo_visit_participants?participant_profile_id=in.(${profileUids.map(enc).join(',')})&field_demo_visit_id=in.(${ids.map(enc).join(',')})&select=field_demo_visit_id`);
+  const participants = await supabaseRest(`field_demo_visit_participants?participant_profile_id=in.(${profileUids.map(enc).join(',')})&field_demo_visit_id=in.(${ids.map(enc).join(',')})&role=eq.loan_officer&responsibility=eq.financing_support&is_primary=eq.true&status=in.(assigned,confirmed,en_route,on_site,live)&select=field_demo_visit_id,participant_profile_id`);
   const allowed = new Set((Array.isArray(participants) ? participants : []).map((row) => row.field_demo_visit_id));
   if (!allowed.size) return [];
-  const visits = await supabaseRest(`field_demo_visits?id=in.(${[...allowed].map(enc).join(',')})&select=id,outreach_queue_id,open_house_id,agent_name,agent_phone,agent_email,brokerage,notes`);
-  const queueIds = [...new Set((Array.isArray(visits) ? visits : []).map((row) => row.outreach_queue_id).filter(Boolean))];
-  const queues = queueIds.length ? await supabaseRest(`agent_outreach_queue?id=in.(${queueIds.map(enc).join(',')})&select=id,address,listing_photo_url,agent_name,agent_phone,agent_email,brokerage,open_house_id`) : [];
-  const byQueue = new Map((Array.isArray(queues) ? queues : []).map((row) => [row.id, row]));
-  return (Array.isArray(visits) ? visits : []).map((visit) => ({ visit_id:visit.id, ...byQueue.get(visit.outreach_queue_id), ...Object.fromEntries(Object.entries(visit).filter(([,value]) => value)) }));
+  const visits = await supabaseRest(`field_demo_visits?id=in.(${[...allowed].map(enc).join(',')})&status=neq.cancelled&select=id,outreach_queue_id,open_house_id,open_house_event_id,agent_name,agent_phone,agent_email,brokerage,notes`);
+  return Promise.all((Array.isArray(visits) ? visits : []).map(async (visit) => ({
+    ...await assignmentContext(visit), visit_id:visit.id,
+    agent_contact_url:contactUrl(visit.id, participants.find((row) => row.field_demo_visit_id === visit.id).participant_profile_id)
+  })));
 }
 
 module.exports = async function handler(req, res) {

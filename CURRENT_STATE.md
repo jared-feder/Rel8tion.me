@@ -4,6 +4,15 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-09-23: Loan officer assignment contact card and exact open-house link
+
+- `[IMPLEMENTED]` Local assignment SMS now includes host name/phone, a signed downloadable vCard, the exact assigned visit link, and the loan officer's public profile when a slug exists. Confirmed/outreach assignments use the existing notification path; manual/automatic live-event coverage now also notifies the assigned LO after saving its field participant. No test texts were sent.
+- `[IMPLEMENTED]` The account sign-in preserves the visit and opens its dashboard card with property photo, directions, Save Agent Contact, and calendar controls. Requested visits can load beyond the normal date window and first 200 participants; withdrawn primary assignments are excluded. Property context comes from the visit's queue, listing, or event without copying another agent's contact identity.
+- `[IMPLEMENTED]` `/api/assignment-contact` returns vCard 3.0 with UTF-8 folding and escaped values. Signed links expire after 30 days and check current primary financing assignment and non-cancelled visit on every request. They convey no dashboard or buyer-data access. The authenticated account API issues fresh contact links for eligible visits. No database migration or Edge Function deployment is needed.
+- `[VERIFIED LOCALLY]` All 11 checks in `node test/assignment-notification.test.cjs` pass: signed-link expiry/tampering/revocation, vCard output, SMS payload/provider status, live assignment notification, login forwarding, context preservation, out-of-range visits, platform map URLs, and browser script parsing. Node syntax checks and `verify:agent-lo-assignment` pass. `verify:routes` passes with filesystem fallback because sandboxed git child-process spawning is denied. The test runner's child-process mode also encountered EPERM; direct execution passed.
+- `[NEEDS VERIFICATION]` These changes are not deployed. Real provider delivery, authenticated production data, Safari/iPhone contact import, and Chrome/Android contact import remain unverified. The text contains a contact download link, not a carrier-dependent MMS vCard attachment.
+- `AGENTS.md updated - preserve assignment deep links, restricted contact capabilities, and delivery/device evidence boundaries.`
+
 ## 2026-09-23: Outreach capacity increase
 
 - [IMPLEMENTED] Owner-approved automatic outreach ceilings are raised from 7/run, 20/rolling hour, and 150/rolling 24 hours to 25/run, 100/rolling hour, and 500/rolling 24 hours across the Vercel cron wrapper, the Supabase sender hard caps/defaults, and REL8TION COMMAND guardrail limits.
@@ -835,3 +844,18 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - `[IMPLEMENTED]` `npm run lint`, `npm run typecheck`, `npm test`, `npm run verify:routes`, and `npm run verify:app` provide repository-appropriate static syntax, authorization, RBAC, route-contract, and architecture checks for the universal application. The frameworkless Vercel project intentionally has no conventional `build` script so Vercel keeps its existing zero-config static/serverless packaging behavior.
 - `[IMPLEMENTED]` The protected Vercel Preview for `feature/role-aware-dashboard` was generated through the existing Git integration and verified read-only on 2026-07-28. Desktop and 390×844 mobile gateway layouts rendered without horizontal overflow; `/api/app/session` returned an unauthenticated state; `/api/app/admin-summary` returned 401; and `/event`, `/claim`, `/s.html`, `/a`, `/b`, `/nmb-verified`, and the `/k` missing-UID fallback retained their expected public behavior. Before production rollout, direct `/admin` compatibility was tightened to preserve same-origin COMMAND credentials while retaining server authorization on every privileged API. The owner approved production rollout on 2026-07-28 subject to preserving admin dashboard access; production source remains `main`, and the exact live SHA must be verified through Vercel before making a live claim.
 - `[IMPLEMENTED]` `docs/universal-app-and-platform-admin-guide.md` explains in plain language what the universal app and Platform Admin foundation do, how they differ from REL8TION COMMAND, what is live, and what remains before role-based administration is operational. The universal shell uses the established REL8TION hand-and-wordmark logo instead of the placeholder `R8` tile.
+
+
+## 2026-09-24: Assignment notification production release preparation
+
+- Prepared in an isolated checkout from origin/main c31e79901867207f1bcd75de06055c372874c97e, matching the current READY production deployment dpl_6wHAU9gpcd8zywZWz8Xf7mxnb5KV. Preserved newer outreach changes and unrelated local edits.
+- Production read-only schema check confirms UUID visit/profile identifiers and required contact fields. All 37 active primary financing assignments match verified profile UIDs and have public profile slugs; 33 have both saved host name and phone. Missing contact values are not invented.
+- All 11 notification regressions, route checks, and existing agent/LO assignment checks pass on the release checkout. No messages sent during preparation.
+- AGENTS.md updated with restricted contact download and assignment-link rules.
+
+
+## 2026-09-24: Production review follow-ups
+
+- Fixed PR #54 findings: setup/recovery requests now send the visit; server validates UUID and current assignment before preserving it in the canonical callback. Token cleanup retains the visit through reloads.
+- Account and access-link APIs now require exactly one active matching approved profile; they no longer combine multiple profile UIDs by email. Production read-only check found zero duplicate active email groups.
+- All 14 focused tests pass, including invite/recovery assigned/unassigned visit cases and shared-email rejection. No test SMS sent. AGENTS.md updated with these durable boundaries.

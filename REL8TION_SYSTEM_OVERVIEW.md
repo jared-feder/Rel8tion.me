@@ -4,6 +4,8 @@ Human architecture and product overview for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+- `[IMPLEMENTED]` Local loan-officer assignment notifications include a downloadable hosting-agent vCard, a public LO profile link when available, and `/loan-officer?visit=<id>`. Sign-in carries that visit into the field dashboard, which focuses the property card with photo, calendar, contact, and platform-aware directions. Contact-download capabilities expire after 30 days and require a current primary financing assignment; they never unlock the dashboard or buyer data. Production SMS delivery and physical iPhone/Android contact import remain `[NEEDS VERIFICATION]`.
+
 This document explains how the product fits together. Use `CURRENT_STATE.md` for daily status and verification needs. Use `AGENTS.md` for Codex operating rules and dangerous-file guidance.
 
 Status labels used in this file:
@@ -375,3 +377,5 @@ The administration shell itself embeds no platform data. A direct request that d
 [IMPLEMENTED] The COMMAND release-window editor keeps unsaved date/checkbox/reason values and their original saved revision in in-memory draft state, separate from refreshed control data. Save snapshots the payload before prompts or renders. Failed saves retain the draft and show the returned error; Reload saved dates discards it only after confirmation and a successful read. Stale background reads cannot restore an older saved release-window revision. This is a browser form-state repair, not a change to server authorization, date rules, outreach eligibility, or delivery. Deployment and live-browser behavior remain [NEEDS VERIFICATION].
 
 [IMPLEMENTED] Failed COMMAND control refreshes retain the complete last successful control snapshot and display an unverified-status warning while preserving release-window drafts. Only successful reads or setting saves clear the refresh warning.
+
+- [IMPLEMENTED] Assignment deep links survive password setup and recovery SMS. Account identity requires a unique active approved profile; duplicate email identities require operator correction before access or contact-link issuance.

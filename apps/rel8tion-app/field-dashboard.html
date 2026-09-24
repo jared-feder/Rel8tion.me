@@ -61,7 +61,7 @@
       messages: {},
       activeConversationByVisit: {},
       scheduleOpen: false,
-      activeSection: params.get('section') || window.location.hash.replace(/^#/, '') || 'lo-overview',
+      activeSection: params.get('section') || (params.get('visit') ? 'lo-open-houses' : '') || window.location.hash.replace(/^#/, '') || 'lo-overview',
       authSession: null,
       busy: false,
       message: '',
@@ -174,7 +174,7 @@
     }
 
     function loanOfficerLoginHref() {
-      return '/loan-officer';
+      return `/loan-officer${params.get('visit') ? `?visit=${encodeURIComponent(params.get('visit'))}` : ''}`;
     }
 
     function buildAvailabilitySlots(data) {
@@ -253,12 +253,12 @@
       const contexts = new Map(contextRows.map((row) => [row.visit_id, row]));
       const queueIds = [...new Set(visits.map((visit) => visit.outreach_queue_id).filter(Boolean))];
       for (const queueId of queueIds) {
-        if (contextRows.some((row) => row.id === queueId)) continue;
+        if (visits.filter((visit) => visit.outreach_queue_id === queueId).every((visit) => contexts.has(visit.id))) continue;
         const rows = await request(`agent_outreach_queue?id=eq.${encodeURIComponent(queueId)}&select=id,address,listing_photo_url,agent_name,agent_phone,agent_email,brokerage,open_house_id&limit=1`).catch(() => []);
         const queue = Array.isArray(rows) ? rows[0] : null;
-        visits.filter((visit) => visit.outreach_queue_id === queueId).forEach((visit) => { if (queue) contexts.set(visit.id, { visit_id:visit.id, ...queue }); });
+        visits.filter((visit) => visit.outreach_queue_id === queueId).forEach((visit) => { if (queue && !contexts.has(visit.id)) contexts.set(visit.id, { visit_id:visit.id, ...queue }); });
       }
-      return visits.map((visit) => ({ ...contexts.get(visit.id), ...visit, listing_photo_url:contexts.get(visit.id)?.listing_photo_url || visit.listing_photo_url || '', address:contexts.get(visit.id)?.address || visit.address || '' }));
+      return visits.map((visit) => ({ ...contexts.get(visit.id), ...visit, agent_contact_url:contexts.get(visit.id)?.agent_contact_url || '', listing_photo_url:contexts.get(visit.id)?.listing_photo_url || visit.listing_photo_url || '', address:contexts.get(visit.id)?.address || visit.address || '' }));
     }
 
     function relationshipRange() {
@@ -305,17 +305,21 @@
 
       const seen = new Map();
       for (const filter of queries) {
-        const rows = await request(
+        let rows = await request(
           `field_demo_visit_participants?${filter}&select=*,field_demo_visits(*)&order=created_at.asc&limit=200`
         ).catch((error) => {
           console.log('field demo participant load skipped', error);
           return [];
         });
+        if (isUuid(params.get('visit'))) {
+          const linkedRows = await request(`field_demo_visit_participants?${filter}&field_demo_visit_id=eq.${encodeURIComponent(params.get('visit'))}&select=*,field_demo_visits(*)`).catch(() => []);
+          rows = [...rows, ...linkedRows];
+        }
         (Array.isArray(rows) ? rows : []).forEach((row) => {
           const visit = row.field_demo_visits;
           if (!visit?.id) return;
           const scheduled = new Date(visit.scheduled_start || '');
-          if (!Number.isNaN(scheduled.getTime()) && (scheduled < start || scheduled >= end)) return;
+          if (visit.id !== params.get('visit') && !Number.isNaN(scheduled.getTime()) && (scheduled < start || scheduled >= end)) return;
           seen.set(row.id, row);
         });
       }
@@ -327,6 +331,7 @@
       participantRows.forEach((participant) => {
         const visit = participant.field_demo_visits;
         if (!visit?.id || visit.status === 'cancelled' || participant.status === 'cancelled') return;
+        if (participant.role === 'loan_officer' && participant.responsibility === 'financing_support' && participant.is_primary === false) return;
         if (!visitsById.has(visit.id)) visitsById.set(visit.id, { ...visit, participants: [] });
         visitsById.get(visit.id).participants.push({ ...participant, field_demo_visits: undefined });
       });
@@ -972,7 +977,7 @@
       const address = visit.address || visit.open_house_id || visit.open_house_event_id || 'Field visit';
       const agentMessage = `Hi${visit.agent_name ? ` ${visit.agent_name}` : ''}, this is ${state.profile?.full_name || participantName(primary)}. I am assigned to your REL8TION field demo.`;
       return `
-        <article class="rounded-[24px] border border-white/80 bg-white/78 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] sm:rounded-[30px] sm:p-5">
+        <article id="visit-${esc(visit.id)}" tabindex="-1" class="scroll-mt-5 rounded-[24px] border border-white/80 bg-white/78 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] sm:rounded-[30px] sm:p-5">
           ${visit.listing_photo_url ? `<img src="${esc(visit.listing_photo_url)}" alt="${esc(address)}" class="mb-4 h-48 w-full rounded-[22px] object-cover sm:h-64">` : ''}
           <div class="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
             <div>
@@ -992,6 +997,7 @@
               <div class="mt-2 text-xl font-black">${esc(visit.agent_name || 'Agent')}</div>
               <div class="mt-1 text-sm font-bold text-slate-500">${esc(visit.brokerage || 'Brokerage not listed')}</div>
               <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                ${visit.agent_contact_url ? `<a href="${esc(visit.agent_contact_url)}" class="rounded-full bg-sky-600 px-3 py-3 text-center text-xs font-black text-white">Save Agent Contact</a>` : ''}
                 <a href="${esc(telHref(visit.agent_phone))}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Call Agent</a>
                 <a href="${esc(smsHref(visit.agent_phone, agentMessage))}" class="rounded-full bg-white px-3 py-2 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_phone ? '' : 'pointer-events-none opacity-40'}">Text Agent</a>
                 <a href="${visit.agent_email ? `mailto:${esc(visit.agent_email)}` : '#'}" class="rounded-full bg-white px-3 py-3 text-center text-xs font-black text-slate-700 ring-1 ring-slate-200 ${visit.agent_email ? '' : 'pointer-events-none opacity-40'}">Email Agent</a>
@@ -1535,6 +1541,10 @@
       state.outreachCandidates = await loadOutreachCandidates();
       const rows = await loadParticipantRows(dashboardRange());
       state.visits = await loadVisitContexts(groupVisits(rows));
+      const requestedVisit = params.get('visit');
+      const targetVisit = state.visits.find((visit) => visit.id === requestedVisit || visit.duplicate_visit_ids?.includes(requestedVisit));
+      if (requestedVisit && !targetVisit) state.error = 'This open house is no longer available in your assignments. Contact REL8TION if you need help.';
+      if (targetVisit) state.visits = [targetVisit, ...state.visits.filter((visit) => visit !== targetVisit)];
       if (isLoanOfficerDashboard()) {
         const relationshipRows = await loadParticipantRows(relationshipRange());
         state.relationshipVisits = groupVisits(relationshipRows);
@@ -1548,6 +1558,11 @@
       await loadBuyerRequestsForVisits([...buyerVisitMap.values()]);
       await loadChatsForVisits(state.visits);
       render();
+      if (targetVisit && state.activeSection === 'lo-open-houses') {
+        const card = document.getElementById(`visit-${targetVisit.id}`);
+        card?.scrollIntoView({ block:'start' });
+        card?.focus({ preventScroll:true });
+      }
     }
 
     window.toggleSchedule = () => {
