@@ -26,6 +26,7 @@
     import { SUPABASE_URL, KEY } from '/apps/rel8tion-app/src/core/config.js';
     const client=window.supabase.createClient(SUPABASE_URL,KEY);
     const mode=new URLSearchParams(location.search).get('mode')||'';
+    const assignmentVisit=new URLSearchParams(location.search).get('visit')||'';
     const deviceLockSetupRequested=new URLSearchParams(location.search).get('device_lock')==='setup';
     const sections=['loading','setup','login','phoneLockSetup','phoneUnlock','pinSetup','pinUnlock'];
     const status=document.getElementById('status');
@@ -69,7 +70,9 @@
       const data=await response.json().catch(()=>({}));
       if(!response.ok||!data.profile?.uid)throw new Error(data.error||'Approved loan officer profile not found.');
       markDashboardUnlocked(session);
-      location.replace(`/field-dashboard?role=loan_officer&uid=${encodeURIComponent(data.profile.uid)}`);
+      const destination=new URLSearchParams({role:'loan_officer',uid:data.profile.uid});
+      if(assignmentVisit){destination.set('visit',assignmentVisit);destination.set('section','lo-open-houses')}
+      location.replace(`/field-dashboard?${destination.toString()}`);
     }
     async function boot(){
       const linkParams=new URLSearchParams(location.search);
