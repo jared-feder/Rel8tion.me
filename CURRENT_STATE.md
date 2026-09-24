@@ -852,3 +852,10 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - Production read-only schema check confirms UUID visit/profile identifiers and required contact fields. All 37 active primary financing assignments match verified profile UIDs and have public profile slugs; 33 have both saved host name and phone. Missing contact values are not invented.
 - All 11 notification regressions, route checks, and existing agent/LO assignment checks pass on the release checkout. No messages sent during preparation.
 - AGENTS.md updated with restricted contact download and assignment-link rules.
+
+
+## 2026-09-24: Production review follow-ups
+
+- Fixed PR #54 findings: setup/recovery requests now send the visit; server validates UUID and current assignment before preserving it in the canonical callback. Token cleanup retains the visit through reloads.
+- Account and access-link APIs now require exactly one active matching approved profile; they no longer combine multiple profile UIDs by email. Production read-only check found zero duplicate active email groups.
+- All 14 focused tests pass, including invite/recovery assigned/unassigned visit cases and shared-email rejection. No test SMS sent. AGENTS.md updated with these durable boundaries.

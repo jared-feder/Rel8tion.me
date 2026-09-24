@@ -1,4 +1,5 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
+const { accountProfile } = require('../lib/loan-officer-account-identity');
 
 const clean = (value, max = 2000) => String(value || '').trim().slice(0, max);
 const enc = (value) => encodeURIComponent(clean(value));
@@ -68,12 +69,18 @@ module.exports = async function handler(req, res) {
       sendJson(res, 405, { ok:false, error:'Method not allowed.' });
       return;
     }
-    const email = clean(bodyOf(req).email, 320).toLowerCase();
+    const body = bodyOf(req);
+    const email = clean(body.email, 320).toLowerCase();
+    const visitId = clean(body.visit, 100);
+    if (visitId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(visitId)) {
+      return sendJson(res, 400, { ok:false, error:'Invalid assignment link.' });
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       sendJson(res, 400, { ok:false, error:'Enter the approved email address.' });
       return;
     }
-    const profile = one(await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=uid,full_name,email,phone,industry,title&limit=1`));
+    const profiles = await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=uid,full_name,email,phone,industry,title&limit=20`);
+    const profile = accountProfile(profiles, email);
     if (!profile?.uid || !/loan|mortgage/i.test(`${profile.industry || ''} ${profile.title || ''}`)) {
       sendJson(res, 200, { ok:true, delivery:'If an approved account matches, a secure link will be sent to its saved mobile number.' });
       return;
@@ -88,8 +95,12 @@ module.exports = async function handler(req, res) {
       sendJson(res, 200, { ok:true, delivery:'A secure link was just sent. Wait 30 seconds before requesting another so the current link remains valid.' });
       return;
     }
-    const redirectTo = `${clean(process.env.PUBLIC_APP_URL || process.env.REL8TION_APP_URL || 'https://app.rel8tion.me', 500).replace(/\/$/, '')}/loan-officer?mode=setup`;
-    const generated = await generateAccountLink(profile, url, key, redirectTo);
+    const redirectTo = new URL('https://app.rel8tion.me/loan-officer?mode=setup');
+    if (visitId) {
+      const assigned = one(await supabaseRest(`field_demo_visit_participants?field_demo_visit_id=eq.${enc(visitId)}&participant_profile_id=eq.${enc(profile.uid)}&role=eq.loan_officer&responsibility=eq.financing_support&is_primary=eq.true&status=in.(assigned,confirmed,en_route,on_site,live)&select=id&limit=1`));
+      if (assigned) redirectTo.searchParams.set('visit', visitId);
+    }
+    const generated = await generateAccountLink(profile, url, key, redirectTo.toString());
     const delivery = await textAccountLink(profile, generated.actionLink, url, key);
     sendJson(res, 200, { ok:true, delivery:'Secure account link sent by text.', mode:generated.mode });
   } catch (error) {

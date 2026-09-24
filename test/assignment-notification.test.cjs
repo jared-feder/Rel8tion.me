@@ -181,3 +181,53 @@ test('live coverage assignment sends the LO notification after saving its partic
   assert.equal(calls.length, 1);
   assert.equal(calls[0].agent_phone, profile.phone);
 });
+
+test('shared email profiles fail closed instead of widening assignment access', () => {
+  const { accountProfile } = require('../lib/loan-officer-account-identity');
+  const officer = { ...profile, email:'lo@example.test', title:'Loan Officer' };
+  assert.equal(accountProfile([officer], officer.email).uid, profileUid);
+  assert.throws(() => accountProfile([officer, { ...officer, uid:visitId, full_name:'Another Person' }], officer.email), /unique approved profile/);
+  assert.throws(() => accountProfile([officer, { ...officer, uid:visitId }], officer.email), /unique approved profile/);
+  assert.throws(() => accountProfile([{ ...officer, email:'other@example.test' }], officer.email), /unique approved profile/);
+});
+
+test('recovery and invite texts retain only a visit assigned to the canonical profile', async () => {
+  for (const exists of [true, false]) {
+    for (const assigned of [true, false]) {
+      let sent;
+      const officer = { ...profile, email:'lo@example.test', title:'Loan Officer' };
+      const { auth } = setup(async (query) => {
+        if (query.startsWith('verified_profiles')) return [officer];
+        if (query.startsWith('field_demo_visit_participants')) {
+          assert.ok(query.includes(`participant_profile_id=eq.${profileUid}`));
+          return assigned ? [{ id:'assignment' }] : [];
+        }
+        return [];
+      });
+      const handler = load('api/loan-officer-access-link.js', { '../lib/admin-auth':auth }, {
+        fetch:async (url, options) => {
+          if (url.includes('/admin/users')) return { ok:true, json:async () => ({ users:exists ? [{ email:officer.email }] : [] }) };
+          if (url.includes('/generate_link')) return { ok:true, json:async () => ({ action_link:`https://example.test/verify?token=test-token&type=${exists ? 'recovery' : 'invite'}` }) };
+          sent = JSON.parse(options.body);
+          return { ok:true, json:async () => ({ success:true }) };
+        }
+      });
+      const res = response();
+      await handler({ method:'POST', body:{ email:officer.email, visit:visitId } }, res);
+      assert.equal(res.statusCode, 200);
+      const link = new URL(sent.message.match(/https:\/\/\S+$/)[0]);
+      assert.equal(link.origin, 'https://app.rel8tion.me');
+      assert.equal(link.searchParams.get('type'), exists ? 'recovery' : 'invite');
+      assert.equal(link.searchParams.get('visit'), assigned ? visitId : null);
+      assert.equal(sent.agent_phone, officer.phone);
+    }
+  }
+});
+
+test('invalid recovery visit is rejected without account lookup or SMS', async () => {
+  const { auth } = setup(async () => { throw new Error('Unexpected query'); });
+  const handler = load('api/loan-officer-access-link.js', { '../lib/admin-auth':auth });
+  const res = response();
+  await handler({ method:'POST', body:{ email:'lo@example.test', visit:'https://attacker.test' } }, res);
+  assert.equal(res.statusCode, 400);
+});
