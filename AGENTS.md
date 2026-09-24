@@ -262,3 +262,5 @@ Every completed REL8TION work log must include an explicit `AGENTS.md` dispositi
 - [IMPLEMENTED] Keep the mocked regression suite in test/outreach-release-window-form.test.cjs passing. Testing a date-saving fix must not enable a production override, unpause outreach, alter recipient protections, or send real messages.
 
 - [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.
+
+- [IMPLEMENTED] Loan-officer setup/recovery SMS must carry a validated assignment visit through the fixed app.rel8tion.me callback and password setup. Only preserve visits belonging to the unique approved profile. Shared or duplicate active profile emails fail closed for account access and contact capability issuance; email equality must not aggregate people.

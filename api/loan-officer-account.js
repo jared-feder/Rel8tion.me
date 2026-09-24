@@ -1,6 +1,7 @@
 const { sendJson, supabaseRest } = require('../lib/admin-auth');
 const crypto = require('crypto');
 const { assignmentContext, contactUrl } = require('../lib/assignment-contact');
+const { accountProfile } = require('../lib/loan-officer-account-identity');
 
 const clean = (value, max = 2000) => String(value || '').trim().slice(0, max);
 const enc = (value) => encodeURIComponent(clean(value));
@@ -41,13 +42,8 @@ async function uploadHeadshot(dataUrl, profileUid, url, key) {
 
 async function profileForEmail(email) {
   const rows = await supabaseRest(`verified_profiles?email=ilike.${enc(email)}&is_active=eq.true&select=*&order=updated_at.desc&limit=20`);
-  const profile = Array.isArray(rows) ? rows[0] || null : null;
-  if (!profile?.uid || !/loan|mortgage/i.test(`${profile.industry || ''} ${profile.title || ''}`)) {
-    const error = new Error('No approved loan officer profile matches this email.');
-    error.status = 403;
-    throw error;
-  }
-  return { profile, profiles:rows };
+  const profile = accountProfile(rows, email);
+  return { profile, profiles:[profile] };
 }
 
 async function visitContexts(profiles, rawIds) {
