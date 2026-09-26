@@ -4,6 +4,16 @@ Daily operational source of truth for REL8TION.
 
 Last cleaned: 2026-06-04.
 
+## 2026-09-26: Assignment SMS carrier filtering investigation
+
+- `[VERIFIED]` Owner-authorized Twilio support ticket `29732015` was submitted under REL8TION LLC and read back as New, Programmable Messaging, P3 (General). It requests the specific filtering cause and configuration/remediation guidance. The disclosure correction is in staging PR #56, not deployed.
+
+- `[VERIFIED]` Twilio's REL8TION LLC account shows assignment message `SM5c292b5d04ca9b0f87fe2c84981a275b` created at 12:09:57 EDT and marked Undelivered at the Carrier Network stage 0.30 seconds later, error 30007 (Message filtered). Sender ends 5461; recipient ends 8059. The assignment save and provider submission succeeded; handset delivery did not.
+- `[VERIFIED]` The sender's brand is Approved and its A2P campaign `CM633c6c1b67db977f3ec202d4be6a1d93` is Verified/Approved. The registered description requires opt-out instructions; the blocked assignment text omitted them. This discrepancy does not establish the carrier's exact filtering trigger.
+- `[IMPLEMENTED LOCALLY]` Append the opt-out disclosure at the assignment SMS boundary for both recipients, preserving contact and property links, event transactional routing, and suppression. All 14 focused assignment checks pass with mocked provider calls. No resend or sender configuration change was made.
+- `[NEEDS VERIFICATION]` The deployed send-lead-sms version 71 does not request a delivery callback for this path, and no callback event exists for the message. Provider review and successful delivery after release remain outstanding. This local disclosure correction alone is not a delivery repair.
+- `AGENTS.md updated - retain campaign disclosure and distinguish filtering investigation from delivery proof.`
+
 ## 2026-09-23: Loan officer assignment contact card and exact open-house link
 
 - `[IMPLEMENTED]` Local assignment SMS now includes host name/phone, a signed downloadable vCard, the exact assigned visit link, and the loan officer's public profile when a slug exists. Confirmed/outreach assignments use the existing notification path; manual/automatic live-event coverage now also notifies the assigned LO after saving its field participant. No test texts were sent.
