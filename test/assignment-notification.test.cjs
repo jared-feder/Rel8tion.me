@@ -75,8 +75,9 @@ test('assignment SMS includes card, exact visit and public profile; preserves tr
   const assignment = load('api/admin/loan-officer-assignment.js', {
     '../../lib/admin-auth':auth, '../../lib/assignment-contact':contact
   }, { fetch:async (url, options) => { calls.push(JSON.parse(options.body)); return { ok:true, json:async () => ({ sms:{ ok:true, status:'queued', sid:'SM-test' } }) }; } });
-  const results = await assignment.notifyConfirmedAssignment(visit, profile, { loanOfficerOnly:true });
-  assert.equal(calls.length, 1);
+  const results = await assignment.notifyConfirmedAssignment(visit, profile);
+  assert.equal(calls.length, 2);
+  for (const call of calls) assert.match(call.message, /Reply STOP to opt out\.$/);
   assert.equal(calls[0].agent_phone, profile.phone);
   assert.equal(calls[0].category, 'event_transactional');
   assert.match(calls[0].message, /Save agent contact: https:\/\/app.rel8tion.me\/api\/assignment-contact\?token=/);
