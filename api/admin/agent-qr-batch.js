@@ -147,6 +147,8 @@ async function reserveEventPasses(quantity, id) {
     + '&sponsor_loan_officer_profile_id=is.null&sponsor_loan_officer_uid=is.null'
     + '&pass_model=eq.single_event&sponsor_coverage_required=eq.false'
     + '&sponsor_coverage_consent_required=eq.true&reuse_allowed=eq.false&reuse_status=eq.not_reusable'
+    // Exclude historical rows before LIMIT so they cannot hide fresh stock.
+    + '&or=(metadata.is.null,metadata.eq.%7B%7D)'
     + `&select=*&order=created_at.asc,public_code.asc&limit=${candidateLimit}`
   );
   const selected = (Array.isArray(candidates) ? candidates : []).filter(isFreshEventPass).slice(0, quantity);
@@ -162,7 +164,8 @@ async function reserveEventPasses(quantity, id) {
         + '&claimed_at=is.null&smart_sign_id=is.null&assigned_agent_slug=is.null&assigned_agent_phone=is.null'
         + '&sponsor_loan_officer_profile_id=is.null&sponsor_loan_officer_uid=is.null'
         + '&pass_model=eq.single_event&sponsor_coverage_required=eq.false'
-        + '&sponsor_coverage_consent_required=eq.true&reuse_allowed=eq.false&reuse_status=eq.not_reusable',
+        + '&sponsor_coverage_consent_required=eq.true&reuse_allowed=eq.false&reuse_status=eq.not_reusable'
+        + '&or=(metadata.is.null,metadata.eq.%7B%7D)',
         {
           method: 'PATCH',
           headers: { Prefer: 'return=representation' },

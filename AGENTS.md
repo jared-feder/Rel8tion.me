@@ -94,6 +94,8 @@ Preserve these priorities:
 
 ## QR And Inventory Guardrails
 
+- `[IMPLEMENTED]` Event Pass QR batch selection must exclude nonempty historical metadata in the database query before applying LIMIT, and repeat that guard on reservation. Filtering only a limited result in JavaScript can falsely report empty stock when older freshened rows precede unused inventory.
+
 - `[IMPLEMENTED]` Printed agent Rel8tionChip QR inventory lives in `rel8tion_chip_inventory` and resolves through `/c/:code` or `/chip/:code`.
 - `[IMPLEMENTED]` Linked agent QR rows redirect to `/b?agent=<slug>`. Do not route printed agent QR codes directly to `/agent-home`.
 - `[IMPLEMENTED]` A printed agent QR may be deliberately converted to an Event Pass only by retiring its agent inventory row and creating a matching `smart_sign_inventory` Event Pass row with explicit conversion metadata tied to the original row id. Only that narrow case may redirect `/c/:code` to `/pass?code=...`; `smart_sign_inventory.public_code` remains the Event Pass source of truth.

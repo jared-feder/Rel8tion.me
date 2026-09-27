@@ -123,10 +123,15 @@ async function verifyEventPassBatch() {
     qr_url: 'https://wrong.example/ignored',
     claimed_at: null
   };
+  const historical = Array.from({ length: 5 }, (_, index) => ({
+    ...fresh, id: `historical-${index}`, public_code: `ep-old-${index}`,
+    metadata: { freshened_reason: 'admin_scanner_freshen' }
+  }));
 
   const res = await requestBatch({ quantity: 1, inventory_type: 'event_pass' }, async (url, options = {}) => {
     calls.push({ url, options });
     if (options.method === 'PATCH') {
+      assert.equal(new URL(url).searchParams.get('or'), '(metadata.is.null,metadata.eq.{})');
       assert.match(url, /id=eq\.fresh-pass/);
       assert.doesNotMatch(url, /claimed-pass/);
       const patch = JSON.parse(options.body);
@@ -142,7 +147,13 @@ async function verifyEventPassBatch() {
     assert.match(url, /smart_sign_inventory\?inventory_type=eq\.event_pass/);
     assert.match(url, /claimed_at=is\.null/);
     assert.match(url, /reuse_status=eq\.not_reusable/);
-    return responseJson([claimed, fresh]);
+    // Model the database filtering before LIMIT: the old query sees only history.
+    const params = new URL(url).searchParams;
+    let rows = [...historical, fresh];
+    if (params.get('or') === '(metadata.is.null,metadata.eq.{})') {
+      rows = rows.filter((row) => !row.metadata || Object.keys(row.metadata).length === 0);
+    }
+    return responseJson(rows.slice(0, Number(params.get('limit'))));
   });
 
   assert.equal(res.statusCode, 200);
