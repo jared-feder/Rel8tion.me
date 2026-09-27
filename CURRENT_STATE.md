@@ -2,6 +2,13 @@
 
 Daily operational source of truth for REL8TION.
 
+## 2026-09-27: Event Pass QR false empty-stock repair
+
+- `[VERIFIED]` Production inventory inspection found 910 eligible fresh passes. The previous one-code request limited candidates to three before checking metadata; the first five candidates were historical freshened rows, hiding the available stock.
+- `[IMPLEMENTED]` QR batch selection now filters null/empty metadata in the database before LIMIT and repeats that check on reservation. Existing assignment, sponsor, claim, and print guards remain intact.
+- `[VERIFIED LOCALLY]` QR batch regression verification passes with five historical rows ahead of fresh stock. The equivalent read-only production query returns fresh codes. Deployment remains pending.
+- `AGENTS.md updated - filter historical metadata before limiting Event Pass print candidates and recheck on reservation.`
+
 Last cleaned: 2026-06-04.
 
 ## 2026-09-23: Loan officer assignment contact card and exact open-house link
