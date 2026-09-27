@@ -87,6 +87,8 @@ test('Event Pass activation does not block on optional browser session persisten
   assert.match(html, /if\(state\.publicCode&&!state\.uid\)\{const sign=await resolveSignByCode\(state\.publicCode\),pass=isEventPassFlow\(\)/);
   assert.match(html, /const storageAreas=\(\)=>\{const areas=\[\];for\(const name of \['localStorage','sessionStorage'\]/);
   assert.match(routerHtml, /function browserStorageAreas\(\)\s*\{[\s\S]*?sessionStorage/);
+  assert.match(routerHtml, /function readChipQrPendingSession\(\)\s*\{[\s\S]*?readBrowserStorage\(CHIP_QR_PENDING_KEY\)/);
+  assert.match(routerHtml, /function readOpenHouseKitPendingSession\(\)\s*\{[\s\S]*?readBrowserStorage\(OPEN_HOUSE_KIT_PENDING_KEY\)/);
 });
 
 test('protected server route creates a fresh Event Pass backing sign with the claimed NFC and agent', async () => {
