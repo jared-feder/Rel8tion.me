@@ -228,12 +228,35 @@ async function verifyGuards() {
   assert.match(empty.body.error, /No fresh unprinted Event Pass/);
 }
 
+async function verifyReservationRace() {
+  let writes = 0;
+  const fresh = {
+    id: 'race-pass', public_code: 'ep-race', inventory_type: 'event_pass',
+    is_printed: false, pass_model: 'single_event', sponsor_coverage_required: false,
+    sponsor_coverage_consent_required: true, reuse_allowed: false,
+    reuse_status: 'not_reusable', metadata: null
+  };
+  const res = await requestBatch({ quantity: 1, inventory_type: 'event_pass' }, async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      writes += 1;
+      assert.equal(new URL(url).searchParams.get('or'), '(metadata.is.null,metadata.eq.{})');
+      // Another operation added historical metadata after selection; reserve nothing.
+      return responseJson([]);
+    }
+    return responseJson([fresh]);
+  });
+  assert.equal(writes, 1);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.headers['content-type'], undefined);
+}
+
 (async () => {
   try {
     await verifyAgentBatch();
     await verifySmartSignBatch();
     await verifyEventPassBatch();
     await verifyGuards();
+    await verifyReservationRace();
     console.log('Admin Agent/Smart Sign/Event Pass QR batch verification passed.');
   } finally {
     delete global.fetch;
