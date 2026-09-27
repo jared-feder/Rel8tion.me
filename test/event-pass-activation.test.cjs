@@ -81,6 +81,12 @@ test('activation page delegates Event Pass backing-sign creation to the protecte
   assert.match(fs.readFileSync(path.join(__dirname, '../lib/event-pass-registration.js'), 'utf8'), /ensureEventPassBackingSign/);
 });
 
+test('Event Pass activation does not block on optional browser session persistence', () => {
+  assert.match(html, /async function saveEventPassSession\(patch=\{\}\)\{\s*try\{return await saveRemoteSession\(patch\)\}catch\(error\)\{console\.warn\('Event Pass activation session save skipped'/);
+  assert.match(html, /await \(pass\?saveEventPassSession\(next\):saveRemoteSession\(next\)\)/);
+  assert.match(html, /if\(state\.publicCode&&!state\.uid\)\{const sign=await resolveSignByCode\(state\.publicCode\),pass=isEventPassFlow\(\)/);
+});
+
 test('protected server route creates a fresh Event Pass backing sign with the claimed NFC and agent', async () => {
   const originalFetch = global.fetch;
   const originalUrl = process.env.SUPABASE_URL;
