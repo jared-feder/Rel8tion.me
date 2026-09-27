@@ -5,7 +5,9 @@ Daily operational source of truth for REL8TION.
 ## 2026-09-27: Event Pass activation save blocker
 
 - `[IMPLEMENTED]` Event Pass QR activation no longer stops when the optional browser-side `smart_sign_activation_sessions` write fails. The flow keeps local activation state and continues to the protected `/api/event-pass/action` route, while Smart Sign setup retains its existing strict session persistence.
-- `[VERIFIED LOCALLY]` Event Pass activation tests pass 9/9, including the new optional-session regression. Server syntax and route checks pass. Production deployment pending.
+- `[VERIFIED LOCALLY]` Event Pass activation tests pass 9/9, including the new optional-session regression. Server syntax and route checks pass.
+- `[DEPLOYED]` PR #59 merged to `main` at `391a50da9afa163b75a296d3fe77f838c41b7036`; Vercel production deployment `dpl_DNDitEZ96K8dmt7UKySoK71QspxT` is READY and serves the updated activation page.
+- `[VERIFIED LIVE]` `https://app.rel8tion.me/apps/rel8tion-app/sign-demo-activate.html` returns 200 and includes the Event Pass best-effort session-save branch.
 - `AGENTS.md updated - browser activation-session persistence is best-effort for Event Pass activation.`
 
 ## 2026-09-27: Event Pass QR false empty-stock repair
