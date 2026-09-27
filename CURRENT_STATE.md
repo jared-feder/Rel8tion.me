@@ -5,7 +5,9 @@ Daily operational source of truth for REL8TION.
 ## 2026-09-27: Fresh-phone browser storage fallback
 
 - `[IMPLEMENTED]` Event Pass activation and NFC handoff now use `sessionStorage` when `localStorage` is unavailable, while remote browser session persistence remains best-effort and the protected server activation remains authoritative.
-- `[VERIFIED LOCALLY]` Focused Event Pass activation tests pass with the fresh-phone storage regression coverage; deployment pending.
+- `[VERIFIED LOCALLY]` Focused Event Pass activation tests pass with the fresh-phone storage regression coverage.
+- `[DEPLOYED]` PR #61 merged to `main` at `8f530da3b6a0daf6f236b4ef62cd2331f064a092`; Vercel production deployment `dpl_D4cRnyUfn1CM36axhomFwTPtVtdb` is READY and reports that exact SHA.
+- `[VERIFIED LIVE]` The production activation page returns HTTP 200 and contains the session-storage fallback; the `/k` router reads the same fallback-safe storage helpers.
 - `AGENTS.md updated - added the browser storage fallback guardrail.`
 
 ## 2026-09-27: Event Pass activation save blocker
