@@ -2,6 +2,12 @@
 
 Daily operational source of truth for REL8TION.
 
+## 2026-09-27: Fresh-phone browser storage fallback
+
+- `[IMPLEMENTED]` Event Pass activation and NFC handoff now use `sessionStorage` when `localStorage` is unavailable, while remote browser session persistence remains best-effort and the protected server activation remains authoritative.
+- `[VERIFIED LOCALLY]` Focused Event Pass activation tests pass with the fresh-phone storage regression coverage; deployment pending.
+- `AGENTS.md updated - added the browser storage fallback guardrail.`
+
 ## 2026-09-27: Event Pass activation save blocker
 
 - `[IMPLEMENTED]` Event Pass QR activation no longer stops when the optional browser-side `smart_sign_activation_sessions` write fails. The flow keeps local activation state and continues to the protected `/api/event-pass/action` route, while Smart Sign setup retains its existing strict session persistence.

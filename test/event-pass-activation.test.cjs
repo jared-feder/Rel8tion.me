@@ -85,6 +85,8 @@ test('Event Pass activation does not block on optional browser session persisten
   assert.match(html, /async function saveEventPassSession\(patch=\{\}\)\{\s*try\{return await saveRemoteSession\(patch\)\}catch\(error\)\{console\.warn\('Event Pass activation session save skipped'/);
   assert.match(html, /await \(pass\?saveEventPassSession\(next\):saveRemoteSession\(next\)\)/);
   assert.match(html, /if\(state\.publicCode&&!state\.uid\)\{const sign=await resolveSignByCode\(state\.publicCode\),pass=isEventPassFlow\(\)/);
+  assert.match(html, /const storageAreas=\(\)=>\{const areas=\[\];for\(const name of \['localStorage','sessionStorage'\]/);
+  assert.match(routerHtml, /function browserStorageAreas\(\)\s*\{[\s\S]*?sessionStorage/);
 });
 
 test('protected server route creates a fresh Event Pass backing sign with the claimed NFC and agent', async () => {

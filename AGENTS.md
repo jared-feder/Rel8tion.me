@@ -86,6 +86,7 @@ Preserve these priorities:
 - `[IMPLEMENTED]` Active front smart sign chip routes public/buyer traffic to `/s?code=...` and then to `/event` when live.
 - `[IMPLEMENTED]` Active rear smart sign chip starts an agent dashboard challenge and requires the agent keychain before dashboard access.
 - `[IMPLEMENTED]` Event Pass activation must keep browser-side activation-session persistence best-effort. A failure writing `smart_sign_activation_sessions` cannot block the protected `/api/event-pass/action` open-house activation; local state and the server route remain authoritative.
+- `[IMPLEMENTED]` Event Pass activation and NFC handoff must tolerate browsers that reject `localStorage`; use `sessionStorage` as a same-tab fallback so a fresh phone can carry the pending QR and keychain state forward.
 - `[IMPLEMENTED]` Rear-sign dashboard verification takes precedence over loan-officer sign-in browser state.
 - `[IMPLEMENTED]` Sign activation chip scans take precedence over backup-keychain linking so a fresh sign chip cannot be claimed as an agent backup keychain.
 - `[IMPLEMENTED]` Pending Event Pass and Sponsored Event Pass activation must keep their Event Pass behavior and must not fall into normal agent profile/keychain claim behavior.

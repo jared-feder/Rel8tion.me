@@ -90,19 +90,46 @@
       window.location.href = `${url.pathname}${url.search}`;
     }
 
+    function browserStorageAreas() {
+      const areas = [];
+      for (const name of ['localStorage', 'sessionStorage']) {
+        try {
+          const area = window[name];
+          if (area) areas.push(area);
+        } catch (_) {}
+      }
+      return areas;
+    }
+
+    function readBrowserStorage(key) {
+      for (const area of browserStorageAreas()) {
+        try {
+          const raw = area.getItem(key);
+          if (raw) return raw;
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    function removeBrowserStorage(key) {
+      for (const area of browserStorageAreas()) {
+        try { area.removeItem(key); } catch (_) {}
+      }
+    }
+
     function readSignActivationSession() {
       try {
-        const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+        const raw = readBrowserStorage(SIGN_DEMO_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.updatedAt || parsed.createdAt || parsed.qrArmedAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 45 * 60 * 1000) {
-          window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          removeBrowserStorage(SIGN_DEMO_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        removeBrowserStorage(SIGN_DEMO_SESSION_KEY);
         return null;
       }
     }
