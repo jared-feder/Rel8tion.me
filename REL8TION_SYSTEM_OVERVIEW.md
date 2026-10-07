@@ -2,6 +2,8 @@
 
 Human architecture and product overview for REL8TION.
 
+- [IMPLEMENTED] /brian is Brian Puls's standalone public business card, with /api/contact/brian-puls providing an inline vCard. It uses public professional details and does not alter verified-profile, NFC, dashboard, or QR-inventory routing.
+
 - `[IMPLEMENTED]` COMMAND Event Pass QR export filters historical metadata in its database selection before limiting the batch, so older freshened passes cannot conceal fresh print inventory. Reservation repeats the same metadata guard.
 
 Last cleaned: 2026-06-04.

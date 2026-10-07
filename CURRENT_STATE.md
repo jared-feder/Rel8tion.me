@@ -2,6 +2,12 @@
 
 Daily operational source of truth for REL8TION.
 
+## 2026-10-07: Brian Puls digital business card
+
+- [IMPLEMENTED] Public /brian uses Jared's jaredfeder.com/bizcard design with Brian's verified photo, NMB phone/email, producing-branch-manager title and NMLS #36142 from his official NMB profile. Save Contact downloads /api/contact/brian-puls; QR/share/copy target https://irel8.me/brian. The page collects no borrower data.
+- [VERIFIED LOCALLY] Desktop (1440px) and mobile (390px, 320px) checks passed: no overflow, broken images, or browser errors; save prompt, QR, clipboard, contact links, and vCard GET/HEAD/405 behavior work. Production verification is pending; physical iPhone/Android import remains unverified.
+- AGENTS.md reviewed - no durable rule change.
+
 ## 2026-09-27: Fresh-phone browser storage fallback
 
 - `[IMPLEMENTED]` Event Pass activation and NFC handoff now use `sessionStorage` when `localStorage` is unavailable, while remote browser session persistence remains best-effort and the protected server activation remains authoritative.
