@@ -67,17 +67,17 @@
 
     function readChipQrPendingSession() {
       try {
-        const raw = window.localStorage.getItem(CHIP_QR_PENDING_KEY);
+        const raw = readBrowserStorage(CHIP_QR_PENDING_KEY);
         if (!raw) return '';
         const parsed = JSON.parse(raw);
         const expiresAt = new Date(parsed.expiresAt || 0).getTime();
         if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-          window.localStorage.removeItem(CHIP_QR_PENDING_KEY);
+          removeBrowserStorage(CHIP_QR_PENDING_KEY);
           return '';
         }
         return normalizeChipQrInput(parsed.chipCode || parsed.code || '');
       } catch (_) {
-        window.localStorage.removeItem(CHIP_QR_PENDING_KEY);
+        removeBrowserStorage(CHIP_QR_PENDING_KEY);
         return '';
       }
     }
@@ -90,31 +90,58 @@
       window.location.href = `${url.pathname}${url.search}`;
     }
 
+    function browserStorageAreas() {
+      const areas = [];
+      for (const name of ['localStorage', 'sessionStorage']) {
+        try {
+          const area = window[name];
+          if (area) areas.push(area);
+        } catch (_) {}
+      }
+      return areas;
+    }
+
+    function readBrowserStorage(key) {
+      for (const area of browserStorageAreas()) {
+        try {
+          const raw = area.getItem(key);
+          if (raw) return raw;
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    function removeBrowserStorage(key) {
+      for (const area of browserStorageAreas()) {
+        try { area.removeItem(key); } catch (_) {}
+      }
+    }
+
     function readSignActivationSession() {
       try {
-        const raw = window.localStorage.getItem(SIGN_DEMO_SESSION_KEY);
+        const raw = readBrowserStorage(SIGN_DEMO_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.updatedAt || parsed.createdAt || parsed.qrArmedAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 45 * 60 * 1000) {
-          window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+          removeBrowserStorage(SIGN_DEMO_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(SIGN_DEMO_SESSION_KEY);
+        removeBrowserStorage(SIGN_DEMO_SESSION_KEY);
         return null;
       }
     }
 
     function readAgentDashboardSession() {
       try {
-        const raw = window.localStorage.getItem(AGENT_DASHBOARD_SESSION_KEY);
+        const raw = readBrowserStorage(AGENT_DASHBOARD_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
-          window.localStorage.removeItem(AGENT_DASHBOARD_SESSION_KEY);
+          removeBrowserStorage(AGENT_DASHBOARD_SESSION_KEY);
           return null;
         }
         return parsed;
@@ -125,12 +152,12 @@
 
     function readLoanOfficerSession() {
       try {
-        const raw = window.localStorage.getItem(LOAN_OFFICER_SESSION_KEY);
+        const raw = readBrowserStorage(LOAN_OFFICER_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
-          window.localStorage.removeItem(LOAN_OFFICER_SESSION_KEY);
+          removeBrowserStorage(LOAN_OFFICER_SESSION_KEY);
           return null;
         }
         return parsed;
@@ -141,51 +168,51 @@
 
     function readKeyResetSession() {
       try {
-        const raw = window.localStorage.getItem(KEY_RESET_SESSION_KEY);
+        const raw = readBrowserStorage(KEY_RESET_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 10 * 60 * 1000) {
-          window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
+          removeBrowserStorage(KEY_RESET_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(KEY_RESET_SESSION_KEY);
+        removeBrowserStorage(KEY_RESET_SESSION_KEY);
         return null;
       }
     }
 
     function readOpenHouseKitPendingSession() {
       try {
-        const raw = window.localStorage.getItem(OPEN_HOUSE_KIT_PENDING_KEY);
+        const raw = readBrowserStorage(OPEN_HOUSE_KIT_PENDING_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const expiresAt = new Date(parsed.expiresAt || 0).getTime();
         if (parsed.purpose !== 'open_house_kit_confirm' || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-          window.localStorage.removeItem(OPEN_HOUSE_KIT_PENDING_KEY);
+          removeBrowserStorage(OPEN_HOUSE_KIT_PENDING_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(OPEN_HOUSE_KIT_PENDING_KEY);
+        removeBrowserStorage(OPEN_HOUSE_KIT_PENDING_KEY);
         return null;
       }
     }
 
     function readLoanOfficerSignSetupSession() {
       try {
-        const raw = window.localStorage.getItem(LO_SIGN_SETUP_SESSION_KEY);
+        const raw = readBrowserStorage(LO_SIGN_SETUP_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const expiresAt = new Date(parsed.expiresAt || parsed.createdAt || 0).getTime();
         if (!parsed.publicCode || !parsed.loanOfficerUid || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-          window.localStorage.removeItem(LO_SIGN_SETUP_SESSION_KEY);
+          removeBrowserStorage(LO_SIGN_SETUP_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(LO_SIGN_SETUP_SESSION_KEY);
+        removeBrowserStorage(LO_SIGN_SETUP_SESSION_KEY);
         return null;
       }
     }
@@ -237,17 +264,17 @@
 
     function readAddKeychainSession() {
       try {
-        const raw = window.localStorage.getItem(ADD_KEYCHAIN_SESSION_KEY);
+        const raw = readBrowserStorage(ADD_KEYCHAIN_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
-          window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+          removeBrowserStorage(ADD_KEYCHAIN_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(ADD_KEYCHAIN_SESSION_KEY);
+        removeBrowserStorage(ADD_KEYCHAIN_SESSION_KEY);
         return null;
       }
     }
@@ -296,17 +323,17 @@
 
     function readExtraSignChipSession() {
       try {
-        const raw = window.localStorage.getItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+        const raw = readBrowserStorage(EXTRA_SIGN_CHIP_SESSION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const ageMs = Date.now() - new Date(parsed.createdAt || 0).getTime();
         if (!Number.isFinite(ageMs) || ageMs > 15 * 60 * 1000) {
-          window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+          removeBrowserStorage(EXTRA_SIGN_CHIP_SESSION_KEY);
           return null;
         }
         return parsed;
       } catch (_) {
-        window.localStorage.removeItem(EXTRA_SIGN_CHIP_SESSION_KEY);
+        removeBrowserStorage(EXTRA_SIGN_CHIP_SESSION_KEY);
         return null;
       }
     }

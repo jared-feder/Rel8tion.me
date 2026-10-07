@@ -2,6 +2,10 @@
 
 Human architecture and product overview for REL8TION.
 
+- [IMPLEMENTED] /brian is Brian Puls's standalone public business card, with /api/contact/brian-puls providing an inline vCard. It uses public professional details and does not alter verified-profile, NFC, dashboard, or QR-inventory routing.
+
+- `[IMPLEMENTED]` COMMAND Event Pass QR export filters historical metadata in its database selection before limiting the batch, so older freshened passes cannot conceal fresh print inventory. Reservation repeats the same metadata guard.
+
 Last cleaned: 2026-06-04.
 
 - `[IMPLEMENTED]` Local loan-officer assignment notifications include a downloadable hosting-agent vCard, a public LO profile link when available, and `/loan-officer?visit=<id>`. Sign-in carries that visit into the field dashboard, which focuses the property card with photo, calendar, contact, and platform-aware directions. Contact-download capabilities expire after 30 days and require a current primary financing assignment; they never unlock the dashboard or buyer data. Production SMS delivery and physical iPhone/Android contact import remain `[NEEDS VERIFICATION]`.
@@ -106,6 +110,8 @@ The agent owner dashboard validates the claimed NFC UID/agent pairing before loa
 - `[IMPLEMENTED]` A deliberately converted printed agent QR may route from `/c/:code` to `/pass?code=...` only when the original agent inventory row is retired and the matching Event Pass row contains explicit conversion metadata tied to that original row id. `smart_sign_inventory.public_code` remains the Event Pass source of truth.
 - `[IMPLEMENTED]` A fresh Event Pass QR scan presents a visual NFC handoff showing the physical pass approaching the correct iPhone and Android NFC areas; public codes and chip-status jargon are hidden from the normal field instruction.
 - `[IMPLEMENTED]` Successful normal Event Pass activation shows one concise field-use handoff: visitors scan the printed QR to check in, while the agent taps the Event Pass NFC to reopen the live dashboard. The screen contains one dashboard action and no pass code, event id, setup explanation, buyer-route shortcut, or restart menu. The dashboard header provides a contextual **Get Support** email action without placing the NFC UID in the message.
+- `[IMPLEMENTED]` Event Pass activation treats browser-side activation-session persistence as best-effort; a failure writing `smart_sign_activation_sessions` cannot block the protected open-house activation route, whose server result remains authoritative.
+- `[IMPLEMENTED]` Event Pass activation falls back to `sessionStorage` when a browser rejects `localStorage`, preserving the same-tab QR and NFC handoff on a fresh phone.
 - `[IMPLEMENTED]` `/sponsored-pass-activate` activates reusable Sponsored Event Passes.
 - `[IMPLEMENTED]` Sponsored Event Pass activation records `event_pass_coverage_consents` before sponsor visibility.
 - `[IMPLEMENTED]` `/api/event-pass/action` is the server authorization boundary for normal Event Pass registration. It derives the host from the claimed keychain, compares stored agent identity with the listing agent, permits an explicitly confirmed substitute only when the stored brokerage matches, then creates or recovers the exact QR/NFC backing sign and locks the event, sign, and inventory to that agent with the service role. The fresh-pass browser flow carries only an in-memory placeholder and cannot create Event Pass sign rows through the anonymous Data API. Sponsored activation uses the same authorization module; free-form brokerage text alone cannot authorize a substitute.

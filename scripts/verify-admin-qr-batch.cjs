@@ -123,10 +123,15 @@ async function verifyEventPassBatch() {
     qr_url: 'https://wrong.example/ignored',
     claimed_at: null
   };
+  const historical = Array.from({ length: 5 }, (_, index) => ({
+    ...fresh, id: `historical-${index}`, public_code: `ep-old-${index}`,
+    metadata: { freshened_reason: 'admin_scanner_freshen' }
+  }));
 
   const res = await requestBatch({ quantity: 1, inventory_type: 'event_pass' }, async (url, options = {}) => {
     calls.push({ url, options });
     if (options.method === 'PATCH') {
+      assert.equal(new URL(url).searchParams.get('or'), '(metadata.is.null,metadata.eq.{})');
       assert.match(url, /id=eq\.fresh-pass/);
       assert.doesNotMatch(url, /claimed-pass/);
       const patch = JSON.parse(options.body);
@@ -142,7 +147,13 @@ async function verifyEventPassBatch() {
     assert.match(url, /smart_sign_inventory\?inventory_type=eq\.event_pass/);
     assert.match(url, /claimed_at=is\.null/);
     assert.match(url, /reuse_status=eq\.not_reusable/);
-    return responseJson([claimed, fresh]);
+    // Model the database filtering before LIMIT: the old query sees only history.
+    const params = new URL(url).searchParams;
+    let rows = [...historical, fresh];
+    if (params.get('or') === '(metadata.is.null,metadata.eq.{})') {
+      rows = rows.filter((row) => !row.metadata || Object.keys(row.metadata).length === 0);
+    }
+    return responseJson(rows.slice(0, Number(params.get('limit'))));
   });
 
   assert.equal(res.statusCode, 200);
@@ -217,12 +228,35 @@ async function verifyGuards() {
   assert.match(empty.body.error, /No fresh unprinted Event Pass/);
 }
 
+async function verifyReservationRace() {
+  let writes = 0;
+  const fresh = {
+    id: 'race-pass', public_code: 'ep-race', inventory_type: 'event_pass',
+    is_printed: false, pass_model: 'single_event', sponsor_coverage_required: false,
+    sponsor_coverage_consent_required: true, reuse_allowed: false,
+    reuse_status: 'not_reusable', metadata: null
+  };
+  const res = await requestBatch({ quantity: 1, inventory_type: 'event_pass' }, async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      writes += 1;
+      assert.equal(new URL(url).searchParams.get('or'), '(metadata.is.null,metadata.eq.{})');
+      // Another operation added historical metadata after selection; reserve nothing.
+      return responseJson([]);
+    }
+    return responseJson([fresh]);
+  });
+  assert.equal(writes, 1);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.headers['content-type'], undefined);
+}
+
 (async () => {
   try {
     await verifyAgentBatch();
     await verifySmartSignBatch();
     await verifyEventPassBatch();
     await verifyGuards();
+    await verifyReservationRace();
     console.log('Admin Agent/Smart Sign/Event Pass QR batch verification passed.');
   } finally {
     delete global.fetch;

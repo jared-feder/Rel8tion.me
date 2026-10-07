@@ -2,6 +2,33 @@
 
 Daily operational source of truth for REL8TION.
 
+## 2026-10-07: Brian Puls digital business card
+
+- [IMPLEMENTED] Public /brian uses Jared's jaredfeder.com/bizcard design with Brian's verified photo, NMB phone/email, producing-branch-manager title and NMLS #36142 from his official NMB profile. Save Contact downloads /api/contact/brian-puls; QR/share/copy target https://irel8.me/brian. The page collects no borrower data.
+- [VERIFIED LOCALLY] Desktop (1440px) and mobile (390px, 320px) checks passed: no overflow, broken images, or browser errors; save prompt, QR, clipboard, contact links, and vCard GET/HEAD/405 behavior work. Production verification is pending; physical iPhone/Android import remains unverified.
+- AGENTS.md reviewed - no durable rule change.
+
+## 2026-09-27: Fresh-phone browser storage fallback
+
+- `[IMPLEMENTED]` Event Pass activation and NFC handoff now use `sessionStorage` when `localStorage` is unavailable, while remote browser session persistence remains best-effort and the protected server activation remains authoritative.
+- `[VERIFIED LOCALLY]` Focused Event Pass activation tests pass with the fresh-phone storage regression coverage; deployment pending.
+- `AGENTS.md updated - added the browser storage fallback guardrail.`
+
+## 2026-09-27: Event Pass activation save blocker
+
+- `[IMPLEMENTED]` Event Pass QR activation no longer stops when the optional browser-side `smart_sign_activation_sessions` write fails. The flow keeps local activation state and continues to the protected `/api/event-pass/action` route, while Smart Sign setup retains its existing strict session persistence.
+- `[VERIFIED LOCALLY]` Event Pass activation tests pass 9/9, including the new optional-session regression. Server syntax and route checks pass.
+- `[DEPLOYED]` PR #59 merged to `main` at `391a50da9afa163b75a296d3fe77f838c41b7036`; Vercel production deployment `dpl_DNDitEZ96K8dmt7UKySoK71QspxT` is READY and serves the updated activation page.
+- `[VERIFIED LIVE]` `https://app.rel8tion.me/apps/rel8tion-app/sign-demo-activate.html` returns 200 and includes the Event Pass best-effort session-save branch.
+- `AGENTS.md updated - browser activation-session persistence is best-effort for Event Pass activation.`
+
+## 2026-09-27: Event Pass QR false empty-stock repair
+
+- `[VERIFIED]` Production inventory inspection found 910 eligible fresh passes. The previous one-code request limited candidates to three before checking metadata; the first five candidates were historical freshened rows, hiding the available stock.
+- `[IMPLEMENTED]` QR batch selection now filters null/empty metadata in the database before LIMIT and repeats that check on reservation. Existing assignment, sponsor, claim, and print guards remain intact.
+- `[VERIFIED LOCALLY]` QR batch regression verification passes with five historical rows ahead of fresh stock. The equivalent read-only production query returns fresh codes. Deployment remains pending.
+- `AGENTS.md updated - filter historical metadata before limiting Event Pass print candidates and recheck on reservation.`
+
 Last cleaned: 2026-06-04.
 
 ## 2026-09-23: Loan officer assignment contact card and exact open-house link
