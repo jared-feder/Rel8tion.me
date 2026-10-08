@@ -3,7 +3,7 @@ const VCARD = [
   'VERSION:3.0',
   'N:Puls;Brian;;;',
   'FN:Brian Puls',
-  'ORG:Nationwide Mortgage Bankers',
+  'ORG:NMBNOW',
   'TITLE:Producing Branch Manager',
   'TEL;TYPE=CELL:+15165272705',
   'EMAIL;TYPE=INTERNET:bpuls@nmbnow.com',
