@@ -2,6 +2,13 @@
 
 Daily operational source of truth for REL8TION.
 
+## 2026-10-08: Jared short business-card URL and card release
+
+- [IMPLEMENTED] /jared copies the existing jaredfeder.com/bizcard content and design, with the displayed address, canonical URL and share/copy actions using https://irel8.me/jared. Existing contact endpoint and links are preserved. The QR panel now uses a local QR SVG for https://irel8.me/jared; SVG and PNG copies are supplied for printing.
+- [IMPLEMENTED] Both standalone cards now live at the repository root with their dependencies. Removed the alternate app-root Brian page/rewrites identified by review; the production root is unchanged.
+- [NEEDS VERIFICATION] Release and public-domain checks pending. Owner approved publication and the specific release override on 2026-10-08.
+- AGENTS.md reviewed - no durable rule change.
+
 ## 2026-10-07: Brian Puls digital business card
 
 - [IMPLEMENTED] Public /brian uses Jared's jaredfeder.com/bizcard design with Brian's verified photo, NMB phone/email, producing-branch-manager title and NMLS #36142 from his official NMB profile. Save Contact downloads /api/contact/brian-puls; QR/share/copy target https://irel8.me/brian. The page collects no borrower data.
