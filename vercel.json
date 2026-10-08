@@ -68,8 +68,9 @@
     }
   ],
   "rewrites": [
-    { "source": "/brian", "destination": "/apps/rel8tion-app/brian.html" },
-    { "source": "/brian.html", "destination": "/apps/rel8tion-app/brian.html" },
+    { "source": "/jared", "destination": "/jared.html" },
+    { "source": "/brian", "destination": "/brian.html" },
+    { "source": "/brian.html", "destination": "/brian.html" },
     { "source": "/", "has": [{ "type": "host", "value": "getrel8tion.com" }], "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
     { "source": "/", "has": [{ "type": "host", "value": "www.getrel8tion.com" }], "destination": "/apps/rel8tion-app/get-open-house-kit.html" },
     { "source": "/", "destination": "/apps/rel8tion-app/app" },
