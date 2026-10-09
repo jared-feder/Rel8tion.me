@@ -91,6 +91,7 @@ async function sendAssignmentSms(to, name, message, metadata) {
   const url = clean(process.env.SUPABASE_URL, 500).replace(/\/$/, '');
   const key = clean(process.env.SUPABASE_SERVICE_ROLE_KEY, 2000);
   if (!phone || !url || !key) return { status:'skipped' };
+  message = `${message.trim()}\n\nReply STOP to opt out.`;
   const response = await fetch(`${url}/functions/v1/send-lead-sms`, { method:'POST', headers:{ apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({ agent_phone:phone, buyer_phone:phone, buyer_name:name || 'Open house contact', category:'event_transactional', message, metadata }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error) throw new Error(payload?.error || `Assignment SMS failed: ${response.status}`);
