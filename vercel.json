@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": {
+    "api/cron/weekly-production-report.js": {
+      "maxDuration": 300
+    },
+    "api/admin/weekly-production-reports.js": {
+      "maxDuration": 300
+    },
     "api/admin/agent-ranking.js": {
       "maxDuration": 300
     },

@@ -5,6 +5,10 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 
 const criticalProductionFiles = [
+  ['api/admin/weekly-production-reports.js', 'weekly production report archive'],
+  ['api/cron/weekly-production-report.js', 'weekly production report scheduler'],
+  ['weekly-production-report-worker.cjs', 'weekly production report generator'],
+  ['lib/weekly-report-archive.js', 'weekly production report persistence'],
   ['api/agent-profile-photo.js', 'agent owner profile photo uploads'],
   ['api/buyer-affordability.js', 'buyer sync and LO affordability guidance'],
   ['api/chip-qr.js', 'printed Rel8tionChip QR resolver'],
@@ -182,6 +186,11 @@ function main() {
         problem: `${result.state} cron API target`
       });
     }
+  }
+
+  if (configPath === path.join(ROOT, 'vercel.json') && !(config.crons || []).some((cron) =>
+    cron.path === '/api/cron/weekly-production-report' && cron.schedule === '5 13,14 * * 1')) {
+    failures.push({ type: 'weekly-report-schedule', route: '/api/cron/weekly-production-report', file: 'vercel.json', problem: 'Missing Monday New York weekly report schedule' });
   }
 
   for (const [file, reason] of criticalProductionFiles) {

@@ -1,5 +1,14 @@
 # CURRENT_STATE.md
 
+## 2026-10-13: Weekly production report archive and visibility
+
+- `[IMPLEMENTED IN SOURCE]` COMMAND Reports now includes a weekly archive, selected-week generation, saved metrics/event rows, print/PDF, missed-week warnings, and separate generation/email/closeout status. Manual generation saves a snapshot without event closeout or outbound email.
+- `[IMPLEMENTED IN SOURCE]` The scheduled worker persists the report before closeout/email, paginates report source records, serializes processing by reporting week, preserves completed snapshots, and avoids automatically resending accepted or uncertain email submissions. Sponsored events without a saved agent recap are deferred from closeout.
+- `[VERIFIED]` Applied the narrow archive and grant migrations to `nicanqrfqlbnlmnoernb`. The table has RLS, no anon/authenticated grants, server select/insert/update only, and a trigger preventing replacement of completed snapshots.
+- `[VERIFIED]` Production configuration inspection found SMTP settings but no Resend key or report recipient. The old worker supported only Resend. Added support for the existing SMTP provider and configured the owner's explicitly supplied report address in `PRODUCTION_REPORT_EMAILS`. An explicit Email report action submits the saved snapshot without closing events. Production delivery verification is pending.
+- `[VERIFIED LOCALLY]` All 16 weekly-report regressions, 33 existing COMMAND tests, app architecture, and route checks pass. Required CI and route checks now protect the archive and Monday schedule. Production release verification is pending.
+- `AGENTS.md` updated with durable archive, side-effect, immutable-history, email-status, and regression-test rules.
+
 Daily operational source of truth for REL8TION.
 
 ## 2026-10-08: Jared short business-card URL and card release

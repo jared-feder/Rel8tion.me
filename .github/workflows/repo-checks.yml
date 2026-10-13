@@ -19,6 +19,9 @@ jobs:
       - name: Verify Vercel route map
         run: npm run verify:routes
 
+      - name: Protect weekly report archive and scheduling
+        run: npm run verify:weekly-reports
+
       - name: Prevent legacy loan-officer keychain assignment
         run: npm run verify:agent-lo-assignment
 
@@ -72,6 +75,8 @@ jobs:
             matches="$(git diff -U0 "${base}" "${head}" -- "${file}" \
               | grep -E '^\+' \
               | grep -Ev '^\+\+\+' \
+              | grep -Ev "^\\+grant select, insert, update on public\\.weekly_production_reports to ${sr_token};$" \
+              | grep -Ev "^\\+revoke all on public\\.weekly_production_reports from ${sr_token};$" \
               | grep -Ev "^\\+ *const key = process\\.env\\.${sr_name}; *$" \
               | grep -Ev "^\\+ *process:\\{ env:\\{ ${sr_name}:'test-only-signing-secret', SUPABASE_URL:'https://example.test' \\} \\}, *$" \
               | grep -E "${pattern}" || true)"
