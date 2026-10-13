@@ -7750,8 +7750,8 @@ ${rowsHtml}
       return `<h3>Week of ${esc(report.week_start)}</h3>
         <p>${metrics.map(([label, key]) => `${esc(label)}: <strong>${esc(totals[key] ?? 0)}</strong>`).join(' &nbsp; | &nbsp; ')}</p>
         <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr>
-        ${['Open house', 'Agent / Loan officer', 'Check-ins', 'Financing', 'Disclosures', 'Messages', 'LO guidance'].map((label) => `<th style="padding:8px">${label}</th>`).join('')}</tr></thead><tbody>
-        ${(report.summary.rows || []).map((row) => `<tr><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.address)}<br>${esc(fmtDate(row.start))}</td><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.agent)}<br>${esc(row.loanOfficer)}</td>${['checkins', 'financing', 'disclosures', 'messages', 'guidance'].map((key) => `<td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row[key] ?? 0)}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="7" style="padding:16px">No events were recorded in this week.</td></tr>'}
+        ${['Open house', 'Agent / Loan officer', 'Check-ins', 'Financing', 'Disclosures', 'Messages', 'LO guidance', 'Devices'].map((label) => `<th style="padding:8px">${label}</th>`).join('')}</tr></thead><tbody>
+        ${(report.summary.rows || []).map((row) => `<tr><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.address)}<br>${esc(fmtDate(row.start))}</td><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.agent)}<br>${esc(row.loanOfficer)}</td>${['checkins', 'financing', 'disclosures', 'messages', 'guidance', 'devices'].map((key) => `<td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row[key] ?? 0)}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="8" style="padding:16px">No events were recorded in this week.</td></tr>'}
         </tbody></table></div>`;
     }
 

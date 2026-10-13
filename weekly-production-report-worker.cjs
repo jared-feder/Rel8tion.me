@@ -156,7 +156,7 @@ function inFilter(ids) {
 
 async function supportingRows(events) {
   const eventIds = events.map((event) => event.id).filter(Boolean);
-  if (!eventIds.length) return { houses: [], agents: [], checkins: [], sessions: [], messages: [], guidance: [] };
+  if (!eventIds.length) return { houses: [], agents: [], checkins: [], sessions: [], messages: [], guidance: [], devices: [] };
   const houseIds = [...new Set(events.map((event) => event.open_house_source_id).filter(Boolean))];
   const slugs = [...new Set(events.map((event) => event.host_agent_slug).filter(Boolean))];
   async function related(table, column, ids, select, order = 'id.asc') {
@@ -166,15 +166,16 @@ async function supportingRows(events) {
     }
     return rows;
   }
-  const [houses, agents, checkins, sessions, messages, guidance] = await Promise.all([
+  const [houses, agents, checkins, sessions, messages, guidance, devices] = await Promise.all([
     related('open_houses', 'id', houseIds, 'id,address,price,open_start,open_end,image,agent,brokerage'),
     related('agents', 'slug', slugs, 'slug,name,brokerage', 'slug.asc'),
     related('event_checkins', 'open_house_event_id', eventIds, 'id,open_house_event_id,visitor_type,pre_approved,metadata,created_at'),
     related('event_loan_officer_sessions', 'open_house_event_id', eventIds, 'id,open_house_event_id,loan_officer_name,status,source', 'signed_in_at.desc,id.asc'),
     related('event_conversation_messages', 'open_house_event_id', eventIds, 'id,open_house_event_id,sender_role,created_at'),
-    related('buyer_affordability_guidance', 'source_event_id', eventIds, 'id,source_event_id,status,created_at')
+    related('buyer_affordability_guidance', 'source_event_id', eventIds, 'id,source_event_id,status,created_at'),
+    related('smart_signs', 'active_event_id', eventIds, 'id,active_event_id')
   ]);
-  return { houses, agents, checkins, sessions, messages, guidance };
+  return { houses, agents, checkins, sessions, messages, guidance, devices };
 }
 
 function summarize(events, related, closedDevices = new Map()) {
@@ -300,7 +301,12 @@ async function run({ now = new Date(), dryRun = false, force = false } = {}) {
 
 async function buildReport(window) {
   const events = await loadEvents(window);
-  return summarize(events, await supportingRows(events));
+  const related = await supportingRows(events);
+  const deviceCounts = new Map();
+  for (const device of related.devices) {
+    deviceCounts.set(device.active_event_id, (deviceCounts.get(device.active_event_id) || 0) + 1);
+  }
+  return summarize(events, related, deviceCounts);
 }
 
 async function closeStaleEvents(window, now = new Date()) {

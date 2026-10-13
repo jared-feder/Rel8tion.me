@@ -183,6 +183,42 @@ test('API rejects unauthorized requests before archive reads or writes', async (
   assert.equal(accesses, 0);
 });
 
+test('snapshot counts attached devices before closeout, overriding stale setup counts', async () => {
+  const generator = loadModule('weekly-production-report-worker.cjs', {}, {
+    process: { env: new Proxy({}, { get: () => 'https://test.invalid' }) },
+    fetch: async (url, options) => {
+      assert.equal(options.method, undefined, 'report generation only reads source data');
+      const parsed = new URL(url);
+      let rows = [];
+      if (parsed.pathname.endsWith('/open_house_events') && parsed.searchParams.get('start_time') !== 'is.null') {
+        rows = [{ id: 'event-one', start_time: '2026-10-10T16:00:00Z', setup_context: { coverage_device_count: 1 } }];
+      }
+      if (parsed.pathname.endsWith('/smart_signs')) rows = [
+        { id: 'device-one', active_event_id: 'event-one' }, { id: 'device-two', active_event_id: 'event-one' }
+      ];
+      return { ok: true, text: async () => JSON.stringify(rows) };
+    }
+  });
+  const report = await generator.buildReport(window);
+  assert.equal(report.rows[0].devices, 2);
+});
+
+test('scheduled closeout defers sponsored events until their agent recap is saved', async () => {
+  const closeout = loadModule('weekly-production-report-worker.cjs', {}, {
+    process: { env: new Proxy({}, { get: () => 'https://test.invalid' }) },
+    fetch: async (url, options) => {
+      assert.equal(options.method, undefined, 'deferred events must not be changed');
+      const rows = new URL(url).searchParams.get('start_time') === 'is.null' ? [] : [
+        { id: 'event-one', setup_context: { event_access_mode: 'sponsored_event_only' } }
+      ];
+      return { ok: true, text: async () => JSON.stringify(rows) };
+    }
+  });
+  const result = await closeout.closeStaleEvents(window, now);
+  assert.equal(result.closed, 0);
+  assert.equal(result.deferred.length, 1);
+});
+
 test('COMMAND displays the archive safely and all inline scripts parse', () => {
   const html = fs.readFileSync(path.join(root, 'apps/rel8tion-app/admin.html'), 'utf8');
   for (const [, script] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if (script.trim()) new Function(script);
