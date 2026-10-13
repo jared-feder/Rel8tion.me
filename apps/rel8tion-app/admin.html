@@ -1624,6 +1624,7 @@
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
+      weeklyReports: { loaded: false, loading: false, error: '', reports: [], selected: '', detail: null, expected_week: '', configuration: null, missing_report: false },
       futureOpenHouseFilters: {
         agent: '',
         relationship: 'all',
@@ -2746,6 +2747,7 @@
         restoreUiState(restoreSnapshot);
         if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
         refreshRelationshipsInBackground().catch(() => null);
+        if (state.area === 'reports') loadWeeklyReports();
       } catch (error) {
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -3033,6 +3035,7 @@ ${rowsHtml}
       syncCommandNavigation();
       refreshAreaContent();
       if (area === 'outreach' && state.query.trim().length >= 2) loadOutreachSearch().catch(() => null);
+      if (area === 'reports' && !state.weeklyReports.loaded) loadWeeklyReports();
       if (area === 'buyerFinder' && !state.buyerFinder.loaded && !state.buyerFinder.loading) {
         loadBuyerHomeFinder({ showLoading: true }).catch(() => null);
       }
@@ -5055,6 +5058,15 @@ ${rowsHtml}
     }
 
     function bindAreaActions() {
+      document.getElementById('refreshWeeklyReports')?.addEventListener('click', () => loadWeeklyReports());
+      document.getElementById('generateWeeklyReport')?.addEventListener('click', () => loadWeeklyReports(true));
+      document.getElementById('emailWeeklyReport')?.addEventListener('click', () => loadWeeklyReports('email'));
+      document.getElementById('weeklyReportWeek')?.addEventListener('change', (event) => {
+        state.weeklyReports.selected = event.target.value;
+        state.weeklyReports.detail = null;
+        loadWeeklyReports();
+      });
+      document.getElementById('printWeeklyReport')?.addEventListener('click', printWeeklyReport);
       document.querySelectorAll('a[href^="/admin?"]').forEach((link) => {
         let target;
         try {
@@ -7699,6 +7711,95 @@ ${rowsHtml}
       `;
     }
 
+    async function loadWeeklyReports(generate = false) {
+      const weekly = state.weeklyReports;
+      if (!state.verified || weekly.loading) return;
+      const selected = document.getElementById('weeklyReportWeek')?.value || weekly.selected || weekly.expected_week;
+      weekly.loading = true;
+      weekly.error = '';
+      if (state.area === 'reports') refreshAreaContent();
+      try {
+        if (generate) {
+          await api('/api/admin/weekly-production-reports', { method: 'POST',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: generate === 'email' ? 'email' : 'generate', week: selected }) });
+        }
+        const result = await api('/api/admin/weekly-production-reports');
+        Object.assign(weekly, result, { loaded: true, selected: selected || result.expected_week });
+        weekly.detail = null;
+        if (result.reports.some((row) => row.week_start === weekly.selected)) {
+          weekly.detail = (await api(`/api/admin/weekly-production-reports?week=${encodeURIComponent(weekly.selected)}`)).report;
+        }
+      } catch (error) {
+        weekly.error = error.message || 'Weekly reports could not be refreshed.';
+      } finally {
+        weekly.loading = false;
+        if (state.verified && state.area === 'reports') refreshAreaContent();
+      }
+    }
+
+    function weeklyStatusLabel(status) {
+      return ({ ready: 'Saved', pending: 'Not started', building: 'Generating', failed: 'Failed',
+        sent: 'Accepted by email provider', sending: 'Submitting email', unknown: 'Email outcome unconfirmed',
+        not_configured: 'Email not configured', not_requested: 'Email not requested' })[status] || status;
+    }
+
+    function weeklyReportBody(report) {
+      if (!report?.summary) return '<p>No saved report is available for this week.</p>';
+      const totals = report.summary.totals || {};
+      const metrics = [['Events', 'events'], ['Check-ins', 'checkins'], ['Financing requests', 'financing'], ['Disclosures', 'disclosures'], ['Messages', 'messages'], ['LO guidance', 'guidance']];
+      return `<h3>Week of ${esc(report.week_start)}</h3>
+        <p>${metrics.map(([label, key]) => `${esc(label)}: <strong>${esc(totals[key] ?? 0)}</strong>`).join(' &nbsp; | &nbsp; ')}</p>
+        <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr>
+        ${['Open house', 'Agent / Loan officer', 'Check-ins', 'Financing', 'Disclosures', 'Messages', 'LO guidance', 'Devices'].map((label) => `<th style="padding:8px">${label}</th>`).join('')}</tr></thead><tbody>
+        ${(report.summary.rows || []).map((row) => `<tr><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.address)}<br>${esc(fmtDate(row.start))}</td><td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row.agent)}<br>${esc(row.loanOfficer)}</td>${['checkins', 'financing', 'disclosures', 'messages', 'guidance', 'devices'].map((key) => `<td style="padding:8px;border-top:1px solid #dbe4f0">${esc(row[key] ?? 0)}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="8" style="padding:16px">No events were recorded in this week.</td></tr>'}
+        </tbody></table></div>`;
+    }
+
+    function printWeeklyReport() {
+      const report = state.weeklyReports.detail;
+      if (!report?.summary) return;
+      const popup = window.open('', '_blank');
+      if (!popup) return showToast('Allow popups to print the weekly report.');
+      popup.opener = null;
+      popup.document.write(`<!doctype html><html><head><title>REL8TION weekly report ${esc(report.week_start)}</title></head><body style="font-family:Arial,sans-serif;padding:24px"><h1>Weekly Open House Production Report</h1>${weeklyReportBody(report)}<p>Saved ${esc(fmtDate(report.generated_at))}. Reporting dates use America/New_York.</p></body></html>`);
+      popup.document.close();
+      popup.focus();
+      popup.print();
+    }
+
+    function renderWeeklyReports() {
+      const weekly = state.weeklyReports;
+      const report = weekly.detail;
+      const weeks = new Set(weekly.reports.map((row) => row.week_start));
+      if (weekly.expected_week) {
+        const last = new Date(`${weekly.expected_week}T12:00:00Z`);
+        for (let index = 0; index < 104; index++) {
+          const week = new Date(last.getTime() - index * 7 * 86400000).toISOString().slice(0, 10);
+          if (week < '2026-07-13') break;
+          weeks.add(week);
+        }
+      }
+      const disabled = weekly.loading ? ' disabled' : '';
+      return `<section class="glass-card" style="padding:18px;margin-bottom:24px" aria-label="Weekly production reports">
+        <div class="section-head"><div><h2>Weekly production reports</h2><div class="sub">Monday through Sunday, New York time. Automatically generated Monday morning.</div></div>
+        <button class="btn soft" id="refreshWeeklyReports"${disabled}>${weekly.loading ? 'Loading...' : 'Refresh archive'}</button></div>
+        ${weekly.error ? `<p role="alert">${esc(weekly.error)} Previously loaded information may be out of date.</p>` : ''}
+        ${weekly.missing_report ? `<p role="status"><strong>Report overdue:</strong> week of ${esc(weekly.expected_week)} has no completed saved report.</p>` : ''}
+        ${weekly.configuration && !weekly.configuration.ready ? `<p role="status"><strong>Configuration needed:</strong> ${esc(weekly.configuration.missing.join(', '))}.</p>` : ''}
+        <div class="report-toolbar"><label>Reporting week <select class="select" id="weeklyReportWeek"${disabled}>
+        ${[...weeks].sort().reverse().map((week) => `<option value="${esc(week)}"${weekly.selected === week ? ' selected' : ''}>${esc(week)}${weekly.reports.some((row) => row.week_start === week && row.generation_status === 'ready') ? ' - saved' : ''}</option>`).join('')}</select></label>
+        <button class="btn soft" id="generateWeeklyReport"${disabled}${!weekly.loaded || report?.generation_status === 'ready' ? ' disabled' : ''}>Generate selected week</button>
+        <button class="btn soft" id="printWeeklyReport"${disabled}${report?.summary ? '' : ' disabled'}>Print / Save PDF</button></div>
+        <p><button class="btn soft" id="emailWeeklyReport"${disabled}${!report?.summary || !weekly.configuration?.ready || ['sent', 'sending', 'unknown'].includes(report?.email_status) ? ' disabled' : ''}>Email report to configured recipients</button></p>
+        <p class="small">Generate saves a report only. Existing saved reports stay unchanged.</p>
+        ${report ? `<p><strong>${esc(weeklyStatusLabel(report.generation_status))}</strong>${report.generated_at ? ` ${esc(fmtDate(report.generated_at))}` : ''} | ${esc(weeklyStatusLabel(report.email_status))}${report.email_sent_at ? ` ${esc(fmtDate(report.email_sent_at))}` : ''}</p>
+        ${report.generation_error || report.email_error ? `<p role="alert">${esc(report.generation_error || report.email_error)}</p>` : ''}
+        ${report.closeout_status === 'failed' ? '<p role="alert">Event closeout failed. The saved report remains available.</p>' : ''}
+        ${report.closeout_result?.deferred?.length ? `<p role="status">${esc(report.closeout_result.deferred.length)} event(s) need an agent recap before closeout.</p>` : ''}
+        ${weeklyReportBody(report)}` : `<p>${weekly.loading ? 'Loading saved reports...' : 'No saved report for the selected week. Generate it from the preserved event records.'}</p>`}
+      </section>`;
+    }
+
     function renderReports() {
       const outreach = state.command?.outreach || {};
       const confirmed = confirmedReportRows();
@@ -7711,6 +7812,7 @@ ${rowsHtml}
       }).length;
       const pastCount = allConfirmed.length - upcomingCount;
       return `
+        ${renderWeeklyReports()}
         <div class="section-head">
           <div>
             <h2>Reports</h2>
@@ -7807,6 +7909,7 @@ ${rowsHtml}
       syncCommandNavigation();
       refreshAreaContent();
       if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
+      if (state.area === 'reports' && !state.weeklyReports.loaded) loadWeeklyReports();
     });
     window.setInterval(() => {
       refreshLiveData().catch(() => null);

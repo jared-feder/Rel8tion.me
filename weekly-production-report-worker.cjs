@@ -18,6 +18,11 @@ function config() {
 }
 
 const enc = (value) => encodeURIComponent(String(value ?? '').trim());
+function emailConfiguration() {
+  const smtp = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+  return { provider: smtp ? 'smtp' : process.env.RESEND_API_KEY ? 'resend' : null,
+    recipientsConfigured: Boolean(String(process.env.PRODUCTION_REPORT_EMAILS || process.env.PRODUCTION_REPORT_EMAIL || process.env.REL8TION_OWNER_EMAIL || '').trim()) };
+}
 const clean = (value) => String(value ?? '').trim();
 const one = (rows) => Array.isArray(rows) ? rows[0] || null : null;
 const safeObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -71,10 +76,11 @@ async function rest(path, options = {}) {
   const { supabaseUrl } = config();
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...options,
+    signal: AbortSignal.timeout(20000),
     headers: headers({ 'Content-Type': 'application/json', ...(options.headers || {}) })
   });
   const text = await response.text();
-  if (!response.ok) throw new Error(`Supabase ${response.status}: ${text}`);
+  if (!response.ok) throw new Error(`Report data request failed (${response.status}).`);
   return text ? JSON.parse(text) : [];
 }
 
@@ -82,31 +88,47 @@ async function patch(path, body) {
   return rest(path, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
 }
 
+async function allRows(path) {
+  const rows = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = await rest(`${path}&limit=500&offset=${offset}`);
+    if (!Array.isArray(page)) throw new Error('Invalid report data response.');
+    rows.push(...page);
+    if (page.length < 500) return rows;
+  }
+}
+
 async function loadEvents(window) {
-  const byStart = await rest(
+  const byStart = await allRows(
     `open_house_events?start_time=gte.${enc(window.start.toISOString())}` +
     `&start_time=lt.${enc(window.end.toISOString())}` +
-    '&select=*&order=start_time.asc.nullslast,created_at.asc&limit=1000'
+    '&select=*&order=start_time.asc.nullslast,id.asc'
   );
-  const withoutStart = await rest(
+  const withoutStart = await allRows(
     `open_house_events?start_time=is.null&created_at=gte.${enc(window.start.toISOString())}` +
     `&created_at=lt.${enc(window.end.toISOString())}` +
-    '&select=*&order=created_at.asc&limit=1000'
+    '&select=*&order=created_at.asc,id.asc'
   );
   return [...new Map([...byStart, ...withoutStart].map((event) => [event.id, event])).values()];
 }
 
 async function loadStaleOpenEvents(window) {
-  const byStart = await rest(
-    `open_house_events?status=eq.active&ended_at=is.null&start_time=lt.${enc(window.end.toISOString())}&select=*&limit=1000`
+  const byStart = await allRows(
+    `open_house_events?status=eq.active&ended_at=is.null&start_time=lt.${enc(window.end.toISOString())}&select=*&order=id.asc`
   );
-  const withoutStart = await rest(
-    `open_house_events?status=eq.active&ended_at=is.null&start_time=is.null&created_at=lt.${enc(window.end.toISOString())}&select=*&limit=1000`
+  const withoutStart = await allRows(
+    `open_house_events?status=eq.active&ended_at=is.null&start_time=is.null&created_at=lt.${enc(window.end.toISOString())}&select=*&order=id.asc`
   );
   return [...new Map([...byStart, ...withoutStart].map((event) => [event.id, event])).values()];
 }
 
 async function closeEvent(event, now, dryRun) {
+  const context = safeObject(event.setup_context);
+  const sponsored = context.event_access_mode === 'sponsored_event_only'
+    || (context.limited_rel8tion_version === true && context.flow === 'event-pass-sponsored-reuse');
+  if (sponsored && safeObject(context.event_recap_email).status !== 'sent') {
+    return { eventId: event.id, closed: false, reason: 'Agent recap required before closeout' };
+  }
   const signs = await rest(`smart_signs?active_event_id=eq.${enc(event.id)}&select=id`).catch(() => []);
   if (dryRun) return { eventId: event.id, deviceCount: signs.length, closed: false };
   await patch(`open_house_events?id=eq.${enc(event.id)}`, {
@@ -134,18 +156,26 @@ function inFilter(ids) {
 
 async function supportingRows(events) {
   const eventIds = events.map((event) => event.id).filter(Boolean);
-  if (!eventIds.length) return { houses: [], agents: [], checkins: [], sessions: [], messages: [], guidance: [] };
+  if (!eventIds.length) return { houses: [], agents: [], checkins: [], sessions: [], messages: [], guidance: [], devices: [] };
   const houseIds = [...new Set(events.map((event) => event.open_house_source_id).filter(Boolean))];
   const slugs = [...new Set(events.map((event) => event.host_agent_slug).filter(Boolean))];
-  const [houses, agents, checkins, sessions, messages, guidance] = await Promise.all([
-    houseIds.length ? rest(`open_houses?id=${inFilter(houseIds)}&select=id,address,price,open_start,open_end,image,agent,brokerage&limit=1000`) : [],
-    slugs.length ? rest(`agents?slug=${inFilter(slugs)}&select=slug,name,email,phone,brokerage&limit=1000`) : [],
-    rest(`event_checkins?open_house_event_id=${inFilter(eventIds)}&select=id,open_house_event_id,visitor_type,pre_approved,metadata,created_at&limit=5000`),
-    rest(`event_loan_officer_sessions?open_house_event_id=${inFilter(eventIds)}&select=id,open_house_event_id,loan_officer_name,loan_officer_email,loan_officer_company,status,source&limit=2000`),
-    rest(`event_conversation_messages?open_house_event_id=${inFilter(eventIds)}&select=id,open_house_event_id,sender_role,created_at&limit=5000`).catch(() => []),
-    rest(`buyer_affordability_guidance?source_event_id=${inFilter(eventIds)}&select=id,source_event_id,status,created_at&limit=5000`).catch(() => [])
+  async function related(table, column, ids, select, order = 'id.asc') {
+    const rows = [];
+    for (let index = 0; index < ids.length; index += 50) {
+      rows.push(...await allRows(`${table}?${column}=${inFilter(ids.slice(index, index + 50))}&select=${select}&order=${order}`));
+    }
+    return rows;
+  }
+  const [houses, agents, checkins, sessions, messages, guidance, devices] = await Promise.all([
+    related('open_houses', 'id', houseIds, 'id,address,price,open_start,open_end,image,agent,brokerage'),
+    related('agents', 'slug', slugs, 'slug,name,brokerage', 'slug.asc'),
+    related('event_checkins', 'open_house_event_id', eventIds, 'id,open_house_event_id,visitor_type,pre_approved,metadata,created_at'),
+    related('event_loan_officer_sessions', 'open_house_event_id', eventIds, 'id,open_house_event_id,loan_officer_name,status,source', 'signed_in_at.desc,id.asc'),
+    related('event_conversation_messages', 'open_house_event_id', eventIds, 'id,open_house_event_id,sender_role,created_at'),
+    related('buyer_affordability_guidance', 'source_event_id', eventIds, 'id,source_event_id,status,created_at'),
+    related('smart_signs', 'active_event_id', eventIds, 'id,active_event_id')
   ]);
-  return { houses, agents, checkins, sessions, messages, guidance };
+  return { houses, agents, checkins, sessions, messages, guidance, devices };
 }
 
 function summarize(events, related, closedDevices = new Map()) {
@@ -157,7 +187,8 @@ function summarize(events, related, closedDevices = new Map()) {
     const messages = related.messages.filter((row) => row.open_house_event_id === event.id);
     const guidance = related.guidance.filter((row) => row.source_event_id === event.id);
     const financing = checkins.filter((row) => safeObject(row.metadata).financing_requested === true).length;
-    const disclosures = checkins.filter((row) => safeObject(row.metadata).disclosure_accepted === true).length;
+    const disclosures = checkins.filter((row) => safeObject(row.metadata).disclosure_accepted === true
+      || require('./lib/event-recap-email').disclosureSigned(row)).length;
     const house = houseById.get(String(event.open_house_source_id)) || {};
     const agent = agentBySlug.get(event.host_agent_slug) || {};
     const context = safeObject(event.setup_context);
@@ -212,11 +243,36 @@ function reportText(summary, window, staleClosed) {
 
 async function sendReport(summary, window, staleClosed) {
   const cfg = config();
-  if (!cfg.resendKey || !cfg.recipients.length) {
-    return { status: 'not_configured', missing: [!cfg.resendKey ? 'RESEND_API_KEY' : '', !cfg.recipients.length ? 'PRODUCTION_REPORT_EMAILS' : ''].filter(Boolean) };
+  const delivery = emailConfiguration();
+  if (!delivery.provider || !cfg.recipients.length) return { status: 'not_configured' };
+  if (delivery.provider === 'smtp') {
+    const port = Number(process.env.SMTP_PORT || 465);
+    const transport = require('nodemailer').createTransport({
+      host: process.env.SMTP_HOST, port, secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+      connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
+    });
+    try {
+      const result = await transport.sendMail({
+        from: process.env.REL8TION_FROM_EMAIL || process.env.LEAD_FROM_EMAIL || process.env.SMTP_USER,
+        to: cfg.recipients,
+        messageId: `<weekly-production-${window.key}@rel8tion.me>`,
+        subject: `REL8TION Weekly Production Report - week of ${window.key}`,
+        html: reportHtml(summary, window, staleClosed), text: reportText(summary, window, staleClosed)
+      });
+      if (result.rejected?.length || !result.accepted?.length) throw new Error('Email recipients were not all accepted.');
+      return { status: 'sent', id: result.messageId || '', recipients: cfg.recipients.length };
+    } catch (error) {
+      const failure = new Error('SMTP submission failed. Verify sender configuration and provider activity.');
+      failure.definiteRejection = ['EAUTH', 'ECONNECTION'].includes(error.code);
+      throw failure;
+    } finally {
+      transport.close();
+    }
   }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
+    signal: AbortSignal.timeout(20000),
     headers: { Authorization: `Bearer ${cfg.resendKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `rel8tion-weekly-production-${window.key}` },
     body: JSON.stringify({
       from: cfg.from,
@@ -227,33 +283,39 @@ async function sendReport(summary, window, staleClosed) {
     })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Resend ${response.status}: ${JSON.stringify(payload)}`);
+  if (!response.ok) {
+    const error = new Error(`Email provider rejected the report (${response.status}).`);
+    error.definiteRejection = response.status >= 400 && response.status < 500;
+    throw error;
+  }
   return { status: 'sent', id: payload.id || '', recipients: cfg.recipients.length };
 }
 
 async function run({ now = new Date(), dryRun = false, force = false } = {}) {
   if (!force && !mondayNineAmNewYork(now)) return { skipped: true, reason: 'outside_monday_9am_new_york' };
   const window = reportWindow(now);
-  const staleEvents = await loadStaleOpenEvents(window);
-  const closedDevices = new Map();
-  for (const event of staleEvents) {
-    const result = await closeEvent(event, now.toISOString(), dryRun);
-    closedDevices.set(event.id, result.deviceCount);
-  }
-  const events = await loadEvents(window);
-  const related = await supportingRows(events);
-  const summary = summarize(events, related, closedDevices);
-  const email = dryRun ? { status: 'dry_run' } : await sendReport(summary, window, staleEvents.length);
-  return {
-    skipped: false,
-    dryRun,
-    window: { start: window.start.toISOString(), end: window.end.toISOString(), key: window.key },
-    staleEventsClosed: dryRun ? 0 : staleEvents.length,
-    staleEventsWouldClose: dryRun ? staleEvents.length : 0,
-    totals: summary.totals,
-    events: summary.rows,
-    email
-  };
+  if (dryRun) return { skipped: false, dryRun: true, window: { start: window.start, end: window.end, key: window.key }, ...await buildReport(window) };
+  const { processReport } = require('./lib/weekly-report-archive');
+  return processReport({ window, scheduled: true, now });
 }
 
-module.exports = { mondayNineAmNewYork, reportWindow, run };
+async function buildReport(window) {
+  const events = await loadEvents(window);
+  const related = await supportingRows(events);
+  const deviceCounts = new Map();
+  for (const device of related.devices) {
+    deviceCounts.set(device.active_event_id, (deviceCounts.get(device.active_event_id) || 0) + 1);
+  }
+  return summarize(events, related, deviceCounts);
+}
+
+async function closeStaleEvents(window, now = new Date()) {
+  const staleEvents = await loadStaleOpenEvents(window);
+  const results = [];
+  for (const event of staleEvents) {
+    results.push(await closeEvent(event, now.toISOString(), false));
+  }
+  return { closed: results.filter((row) => row.closed).length, deferred: results.filter((row) => !row.closed) };
+}
+
+module.exports = { mondayNineAmNewYork, reportWindow, run, buildReport, closeStaleEvents, sendReport, reportHtml, rest, allRows, summarize, emailConfiguration };
