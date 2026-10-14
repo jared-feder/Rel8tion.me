@@ -6,6 +6,7 @@ const { reportWindow, mondayNineAmNewYork, rest, allRows, emailConfiguration } =
 const hash = (value) => createHash('sha256').update(String(value)).digest('hex');
 const unique = (values) => new Set(values.filter(Boolean)).size;
 const ratio = (a, b) => b ? a / b : null;
+const confirmationStatuses = new Set(['confirmed_open_house', 'accepted_open_house', 'confirmed', 'accepted']);
 const phone = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
   return digits.length === 10 ? `1${digits}` : digits.length >= 11 ? digits : '';
@@ -89,7 +90,7 @@ function summarize(data, window, previous = [], now = new Date()) {
   }
   for (const row of queue) {
     const linked = visitsByQueue.get(row.id) || [];
-    const confirmed = ['confirmed', 'accepted'].includes(row.review_status) || linked.length > 0;
+    const confirmed = confirmationStatuses.has(row.review_status) || linked.length > 0;
     const key = hash(`${row.open_house_id || row.id}|${day(row.open_start || linked[0]?.scheduled_start)}`);
     if (!confirmed && !ledger.has(key)) continue;
     const person = identity(row, `queue:${row.id}`);
@@ -108,7 +109,7 @@ function summarize(data, window, previous = [], now = new Date()) {
   for (const [id, person] of people) {
     const s = person.statuses;
     const status = suppressed.has(person.contact) || [...s].some((v) => /opt(?:ed)?[_ -]?out/i.test(v)) ? 'opted_out'
-      : s.has('not_now') ? 'not_now' : s.has('confirmed') || s.has('accepted') ? 'confirmed'
+      : s.has('not_now') ? 'not_now' : [...s].some((value) => confirmationStatuses.has(value)) ? 'confirmed'
         : s.has('interested') ? 'interested' : s.has('replied') ? 'replied' : null;
     if (!status) continue;
     statuses[status]++;

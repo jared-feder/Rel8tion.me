@@ -51,6 +51,15 @@ test('house/date duplicates count once and test visits do not create confirmatio
   assert.equal(summarize(d).lifetime.confirmed, 1);
 });
 
+test('production confirmation statuses count even without a field visit', () => {
+  const d = empty();
+  d.queue = [queue('1', { review_status: 'confirmed_open_house' }), queue('2', { agent_phone: '5165550101', review_status: 'accepted_open_house' })];
+  const s = summarize(d);
+  assert.equal(s.lifetime.confirmed, 2);
+  assert.equal(s.current.confirmed, 2);
+  assert.equal(s.relationships.statuses.confirmed, 2);
+});
+
 test('shared office numbers never merge conflicting names or attribute ambiguous replies', () => {
   const d = empty(); d.queue = [queue('1'), queue('2', { agent_name: 'Jane Other' })];
   d.replies = [{ id: 'r', direction: 'inbound', from_phone: '5165550100', received_at: '2026-10-09T12:00:00Z' }];
