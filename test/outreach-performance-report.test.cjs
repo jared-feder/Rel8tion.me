@@ -140,6 +140,24 @@ test('edition storage scopes reads, locks and writes to the composite key', asyn
   assert.ok(calls.filter(c=>c.options.method!=='POST').every(c=>c.path.includes('report_version=eq.2')));
 });
 
+test('an original snapshot cannot hide a missing expanded edition in COMMAND', async () => {
+  const context={module:{exports:{}},require:name=>name.includes('weekly-report-archive')?{createArchive:({version})=>({
+    listReports:async()=>({reports:version===1?[{week_start:window.key,generation_status:'ready',report_version:1}]:[],missing_report:version===2,expected_week:window.key}),
+    getReport:async()=>version===1?{report_version:1}:null
+  })}:worker};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../lib/outreach-report-archive'),'utf8'),context);
+  const archive=context.module.exports,result=await archive.listReports(now);
+  assert.equal(result.missing_report,false);assert.equal(result.expanded_edition_missing,true);
+  assert.equal(result.reports[0].original_available,true);
+  assert.equal((await archive.getReport(window.key)).report_version,1);
+  await assert.rejects(archive.getReport(window.key,'3'),/Unknown report edition/);
+  const html=fs.readFileSync('apps/rel8tion-app/admin.html','utf8');
+  const body=html.match(/    function renderOutreachReports\(\) \{([\s\S]*?)\n    async function loadWeeklyReports/)[0].replace(/\n    async function loadWeeklyReports$/,'');
+  const ui={state:{outreachReports:{...result,selected:window.key,detail:null}},esc:String};
+  vm.createContext(ui);vm.runInContext(body,ui);
+  assert.match(vm.runInContext('renderOutreachReports()',ui),/Expanded edition missing:/);
+});
+
 test('unauthorized JSON and PDF requests cannot read the archive', async () => {
   const context = { module: { exports: {} }, console, require: (name) => name.includes('admin-auth') ? {
     adminAuthorized: () => ({ ok: false, error: 'Unauthorized' }), assertAdminConfig() {}, sendJson: (res, status, body) => ({ status, body })
