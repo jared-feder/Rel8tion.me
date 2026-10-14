@@ -1624,6 +1624,7 @@
       outreachFilter: 'needs_reply',
       reportWindow: 'all',
       reportSort: 'auto',
+      outreachReports: { loaded: false, loading: false, error: '', reports: [], selected: '', detail: null, expected_week: '', configuration: null, missing_report: false },
       weeklyReports: { loaded: false, loading: false, error: '', reports: [], selected: '', detail: null, expected_week: '', configuration: null, missing_report: false },
       futureOpenHouseFilters: {
         agent: '',
@@ -2747,7 +2748,7 @@
         restoreUiState(restoreSnapshot);
         if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
         refreshRelationshipsInBackground().catch(() => null);
-        if (state.area === 'reports') loadWeeklyReports();
+        if (state.area === 'reports') { loadOutreachReports(); loadWeeklyReports(); }
       } catch (error) {
         const restoreSnapshot = isCommandEditing() ? captureUiState() : uiSnapshot;
         state.loading = false;
@@ -3035,6 +3036,7 @@ ${rowsHtml}
       syncCommandNavigation();
       refreshAreaContent();
       if (area === 'outreach' && state.query.trim().length >= 2) loadOutreachSearch().catch(() => null);
+      if (area === 'reports' && !state.outreachReports.loaded) loadOutreachReports();
       if (area === 'reports' && !state.weeklyReports.loaded) loadWeeklyReports();
       if (area === 'buyerFinder' && !state.buyerFinder.loaded && !state.buyerFinder.loading) {
         loadBuyerHomeFinder({ showLoading: true }).catch(() => null);
@@ -5058,6 +5060,15 @@ ${rowsHtml}
     }
 
     function bindAreaActions() {
+      document.getElementById('refreshOutreachReports')?.addEventListener('click', () => loadOutreachReports());
+      document.getElementById('generateOutreachReport')?.addEventListener('click', () => loadOutreachReports('generate'));
+      document.getElementById('emailOutreachReport')?.addEventListener('click', () => loadOutreachReports('email'));
+      document.getElementById('downloadOutreachReport')?.addEventListener('click', downloadOutreachReport);
+      document.getElementById('outreachReportWeek')?.addEventListener('change', (event) => {
+        state.outreachReports.selected = event.target.value;
+        state.outreachReports.detail = null;
+        loadOutreachReports();
+      });
       document.getElementById('refreshWeeklyReports')?.addEventListener('click', () => loadWeeklyReports());
       document.getElementById('generateWeeklyReport')?.addEventListener('click', () => loadWeeklyReports(true));
       document.getElementById('emailWeeklyReport')?.addEventListener('click', () => loadWeeklyReports('email'));
@@ -7711,6 +7722,68 @@ ${rowsHtml}
       `;
     }
 
+    async function loadOutreachReports(action = '') {
+      const reports = state.outreachReports;
+      if (!state.verified || reports.loading) return;
+      const selected = document.getElementById('outreachReportWeek')?.value || reports.selected || reports.expected_week;
+      reports.loading = true; reports.error = '';
+      if (state.area === 'reports') refreshAreaContent();
+      try {
+        if (action) await api('/api/admin/outreach-performance-reports', { method: 'POST', body: JSON.stringify({ action, week: selected }) });
+        const result = await api('/api/admin/outreach-performance-reports');
+        Object.assign(reports, result, { loaded: true, selected: selected || result.expected_week, detail: null });
+        if (result.reports.some((row) => row.week_start === reports.selected)) {
+          reports.detail = (await api(`/api/admin/outreach-performance-reports?week=${encodeURIComponent(reports.selected)}`)).report;
+        }
+      } catch (error) { reports.error = error.message || 'Outreach briefs could not be refreshed.'; }
+      finally { reports.loading = false; if (state.verified && state.area === 'reports') refreshAreaContent(); }
+    }
+
+    async function downloadOutreachReport() {
+      const reports = state.outreachReports;
+      if (!reports.detail?.summary || reports.loading) return;
+      const week = reports.detail.week_start;
+      try {
+        const response = await fetch(`/api/admin/outreach-performance-reports?week=${encodeURIComponent(week)}&format=pdf`, { headers: authHeaders(), cache: 'no-store' });
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'PDF download failed.');
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a'); link.href = url; link.download = `rel8tion-outreach-performance-brief-${week}.pdf`;
+        document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (error) { showToast(error.message); }
+    }
+
+    function outreachBriefBody(summary) {
+      if (!summary) return '';
+      const s = summary, l = s.lifetime, w = s.current, p = s.prior, e = s.engine;
+      const n = (value) => Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 1 });
+      const pct = (value) => value == null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
+      const table = (headers, rows) => `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr>${headers.map((h) => `<th style="padding:9px;border-bottom:1px solid #cbd5e1">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td style="padding:9px;border-bottom:1px solid #e2e8f0">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      return `<div style="background:#102a43;color:#fff;border-radius:16px;padding:22px;margin:18px 0"><div style="font-size:12px;letter-spacing:.12em;color:#76dbe4">REL8TION / OUTREACH PERFORMANCE BRIEF</div><h3 style="color:inherit;margin:10px 0 18px">Executive summary - week of ${esc(s.week)}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px">${[['Recorded outbound', l.outbound], ['Ever confirmed', l.confirmed], ['Active relationships', s.relationships.active], ['Houses / week', e.housesPerWeek]].map(([label, count]) => `<div><strong style="font-size:28px">${n(count)}</strong><div style="font-size:12px">${esc(label)}</div></div>`).join('')}</div><p>${n(w.initial)} initial messages this week; ${n(w.replied)} replying agents (${pct(w.replyRate)}); ${n(w.confirmed)} recorded confirmations attributed to this cohort.</p></div>
+      <details open><summary><strong>Week in review</strong></summary>${table(['Measure', 'This week', 'Prior week'], [['Initial messages', w.initial, p.initial], ['Distinct contacts', w.contacts, p.contacts], ['Agents replied', w.replied, p.replied], ['Confirmed houses', w.confirmed, p.confirmed], ['Buyer check-in records', w.buyerCheckins, p.buyerCheckins], ['Events producing check-ins', w.producingEvents, p.producingEvents], ['Profile / HomeKey leads', w.profileLeads, p.profileLeads], ['New houses', w.houses, p.houses], ['Distinct agents enriched', w.enrichedAgents, p.enrichedAgents]])}</details>
+      <details><summary><strong>Lifetime outreach funnel</strong></summary><p>${n(l.contacts)} distinct contacts; ${n(l.replied)} agents replied (${pct(l.replyRate)}); ${n(l.confirmedHosts)} confirmed hosts. ${n(l.cancelled)} cancellations remain included in confirmed history.</p>${table(['Outbound type', 'Recorded messages'], Object.entries(l.mix).map(([type, count]) => [type, n(count)]))}</details>
+      <details><summary><strong>Weekly conversion cohorts</strong></summary>${table(['Week', 'Initial', 'Replied', 'Reply rate', 'Confirmed', 'Conversion'], s.cohorts.map((row) => [row.week, row.initial, row.replied, pct(row.replyRate), row.confirmed, pct(row.conversionRate)]))}<p class="small">Reply rate uses distinct contacts; conversion uses initial messages. Outcomes are known as of this saved snapshot.</p></details>
+      <details><summary><strong>Relationship network</strong></summary>${table(['Current status', 'Agents'], Object.entries(s.relationships.statuses).map(([status, count]) => [status.replace(/_/g, ' '), n(count)]))}${table(['Active brokerage', 'Agents'], s.relationships.brokerages.map((row) => [row.name, n(row.count)]))}</details>
+      <details><summary><strong>Data engine and definitions</strong></summary><p>${n(e.houses)} house records; ${n(e.housesPerWeek)} houses and ${n(e.agentsPerWeek)} distinct enriched agents per completed week. Recent eight-week pace: ${n(e.recentHousesPerWeek)} houses and ${n(e.recentAgentsPerWeek)} agents per week.</p><p>${n(e.recordWithoutFlag)} houses have enrichment records but no flag; ${n(e.flagWithoutRecord)} have the flag but no enrichment record.</p>${s.notes.map((note) => `<p class="small">${esc(note)}</p>`).join('')}</details>`;
+    }
+
+    function renderOutreachReports() {
+      const r = state.outreachReports, report = r.detail;
+      const weeks = new Set(r.reports.map((row) => row.week_start));
+      if (r.expected_week) for (let index = 0; index < 104; index++) {
+        const week = new Date(new Date(`${r.expected_week}T12:00:00Z`).getTime() - index * 7 * 86400000).toISOString().slice(0, 10);
+        if (week < '2026-04-20') break; weeks.add(week);
+      }
+      const disabled = r.loading ? ' disabled' : '';
+      return `<section class="glass-card" style="padding:22px;margin-bottom:24px" aria-label="Outreach performance briefs"><div class="section-head"><div><h2>Outreach performance brief</h2><p class="sub">Your six-section weekly brief. Saved every Monday at 9:10 AM New York time, with a PDF emailed to the configured owner address.</p></div><button class="btn soft" id="refreshOutreachReports"${disabled}>${r.loading ? 'Loading...' : 'Refresh archive'}</button></div>
+      ${r.error ? `<p role="alert">${esc(r.error)} Previously loaded information may be out of date.</p>` : ''}
+      ${r.missing_report ? `<p role="status"><strong>Brief overdue:</strong> week of ${esc(r.expected_week)} has no saved brief.</p>` : ''}
+      ${r.configuration && !r.configuration.ready ? `<p role="status"><strong>Configuration needed:</strong> ${esc(r.configuration.missing.join(', '))}.</p>` : ''}
+      <div class="report-toolbar"><label>Reporting week <select class="select" id="outreachReportWeek"${disabled}>${[...weeks].sort().reverse().map((week) => `<option value="${esc(week)}"${r.selected === week ? ' selected' : ''}>${esc(week)}${r.reports.some((row) => row.week_start === week && row.generation_status === 'ready') ? ' - saved' : ''}</option>`).join('')}</select></label><button class="btn soft" id="generateOutreachReport"${disabled}${!r.loaded || report?.generation_status === 'ready' ? ' disabled' : ''}>Generate selected week</button><button class="btn" id="downloadOutreachReport"${disabled}${report?.summary ? '' : ' disabled'}>Download six-page PDF</button><button class="btn soft" id="emailOutreachReport"${disabled}${!report?.summary || !r.configuration?.ready || ['sent', 'sending', 'unknown'].includes(report?.email_status) ? ' disabled' : ''}>Email brief</button></div>
+      <p class="small">Saved briefs stay unchanged. Generating an older week reconstructs its activity using outcomes known today.</p>
+      ${report ? `<p><strong>${esc(weeklyStatusLabel(report.generation_status))}</strong> ${esc(fmtDate(report.generated_at))} | ${esc(weeklyStatusLabel(report.email_status))}</p>${report.generation_error || report.email_error ? `<p role="alert">${esc(report.generation_error || report.email_error)}</p>` : ''}${outreachBriefBody(report.summary)}` : `<p>${r.loading ? 'Loading your saved outreach brief...' : 'No saved brief for this week. Generate it to view and download the PDF.'}</p>`}
+      <p class="small">Original reference briefs: <a href="https://drive.google.com/file/d/1B9uMy-SV8Wt0GeggMrT73jmBNBBU5bKU/view" target="_blank" rel="noopener">August 5</a> &nbsp; <a href="https://drive.google.com/file/d/1NT2ozChzCNLlqfoh83FdYp0OI5IQux-W/view" target="_blank" rel="noopener">August 17</a></p></section>`;
+    }
+
     async function loadWeeklyReports(generate = false) {
       const weekly = state.weeklyReports;
       if (!state.verified || weekly.loading) return;
@@ -7781,7 +7854,7 @@ ${rowsHtml}
       }
       const disabled = weekly.loading ? ' disabled' : '';
       return `<section class="glass-card" style="padding:18px;margin-bottom:24px" aria-label="Weekly production reports">
-        <div class="section-head"><div><h2>Weekly production reports</h2><div class="sub">Monday through Sunday, New York time. Automatically generated Monday morning.</div></div>
+        <div class="section-head"><div><h2>Event-production reports</h2><div class="sub">Event check-ins, financing requests and disclosures. Monday through Sunday, New York time.</div></div>
         <button class="btn soft" id="refreshWeeklyReports"${disabled}>${weekly.loading ? 'Loading...' : 'Refresh archive'}</button></div>
         ${weekly.error ? `<p role="alert">${esc(weekly.error)} Previously loaded information may be out of date.</p>` : ''}
         ${weekly.missing_report ? `<p role="status"><strong>Report overdue:</strong> week of ${esc(weekly.expected_week)} has no completed saved report.</p>` : ''}
@@ -7812,6 +7885,7 @@ ${rowsHtml}
       }).length;
       const pastCount = allConfirmed.length - upcomingCount;
       return `
+        ${renderOutreachReports()}
         ${renderWeeklyReports()}
         <div class="section-head">
           <div>
@@ -7909,6 +7983,7 @@ ${rowsHtml}
       syncCommandNavigation();
       refreshAreaContent();
       if (state.agentFocus) hydrateAgentProfile(state.agentFocus).catch(() => null);
+      if (state.area === 'reports' && !state.outreachReports.loaded) loadOutreachReports();
       if (state.area === 'reports' && !state.weeklyReports.loaded) loadWeeklyReports();
     });
     window.setInterval(() => {

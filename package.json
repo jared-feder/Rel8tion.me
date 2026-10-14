@@ -13,6 +13,7 @@
     "verify:booking": "node scripts/verify-booking-calendar.cjs",
     "verify:routes": "node scripts/verify-route-map.cjs",
     "verify:weekly-reports": "node --test test/weekly-production-reports.test.cjs",
+    "verify:outreach-reports": "node --test test/outreach-performance-report.test.cjs",
     "verify:property-experience": "node test/open-house-link.test.cjs",
     "verify:event-pass-activation": "node test/event-pass-activation.test.cjs",
     "verify:event-pass-mobile-viewport": "node test/event-pass-mobile-viewport.test.cjs",
