@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": {
+    "api/cron/outreach-performance-report.js": {
+      "maxDuration": 300
+    },
+    "api/admin/outreach-performance-reports.js": {
+      "maxDuration": 300
+    },
     "api/cron/weekly-production-report.js": {
       "maxDuration": 300
     },
@@ -22,6 +28,10 @@
     }
   },
   "crons": [
+    {
+      "path": "/api/cron/outreach-performance-report",
+      "schedule": "10 13,14 * * 1"
+    },
     {
       "path": "/api/cron/refresh-open-house-data",
       "schedule": "*/30 * * * *"

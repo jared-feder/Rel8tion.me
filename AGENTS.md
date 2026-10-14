@@ -207,6 +207,8 @@ Preserve these priorities:
 
 ## Testing And Checks
 
+- `[IMPLEMENTED]` The six-section Outreach Performance Brief is distinct from the event-production report. Its sources are `outreach-performance-report-worker.cjs`, `lib/outreach-report-pdf.js`, `lib/outreach-report-archive.js`, the private `outreach_performance_reports` table, and the protected `/api/admin/outreach-performance-reports` route. Preserve the Monday 09:10 New York schedule, immutable snapshots, owner-email attachment and no-SMS/no-event-closeout boundary. Keep provider-ID deduplication, person-specific contact matching, completed-week cohorts, explicit rate denominators, and historical confirmations after cancellation/opt-out. Run `npm run verify:outreach-reports` and `npm run verify:weekly-reports` when changing either report. Do not replace the original reference PDFs or present newly reconstructed historical weeks as their original frozen reports.
+
 Use the checks that match the touched area.
 
 General inspection:

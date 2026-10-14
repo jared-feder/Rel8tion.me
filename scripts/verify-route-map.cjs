@@ -5,6 +5,11 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 
 const criticalProductionFiles = [
+  ['api/admin/outreach-performance-reports.js', 'outreach brief archive and PDF'],
+  ['api/cron/outreach-performance-report.js', 'outreach brief scheduler'],
+  ['outreach-performance-report-worker.cjs', 'outreach brief calculations'],
+  ['lib/outreach-report-archive.js', 'outreach brief persistence'],
+  ['lib/outreach-report-pdf.js', 'six-section outreach PDF'],
   ['api/admin/weekly-production-reports.js', 'weekly production report archive'],
   ['api/cron/weekly-production-report.js', 'weekly production report scheduler'],
   ['weekly-production-report-worker.cjs', 'weekly production report generator'],
@@ -191,6 +196,11 @@ function main() {
   if (configPath === path.join(ROOT, 'vercel.json') && !(config.crons || []).some((cron) =>
     cron.path === '/api/cron/weekly-production-report' && cron.schedule === '5 13,14 * * 1')) {
     failures.push({ type: 'weekly-report-schedule', route: '/api/cron/weekly-production-report', file: 'vercel.json', problem: 'Missing Monday New York weekly report schedule' });
+  }
+
+  if (configPath === path.join(ROOT, 'vercel.json') && !(config.crons || []).some((cron) =>
+    cron.path === '/api/cron/outreach-performance-report' && cron.schedule === '10 13,14 * * 1')) {
+    failures.push({ type: 'outreach-report-schedule', route: '/api/cron/outreach-performance-report', file: 'vercel.json', problem: 'Missing Monday New York outreach brief schedule' });
   }
 
   for (const [file, reason] of criticalProductionFiles) {

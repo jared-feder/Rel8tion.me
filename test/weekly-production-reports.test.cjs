@@ -76,6 +76,14 @@ test('scheduled run reuses manual snapshot and never duplicates accepted email',
   assert.equal(f.records.get(window.key).email_status, 'sent');
 });
 
+test('outreach archive shares immutable delivery safeguards without event closeout', async () => {
+  const f = fixture();
+  const outreach = f.archive.createArchive({ table: 'outreach_performance_reports', closeEvents: false, firstWeek: '2026-04-20' });
+  await outreach.processReport({ window, scheduled: true, now });
+  await outreach.processReport({ window, scheduled: true, now });
+  assert.deepEqual(f.calls, { build: 1, close: 0, email: 1 });
+});
+
 test('explicit email action never closes events and cannot duplicate accepted delivery', async () => {
   const f = fixture();
   await f.archive.processReport({ window, emailOnly: true });

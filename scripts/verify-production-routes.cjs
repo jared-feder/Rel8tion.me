@@ -1,6 +1,9 @@
 const BASE_URL = (process.env.BASE_URL || 'https://app.rel8tion.me').replace(/\/$/, '');
 
 const checks = [
+  { path: '/api/admin/outreach-performance-reports', statuses: [401], label: 'outreach performance brief authorization' },
+  { path: '/api/admin/outreach-performance-reports?week=2026-10-05&format=pdf', statuses: [401], label: 'outreach PDF authorization' },
+  { path: '/api/cron/outreach-performance-report', statuses: [401], label: 'outreach scheduler authorization' },
   { path: '/api/admin/weekly-production-reports', statuses: [401], label: 'weekly report archive authorization' },
   { path: '/get-open-house-kit', statuses: [200], label: 'Open House Kit landing page' },
   { path: '/kit-intake?flow=manual', statuses: [200], label: 'Open House Kit intake page' },
