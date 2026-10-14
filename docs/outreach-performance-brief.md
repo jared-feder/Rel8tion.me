@@ -5,7 +5,7 @@ The owner's August 17, 2026 six-section PDF is the product reference. The earlie
 ## Report and delivery
 
 - COMMAND: `https://app.rel8tion.me/command?area=reports`.
-- Private JSON/PDF archive: `/api/admin/outreach-performance-reports`, existing admin-header authorization required. `GET ?week=YYYY-MM-DD&format=pdf` downloads six pages. Credentials never appear in URLs.
+- Private JSON/PDF archive: `/api/admin/outreach-performance-reports`, existing admin-header authorization required. `GET ?week=YYYY-MM-DD&format=pdf` downloads the newest edition; add `version=1` for the original. Edition 2 has eight core sections and paginates long tables. Credentials never appear in URLs.
 - `POST {action: "generate", week: "YYYY-MM-DD"}` creates only a snapshot. `action: "email"` submits its PDF to configured report recipients. It never sends agent outreach or closes events.
 - `/api/cron/outreach-performance-report`: Monday 09:10 New York, protected with the existing cron bearer secret. UTC 13:10 and 14:10 schedules are filtered by the New York hour guard.
 - `PRODUCTION_REPORT_EMAILS` (or the existing singular/owner fallback) chooses recipients. Existing SMTP or Resend configuration is reused. Accepted email submissions and uncertain outcomes are not automatically resent; acceptance is not proof of inbox delivery.
@@ -33,6 +33,24 @@ All activity weeks are completed Monday-Sunday periods in America/New_York. Life
 | Quality gaps | Houses with enrichment records but no flag, or a flag but no record; missing contact identities; inbound rows without a matching queue link. |
 
 Source deletions before archive restoration cannot be recovered from these tables. Differences from the August reference PDFs may reflect elapsed activity, matured outcomes, source changes and explicit identity/deduplication rules. Never fabricate missing historical snapshots or replace verified records with the older PDF totals.
+
+## Expanded edition (version 2)
+
+The original metric contract remains in force. These additions restore the fuller conversion and lead narrative:
+
+| Measure | Definition |
+| --- | --- |
+| Reply-to-host | Distinct replying agents with confirmed houses / distinct replying agents. Hosts without a recorded post-send reply are separately identified, never silently included in this rate. |
+| Houses from replies | Confirmed houses associated with replying agents. A repeat host contributes one host but can contribute multiple houses. |
+| Overall host conversion | Distinct contacted agents with a confirmed house / distinct contacted agents. |
+| Recent/all cohort conversion | Confirmed houses / initial messages summed over recent eight or all completed initial-send cohorts. |
+| Weekly lead total | Buyer check-in records plus profile/HomeKey lead records created during the week; not deduplicated people. |
+| Leads per producing event | Linked buyer records created this week / distinct event IDs producing those records. |
+| Leads per recorded event | This-week buyer records for eligible events dated this week / all such events, including zero-lead events. Active/live/ended/completed events qualify; explicit test sources and cancellations do not. |
+| Per-open-house rows | One row per event ID with property address, event date, count and reporting-week scope. Resumed sessions can appear separately. Other-date/unverified events, unlinked records and profile leads remain separate. |
+| Source cadence | Houses or distinct agent identities per source per completed week. Source-level agent counts may overlap; overall agent cadence deduplicates within each week. Small PDF source rows are combined as Other, without dropping their counts. |
+
+Migration `20261014201556_outreach_report_editions.sql` adds an edition column (old rows default to 1), replaces the week-only primary key with a composite key, and prevents changing an edition. Existing RLS, private grants and completed-snapshot protection remain. The archive factory scopes reads, upserts, leases and email state by edition. Email provider idempotency/message IDs include the edition. Apply the migration with the edition-aware release; the older worker's week-only upsert key is incompatible after the constraint change. Never regenerate or mutate the original snapshot to add fields.
 
 ## Verification
 

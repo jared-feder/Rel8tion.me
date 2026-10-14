@@ -18,6 +18,8 @@ Status labels used in this repo:
 
 ## Read This First
 
+- `[IMPLEMENTED]` Outreach brief edition 2 uses `(week_start, report_version)` for archive writes, locks and delivery idempotency. Never overwrite edition 1 or change a saved edition number; retain its renderer and original download. Reply-to-host rates must intersect replying agents with confirmed hosts, count repeat hosts once, and show confirmed house counts separately. Lead averages must state whether zero-lead events are included. Per-open-house rows count recorded event IDs, including separate resumed sessions. No buyer contact information belongs in the report snapshot.
+
 - `[IMPLEMENTED]` Production is configured to deploy from `main` through Vercel Git production branch automation. Verify the exact live SHA with Vercel inspection plus `git log -1 origin/main` before making live claims.
 - `[IMPLEMENTED]` `staging` exists as the preview/staging branch. Do not force-push `main` or `staging`.
 - `[IMPLEMENTED]` The older direct deploy from `modular-claim-test` commit `51d2d1a` is historical only and preserved as tag `production-51d2d1a-2026-05-08`. Do not treat that branch as the current production source.
