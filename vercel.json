@@ -3,10 +3,12 @@
   "cleanUrls": true,
   "functions": {
     "api/cron/outreach-performance-report.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "assets/rel8tion-brand/**"
     },
     "api/admin/outreach-performance-reports.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "assets/rel8tion-brand/**"
     },
     "api/cron/weekly-production-report.js": {
       "maxDuration": 300

@@ -36,6 +36,8 @@ Source deletions before archive restoration cannot be recovered from these table
 
 ## Expanded edition (version 2)
 
+Branding follows COMMAND: the existing REL8TION logo, sky #38bdf8, blue #2563eb, navy #1f2a5a, Inter body text and Plus Jakarta Sans display text. Assets and font licenses live in `assets/rel8tion-brand`; both report functions bundle them explicitly. Inter is embedded in full because subsetting lost composite glyphs during visual verification. Email uses the existing public logo URL and matching palette with system font fallbacks.
+
 The original metric contract remains in force. These additions restore the fuller conversion and lead narrative:
 
 | Measure | Definition |

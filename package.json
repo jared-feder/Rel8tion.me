@@ -43,6 +43,7 @@
     "refresh:onekey:dry-run": "node onekey-freshness-worker.cjs --dry-run"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
     "cheerio": "^1.0.0",
     "jszip": "^3.10.1",
     "nodemailer": "^7.0.13",

@@ -2,6 +2,8 @@
 
 Human architecture and product overview for REL8TION.
 
+- `[IMPLEMENTED, RELEASE PENDING]` Expanded outreach reports use REL8TION COMMAND branding throughout the PDF, email and archive panel. The PDF embeds the existing logo and licensed Inter/Plus Jakarta Sans fonts from repository assets, so rendering does not depend on external font or logo availability. Original report editions retain their original renderer.
+
 - `[IMPLEMENTED, RELEASE PENDING]` The expanded outreach brief adds reply-to-host and overall host conversion, confirmation-source mix, recent/all-cohort comparisons and weekly lead production by open-house event. The redesigned PDF includes eight core sections and paginates long property tables. Report editions share the private archive under `(week_start, report_version)`; existing edition-1 snapshots and PDFs remain accessible. Edition 2 has independent processing/email state and preserves the no-SMS/no-closeout boundary. Lead averages distinguish producing events from all eligible recorded events, including zeros; event records and profile/HomeKey leads are not unique buyers or causal outreach attribution.
 
 - `[VERIFIED LIVE 2026-10-14]` The six-section outreach brief is deployed through `main` in PR #69. The latest completed-week snapshot and protected six-page PDF were verified on `app.rel8tion.me`; its email submission was accepted by SMTP. Monday 09:10 New York scheduling is configured in the deployed route map; the next scheduled execution remains a future verification boundary.
