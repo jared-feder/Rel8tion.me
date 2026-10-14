@@ -14,13 +14,13 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
       if (req.query?.week) {
         const window = archive.windowForWeek(String(req.query.week));
-        const report = await archive.getReport(window.key);
+        const report = await archive.getReport(window.key, req.query.version);
         if (!report) return sendJson(res, 404, { ok: false, error: 'No saved brief for this week.' });
         if (req.query.format === 'pdf') {
           if (report.generation_status !== 'ready') return sendJson(res, 409, { ok: false, error: 'Generate this brief before downloading.' });
           const pdf = await require('../../lib/outreach-report-pdf').renderPdf(report.summary);
           res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="rel8tion-outreach-performance-brief-${window.key}.pdf"`);
+          res.setHeader('Content-Disposition', `attachment; filename="rel8tion-outreach-performance-brief-${window.key}-v${report.report_version || 1}.pdf"`);
           return res.status(200).send(Buffer.from(pdf));
         }
         // Internal hashed outcome references support history preservation, not browser display.

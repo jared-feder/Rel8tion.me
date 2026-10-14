@@ -88,14 +88,74 @@ test('lead records, distinct producing events and enrichment mismatches remain s
   assert.equal(s.engine.recordWithoutFlag, 1); assert.equal(s.engine.flagWithoutRecord, 1);
 });
 
-test('PDF renders all six sections for empty and populated reports', async () => {
+test('expanded PDF renders eight sections; original edition stays six pages', async () => {
   const { PDFDocument } = require('pdf-lib');
   const d = empty(); d.houses = [{ id: 'h', created_at: '2026-08-03T12:00:00Z' }];
   for (let i = 0; i < 10; i++) d.queue.push(queue(String(i), { agent_phone: `51655501${String(i).padStart(2, '0')}`, brokerage: `Brokerage ${i}`, review_status: 'confirmed' }));
   for (const input of [empty(), d]) {
     const bytes = await require('../lib/outreach-report-pdf').renderPdf(summarize(input));
-    assert.equal((await PDFDocument.load(bytes)).getPageCount(), 6);
+    assert.ok((await PDFDocument.load(bytes)).getPageCount() >= 8);
+    const original = summarize(input);
+    const legacy = await require('../lib/outreach-report-pdf').renderPdf({ ...original, version: 1, notes: original.notes.slice(0, 6) });
+    assert.equal((await PDFDocument.load(legacy)).getPageCount(), 6);
   }
+});
+
+test('reply-to-host conversion intersects repliers and deduplicates repeat hosts', () => {
+  const d=empty();d.queue=[queue('1',{review_status:'confirmed'}),queue('2',{review_status:'confirmed'}),queue('3',{agent_phone:'5165550101',review_status:'confirmed'}),queue('4',{agent_phone:'5165550102'})];
+  d.replies=[{id:'r1',queue_row_id:'1',direction:'inbound',received_at:'2026-10-07T12:00:00Z'},{id:'r4',queue_row_id:'4',direction:'inbound',received_at:'2026-10-07T12:00:00Z'}];
+  const s=summarize(d);
+  assert.equal(s.lifetime.replied,2);assert.equal(s.lifetime.replyingHosts,1);assert.equal(s.lifetime.replyToHostRate,.5);
+  assert.equal(s.lifetime.confirmedFromReplies,2);assert.equal(s.lifetime.hostsWithoutRecordedReply,1);
+  assert.equal(s.lifetime.overallHostRate,2/3);assert.equal(s.current.replyToHostRate,.5);
+  assert.equal(s.cohortTotals.recent.conversionRate,3/4);
+});
+
+test('lead averages separate producing events, zeros, other dates, unlinked and profile records', () => {
+  const d=empty();d.events=[{id:'e1',event_date:'2026-10-05',status:'ended'},{id:'e2',event_date:'2026-10-11',status:'ended'},{id:'old',event_date:'2026-09-27',status:'ended'},{id:'draft',event_date:'2026-10-10',status:'draft'}];
+  d.checkins=['e1','e1','old',null].map((id,i)=>({id:String(i),open_house_event_id:id,visitor_type:'buyer',created_at:'2026-10-10T12:00:00Z'}));
+  d.leads=[{id:'profile',created_at:'2026-10-10T12:00:00Z'}];
+  const b=summarize(d).leads.current;
+  assert.equal(worker.cohort('2026-10-05'),'2026-10-05');assert.equal(b.totalLeadRecords,5);assert.equal(b.buyerLeads,4);
+  assert.equal(b.producingOpenHouses,2);assert.equal(b.leadsPerProducingOpenHouse,1.5);
+  assert.equal(b.recordedOpenHouses,2);assert.equal(b.leadsPerRecordedOpenHouse,1);assert.equal(b.zeroLeadOpenHouses,1);
+  assert.equal(b.otherEventLeads,1);assert.equal(b.unlinkedBuyerLeads,1);assert.equal(b.perOpenHouse.length,3);
+});
+
+test('large property tables paginate without dropping rows', async () => {
+  const d=empty();d.events=Array.from({length:75},(_,i)=>({id:`e${i}`,address:`Synthetic property ${i}`,event_date:'2026-10-10',status:'ended'}));
+  const s=summarize(d);assert.equal(s.leads.current.perOpenHouse.length,75);
+  const pdf=await require('pdf-lib').PDFDocument.load(await require('../lib/outreach-report-pdf').renderPdf(s));
+  assert.ok(pdf.getPageCount()>8);
+});
+
+test('edition storage scopes reads, locks and writes to the composite key', async () => {
+  const calls=[];let row;
+  const fake={...worker,rest:async(path,options={})=>{calls.push({path,options});if(options.method==='POST'){row={...JSON.parse(options.body),generation_status:'ready',summary:{version:2},email_status:'sent'};return [];}
+    if(options.method==='PATCH'){Object.assign(row,JSON.parse(options.body));return [row];}return row?[row]:[];}};
+  const archive=require('../lib/weekly-report-archive').createArchive({worker:fake,table:'outreach_performance_reports',version:2,closeEvents:false});
+  await archive.processReport({window});await archive.getReport(window.key);
+  assert.match(calls[0].path,/on_conflict=week_start,report_version/);
+  assert.equal(JSON.parse(calls[0].options.body).report_version,2);
+  assert.ok(calls.filter(c=>c.options.method!=='POST').every(c=>c.path.includes('report_version=eq.2')));
+});
+
+test('an original snapshot cannot hide a missing expanded edition in COMMAND', async () => {
+  const context={module:{exports:{}},require:name=>name.includes('weekly-report-archive')?{createArchive:({version})=>({
+    listReports:async()=>({reports:version===1?[{week_start:window.key,generation_status:'ready',report_version:1}]:[],missing_report:version===2,expected_week:window.key}),
+    getReport:async()=>version===1?{report_version:1}:null
+  })}:worker};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../lib/outreach-report-archive'),'utf8'),context);
+  const archive=context.module.exports,result=await archive.listReports(now);
+  assert.equal(result.missing_report,false);assert.equal(result.expanded_edition_missing,true);
+  assert.equal(result.reports[0].original_available,true);
+  assert.equal((await archive.getReport(window.key)).report_version,1);
+  await assert.rejects(archive.getReport(window.key,'3'),/Unknown report edition/);
+  const html=fs.readFileSync('apps/rel8tion-app/admin.html','utf8');
+  const body=html.match(/    function renderOutreachReports\(\) \{([\s\S]*?)\n    async function loadWeeklyReports/)[0].replace(/\n    async function loadWeeklyReports$/,'');
+  const ui={state:{outreachReports:{...result,selected:window.key,detail:null}},esc:String};
+  vm.createContext(ui);vm.runInContext(body,ui);
+  assert.match(vm.runInContext('renderOutreachReports()',ui),/Expanded edition missing:/);
 });
 
 test('unauthorized JSON and PDF requests cannot read the archive', async () => {
@@ -113,4 +173,8 @@ test('Monday schedule, private migration and required CI check are protected', (
   const sql = fs.readFileSync('supabase/migrations/20261014004205_outreach_performance_reports.sql', 'utf8');
   assert.match(sql, /enable row level security/); assert.match(sql, /from public, anon, authenticated/); assert.match(sql, /protect_weekly_report_snapshot/);
   assert.match(fs.readFileSync('.github/workflows/repo-checks.yml', 'utf8'), /verify:outreach-reports/);
+  const editions = fs.readFileSync('supabase/migrations/20261014201556_outreach_report_editions.sql','utf8');
+  assert.match(editions,/primary key \(week_start, report_version\)/);
+  assert.match(editions,/new.report_version is distinct from old.report_version/);
+  assert.doesNotMatch(editions,/disable row level security|grant .* to (anon|authenticated)/i);
 });

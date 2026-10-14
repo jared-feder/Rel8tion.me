@@ -19,7 +19,8 @@ const stamp = (value) => {
   return Date.parse(/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(text) ? text : `${text}Z`);
 };
 const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-const day = (value) => Number.isFinite(stamp(value)) ? dayFormatter.format(new Date(stamp(value))) : '';
+const day = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? String(value)
+  : Number.isFinite(stamp(value)) ? dayFormatter.format(new Date(stamp(value))) : '';
 const cohortCache = new Map();
 function cohort(value) {
   if (cohortCache.has(value)) return cohortCache.get(value);
@@ -133,21 +134,28 @@ function summarize(data, window, previous = [], now = new Date()) {
     const a = agents.filter((row) => cohort(row.created_at) === cursor);
     const wins = outcomes.filter((row) => row.cohort === cursor);
     const contacts = unique(q.map((row) => row.person));
-    const repliers = unique(q.filter(hasReply).map((row) => row.person));
+    const replyingAgents = new Set(q.filter(hasReply).map((row) => hash(row.person)));
+    const repliers = replyingAgents.size;
+    const replyingHosts = unique(wins.filter((row) => replyingAgents.has(row.agent)).map((row) => row.agent));
     const checkins = data.checkins.filter((row) => known(row) && row.visitor_type !== 'buyer_agent' && cohort(row.created_at) === cursor);
     const leads = data.leads.filter((row) => known(row) && cohort(row.created_at) === cursor);
     weeks.push({ week: cursor, initial: q.length, contacts, replied: repliers, replyRate: ratio(repliers, contacts), confirmed: wins.length,
+      replyingHosts, replyToHostRate: ratio(replyingHosts, repliers), confirmedFromReplies: wins.filter((row) => replyingAgents.has(row.agent)).length,
       conversionRate: ratio(wins.length, q.length), cancelled: wins.filter((row) => row.cancelled).length,
       houses: h.length, enrichedHouses: unique(a.map((row) => row.open_house_id)), enrichedAgents: unique(a.map((row) => identity(row, `agent:${row.id}`))), enrichmentRows: a.length,
       buyerCheckins: checkins.length, producingEvents: unique(checkins.map((row) => row.open_house_event_id)), profileLeads: leads.length });
     const date = new Date(`${cursor}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 7); cursor = date.toISOString().slice(0, 10);
   }
   // Empty historical intake must still produce the selected and comparison weeks.
-  const empty = (week) => ({ week, initial: 0, contacts: 0, replied: 0, replyRate: null, confirmed: 0, conversionRate: null, cancelled: 0, houses: 0, enrichedHouses: 0, enrichedAgents: 0, enrichmentRows: 0, buyerCheckins: 0, producingEvents: 0, profileLeads: 0 });
+  const empty = (week) => ({ week, initial: 0, contacts: 0, replied: 0, replyRate: null, confirmed: 0, replyingHosts: 0, replyToHostRate: null, confirmedFromReplies: 0, conversionRate: null, cancelled: 0, houses: 0, enrichedHouses: 0, enrichedAgents: 0, enrichmentRows: 0, buyerCheckins: 0, producingEvents: 0, profileLeads: 0 });
   const recent = weeks.slice(-8);
   const average = (rows, field) => rows.length ? rows.reduce((n, row) => n + row[field], 0) / rows.length : 0;
   const contacts = unique(sent.map((row) => row.person));
   const replied = unique(sent.filter(hasReply).map((row) => row.person));
+  const replyingAgentIds = new Set(sent.filter(hasReply).map((row) => hash(row.person)));
+  const contactedAgentIds = new Set(sent.map((row) => hash(row.person)));
+  const replyingHosts = unique(outcomes.filter((row) => replyingAgentIds.has(row.agent)).map((row) => row.agent));
+  const contactedHosts = unique(outcomes.filter((row) => contactedAgentIds.has(row.agent)).map((row) => row.agent));
   const mix = { initial: initialMessages.size, followup: followups.size, conversation: conversations.size };
   const warnings = [
     'Weekly activity uses completed Monday-Sunday periods in America/New_York. Lifetime and cohort outcomes reflect evidence available at generation time.',
@@ -157,9 +165,13 @@ function summarize(data, window, previous = [], now = new Date()) {
     'Lead counts are records, not unique buyers or proof of outreach attribution. Buyer-agent-only check-ins are excluded. Contact identities use phone/email with compatible names; conflicting names stay separate.',
     'This is a saved reconstruction from current source records, not a revision of the original August PDFs. Saved snapshots are never overwritten.'
   ];
-  return { version: 1, generatedAt: now.toISOString(), week: window.key, window: { start: window.start.toISOString(), end: window.end.toISOString() },
+  const summary = { version: 2, generatedAt: now.toISOString(), week: window.key, window: { start: window.start.toISOString(), end: window.end.toISOString() },
     lifetime: { outbound: mix.initial + mix.followup + mix.conversation, mix, contacts, replied, replyRate: ratio(replied, contacts),
       confirmed: outcomes.length, confirmedHosts: unique(outcomes.map((row) => row.agent)), cancelled: outcomes.filter((row) => row.cancelled).length,
+      replyingHosts, replyToHostRate: ratio(replyingHosts, replied), contactedHosts, overallHostRate: ratio(contactedHosts, contacts),
+      confirmedFromReplies: outcomes.filter((row) => replyingAgentIds.has(row.agent)).length,
+      hostsWithoutRecordedReply: unique(outcomes.filter((row) => !replyingAgentIds.has(row.agent)).map((row) => row.agent)),
+      confirmationSources: [...outcomes.reduce((map, row) => map.set(row.source || 'Unknown', (map.get(row.source || 'Unknown') || 0) + 1), new Map())].map(([name, count]) => ({ name, count })),
       hostOptOuts: unique(outcomes.filter((row) => row.optedOut).map((row) => row.agent)),
       repeatHosts: [...outcomes.reduce((map, row) => map.set(row.agent, (map.get(row.agent) || 0) + 1), new Map()).values()].filter((n) => n > 1).length,
       buyerCheckins: data.checkins.filter((row) => known(row) && row.visitor_type !== 'buyer_agent').length,
@@ -174,6 +186,56 @@ function summarize(data, window, previous = [], now = new Date()) {
       sources: [...houses.reduce((map, row) => map.set(row.source || 'Unknown', (map.get(row.source || 'Unknown') || 0) + 1), new Map())].map(([name, count]) => ({ name, count })) },
     quality: { missingContactIdentity: sent.filter((row) => row.person.startsWith('queue:')).length, unmatchedInbound: inbound.filter((row) => !byId.has(row.queue_row_id)).length },
     confirmationLedger: outcomes, notes: warnings };
+  const totals = (rows) => {
+    const result = rows.reduce((a, row) => ({ initial: a.initial + row.initial, contacts: a.contacts + row.contacts,
+      replied: a.replied + row.replied, confirmed: a.confirmed + row.confirmed, replyingHosts: a.replyingHosts + row.replyingHosts }),
+    { initial: 0, contacts: 0, replied: 0, confirmed: 0, replyingHosts: 0 });
+    return { ...result, conversionRate: ratio(result.confirmed, result.initial), replyRate: ratio(result.replied, result.contacts), replyToHostRate: ratio(result.replyingHosts, result.replied) };
+  };
+  summary.cohortTotals = { all: totals(weeks), recent: totals(recent) };
+  const completed = (row) => cohort(row.created_at) >= firstWeek && cohort(row.created_at) <= window.key;
+  const sourceCounts = (rows, agentMode = false) => {
+    const bySource = new Map();
+    for (const row of rows.filter(completed)) {
+      const source = row.source || 'Unknown';
+      if (!bySource.has(source)) bySource.set(source, new Set());
+      bySource.get(source).add(agentMode ? `${cohort(row.created_at)}|${identity(row, `agent:${row.id}`)}` : row.id);
+    }
+    return [...bySource].map(([name, ids]) => ({ name, perWeek: weeks.length ? ids.size / weeks.length : 0 })).sort((a, b) => b.perWeek - a.perWeek);
+  };
+  summary.engine.houseSourcesPerWeek = sourceCounts(houses);
+  summary.engine.agentSourcesPerWeek = sourceCounts(agents, true);
+  const eventById = new Map((data.events || []).filter((row) => known(row)).map((row) => [row.id, row]));
+  const addressById = new Map([...(data.houses || []), ...(data.eventHouses || [])].map((row) => [String(row.id), row]));
+  function leadActivity(week) {
+    const checkins = data.checkins.filter((row) => known(row) && row.visitor_type !== 'buyer_agent' && cohort(row.created_at) === week);
+    const profiles = data.leads.filter((row) => known(row) && cohort(row.created_at) === week);
+    const byEvent = new Map();
+    for (const row of checkins) if (row.open_house_event_id) byEvent.set(row.open_house_event_id, (byEvent.get(row.open_house_event_id) || 0) + 1);
+    const eligible = [...eventById.values()].filter((event) => cohort(event.start_time || event.event_date) === week
+      && ['active', 'live', 'ended', 'completed'].includes(event.status) && !/test|qa_fixture/i.test(event.source || '')
+      && !/qa_fixture|manual_test/i.test(addressById.get(String(event.open_house_source_id))?.source || ''));
+    const ids = new Set([...eligible.map((row) => row.id), ...byEvent.keys()]);
+    const rows = [...ids].map((id) => {
+      const event = eventById.get(id) || {};
+      const house = addressById.get(String(event.open_house_source_id)) || {};
+      return { eventId: id, address: house.address || event.address || 'Unlinked open-house event',
+        eventDate: day(event.start_time || event.event_date), host: event.host_agent_slug || '',
+        status: event.status || 'unknown', leads: byEvent.get(id) || 0, inReportingWeek: eligible.some((row) => row.id === id) };
+    }).sort((a, b) => b.leads - a.leads || a.address.localeCompare(b.address));
+    const linkedLeads = [...byEvent.values()].reduce((a, b) => a + b, 0);
+    const eventWeekLeads = rows.filter((row) => row.inReportingWeek).reduce((a, b) => a + b.leads, 0);
+    return { totalLeadRecords: checkins.length + profiles.length, buyerLeads: checkins.length, profileLeads: profiles.length,
+      producingOpenHouses: byEvent.size, leadsPerProducingOpenHouse: ratio(linkedLeads, byEvent.size),
+      recordedOpenHouses: eligible.length, leadsPerRecordedOpenHouse: ratio(eventWeekLeads, eligible.length),
+      zeroLeadOpenHouses: eligible.filter((row) => !byEvent.has(row.id)).length, unlinkedBuyerLeads: checkins.length - linkedLeads,
+      otherEventLeads: linkedLeads - eventWeekLeads, perOpenHouse: rows };
+  }
+  summary.leads = { current: leadActivity(window.key), prior: leadActivity(priorKey),
+    lifetimeTotal: summary.lifetime.buyerCheckins + summary.lifetime.profileLeads };
+  summary.notes.push('Reply-to-host conversion counts replying agents who also have a confirmed house; hosts without a recorded post-send reply are shown separately. Repeat hosts count once within each rate denominator.');
+  summary.notes.push('Per-open-house metrics count recorded event IDs, including separate resumed sessions. The producing average uses linked buyer records divided by events with leads. The all-event average includes zero-lead active/ended events dated in the week. Other-event, unlinked and profile/HomeKey leads remain separate.');
+  return summary;
 }
 
 async function buildReport(window) {
@@ -186,11 +248,18 @@ async function buildReport(window) {
     agents: 'listing_agents?select=id,open_house_id,name,phone_normalized,phone,email,source,created_at',
     checkins: 'event_checkins?select=id,open_house_event_id,visitor_type,created_at',
     leads: 'leads?select=id,created_at',
-    suppression: 'sms_suppression_list?select=id,phone,created_at'
+    suppression: 'sms_suppression_list?select=id,phone,created_at',
+    events: 'open_house_events?select=id,open_house_source_id,start_time,event_date,status,host_agent_slug,address:setup_context->>address,source:setup_context->>source,created_at'
   };
   const entries = await Promise.all(Object.entries(queries).map(async ([name, path]) => [name, await allRows(`${path}&created_at=lte.${encodeURIComponent(now.toISOString())}&order=id.asc`)]));
-  const previous = await allRows('outreach_performance_reports?generation_status=eq.ready&select=summary&order=generated_at.asc,week_start.asc');
-  return summarize(Object.fromEntries(entries), window, previous.flatMap((row) => row.summary?.confirmationLedger || []), now);
+  const data = Object.fromEntries(entries);
+  const eventHouseIds = [...new Set(data.events.map((row) => row.open_house_source_id).filter(Boolean))];
+  data.eventHouses = [];
+  for (let i = 0; i < eventHouseIds.length; i += 100) {
+    data.eventHouses.push(...await allRows(`open_houses?select=id,address,source&id=in.(${eventHouseIds.slice(i, i + 100).map(encodeURIComponent).join(',')})&order=id.asc`));
+  }
+  const previous = await allRows('outreach_performance_reports?generation_status=eq.ready&select=summary&order=generated_at.asc,week_start.asc,report_version.asc');
+  return summarize(data, window, previous.flatMap((row) => row.summary?.confirmationLedger || []), now);
 }
 
 async function sendReport(summary, window) {
@@ -199,16 +268,16 @@ async function sendReport(summary, window) {
   const recipients = String(process.env.PRODUCTION_REPORT_EMAILS || process.env.PRODUCTION_REPORT_EMAIL || process.env.REL8TION_OWNER_EMAIL || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (!delivery.provider || !recipients.length) return { status: 'not_configured' };
   const pdf = Buffer.from(await renderPdf(summary));
-  const filename = `rel8tion-outreach-performance-brief-${window.key}.pdf`;
+  const filename = `rel8tion-outreach-performance-brief-${window.key}-v${summary.version}.pdf`;
   const subject = `REL8TION Outreach Performance Brief - week of ${window.key}`;
-  const text = `Your six-section outreach brief for the week of ${window.key} is attached. View the saved archive at https://app.rel8tion.me/command?area=reports`;
+  const text = `Your outreach brief for the week of ${window.key} is attached, including reply-to-host conversion and weekly leads by open house. View the saved archive at https://app.rel8tion.me/command?area=reports`;
   if (delivery.provider === 'smtp') {
     const port = Number(process.env.SMTP_PORT || 465);
     const transport = require('nodemailer').createTransport({ host: process.env.SMTP_HOST, port, secure: port === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }, connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000 });
     try {
       const result = await transport.sendMail({ from: process.env.REL8TION_FROM_EMAIL || process.env.LEAD_FROM_EMAIL || process.env.SMTP_USER,
-        to: recipients, messageId: `<outreach-performance-${window.key}@rel8tion.me>`, subject, text, html: emailHtml(summary),
+        to: recipients, messageId: `<outreach-performance-${window.key}-v${summary.version}@rel8tion.me>`, subject, text, html: emailHtml(summary),
         attachments: [{ filename, content: pdf, contentType: 'application/pdf' }] });
       if (result.rejected?.length || !result.accepted?.length) throw new Error('Recipients were not all accepted.');
       return { status: 'sent', id: result.messageId || '' };
@@ -218,7 +287,7 @@ async function sendReport(summary, window) {
     } finally { transport.close(); }
   }
   const response = await fetch('https://api.resend.com/emails', { method: 'POST', signal: AbortSignal.timeout(20000),
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `rel8tion-outreach-performance-${window.key}` },
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `rel8tion-outreach-performance-${window.key}-v${summary.version}` },
     body: JSON.stringify({ from: process.env.REL8TION_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'REL8TION <onboarding@resend.dev>',
       to: recipients, subject, text, html: emailHtml(summary), attachments: [{ filename, content: pdf.toString('base64') }] }) });
   const result = await response.json().catch(() => ({}));
