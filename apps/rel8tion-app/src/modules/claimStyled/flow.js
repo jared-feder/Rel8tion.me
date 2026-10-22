@@ -822,7 +822,13 @@ export async function saveFullProfile() {
     window.location.href = routeAfterVerifiedAgent(slug, 'claim-full-profile');
   } catch (e) {
     debug('SAVE FULL PROFILE FAILED', { message: e?.message || String(e) });
-    showFullProfileFormWithHistory(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', 'Saving failed. Please try again.');
+    const detail = String(e?.message || '').toLowerCase();
+    const stage = detail.includes('key') || detail.includes('slot') ? 'key linking' :
+      detail.includes('agent') || detail.includes('profile') ? 'agent profile saving' : 'registration';
+    const code = detail.match(/(?:pgrst|23|42|42501)[a-z0-9]*/i)?.[0]?.toUpperCase() || '';
+    const notice = `Registration failed during ${stage}${code ? ` (error ${code})` : ''}. Please contact REL8TION support with this message; do not reset or reassign the pass.`;
+    console.error('REL8TION CLAIM SAVE ERROR', { stage, code, error: e });
+    showFullProfileFormWithHistory(brokerage || state.detectedHouse?.brokerage || state.selectedBrokerage || '', notice);
   }
 }
 
