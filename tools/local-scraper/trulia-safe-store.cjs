@@ -32,24 +32,29 @@ function parseListingContacts(text) {
   const agents = [];
   const seen = new Set();
   let pendingName = '';
+  let pendingEmail = '';
   for (const line of lines) {
-    if (line === companyLine) { pendingName = ''; continue; }
+    if (line === companyLine) { pendingName = ''; pendingEmail = ''; continue; }
     const number = line.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0];
     const email = line.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
     const cleaned = line.replace(number || /$^/, '').replace(email || /$^/, '').replace(/^[,\s:]+|[,\s:]+$/g, '').trim();
     if (!number) {
-      if (email && agents.length) agents[agents.length - 1].email ||= email;
-      else if (validName(cleaned)) pendingName = cleaned;
+      if (validName(cleaned)) { pendingName = cleaned; pendingEmail = email || ''; }
+      else if (email && pendingName) pendingEmail = email;
+      else if (email && agents.length) agents[agents.length - 1].email ||= email;
       continue;
     }
-    const name = validName(cleaned) ? cleaned : pendingName;
+    const namedInline = validName(cleaned);
+    const name = namedInline ? cleaned : pendingName;
+    const contactEmail = email || ((!namedInline || samePerson(name, pendingName)) ? pendingEmail : '');
     pendingName = '';
+    pendingEmail = '';
     const normalized = phone(number);
     if (!validName(name) || !normalized) continue;
     const identity = nameParts(name).join(' ') + '|' + normalized;
     if (seen.has(identity)) continue;
     seen.add(identity);
-    agents.push({ name, phone:number, phone_normalized:normalized, ...(email ? {email} : {}) });
+    agents.push({ name, phone:number, phone_normalized:normalized, ...(contactEmail ? {email:contactEmail} : {}) });
   }
   return { brokerage, agents, rawBlock:block };
 }

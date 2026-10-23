@@ -28,6 +28,24 @@ test('parses company, adjacent-line phone and email without treating company as 
 test('does not merge distinct people sharing an office phone',()=>{
   assert.equal(samePerson('Alice Rivera','Bob Rivera'),false);assert.equal(samePerson('Alice M Rivera ABR','Alice Rivera'),true);assert.equal(phone('123'), '');
 });
+
+test('keeps named and pending email lines with their own agent through persistence',async()=>{
+  for (const contact of ['Bob Jones bob@example.test\n(516) 555-0456','Bob Jones\nbob@example.test\n(516) 555-0456']) {
+    const parsed=parseListingContacts('Listing by:\nCompass\nAlice Rivera (516) 555-0123\n'+contact+'\nSource: OneKey');
+    assert.equal(parsed.agents.length,2);
+    assert.equal(parsed.agents[0].email,undefined);
+    assert.equal(parsed.agents[1].name,'Bob Jones');
+    assert.equal(parsed.agents[1].email,'bob@example.test');
+    const f=fixture();await f.store.saveListingAgents('event-1',parsed);
+    assert.equal(f.tables.listing_agents[0].email,undefined);
+    assert.equal(f.tables.listing_agents[1].email,'bob@example.test');
+  }
+});
+
+test('a different inline contact cannot inherit an earlier pending email',()=>{
+  const parsed=parseListingContacts('Listing by:\nCompass\nBob Jones bob@example.test\nCarol Smith (516) 555-0789\nSource: OneKey');
+  assert.equal(parsed.agents.length,1);assert.equal(parsed.agents[0].name,'Carol Smith');assert.equal(parsed.agents[0].email,undefined);
+});
 test('preserves existing company, email and all photo fields',async()=>{
   const existing={id:'la-1',open_house_id:'event-1',name:'Alice Rivera',phone:'5165550123',phone_normalized:'5165550123',brokerage:'Verified Co',email:'saved@example.test',primary_photo_url:'verified.jpg',photo_enriched:true};
   const f=fixture([existing]);const saved=await f.store.saveListingAgents('event-1',{brokerage:'Other Co',agents:[agent]});
