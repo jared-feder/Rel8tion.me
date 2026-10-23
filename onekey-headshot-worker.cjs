@@ -112,7 +112,7 @@ async function upcomingTargets({ days = 14, limit = 8, dryRun = false } = {}) {
     const existing = agents.find((agent) => agent.primary_photo_url || agent.directory_photo_url);
     if (existing) {
       const url = existing.primary_photo_url || existing.directory_photo_url;
-      if (!dryRun && target.queueIds.length) await patch('agent_outreach_queue', idFilter(target.queueIds), { agent_photo_url: url });
+      if (!dryRun && target.queueIds.length) await patch('agent_outreach_queue', idFilter(target.queueIds) + '&or=(agent_photo_url.is.null,agent_photo_url.eq.)', { agent_photo_url: url });
       continue;
     }
     const recentlyChecked = agents.some((agent) => agent.photo_last_checked_at && new Date(agent.photo_last_checked_at) > cooldown);
@@ -190,7 +190,7 @@ async function persist(target, match) {
   const publicUrl = `${url}/storage/v1/object/public/${BUCKET}/${path}`;
   const checkedAt = new Date().toISOString();
   if (target.agentIds.length) {
-    await patch('listing_agents', idFilter(target.agentIds), {
+    await patch('listing_agents', idFilter(target.agentIds) + '&and=(or(primary_photo_url.is.null,primary_photo_url.eq.),or(directory_photo_url.is.null,directory_photo_url.eq.))', {
       primary_photo_url: publicUrl,
       photo_enriched: true,
       photo_status: 'primary',
@@ -199,14 +199,14 @@ async function persist(target, match) {
     });
   }
   const queue = target.queueIds.length
-    ? await patch('agent_outreach_queue', idFilter(target.queueIds), { agent_photo_url: publicUrl })
+    ? await patch('agent_outreach_queue', idFilter(target.queueIds) + '&or=(agent_photo_url.is.null,agent_photo_url.eq.)', { agent_photo_url: publicUrl })
     : [];
   return { publicUrl, queueRows: queue.length };
 }
 
 async function markChecked(target, status) {
   if (!target.agentIds.length) return;
-  await patch('listing_agents', idFilter(target.agentIds), {
+  await patch('listing_agents', idFilter(target.agentIds) + '&and=(or(primary_photo_url.is.null,primary_photo_url.eq.),or(directory_photo_url.is.null,directory_photo_url.eq.))', {
     photo_status: status,
     photo_last_checked_at: new Date().toISOString()
   });

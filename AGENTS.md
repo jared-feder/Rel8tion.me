@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Recovery source and saved-photo preservation
+
+- `[IMPLEMENTED]` `tools/local-scraper` is a sanitized source snapshot. Do not copy local `.env`, browser cookies/profiles, logs or private recovery archives into Git. Deploying this repository does not update or launch `C:/Users/jared/scraper`; inspect that working copy and obtain task authorization before replacing it.
+- `[IMPLEMENTED]` OneKey headshot writes must guard blank photo fields in the database PATCH itself, including queue backfills and missing-photo status updates. A manual photo saved after candidate selection must survive the helper run. Keep `npm run verify:scraper-preservation` in CI and preserve person-specific matching rules.
+- `[RISK]` Recovery/archive branches and older worktrees may contain unique source or local data. Do not merge old activation/schedule drafts into current production or delete archives merely because their parent commit is old. Classify substantive diffs against current production first.
+
 Repo operating guide for Codex sessions working on REL8TION.
 
 Last cleaned: 2026-06-04.

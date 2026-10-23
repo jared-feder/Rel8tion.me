@@ -8,6 +8,12 @@ module.exports = async function handler(req, res) {
   }
   try {
     const result = await run({ days: 14, limit: 8 });
+    console.info('[onekey-headshots] complete', {
+      checked: result.checked || 0,
+      enriched: result.enriched || 0,
+      errors: Array.isArray(result.errors) ? result.errors.length : 0,
+      dryRun: result.dryRun === true
+    });
     return res.status(200).json({ ok: true, ...result });
   } catch (error) {
     console.error('[onekey-headshots] cron failed:', error);
