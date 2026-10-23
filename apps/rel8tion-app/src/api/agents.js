@@ -13,10 +13,14 @@ export async function findAgentByPhoneNormalized(phoneNormalized) {
 
 export async function findListingAgentsByOpenHouse(openHouseId) {
   if (!openHouseId) return [];
-  const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}`, {
+  let rows = await fetchJson(`${SUPABASE_URL}/rest/v1/listing_agents?select=*&open_house_id=eq.${encodeURIComponent(openHouseId)}`, {
     headers: authHeaders(KEY)
   });
   if (!Array.isArray(rows)) return [];
+  if (!rows.some((row) => pickAgentDisplayName(row))) {
+    const result = await fetchJson(`/api/listing-agents?open_house_id=${encodeURIComponent(openHouseId)}`);
+    if (Array.isArray(result?.agents) && result.agents.length) rows = result.agents;
+  }
   return Promise.all(rows.map(async (row) => {
     const normalized = normalizeListingAgent(row);
     if (!normalized) return null;
@@ -49,12 +53,24 @@ async function findMatchingAgentProfile(agent = {}) {
   if (agent.name && !isGenericAgentNameValue(agent.name)) filters.push(`name=ilike.${encodeURIComponent(agent.name)}`);
 
   for (const filter of filters) {
-    const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/agents?${filter}&select=*&limit=1`, {
+    const rows = await fetchJson(`${SUPABASE_URL}/rest/v1/agents?${filter}&select=*&limit=10`, {
       headers: authHeaders(KEY)
     });
-    if (Array.isArray(rows) && rows.length) return rows[0];
+    const match = (Array.isArray(rows) ? rows : []).find((row) => (
+      isGenericAgentNameValue(agent.name) || matchingPersonName(agent.name, row.name)
+    ));
+    if (match) return match;
   }
   return null;
+}
+
+function matchingPersonName(left, right) {
+  const anchor = (name) => String(name || '').toLowerCase()
+    .replace(/\be[\s-]*pro\b/g, ' epro ')
+    .replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/)
+    .filter((part) => part.length > 1 && !/^(abr|ahwd|c2ex|cbr|crs|epro|gri|ii|iii|jr|mba|mrp|psa|rsps|sfr|sr|sres|srs|wcr)$/.test(part));
+  const a = anchor(left), b = anchor(right);
+  return a.length >= 2 && b.length >= 2 && a[0] === b[0] && a.at(-1) === b.at(-1);
 }
 
 function cleanText(value) {

@@ -1,5 +1,7 @@
 # REL8TION System Overview
 
+- `[IMPLEMENTED]` Event Pass claim resolves missing listing-agent attribution through the read-only `/api/listing-agents` route. The shared `lib/onekey-listing-agents.js` verifies exact source MLS IDs, reads primary/co-listing business contacts from OneKey property details, and is reused by host authorization and background freshness repair. Cached public attribution does not claim a pass or grant host access; server authorization remains separate.
+
 Human architecture and product overview for REL8TION.
 
 - `[IMPLEMENTED, RELEASE PENDING]` Expanded outreach reports use REL8TION COMMAND branding throughout the PDF, email and archive panel. The PDF embeds the existing logo and licensed Inter/Plus Jakarta Sans fonts from repository assets, so rendering does not depend on external font or logo availability. Original report editions retain their original renderer.

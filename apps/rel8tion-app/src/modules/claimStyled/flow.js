@@ -23,7 +23,7 @@ import {
   isGenericAgentNameValue,
   upsertAgent,
   uploadFullProfilePhoto
-} from '../../api/agents.js?v=20260719-agent-photo';
+} from '../../api/agents.js?v=20261023-listing-agent-details';
 import { sendActivationSMS } from '../../api/notifications.js';
 import { linkKeyToAgent, loadAgentFromUID } from '../../api/keys.js';
 import {
@@ -508,6 +508,11 @@ export async function startDetection() {
 }
 
 export function selectHouse(id) {
+  if (!hasLockedProfileIdentity()) {
+    setPrefilledAgent(null);
+    setDetectedAgentPhoto(null);
+    setSelectedBrokerage('');
+  }
   setDetectedHouse(state.nearbyHouses.find((h) => String(h.id) === String(id)) || null);
   if (state.detectedHouse?.brokerage) {
     setSelectedBrokerage(state.detectedHouse.brokerage);
@@ -559,6 +564,7 @@ async function showAgentSelection() {
 
   try {
     const agents = await findListingAgentsByOpenHouse(h.id);
+    if (state.detectedHouse !== h) return;
 
     if (!agents.length) {
       const listingProfile = await findListingAgentProfile({

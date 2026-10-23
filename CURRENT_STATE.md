@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-10-23: Restore agent details for Event Pass alternative listings
+
+- `[VERIFIED READ-ONLY]` The deployed claim flow matches main `585e735`. A 1,000-row upcoming OneKey sample had only 256 saved agent names. The initial suggestion explicitly preferred a row with contact data, concealing missing attribution on alternative listings. OneKey search summaries omit agent fields while exact property detail data still contains `Listing.AgentOffice.ListAgent` and `CoListAgent`.
+- `[IMPLEMENTED, RELEASE PENDING]` A public read-only `/api/listing-agents` endpoint loads attribution for an existing selected open house, verifies the exact MLS ID on the source detail page, and returns only listing-agent business details. Claim lookup uses it when saved listing agents have no real name. Switching properties clears inferred profile/photo state; profile enrichment rejects conflicting names at a shared phone. Server-side Event Pass host verification uses the same source fallback without weakening authorization.
+- `[IMPLEMENTED, RELEASE PENDING]` The existing OneKey freshness cron now fills missing names and compatible missing phone/email fields from exact listing details. Existing identities and manual price overrides are preserved. No schema, consent, outbound messaging, or inventory changes are included. The cron function receives a 300-second budget for its bounded 20-row refresh.
+- `[VERIFIED LOCALLY]` All 42 focused recovery, Event Pass activation/security/reuse/mobile, and OneKey identity tests pass. Read-only source checks recovered names on all 10 sampled Babylon-area alternatives that had blank saved names; 8 listings had direct agent phones available. A missing direct phone remains blank rather than substituting an office number. No live pass was activated and no message was sent.
+- `[NEEDS VERIFICATION]` Release, production endpoint/browser checks, and scheduled background backfill are pending. The connected Supabase account does not have SQL access to the production project; inspection used the existing public read API.
+
 ## 2026-10-14: Expand the outreach brief to restore conversion and lead detail
 
 - `[IMPLEMENTED, RELEASE PENDING]` Owner-requested branding now uses the existing REL8TION hand/wordmark, COMMAND sky/blue/navy palette, embedded Inter and Plus Jakarta Sans fonts, and branded page headers, cover, charts and footers. The email and COMMAND report panel match. Licensed font files and the unchanged logo are bundled under `assets/rel8tion-brand`; both report functions explicitly include them. Full Inter embedding avoids missing composite glyphs observed during visual review. The branded eight-page preview was checked page by page; original-edition rendering is unchanged.
