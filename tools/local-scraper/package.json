@@ -1,0 +1,25 @@
+{
+  "name": "scraper",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "axios": "^1.14.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "fs-extra": "^11.3.4",
+    "node-cron": "^4.2.1",
+    "node-fetch": "^2.7.0",
+    "puppeteer": "^24.40.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

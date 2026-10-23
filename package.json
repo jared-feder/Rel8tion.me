@@ -16,6 +16,7 @@
     "verify:outreach-reports": "node --test test/outreach-performance-report.test.cjs",
     "verify:property-experience": "node test/open-house-link.test.cjs",
     "verify:event-pass-activation": "node test/event-pass-activation.test.cjs",
+    "verify:scraper-preservation": "node --test tools/local-scraper/trulia-safe-store.test.cjs test/onekey-headshot-preservation.test.cjs test/scraper-integrity-portability.test.cjs && node tools/local-scraper/verify-scraper.cjs --source-only",
     "verify:event-pass-mobile-viewport": "node test/event-pass-mobile-viewport.test.cjs",
     "verify:event-pass-security": "node test/event-pass-security.test.cjs",
     "verify:event-pass-reuse": "node test/event-pass-reuse-flow.test.cjs",

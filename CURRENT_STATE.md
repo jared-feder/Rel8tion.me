@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-10-23: Reconcile recovery repairs with the current production source
+
+- `[IMPLEMENTED, RELEASE PENDING]` Reconciled from production/main `87f8a86498759afad2afe24ffc6d9aa184317137`. The portrait helper now conditionally fills only blank listing-agent and outreach-queue photo fields, including when a manual photo arrives during its source request. A failed portrait lookup cannot mark a newly populated agent photo as missing. The cron emits bounded completion counts without contact data.
+- `[IMPLEMENTED]` `tools/local-scraper` preserves a sanitized recovery source snapshot, guarded fill-only storage, pre-write journaling, process locking, read-back checks and an integrity manifest. Integrity checks normalize line endings so Windows and Linux checkouts agree. This repository copy does not replace or start the owner's working local scraper. Credentials, browser sessions, private backups, logs and dependencies are excluded.
+- `[VERIFIED LOCALLY]` Preservation tests exercise concurrent photo updates, protected contact fields, repeat inserts, rejected identities and portable integrity checks. Existing Event Pass activation/reuse and exact-MLS attribution checks remain release gates. No production pass activation, database repair, schedule change or customer message was used to test this release.
+- `[ARCHIVED LOCALLY]` Earlier activation and broad schedule-reconciliation drafts remain recoverable at `d4b22e2b2325a30260e66c8052046d62eab6dd06` on `codex/archive-scraper-repair-20261023`; they are excluded from this release. The newer Freshen, assigned-officer precedence and listing-attribution implementation is retained.
+- `AGENTS.md updated - conditional blank-photo writes, local-scraper source boundaries and recovery archive preservation.`
+
 ## 2026-10-23: Assigned loan officers take priority over the default Event Pass sponsor
 
 - `[IMPLEMENTED]` Reuse options and activation now resolve the selected open house's current primary COMMAND financing assignment first, then the claimed agent's latest active loan-officer relationship, then the first event since Freshen, then Jared Feder. Both paths use the verified agent and listing, active verified profiles, and the same resolver. The displayed name/photo, consent record and live sponsor session all use the resolved officer. A changed assignment rejects stale sponsor consent before event writes.

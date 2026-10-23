@@ -34,6 +34,9 @@ jobs:
       - name: Protect outreach brief metrics and PDF
         run: npm run verify:outreach-reports
 
+      - name: Protect scraper and saved agent photos
+        run: npm run verify:scraper-preservation
+
       - name: Prevent legacy loan-officer keychain assignment
         run: npm run verify:agent-lo-assignment
 
