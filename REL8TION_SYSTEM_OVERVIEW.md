@@ -1,5 +1,7 @@
 # REL8TION System Overview
 
+- `[IMPLEMENTED]` COMMAND Freshen gives a normal Event Pass one included first registration while preserving its previous event history. Reuse and sponsor resolution share the trusted reset timestamp; later registrations offer event-only sponsorship or paid membership. Jared Feder is the default sponsor when the first event after Freshen has no active loan-officer assignment. An old reuse URL displays only the first-registration action when applicable.
+
 - `[IMPLEMENTED]` Event Pass claim resolves missing listing-agent attribution through the read-only `/api/listing-agents` route. The shared `lib/onekey-listing-agents.js` verifies exact source MLS IDs, reads primary/co-listing business contacts from OneKey property details, and is reused by host authorization and background freshness repair. Cached public attribution does not claim a pass or grant host access; server authorization remains separate. Protected normal Event Pass activation persists and reads back verified recovered attribution in `listing_agents` before event creation so the independent database host guard recognizes the primary or co-listing agent. Read-only lookups do not persist it.
 
 Human architecture and product overview for REL8TION.

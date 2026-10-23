@@ -111,7 +111,7 @@ test('sponsor authorization is re-resolved and recorded on the server before a p
   assert.ok(consentIndex >= 0 && sessionIndex > consentIndex && signLiveIndex > sessionIndex);
 });
 
-test('reused Event Pass keeps the initial event loan officer and otherwise defaults to Brian Puls', async () => {
+test('reused Event Pass keeps the current first event loan officer and otherwise defaults to Jared Feder', async () => {
   await withFreshRegistration(async (freshRegistration) => {
     const originalUid = '11111111-1111-4111-8111-111111111111';
     global.fetch = async (url) => {
@@ -141,7 +141,7 @@ test('reused Event Pass keeps the initial event loan officer and otherwise defau
       if (target.includes(`/verified_profiles?uid=eq.${freshRegistration.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID}`)) {
         return jsonResponse([{
           uid: freshRegistration.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID,
-          full_name: 'Brian Puls',
+          full_name: 'Jared Feder',
           company_name: 'NMB',
           is_active: true
         }]);
@@ -150,9 +150,9 @@ test('reused Event Pass keeps the initial event loan officer and otherwise defau
     };
 
     const fallback = await freshRegistration.resolveReusableEventPassSponsor({ signId: 'sign-one' });
-    assert.equal(fallback.source, 'default_brian_puls');
-    assert.equal(fallback.profile.full_name, 'Brian Puls');
-    assert.equal(fallback.profile.uid, '7e05fcf5-18de-4ba1-b689-b944602ed4ca');
+    assert.equal(fallback.source, 'default_jared_feder');
+    assert.equal(fallback.profile.full_name, 'Jared Feder');
+    assert.equal(fallback.profile.uid, '38e5ab84-c1a2-4107-9f05-47a6caeda341');
   });
 });
 
@@ -177,5 +177,108 @@ test('new browser scripts parse successfully', () => {
     const scripts = inlineScripts(html);
     assert.ok(scripts.length > 0, `${label} should contain a script`);
     scripts.forEach((script) => assert.doesNotThrow(() => new Function(script), label));
+  }
+});
+
+test('Freshen starts one included registration, then the next use requires sponsorship or membership', async () => {
+  await withFreshRegistration(async (api) => {
+    const inventory = { metadata: { freshened_at: '2026-08-10T12:00:00.000Z', freshened_source: 'admin_event_pass_scanner' }, last_activated_at: null };
+    // Freshen may end an older event after the reset timestamp; created_at defines its cycle.
+    const history = [{ id: 'old-event', created_at: '2026-08-01T12:00:00.000Z', ended_at: '2026-08-10T12:01:00.000Z' }];
+    let entitlements = [];
+    global.fetch = async (value, options = {}) => {
+      assert.equal(options.method || 'GET', 'GET');
+      const url = new URL(value);
+      if (url.pathname.endsWith('/open_house_events')) {
+        const after = url.searchParams.get('created_at')?.slice(4);
+        return jsonResponse(history.filter((event) => !after || event.created_at >= after));
+      }
+      if (url.pathname.endsWith('/pricing_entitlements')) return jsonResponse(entitlements);
+      assert.fail(`Unexpected request: ${url.pathname}`);
+    };
+    await api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory);
+    history.push({ id: 'first-after-freshen', created_at: '2026-08-10T13:00:00.000Z', ended_at: '2026-08-10T15:00:00.000Z' });
+    await assert.rejects(api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory), (error) => error.code === 'event_pass_membership_required');
+    entitlements = [{ status: 'active', role: 'real_estate_agent', entitlement_codes: ['agent_dashboard', 'digital_card'] }];
+    await api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory);
+    entitlements = [];
+    inventory.metadata.freshened_at = '2026-08-11T12:00:00.000Z';
+    await api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory);
+    // Joining another pass's event also consumes this pass's included registration.
+    inventory.last_activated_at = '2026-08-11T13:00:00.000Z';
+    await assert.rejects(api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory), (error) => error.status === 402);
+    inventory.last_activated_at = null;
+    inventory.metadata.freshened_source = 'untrusted';
+    await assert.rejects(api.requireReusableEventPassMembership('agent-one', 'sign-one', inventory), (error) => error.status === 402);
+    assert.equal(history.length, 2, 'old events remain intact');
+  });
+});
+
+test('reuse options and sponsor lookup ignore events before the last admin Freshen', async () => {
+  await withFreshRegistration(async (api) => {
+    const inventory = { id: 'inventory-one', public_code: 'pass-one', smart_sign_id: 'sign-one', metadata: { freshened_at: '2026-08-10T12:00:00.000Z', freshened_source: 'admin_event_pass_scanner' } };
+    const sign = { id: 'sign-one', public_code: 'pass-one', uid_primary: 'uid-one', owner_agent_slug: 'agent-one' };
+    const house = { id: 'house-one', agent: 'Test Host', agent_phone: '5165550101', brokerage: 'Test Realty' };
+    global.fetch = async (value, options = {}) => {
+      assert.equal(options.method || 'GET', 'GET');
+      const url = new URL(value);
+      const table = url.pathname.split('/').at(-1);
+      if (table === 'keys') return jsonResponse([{ claimed: true, agent_slug: 'agent-one' }]);
+      if (table === 'smart_sign_inventory') return jsonResponse([inventory]);
+      if (table === 'smart_signs') return jsonResponse([sign]);
+      if (table === 'open_houses') return jsonResponse([house]);
+      if (table === 'agents') return jsonResponse([{ slug: 'agent-one', name: house.agent, phone: house.agent_phone, brokerage: house.brokerage }]);
+      if (table === 'listing_agents') return jsonResponse([{ name: house.agent, phone: house.agent_phone }]);
+      if (table === 'pricing_entitlements') return jsonResponse([]);
+      if (table === 'open_house_events') {
+        assert.equal(url.searchParams.get('created_at'), 'gte.2026-08-10T12:00:00.000Z');
+        return jsonResponse([]);
+      }
+      if (table === 'verified_profiles') {
+        assert.equal(url.searchParams.get('uid'), `eq.${api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID}`);
+        return jsonResponse([{ uid: api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID, full_name: 'Jared Feder', is_active: true, photo_url: 'https://example.test/jared.jpg' }]);
+      }
+      assert.fail(`Unexpected request: ${table}`);
+    };
+    const result = await api.loadEventPassReuseOptions({ uid: 'uid-one', agentSlug: 'agent-one', publicCode: 'pass-one', openHouseId: 'house-one' });
+    assert.equal(result.reuse_required, false);
+    assert.equal(result.sponsor.name, 'Jared Feder');
+    assert.equal(result.sponsor.photo_url, 'https://example.test/jared.jpg');
+    assert.equal(result.sponsor_source, 'default_jared_feder');
+  });
+});
+
+test('a failed history check cannot silently grant another included registration', async () => {
+  await withFreshRegistration(async (api) => {
+    global.fetch = async () => new Response(JSON.stringify({ message: 'history unavailable' }), { status: 503 });
+    await assert.rejects(api.requireReusableEventPassMembership('agent-one', 'sign-one'), /history unavailable/);
+  });
+});
+
+test('first registration hides both reuse choices; later use displays Jared and membership', () => {
+  const vm = require('node:vm');
+  const script = inlineScripts(page).find((value) => value.includes('function renderOptions'));
+  for (const reuseRequired of [false, true]) {
+    const app = { innerHTML: '' };
+    const controls = new Map();
+    const context = { URLSearchParams, location: { search: '' }, document: {
+      getElementById(id) {
+        if (id === 'app') return app;
+        if (!controls.has(id)) controls.set(id, { addEventListener(event, callback) { this[event] = callback; } });
+        return controls.get(id);
+      }
+    } };
+    vm.createContext(context);
+    vm.runInContext(script.replace(/\binit\(\);\s*$/, ''), context);
+    vm.runInContext(`state.context = ${JSON.stringify({ reuse_required: reuseRequired, house: { address: '35 Test Lane' }, sponsor: { name: 'Jared Feder', company: 'NMB' }, plan: { label: '$29/month' } })}; renderOptions();`, context);
+    if (reuseRequired) {
+      assert.match(app.innerHTML, /Jared Feder/);
+      assert.match(app.innerHTML, /Enroll for \$29\/month/);
+      assert.match(app.innerHTML, /sponsorConsent/);
+    } else {
+      assert.match(app.innerHTML, /Activate Open House/);
+      assert.doesNotMatch(app.innerHTML, /Jared Feder|Brian Puls|sponsorConsent|membershipCheckoutButton|\$29/);
+      assert.equal(typeof controls.get('firstUseButton').click, 'function');
+    }
   }
 });

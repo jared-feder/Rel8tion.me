@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-10-23: Freshen grants a first registration; Jared is the default reuse sponsor
+
+- `[IMPLEMENTED]` Normal Event Pass reuse checks now count only events created since the most recent trusted admin Freshen. Old records remain intact, including events closed by Freshen itself. Inventory `last_activated_at` also records use when joining another sign's event. Both the activation API and reuse-options API share this decision, and a failed history read does not silently allow free reuse.
+- `[IMPLEMENTED]` The first registration after Freshen proceeds without sponsorship or membership choices. A stale reuse-page URL renders only Activate Open House when the server says no reuse is required. Its success message does not falsely claim paid membership. After that use, the sponsorship/membership choice returns.
+- `[VERIFIED READ-ONLY]` Production has one active Jared Feder verified profile, UID `38e5ab84-c1a2-4107-9f05-47a6caeda341`, with the NMB Mortgage Loan Officer title and a saved photo. This profile replaces Brian Puls as the default reuse sponsor. A loan officer assigned to the first event after Freshen still takes precedence; older assignments do not carry into the new period.
+- `[VERIFIED LOCALLY]` 79 focused Event Pass, membership, security, mobile, admin-reset and listing-recovery tests pass. Added coverage for Freshen-first/second-use/re-Freshen behavior, preserving historical events, shared-event usage, failed history reads, scoped sponsor resolution, and rendered first-use/reuse screens. CI now runs these lifecycle tests. Production release and physical NFC registration are not yet verified for this change. No real pass was reset or activated and no notification was sent.
+- `AGENTS.md updated - Freshen eligibility boundaries, current-period sponsor resolution, canonical Jared fallback, and lifecycle regression checks.`
+
 ## 2026-10-23: Restore agent details for Event Pass alternative listings
 
 - `[VERIFIED READ-ONLY]` Before the fix, the deployed claim flow matched main `585e735`. A 1,000-row upcoming OneKey sample had only 256 saved agent names. The initial suggestion explicitly preferred a row with contact data, concealing missing attribution on alternative listings. OneKey search summaries omit agent fields while exact property detail data still contains `Listing.AgentOffice.ListAgent` and `CoListAgent`.
