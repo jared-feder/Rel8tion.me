@@ -202,7 +202,7 @@ test('Event Pass role selection is explicit and unrelated listings still activat
   assert.match(activation, /fetch\('\/api\/event-pass\/action'/);
   assert.match(activation, /supporting_listing_agent:supporting/);
   const server = fs.readFileSync(path.join(root, 'lib/event-pass-registration.js'), 'utf8');
-  assert.match(server, /requireReusableEventPassMembership\(key\.agent_slug, sign\.id\)/);
+  assert.match(server, /requireReusableEventPassMembership\(key\.agent_slug, sign\.id, inventory\)/);
   assert.match(server, /pricing_entitlements\?subject_slug=eq\./);
   assert.match(server, /error\.status = 402/);
 });
