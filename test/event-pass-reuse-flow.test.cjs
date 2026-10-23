@@ -230,6 +230,7 @@ test('reuse options and sponsor lookup ignore events before the last admin Fresh
       if (table === 'agents') return jsonResponse([{ slug: 'agent-one', name: house.agent, phone: house.agent_phone, brokerage: house.brokerage }]);
       if (table === 'listing_agents') return jsonResponse([{ name: house.agent, phone: house.agent_phone }]);
       if (table === 'pricing_entitlements') return jsonResponse([]);
+      if (table === 'field_demo_visits' || table === 'agent_loan_officer_relationships') return jsonResponse([]);
       if (table === 'open_house_events') {
         assert.equal(url.searchParams.get('created_at'), 'gte.2026-08-10T12:00:00.000Z');
         return jsonResponse([]);
@@ -252,6 +253,141 @@ test('a failed history check cannot silently grant another included registration
   await withFreshRegistration(async (api) => {
     global.fetch = async () => new Response(JSON.stringify({ message: 'history unavailable' }), { status: 503 });
     await assert.rejects(api.requireReusableEventPassMembership('agent-one', 'sign-one'), /history unavailable/);
+  });
+});
+
+function assignedSponsorFixture(api) {
+  const agent = { slug: 'agent-one', name: 'Test Host', phone: '5165550101', brokerage: 'Test Realty' };
+  const house = { id: 'house-one', agent: agent.name, agent_phone: agent.phone, brokerage: agent.brokerage };
+  const sign = { id: 'sign-one', public_code: 'pass-one', uid_primary: 'uid-one', owner_agent_slug: agent.slug };
+  const inventory = { id: 'inventory-one', public_code: sign.public_code, inventory_type: 'event_pass', smart_sign_id: sign.id, last_activated_at: '2026-08-10T12:00:00Z' };
+  const state = {
+    visits: [{ id: 'visit-one', agent_slug: agent.slug, open_house_id: house.id, status: 'confirmed' }],
+    participants: [{ field_demo_visit_id: 'visit-one', participant_profile_id: 'assigned-lo', role: 'loan_officer', responsibility: 'financing_support', is_primary: true, status: 'assigned' }],
+    relationships: [{ agent_slug: agent.slug, loan_officer_profile_id: 'relationship-lo', status: 'active' }],
+    profiles: ['assigned-lo', 'relationship-lo', api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID].map((uid) => ({ uid, full_name: uid, is_active: true, photo_url: `https://example.test/${uid}.jpg` })),
+    writes: [],
+    priorSponsor: null,
+    failTable: null
+  };
+  global.fetch = async (value, options = {}) => {
+    const url = new URL(value);
+    const table = url.pathname.split('/').at(-1);
+    const query = url.searchParams;
+    const method = options.method || 'GET';
+    if (table === state.failTable) return new Response(JSON.stringify({ message: 'assignment unavailable' }), { status: 503 });
+    if (method !== 'GET') {
+      const body = JSON.parse(options.body);
+      state.writes.push({ table, body });
+      return jsonResponse([{ id: `${table}-new`, ...body, ...(table === 'open_house_events' ? { setup_context: { ...body.setup_context, owner_registration_notification: { status: 'sent' } } } : {}) }]);
+    }
+    if (table === 'keys') return jsonResponse([{ uid: sign.uid_primary, claimed: true, agent_slug: agent.slug }]);
+    if (table === 'agents') return jsonResponse([agent]);
+    if (table === 'open_houses') return jsonResponse([house]);
+    if (table === 'listing_agents') return jsonResponse([{ name: agent.name, phone: agent.phone }]);
+    if (table === 'smart_signs') return jsonResponse([sign]);
+    if (table === 'smart_sign_inventory') return jsonResponse([inventory]);
+    if (table === 'open_house_events' && query.has('smart_sign_id') && state.priorSponsor) return jsonResponse([{ id: 'prior-event', setup_context: { sponsor_loan_officer_uid: state.priorSponsor } }]);
+    if (['open_house_events', 'pricing_entitlements', 'event_pass_coverage_consents', 'event_loan_officer_sessions'].includes(table)) return jsonResponse([]);
+    if (table === 'field_demo_visits') {
+      assert.equal(query.get('open_house_id'), `eq.${house.id}`);
+      assert.equal(query.get('or'), `(agent_slug.eq.${agent.slug},agent_slug.is.null)`);
+      assert.equal(query.get('status'), 'not.in.(cancelled,completed)');
+      return jsonResponse(state.visits.filter((row) => row.open_house_id === house.id && (!row.agent_slug || row.agent_slug === agent.slug) && !['cancelled', 'completed'].includes(row.status)).slice(0, 1));
+    }
+    if (table === 'field_demo_visit_participants') {
+      assert.equal(query.get('role'), 'eq.loan_officer');
+      assert.equal(query.get('responsibility'), 'eq.financing_support');
+      assert.equal(query.get('is_primary'), 'eq.true');
+      assert.equal(query.get('status'), 'in.(assigned,confirmed,en_route,on_site,live)');
+      return jsonResponse(state.participants.filter((row) => query.get('field_demo_visit_id') === `eq.${row.field_demo_visit_id}` && row.role === 'loan_officer' && row.responsibility === 'financing_support' && row.is_primary && ['assigned', 'confirmed', 'en_route', 'on_site', 'live'].includes(row.status)).slice(0, 1));
+    }
+    if (table === 'agent_loan_officer_relationships') {
+      assert.equal(query.get('agent_slug'), `eq.${agent.slug}`);
+      assert.equal(query.get('status'), 'eq.active');
+      assert.equal(query.get('order'), 'last_seen_at.desc.nullslast,first_seen_at.desc.nullslast');
+      return jsonResponse(state.relationships.filter((row) => row.agent_slug === agent.slug && row.status === 'active'));
+    }
+    if (table === 'verified_profiles') {
+      assert.equal(query.get('is_active'), 'eq.true');
+      return jsonResponse(state.profiles.filter((row) => query.get('uid') === `eq.${row.uid}` && row.is_active));
+    }
+    assert.fail(`Unexpected request: ${method} ${url}`);
+  };
+  state.options = { uid: sign.uid_primary, agentSlug: agent.slug, publicCode: sign.public_code, openHouseId: house.id };
+  state.activation = { uid: sign.uid_primary, agent_slug: agent.slug, public_code: sign.public_code, open_house_id: house.id, reuse_mode: 'loan_officer_sponsored', consent_accepted: true };
+  return state;
+}
+
+test('current open-house assignment supplies the displayed profile, consent and live sponsor', async () => {
+  await withFreshRegistration(async (api) => {
+    const state = assignedSponsorFixture(api);
+    // Pre-claim COMMAND assignments have no agent_slug, but are tied to the exact house.
+    state.visits[0].agent_slug = null;
+    const options = await api.loadEventPassReuseOptions(state.options);
+    assert.equal(options.reuse_required, true);
+    assert.equal(options.sponsor_source, 'assigned_open_house_loan_officer');
+    assert.equal(options.sponsor.uid, 'assigned-lo');
+    assert.equal(options.sponsor.photo_url, 'https://example.test/assigned-lo.jpg');
+    assert.equal(state.writes.length, 0);
+    const result = await api.activateNormalEventPass({ ...state.activation, sponsor_profile_id: options.sponsor.uid });
+    assert.equal(result.sponsorship.sponsor.uid, 'assigned-lo');
+    assert.equal(state.writes.find((row) => row.table === 'event_pass_coverage_consents').body.sponsor_loan_officer_uid, 'assigned-lo');
+    assert.equal(state.writes.find((row) => row.table === 'event_loan_officer_sessions').body.verified_profile_uid, 'assigned-lo');
+  });
+});
+
+test('agent relationships outrank pass history; unusable or unrelated assignments do not', async () => {
+  await withFreshRegistration(async (api) => {
+    for (const invalidate of [
+      (state) => { state.visits[0].agent_slug = 'other-agent'; },
+      (state) => { state.visits[0].open_house_id = 'other-house'; },
+      (state) => { state.visits[0].status = 'cancelled'; },
+      (state) => { state.visits[0].status = 'completed'; },
+      (state) => { state.participants[0].status = 'cancelled'; },
+      (state) => { state.participants[0].is_primary = false; },
+      (state) => { state.profiles[0].is_active = false; }
+    ]) {
+      const state = assignedSponsorFixture(api);
+      state.priorSponsor = api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID;
+      invalidate(state);
+      const result = await api.loadEventPassReuseOptions(state.options);
+      assert.equal(result.sponsor.uid, 'relationship-lo');
+      assert.equal(result.sponsor_source, 'agent_loan_officer_relationship');
+    }
+    const state = assignedSponsorFixture(api);
+    state.visits = [];
+    state.relationships.unshift({ agent_slug: 'other-agent', loan_officer_profile_id: 'assigned-lo', status: 'active' });
+    state.profiles.find((row) => row.uid === 'relationship-lo').is_active = false;
+    assert.equal((await api.loadEventPassReuseOptions(state.options)).sponsor.uid, api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID);
+    state.profiles.find((row) => row.uid === 'relationship-lo').is_active = true;
+    state.relationships[1].status = 'inactive';
+    assert.equal((await api.loadEventPassReuseOptions(state.options)).sponsor.uid, api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID);
+  });
+});
+
+test('activation rechecks assignment and requires consent to the newly assigned officer', async () => {
+  await withFreshRegistration(async (api) => {
+    const state = assignedSponsorFixture(api);
+    const displayed = await api.loadEventPassReuseOptions(state.options);
+    state.participants[0].participant_profile_id = 'relationship-lo';
+    await assert.rejects(api.activateNormalEventPass({ ...state.activation, sponsor_profile_id: displayed.sponsor.uid }), /not the server-assigned sponsor/);
+    await assert.rejects(api.activateNormalEventPass({ ...state.activation, sponsor_profile_id: 'relationship-lo', consent_accepted: false }), /Agent consent is required/);
+    assert.equal(state.writes.length, 0);
+    assert.equal((await api.loadEventPassReuseOptions(state.options)).sponsor.uid, 'relationship-lo');
+  });
+});
+
+test('assignment read errors cannot silently substitute the default sponsor', async () => {
+  await withFreshRegistration(async (api) => {
+    for (const table of ['field_demo_visits', 'field_demo_visit_participants', 'agent_loan_officer_relationships', 'verified_profiles']) {
+      const state = assignedSponsorFixture(api);
+      state.failTable = table;
+      if (table === 'agent_loan_officer_relationships') state.visits = [];
+      await assert.rejects(api.loadEventPassReuseOptions(state.options), /assignment unavailable/);
+      await assert.rejects(api.activateNormalEventPass({ ...state.activation, sponsor_profile_id: api.DEFAULT_REUSABLE_EVENT_PASS_SPONSOR_UID }), /assignment unavailable/);
+      assert.equal(state.writes.length, 0);
+    }
   });
 });
 
