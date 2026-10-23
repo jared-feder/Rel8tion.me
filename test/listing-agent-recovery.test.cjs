@@ -140,3 +140,79 @@ test('server host verification accepts the recovered coagent and still rejects a
   assert.equal(result.listing_agent_name, 'Test Coagent');
   await assert.rejects(authorize({ house, agent: { name: 'Other Person', phone: '516-555-0198', brokerage: 'Other Realty' }, identityVerified: true }));
 });
+
+function activationHarness({ hostName = 'Test Coagent', hostPhone = '516-555-0102', failSave = false } = {}) {
+  const filename = require.resolve('../lib/event-pass-registration');
+  const localRequire = require('node:module').createRequire(filename);
+  const module = { exports: {} };
+  const saved = new Map();
+  const writes = [];
+  const agent = { id: 'agent-id', slug: 'test-host', name: hostName, phone: hostPhone, brokerage: 'Test Realty' };
+  const sign = { id: 'sign-id', public_code: 'test-pass', uid_primary: 'test-uid', owner_agent_slug: agent.slug, status: 'inactive' };
+  const inventory = { id: 'inventory-id', public_code: sign.public_code, inventory_type: 'event_pass', smart_sign_id: sign.id };
+  const supabaseRest = async (path, options = {}) => {
+    const url = new URL(path, 'https://db.test/');
+    const table = url.pathname.slice(1);
+    const method = options.method || 'GET';
+    const body = options.body ? JSON.parse(options.body) : null;
+    if (method !== 'GET') writes.push({ table, method, body });
+    if (table === 'listing_agents') {
+      if (method === 'POST') {
+        if (failSave) throw new Error('attribution save failed');
+        assert.match(options.headers.Prefer, /resolution=ignore-duplicates/);
+        if (!saved.has(body.id)) saved.set(body.id, body);
+        return null;
+      }
+      return [...saved.values()].filter((row) => !url.searchParams.has('id') || url.searchParams.get('id') === `eq.${row.id}`);
+    }
+    if (table === 'keys') return [{ id: 'key-id', uid: sign.uid_primary, claimed: true, agent_slug: agent.slug }];
+    if (table === 'agents') return [agent];
+    if (table === 'smart_sign_inventory') return [inventory];
+    if (table === 'smart_signs') return [sign];
+    if (table === 'open_houses') return [house];
+    if (table === 'open_house_events') {
+      if (method === 'POST') {
+        // Model the database trigger's independent saved-listing contact check.
+        const host = [...saved.values()].find((row) => row.open_house_id === body.open_house_source_id && row.phone === agent.phone);
+        if (!host) throw Object.assign(new Error('database host authorization rejected'), { code: '42501' });
+        assert.equal(body.setup_context.listing_agent_id, host.id);
+        return [{ id: 'event-id', ...body, setup_context: { ...body.setup_context, owner_registration_notification: { status: 'sent' } } }];
+      }
+      return [];
+    }
+    throw new Error(`Unexpected database request: ${method} ${path}`);
+  };
+  const context = { module, exports: module.exports, console, process: { env: {} }, Buffer, URL,
+    require: (name) => name === './admin-auth' ? { supabaseRest }
+      : name === './onekey-listing-agents' ? { loadOneKeyListingAgents: async () => listingAgentsFromRecord(record) }
+        : name === 'nodemailer' ? {} : localRequire(name) };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context);
+  return { api: module.exports, saved, writes, agent, request: { uid: sign.uid_primary, public_code: sign.public_code, open_house_id: house.id } };
+}
+
+test('recovered primary and coagent survive the database authorization check before event insertion', async () => {
+  for (const [hostName, hostPhone] of [['Test Primary', '516-555-0101'], ['Test Coagent', '516-555-0102']]) {
+    const harness = activationHarness({ hostName, hostPhone });
+    const result = await harness.api.activateNormalEventPass(harness.request);
+    assert.equal(result.event.id, 'event-id');
+    assert.equal(result.authorization.listing_agent_name, hostName);
+    assert.equal(harness.saved.size, 2);
+    assert.deepEqual(harness.writes.slice(0, 3).map((write) => write.table), ['listing_agents', 'listing_agents', 'open_house_events']);
+    await harness.api.loadListingAuthorization({ house, agent: harness.agent, identityVerified: true, persistRecovered: true });
+    assert.equal(harness.writes.filter((write) => write.table === 'listing_agents').length, 2);
+  }
+});
+
+test('read-only authorization never saves attribution and rejected hosts cannot save it', async () => {
+  const harness = activationHarness();
+  await harness.api.loadListingAuthorization({ house, agent: harness.agent, identityVerified: true });
+  assert.equal(harness.writes.length, 0);
+  await assert.rejects(harness.api.loadListingAuthorization({ house, agent: { name: 'Other Person', phone: '516-555-0198', brokerage: 'Other Realty' }, identityVerified: true, persistRecovered: true }));
+  assert.equal(harness.writes.length, 0);
+});
+
+test('a failed attribution save stops activation before an event or inventory write', async () => {
+  const harness = activationHarness({ failSave: true });
+  await assert.rejects(harness.api.activateNormalEventPass(harness.request), /attribution save failed/);
+  assert.deepEqual(harness.writes.map((write) => write.table), ['listing_agents']);
+});

@@ -1,6 +1,6 @@
 # REL8TION System Overview
 
-- `[IMPLEMENTED]` Event Pass claim resolves missing listing-agent attribution through the read-only `/api/listing-agents` route. The shared `lib/onekey-listing-agents.js` verifies exact source MLS IDs, reads primary/co-listing business contacts from OneKey property details, and is reused by host authorization and background freshness repair. Cached public attribution does not claim a pass or grant host access; server authorization remains separate.
+- `[IMPLEMENTED]` Event Pass claim resolves missing listing-agent attribution through the read-only `/api/listing-agents` route. The shared `lib/onekey-listing-agents.js` verifies exact source MLS IDs, reads primary/co-listing business contacts from OneKey property details, and is reused by host authorization and background freshness repair. Cached public attribution does not claim a pass or grant host access; server authorization remains separate. Protected normal Event Pass activation persists and reads back verified recovered attribution in `listing_agents` before event creation so the independent database host guard recognizes the primary or co-listing agent. Read-only lookups do not persist it.
 
 Human architecture and product overview for REL8TION.
 
