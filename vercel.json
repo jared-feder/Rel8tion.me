@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": {
+    "api/cron/refresh-open-house-data.js": {
+      "maxDuration": 300
+    },
     "api/cron/outreach-performance-report.js": {
       "maxDuration": 300,
       "includeFiles": "assets/rel8tion-brand/**"

@@ -3,6 +3,8 @@ const DEFAULT_LOOKAHEAD_DAYS = 10;
 const DEFAULT_STALE_HOURS = 6;
 const DEFAULT_SEARCH_RADIUS = 0.08;
 const ONEKEY_BASE_URL = 'https://www.onekeymls.com/api/search';
+const { loadOneKeyListingAgents } = require('./lib/onekey-listing-agents');
+const { compatibleAgentNames } = require('./lib/agent-name-identity');
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -334,7 +336,7 @@ function buildOpenHousePatch(openHouse, remote, nowIso) {
       checked_at: nowIso
     },
     brokerage: remote?.brokerage || openHouse.brokerage || null,
-    agent: remote?.agent || openHouse.agent || null,
+    agent: openHouse.agent || remote?.agent || null,
     beds: remote?.beds ?? openHouse.beds ?? null,
     baths: remote?.baths ?? openHouse.baths ?? null,
     sqft: remote?.sqft ?? openHouse.sqft ?? null,
@@ -343,6 +345,11 @@ function buildOpenHousePatch(openHouse, remote, nowIso) {
     lng: remote?.lng ?? openHouse.lng ?? null,
     updated_at: nowIso
   };
+
+  if (remote?.agent && compatibleAgentNames(openHouse.agent, remote.agent)) {
+    if (!openHouse.agent_phone && remote.agent_phone) patch.agent_phone = remote.agent_phone;
+    if (!openHouse.agent_email && remote.agent_email) patch.agent_email = remote.agent_email;
+  }
 
   if (displayPrice !== null && oldPrice !== displayPrice) {
     patch.price = displayPrice;
@@ -467,6 +474,21 @@ async function processOpenHouse(config, openHouse) {
       return { id: openHouse.id, ok: false, reason };
     }
     remote._matchReason = reason;
+
+    // Search summaries omit agent attribution. Enrich only the exact MLS record.
+    if (reason === 'exact_id_match' && (!openHouse.agent || !openHouse.agent_phone)) {
+      try {
+        const agents = await loadOneKeyListingAgents(openHouse, { record: remote.raw });
+        const primary = agents.find((agent) => agent.is_primary) || agents[0];
+        if (primary) {
+          remote.agent = primary.name;
+          remote.agent_phone = primary.phone;
+          remote.agent_email = primary.email;
+        }
+      } catch (error) {
+        console.warn(`[onekey-freshness] agent lookup pending for ${openHouse.id}: ${error.message}`);
+      }
+    }
 
     const patch = buildOpenHousePatch(openHouse, remote, nowIso);
     const oldPrice = numberOrNull(openHouse.price);

@@ -109,8 +109,11 @@ test('sponsored activation keeps consent and the final action fixed on mobile vi
 
 test('cache-busting reaches every module in the claim and resolver chains', () => {
   const version = '20260816-event-pass-mobile';
-  for (const source of [claimHtml, claimBootstrap, claimFlow, passHtml, rootPassHtml, signHtml]) {
+  for (const source of [passHtml, rootPassHtml, signHtml]) {
     assert.match(source, new RegExp(version));
+  }
+  for (const source of [claimHtml, claimBootstrap, claimFlow]) {
+    assert.match(source, /20261023-listing-agent-details/);
   }
   assert.match(rootPassHtml, /activation-resolver-shell/);
 });

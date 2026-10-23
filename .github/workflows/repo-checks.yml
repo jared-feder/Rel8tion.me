@@ -19,6 +19,9 @@ jobs:
       - name: Verify Vercel route map
         run: npm run verify:routes
 
+      - name: Protect Event Pass listing-agent recovery
+        run: node --test test/listing-agent-recovery.test.cjs test/onekey-agent-identity.test.cjs
+
       - name: Protect weekly report archive and scheduling
         run: npm run verify:weekly-reports
 
