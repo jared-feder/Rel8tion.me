@@ -1,5 +1,12 @@
 # CURRENT_STATE.md
 
+## 2026-10-24: Restore sponsored continuation from an inactive Event Pass tap
+
+- `[IMPLEMENTED, RELEASE PENDING]` The inactive Event Pass NFC route reached an unpaid owner-home gate that rendered checkout without any Start Open House action. The server reuse-options response already resolved Jared Feder correctly; the missing entry action prevented agents from reaching listing selection and the sponsor choice. The unpaid home now places Start Open House / Sponsor Options before optional checkout, preserves the verified agent/NFC/pass context, and explains QR recovery when the code is missing. Membership still gates permanent history.
+- `[VERIFIED LIVE, READ ONLY]` Production/main `da35fd567766e9886ba167092558ebb50244385c` contains yesterday's Freshen and sponsor-precedence changes. The affected agent's reuse-options endpoint returned `reuse_required=true`, `membership_active=false`, sponsor Jared Feder and `sponsor_source=default_jared_feder`. Existing live event/inventory records were inspected without changing them. The connected Supabase account lacks production SQL access; the existing public read API and protected application checks supplied the evidence.
+- `[VERIFIED LOCALLY]` All 62 focused Event Pass owner-home, reuse, activation, admin-management, membership/product, host-authorization and security tests pass. The added executable rendering test verifies that unpaid users can reach sponsorship before checkout, the server-resolved or scanned pass code reaches activation with agent/NFC context, and a missing code gets QR recovery. No real activation, consent, checkout, reset, assignment change or customer message was used for verification.
+- `AGENTS.md updated - permanent-history membership gates must not block entry to per-event sponsorship; preserve pass context and test the unpaid owner-home rendering.`
+
 ## 2026-10-23: Reconcile recovery repairs with the current production source
 
 - `[IMPLEMENTED, RELEASE PENDING]` Reconciled from production/main `87f8a86498759afad2afe24ffc6d9aa184317137`. The portrait helper now conditionally fills only blank listing-agent and outreach-queue photo fields, including when a manual photo arrives during its source request. A failed portrait lookup cannot mark a newly populated agent photo as missing. The cron emits bounded completion counts without contact data.
