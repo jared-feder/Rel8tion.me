@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const router = fs.readFileSync(path.join(root, 'apps/rel8tion-app/k.html'), 'utf8');
@@ -25,7 +26,7 @@ test('inactive Event Pass NFC opens the membership home while a live pass opens 
   assert.doesNotMatch(block, /findRecentEventBySignId|Opening setup for the next open house/);
 });
 
-test('Event Pass owner home is membership-gated and starts reuse from the same NFC/QR pair', () => {
+test('Event Pass owner home gates history but keeps sponsored reuse available from the same NFC/QR pair', () => {
   assert.match(home, /event_pass_keychain/);
   assert.match(home, /loadAgentMembership/);
   assert.match(home, /renderMembershipGate/);
@@ -37,6 +38,42 @@ test('Event Pass owner home is membership-gated and starts reuse from the same N
   assert.doesNotMatch(home, /Your Event Pass is now a Rel8tionChip/);
   assert.doesNotMatch(home, /No Open House Kit or separate Rel8tionChip purchase is required/);
   assert.match(home, /if \(keyRole !== 'event_pass_keychain'\) await ensureVerifiedPhoneSession\(\)/);
+});
+
+test('unpaid Event Pass home renders a usable sponsored continuation before checkout', () => {
+  const route = home.slice(home.indexOf('    function eventPassStartRoute('), home.indexOf('    async function startEventPassMembershipCheckout('));
+  const gate = home.slice(home.indexOf('    function renderMembershipGate('), home.indexOf('    function eventAddress('));
+  for (const [serverCode, queryCode, expectedCode] of [
+    ['server-pass', 'stale-pass', 'server-pass'],
+    ['', 'scanned-pass', 'scanned-pass'],
+    ['', '', '']
+  ]) {
+    const context = {
+      app: { innerHTML: '', className: '' },
+      agentSlug: 'returning-agent', uid: 'physical-pass-uid', eventPassCode: queryCode,
+      membershipNotice: '', membershipError: '', URLSearchParams,
+      esc: (value) => String(value || '').replace(/&/g, '&amp;'),
+      agentPhotoUrl: () => '', displayPhone: () => ''
+    };
+    vm.runInNewContext(`${route}\n${gate}\nrenderMembershipGate({name:'Returning Agent'}, {active:false,event_pass_code:${JSON.stringify(serverCode)},checkout_label:'$29/month'});`, context);
+    const html = context.app.innerHTML;
+    assert.match(html, /membershipCheckoutButton/);
+    assert.match(html, /Continue with a loan officer sponsoring/);
+    if (expectedCode) {
+      const href = html.match(/id="eventPassStartButton"[^>]*href="([^"]+)"/)[1].replace(/&amp;/g, '&');
+      const target = new URL(href, 'https://app.rel8tion.me');
+      assert.equal(target.pathname, '/sign-demo-activate');
+      assert.equal(target.searchParams.get('agent'), 'returning-agent');
+      assert.equal(target.searchParams.get('uid'), 'physical-pass-uid');
+      assert.equal(target.searchParams.get('code'), expectedCode);
+      assert.equal(target.searchParams.get('source'), 'event_pass');
+      assert.ok(html.indexOf('eventPassStartButton') < html.indexOf('membershipCheckoutButton'));
+      assert.match(html, /Full membership is optional/);
+    } else {
+      assert.doesNotMatch(html, /eventPassStartButton/);
+      assert.match(html, /Scan the printed QR on this Event Pass/);
+    }
+  }
 });
 
 test('active REL8TION Agent entitlement requires dashboard and digital-card codes', () => {
