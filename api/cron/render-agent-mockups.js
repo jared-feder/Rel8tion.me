@@ -18,10 +18,13 @@ module.exports = async function handler(req, res) {
     if (!sharedSecret) throw new Error('Missing CRON_SHARED_SECRET or CRON_SECRET.');
 
     const body = req.method === 'POST' ? readJsonBody(req) : {};
-    const limit = Math.max(1, Math.min(Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 24), 50));
+    const requestedLimit = Number(body.limit || process.env.OUTREACH_RENDER_LIMIT || 4);
+    // Bound each remote render job below the Vercel function time budget.
+    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 4, 4));
     const base = (process.env.RENDERER_BASE_URL || 'https://mockup-renderer-psi.vercel.app').replace(/\/$/, '');
     const response = await fetch(`${base}/api/render-agent-mockup`, {
       method: 'POST',
+      signal: AbortSignal.timeout(78000),
       headers: {
         'Content-Type': 'application/json',
         'x-cron-secret': sharedSecret,
