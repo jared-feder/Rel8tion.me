@@ -24,6 +24,9 @@ Status labels used in this repo:
 
 ## Read This First
 
+- `[RISK]` Agent outreach mockups are rendered by a separate Vercel project under `apps/mockup-renderer`, not by the main `rel8tion-me` app. Keep that package's `engines.node` on a Vercel-supported version; verify both project deployments independently. Render jobs must stay bounded, prioritize upcoming initial-send queue rows over expired open houses, require the actual property photo, and time out hung image downloads. A READY main app alone does not mean new outreach is deliverable. Do not bypass STOP suppression, sender pause, operator manual/away behavior, opt-out health gates or send caps to compensate for rendering failures.
+
+
 - `[IMPLEMENTED]` Outreach brief edition 2 uses `(week_start, report_version)` for archive writes, locks and delivery idempotency. Never overwrite edition 1 or change a saved edition number; retain its renderer and original download. Reply-to-host rates must intersect replying agents with confirmed hosts, count repeat hosts once, and show confirmed house counts separately. Lead averages must state whether zero-lead events are included. Per-open-house rows count recorded event IDs, including separate resumed sessions. No buyer contact information belongs in the report snapshot.
 
 - `[IMPLEMENTED]` Production is configured to deploy from `main` through Vercel Git production branch automation. Verify the exact live SHA with Vercel inspection plus `git log -1 origin/main` before making live claims.
