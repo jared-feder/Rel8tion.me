@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-10-30: Outreach rendering recovery (urgent)
+
+- `[IMPLEMENTED, RELEASE PENDING]` Production `mockup-renderer` builds have failed on Vercel with `BUILD_UTILS_NODE_VERSION_DISCONTINUED` because its package specified Node 20.x. The last READY deployment continued executing but emitted repeated render API and cron timeout errors during October 26–30. The isolated hotfix moves the renderer to Node 24.x, bounds both renderer entry points to four jobs, increases function execution budgets, and aborts stalled/oversized listing-image downloads.
+- `[IMPLEMENTED, RELEASE PENDING]` The render queue now prioritizes upcoming events with real listing photos and pending initial sends; expired or imageless historical rows no longer monopolize current outreach capacity. Each default batch reserves at most one inventory render slot and prioritizes queue mockups. Sender send caps, suppression, opt-out, quiet hours and operator modes are unchanged; no outbound SMS is triggered by the code patch.
+- `[NEEDS VERIFICATION]` The linked Supabase connector does not expose the REL8TION production project, so current sender pause/operator mode, live queue counts, delivery activity and opt-out-health gate cannot yet be verified by SQL. A successfully deployed renderer alone is not proof that any agent message was sent. After deployment, verify the new renderer alias, successful short render runs, queue readiness and no-send sender diagnostics before concluding outreach recovered.
+- `AGENTS.md updated - preserve time-sensitive image-render prioritization, bounded render jobs and SMS safety controls.`
+
+
 ## 2026-10-24: Restore sponsored continuation from an inactive Event Pass tap
 
 - `[IMPLEMENTED, RELEASE PENDING]` The inactive Event Pass NFC route reached an unpaid owner-home gate that rendered checkout without any Start Open House action. The server reuse-options response already resolved Jared Feder correctly; the missing entry action prevented agents from reaching listing selection and the sponsor choice. The unpaid home now places Start Open House / Sponsor Options before optional checkout, preserves the verified agent/NFC/pass context, and explains QR recovery when the code is missing. Membership still gates permanent history.
