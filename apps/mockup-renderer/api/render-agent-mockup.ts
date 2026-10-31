@@ -217,8 +217,9 @@ export default async function handler(req: any, res: any) {
     const limit = parseLimit(req?.body?.limit);
     const force = Boolean(req?.body?.force);
     const ids = parseIds(req?.body?.ids);
-    const inventoryLimit = ids.length > 0 ? 0 : Math.max(1, Math.floor(limit * 0.75));
-    const queueLimit = ids.length > 0 ? limit : Math.max(1, limit - inventoryLimit);
+    // Prioritize time-sensitive agent outreach; keep one inventory image slot per batch.
+    const inventoryLimit = ids.length > 0 || limit < 4 ? 0 : 1;
+    const queueLimit = ids.length > 0 ? limit : limit - inventoryLimit;
 
     const select = [
       "id",
@@ -247,12 +248,16 @@ export default async function handler(req: any, res: any) {
       `?select=${encodeURIComponent(select)}` +
       `&generation_status=eq.generated` +
       `&send_status=eq.not_sent` +
-      `&order=created_at.asc` +
+      `&order=open_start.asc` +
       `&limit=${queueLimit}`;
 
     if (!force) {
       url += `&mockup_image_url=is.null`;
       url += `&mockup_status=eq.pending`;
+      // Never burn render capacity on past events or missing listing photos.
+      url += `&open_start=gt.${encodeURIComponent(new Date().toISOString())}`;
+      url += `&listing_photo_url=not.is.null`;
+      url += `&initial_send_status=eq.pending`;
     }
 
     if (ids.length > 0) {
