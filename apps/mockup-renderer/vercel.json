@@ -3,7 +3,7 @@
   "functions": {
     "api/render-agent-mockup.ts": {
       "memory": 1024,
-      "maxDuration": 60,
+      "maxDuration": 90,
       "includeFiles": "node_modules/{sharp,@img}/**/*"
     },
     "api/cron-generate.ts": {
@@ -12,7 +12,7 @@
     },
     "api/cron-render.ts": {
       "memory": 256,
-      "maxDuration": 30
+      "maxDuration": 90
     },
     "api/cron-send.ts": {
       "memory": 256,
@@ -20,7 +20,13 @@
     }
   },
   "crons": [
-    { "path": "/api/cron-generate", "schedule": "1,11,21,31,41,51 * * * *" },
-    { "path": "/api/cron-render",   "schedule": "3,13,23,33,43,53 * * * *" }
+    {
+      "path": "/api/cron-generate",
+      "schedule": "1,11,21,31,41,51 * * * *"
+    },
+    {
+      "path": "/api/cron-render",
+      "schedule": "3,13,23,33,43,53 * * * *"
+    }
   ]
 }
