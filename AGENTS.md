@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Event check-in SMS outcome reporting
+
+- `[IMPLEMENTED]` Keep saved check-in success separate from SMS acceptance. Notification failures must not imply that the check-in database write rolled back or trigger blind resubmission. Require positive provider acceptance before setting `financingAlertSent`; terminal failure statuses override `ok=true`, and acceptance must never be presented as handset delivery. Preserve financing opt-in, recipient selection and send order. Run `node --test test/event-sms-outcomes.test.cjs` with mocked fetches; never send real texts for this regression check.
+
 ## Recovery source and saved-photo preservation
 
 - `[IMPLEMENTED]` `tools/local-scraper` is a sanitized source snapshot. Do not copy local `.env`, browser cookies/profiles, logs or private recovery archives into Git. Deploying this repository does not update or launch `C:/Users/jared/scraper`; inspect that working copy and obtain task authorization before replacing it.

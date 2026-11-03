@@ -1668,7 +1668,9 @@ function attachEventHandlers() {
       }
 
       const financingRequested = payload.metadata?.financing_requested === true;
-      await sendBuyerConfirmationSMS({
+      const notificationResults = [];
+      let financingAlertResult = null;
+      notificationResults.push(await sendBuyerConfirmationSMS({
         buyerPhone: payload.visitor_phone || '',
         buyerName: payload.visitor_name || '',
         agentName: pageState.agent?.name || 'Host Agent',
@@ -1677,9 +1679,9 @@ function attachEventHandlers() {
         propertyAddress: pageState.house?.address || pageState.eventRow?.setup_context?.address || '',
         listingUrl: payload.metadata?.listing_sms_url || payload.metadata?.listing_short_url || '',
         listingLabel: payload.metadata?.listing_sms_label || 'Property page'
-      });
+      }));
 
-      await sendAgentCheckinSMS({
+      notificationResults.push(await sendAgentCheckinSMS({
         agentPhone: pageState.agent?.phone || '',
         buyerName: payload.visitor_name || '',
         buyerPhone: payload.visitor_phone || '',
@@ -1688,7 +1690,7 @@ function attachEventHandlers() {
         preapproved: payload.pre_approved,
         buyerAgentName: payload.buyer_agent_name || '',
         buyerAgentPhone: payload.buyer_agent_phone || ''
-      });
+      }));
 
       if (financingRequested) {
         const liveLoanOfficer = pageState.loanOfficer || await getLiveLoanOfficerSession(pageState.eventRow.id).catch(() => null);
@@ -1696,7 +1698,7 @@ function attachEventHandlers() {
         const address = pageState.house?.address || pageState.eventRow?.setup_context?.address || 'Open House Visitor';
         const price = pageState.house?.price ? money(pageState.house.price) : '';
         if (liveLoanOfficer?.loan_officer_phone) {
-          await sendLiveLoanOfficerFinancingAlert({
+          financingAlertResult = await sendLiveLoanOfficerFinancingAlert({
             loanOfficer: liveLoanOfficer,
             agentName: pageState.agent?.name || pageState.eventRow?.host_agent_slug || '',
             buyerPhone: payload.visitor_phone || '',
@@ -1706,14 +1708,14 @@ function attachEventHandlers() {
             price,
             preapproved: payload.pre_approved === true ? 'yes' : 'no'
           });
-          await sendBuyerLoanOfficerIntroSMS({
+          notificationResults.push(await sendBuyerLoanOfficerIntroSMS({
             buyerPhone: payload.visitor_phone || '',
             buyerName: payload.visitor_name || 'Buyer',
             loanOfficer: liveLoanOfficer,
             propertyAddress: address
-          });
+          }));
         } else {
-          await sendJaredFinancingAlert({
+          financingAlertResult = await sendJaredFinancingAlert({
             buyerPhone: payload.visitor_phone || '',
             buyerName: payload.visitor_name || 'Buyer',
             address,
@@ -1730,10 +1732,14 @@ function attachEventHandlers() {
         metadata: createdCheckin?.metadata || payload.metadata
       };
       pageState.mode = 'guest';
-      pageState.financingAlertSent = financingRequested;
-      pageState.successMessage = financingRequested
-        ? 'Check-in complete. Someone will be in contact shortly regarding financing.'
-        : 'Check-in complete. Make yourself at home and do not hesitate to ask questions.';
+      pageState.financingAlertSent = financingRequested && financingAlertResult?.ok === true;
+      if (financingRequested) notificationResults.push(financingAlertResult);
+      const notificationFailed = notificationResults.some((result) => result?.ok !== true);
+      pageState.successMessage = notificationFailed
+        ? 'Check-in saved, but one or more text notifications could not be confirmed. Please contact the host agent directly for next steps.'
+        : financingRequested
+          ? 'Check-in complete. Your financing request was submitted for text notification.'
+          : 'Check-in complete. Make yourself at home and do not hesitate to ask questions.';
       form.reset();
     } catch (error) {
       console.error(error);
@@ -1979,3 +1985,4 @@ export async function initEventShellPage() {
     errorView('Event Could Not Load', error.message || 'Something went wrong while loading this open house check-in.');
   }
 }
+
