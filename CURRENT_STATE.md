@@ -15,6 +15,13 @@
 - `[VERIFIED LOCALLY]` All 62 focused Event Pass owner-home, reuse, activation, admin-management, membership/product, host-authorization and security tests pass. The added executable rendering test verifies that unpaid users can reach sponsorship before checkout, the server-resolved or scanned pass code reaches activation with agent/NFC context, and a missing code gets QR recovery. No real activation, consent, checkout, reset, assignment change or customer message was used for verification.
 - `AGENTS.md updated - permanent-history membership gates must not block entry to per-event sponsorship; preserve pass context and test the unpaid owner-home rendering.`
 
+## 2026-11-03: Event SMS outcome reporting (release pending)
+
+- `[IMPLEMENTED, RELEASE PENDING]` Browser check-in notification helpers now return accepted/failed/skipped outcomes. Saved check-ins remain saved when notification acceptance is unconfirmed; the guest view warns instead of promising financing contact. `financingAlertSent` requires positive acceptance, and terminal failure statuses override `ok=true`.
+- `[VERIFIED LOCALLY]` `node --test test/event-sms-outcomes.test.cjs`: 29 passing mocked tests; both changed JavaScript files pass syntax checks. Existing request URLs, headers, bodies, recipients and send counts were compared with the baseline and remain unchanged. No real SMS was sent.
+- `[NEEDS VERIFICATION]` This change fixes false-success reporting only. Full browser/mobile checks, staging verification, deployed Edge Function/provider configuration and actual handset delivery remain unverified. No production deployment, provider change, retry, extra recipient or new notification trigger is included.
+- `AGENTS.md` updated with the saved-check-in/notification acceptance guardrail and regression command.
+
 ## 2026-10-23: Reconcile recovery repairs with the current production source
 
 - `[IMPLEMENTED, RELEASE PENDING]` Reconciled from production/main `87f8a86498759afad2afe24ffc6d9aa184317137`. The portrait helper now conditionally fills only blank listing-agent and outreach-queue photo fields, including when a manual photo arrives during its source request. A failed portrait lookup cannot mark a newly populated agent photo as missing. The cron emits bounded completion counts without contact data.
