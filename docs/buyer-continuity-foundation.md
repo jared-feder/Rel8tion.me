@@ -177,3 +177,33 @@ Product hypothesis: Buyers always use core REL8TION property discovery, check-in
 **Validation before pricing commitment:** In an opt-in pilot, track invited-agent verification, percentage of requests serviced without subscription, first value achieved, paid trial activation, 30/90-day retention, total buyer intent → official offer conversion, and per-active-agent costs (AI inference, SMS, e-signature, document storage, compliance support). Test $9/$19/$29 entry-price willingness and whether $49 Pro upgrades outperform standalone Deal Desk, without paywalling essential transaction communication. Pricing should ultimately be set by observed adoption and contribution margin.
 
 **Status:** documentation proposal only. No billing change, entitlement change, checkout, offer submission route, data migration, new notification, or production deployment has been made.
+
+## Physical-first market entry and buyer-driven agent network effects (owner thesis, 2026-11-04)
+
+**Positioning hypothesis:** REL8TION is not primarily an app that agents must remember to open. It starts as a **physical-to-digital relationship infrastructure at the open house**, using Event Pass, Smart Signs, NFC/QR and buyer check-in to create an immediate, permissioned connection. The app, agent workspace and buyer AI become the downstream operating layer. Say **“We start where real estate relationships start: at the property.”** Avoid unsupported claims of exclusive ownership of open houses, universal adoption or proprietary market control; the actual defensible advantage, if validated, is deployed physical distribution, habitual check-in, identity/agent attribution, and the resulting permissioned relationship network.
+
+### What the founder reports / what remains to be demonstrated
+
+- Founder reports strong positive reactions from a range of agents—from high-volume producers to infrequent producers—to the existing physical open-house experience. This is qualitative feedback, **not yet documented paid willingness, retention, causal conversion lift or market share**.
+- Founder observes a present monetization gap: agents like the hardware/check-in but lack a demonstrated direct buyer-business result they would pay for. **Proposed value unlock:** buyer-intent capture, AI assistance for unrepresented buyers, and represented-buyer agent matching, bidirectional communication and offer-request handoff.
+- Buyers remain free; verified agents can receive and act on their own clients' requests and communicate without a coercive paywall. A convenient, low-cost premium agent deal workspace can monetize workflow automation rather than buyer access.
+- Physical distribution creates potential network effects: each participating listing agent hosts check-ins; a represented visitor selects their buyer agent; buyer-initiated offer intent prompts an authorized invitation if that agent is not on REL8TION; newly joined agents may in turn deploy Event Pass at their own open houses. **This is a growth mechanism to measure, not a guaranteed viral loop.**
+- Agents with one transaction per year and top producers have different perceived value and affordability. Validate a clear entry plan, then paid automation/integrations for heavier users. Do not force paid enrollment mid-offer or block the buyer's chosen agent from receiving an authorized request.
+
+### The physical-to-digital flywheel
+
+1. **Place:** Event Pass/Sign is present at a real listing's open house, with verified host and listing attribution.
+2. **Meet:** Buyer taps/scans and checks in, regardless of representation; preserve disclosures and consent boundaries.
+3. **Connect:** The correct buyer agent is explicitly selected or verified, or the genuinely unrepresented buyer chooses permissioned follow-up.
+4. **Intent:** Buyer requests information, a showing or a proposed offer amount; these are tracked as distinct funnel events, not binding commitments.
+5. **Collaborate:** Verified agents receive permissioned buyer requests, coordinate with listing agents and prepare compliant formal offers.
+6. **Earn:** Optional paid agent workspace saves measurable time and improves follow-through; no claims of generated business without tracked outcomes.
+7. **Expand:** Invited buyer agents adopt REL8TION and may use the physical products at their next event, restarting the loop.
+
+### Pilot scorecard and decision criteria
+
+Track at event, agent and cohort level (with clear denominators): active physical assets → unique check-ins; share explicitly unrepresented vs represented/unknown; valid agent match rate; invited agents → verified signup; buyer requests → agent acknowledgment → drafted offer → authorized official offer delivered → acknowledged → accepted → closing; premium trial → paid activation → 30/90-day retention; incremental cost per activated agent; support/consent/identity misrouting incidents. Segment listing-side vs buy-side acquisition and compare by agent volume.
+
+Baseline existing check-ins and conversion before enabling pilot. A properly authorized, limited live pilot is required to test whether physical distribution drives lower acquisition cost, higher paid conversion and measurable buyer-side transactions. Measure real agent-provided buyer opportunities and user outcomes rather than relying on positive feedback alone.
+
+**Guardrails:** Never imply that physical check-in itself creates representation, follow-up consent, exclusivity, permission to notify a third party, an offer, or contract acceptance. Verify identities and ownership; prevent represented-buyer poaching; permit human/off-platform participation; comply with brokerage supervision, privacy, communications and offer-delivery requirements. This note changes no production system, subscription or messaging controls.
