@@ -207,3 +207,29 @@ Track at event, agent and cohort level (with clear denominators): active physica
 Baseline existing check-ins and conversion before enabling pilot. A properly authorized, limited live pilot is required to test whether physical distribution drives lower acquisition cost, higher paid conversion and measurable buyer-side transactions. Measure real agent-provided buyer opportunities and user outcomes rather than relying on positive feedback alone.
 
 **Guardrails:** Never imply that physical check-in itself creates representation, follow-up consent, exclusivity, permission to notify a third party, an offer, or contract acceptance. Verify identities and ownership; prevent represented-buyer poaching; permit human/off-platform participation; comply with brokerage supervision, privacy, communications and offer-delivery requirements. This note changes no production system, subscription or messaging controls.
+
+## Additive integration plan: preserve existing REL8TION and include loan officers (2026-11-04)
+
+**Owner clarification:** The goal is to complete and extend the already-planned REL8TION relationship ecosystem with a few complementary additions, **not to rename, replace, replatform, migrate, redesign or interfere with anything already built**. The requirements here are additive concepts for future authorized development only. No production, code, checkout, schema, enrollment, communication settings or existing features may change based solely on this proposal.
+
+### Preserve functioning foundations
+
+- Keep all existing Event Pass, Smart Sign, Rel8tionChip, HomeKey, open-house activation, listing-agent attribution, buyer check-in, disclosures, property pages, agent and loan-officer dashboards, sponsorship, coverage and financing-help paths intact.
+- Keep REL8TION COMMAND, agent outreach, sender controls and existing agent/loan-officer identity and membership entitlements intact. Any rollout must maintain backward compatibility and preserve current routes, QR/NFC codes, URLs, pricing and customer accounts.
+- The existing `apps/agent-website-builder` and `my.rel8tion.me` **Website Builder / Digital You** product remain supported as-is, including current websites, domains, Auth, content and paid entitlements. **Do not rename it or turn it into a different product without explicit owner approval.**
+
+### Proposed small additions, connected to the existing architecture
+
+1. **Buyer pathway:** All visitors may check in, represented or not. An unrepresented buyer can opt into purpose-specific, permissioned Buyer AI follow-up; a represented buyer can select/confirm their own agent and initiate an offer-preparation request without being solicited as a new listing-agent client.
+2. **Buyer ↔ buyer agent ↔ listing agent:** Add verified buyer-agent lookup and safe matching, an authorized invitation when the buyer's agent is not in REL8TION, secure property-specific agent-to-agent communication, buyer-requested proposed offer amounts, and an eventual brokerage-compliant formal-offer workflow. Keep these distinct from an actual signed/submitted offer.
+3. **Loan officers stay central:** Extend existing loan-officer sponsorship, verified profile, financing-help and event coverage. With separately informed buyer consent, provide the appropriately authorized/selected LO a financing-readiness service opportunity linked to the event/offer process. Do not route buyer finance data to an unrelated LO, assume consent from check-in, or let the platform displace a buyer's existing loan officer. Preserve assigned-LO precedence and existing sponsorship rules unless explicitly revised after review.
+4. **Profile Builder as an ADD-ON, not a replacement:** Optionally give buyers a private account card and agents/LOs a simplified verified public/professional profile, drawing from authoritative existing identity records. The existing Website Builder can continue offering rich public sites, custom domains, listings, contact and content. Avoid duplicative identities, cross-project account merging, and changes to builder data or domain routing. Future UI naming is an option, not a decision.
+5. **Commercial model exploration:** Buyers free; consider low-cost paid agent workflow automation and separately evaluate loan-officer value/monetization. Do not change current Stripe products/pricing, subscription access, or block any existing buyer-agent communication/offer access. No compensation tied to steering financing, referral volume or illegal arrangements.
+
+### Integration and rollout gates
+
+Before implementing, create a feature-to-existing-system dependency map and tests showing each existing flow stays unchanged. Implement new permissions/tables/endpoints and UI affordances behind isolated flags with safe defaults, verify actual Supabase/Auth/project boundaries, use synthetic accounts in nonproduction, and require owner approval for merging, deployment, prices, messages or live buyer access. **Add, don't replace.** Mark planned functions accurately as not yet live.
+
+### Product framing
+
+**Physical first:** Existing deployed NFC/QR products initiate a real open-house interaction; REL8TION then preserves appropriate relationships among buyers, listing agents, buyers' agents and loan officers, with permissioned AI and future transaction tools. The network compounds through buyer-driven agent introductions and optional upgraded professional workflows, without abandoning the hardware and loan-officer foundation.
