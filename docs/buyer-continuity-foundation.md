@@ -85,3 +85,44 @@ These are focused local tests, not a full repository, Supabase integration, depl
 8. Obtain authorization for a bounded pilot, recipient/consent rules, sending identity and spend limits. Only then connect delivery, test with approved recipients, and verify reply, handoff and conversion outcomes. Neither this code nor a passing local test authorizes contact.
 
 AGENTS.md disposition: updated with durable review-only and unapplied-proposal guardrails. CURRENT_STATE.md and REL8TION_SYSTEM_OVERVIEW.md distinguish local foundations from live behavior.
+
+## Proposed complementary pathway: represented buyer check-in and agent-to-agent handoff (owner direction, 2026-11-04)
+
+This product requirement **complements** the unrepresented-buyer AI acquisition path above. It is a design proposal only; no implementation, outbound permission, representation grant, provider integration or deployment is authorized by this section.
+
+**Core principle:** any visitor can check in to a property, including a buyer already working with an agent. REL8TION should *protect and strengthen* that existing buyer-agent relationship, not reject the visitor or try to acquire them for the listing agent.
+
+### Buyer-facing experience
+
+1. The buyer completes the normal open-house check-in and disclosures. A prominent question asks: **“Are you currently working with a real estate agent?”** with Yes, No, and Not sure options. Check-in is never denied simply because the buyer is represented.
+2. **No / genuinely unrepresented:** keep the independent, purpose-specific opted-in Buyer AI acquisition/continuity path described above; no message is authorized merely because of check-in.
+3. **Yes:** show a lightweight agent lookup, searchable by agent name, brokerage, city and optionally license number. Show enough verified public details for the buyer to confirm the correct professional; ambiguous, shared-name and unverified matches must be held, not auto-linked.
+4. **Agent not found:** allow the buyer to provide an agent name and *optional* contact details, with clear separate permission to invite that professional. Do not require the existing agent to join REL8TION for the buyer's check-in to succeed.
+5. Ask for informed, explicit permission before sharing the buyer's identity, visit or contact information with the chosen buyer's agent and/or notifying the listing agent of the claimed relationship. Sharing permissions and channel-specific invitations are distinct from generic marketing consent. Keep existing agency disclosures separate.
+
+### Identity, relationship and invitation states
+
+- Persist a buyer-stated agent selection as a **claim/pending verification**, not a verified representation agreement. An independently authenticated buyer agent can accept/confirm the relationship through an authorized flow; disagreement or conflicting existing relationships routes to human review. Never infer agency solely from a search match, check-in, SMS reply or self-reported metadata.
+- Store the buyer-agent relationship separately from the event's authoritative listing-agent ownership. Preserve the host-vs-listing-agent distinction: a substitute host does not become the listing agent automatically.
+- **Buyer agent already registered:** if the buyer opts to share, send an authenticated in-app notification and let the buyer's agent confirm/participate in the event; create or reveal an agent-to-agent thread only after permissions and identities are verified.
+- **Buyer agent not registered:** with an appropriate invitation permission and lawful channel, send a narrowly scoped platform invitation identifying REL8TION and why it was sent, without sensitive buyer details in the unsolicited invitation. After verified registration, a buyer-approved connection can be claimed. Respect STOP, unsubscribes, send limits and quiet hours; an invitation is not transactional by default and is never automatic under this review branch.
+- De-duplicate check-ins, invitations, connection requests and thread creation by canonical buyer, event, requested agent and purpose. Protect shared phone/email numbers, mistaken selections and recycled identities. Provide buyer/agent controls to revoke sharing, correct an incorrect match, and close the relationship/thread where legally and operationally appropriate.
+
+### Listing agent ↔ buyer agent communication
+
+After the buyer's authorized linkage and agent verification, provide a secure, auditable conversation between the **actual listing agent** and the **confirmed buyer's agent** for the specific property/event. The listing agent may review/send or explicitly approve an accurately attributed welcome template such as:
+
+> “Your buyer checked in at [property] today. I'll take good care of them. Feel free to message me here with any questions, and reach out when you're ready to discuss or submit an offer.”
+
+Do not impersonate the listing agent, claim personal care they did not authorize, or disclose the buyer's attendance without buyer-approved sharing. If buyer attendance is not authorized to share, show a generic event-level connection rather than buyer-specific details. Message history, handoff and read receipts are distinct from marketing automation. A future **“Submit an offer on REL8TION”** action is a proposed authenticated broker/agent workflow requiring separate document, delivery, audit, brokerage and local rule review; a chat message is not an offer submission.
+
+### Buyer AI and routing boundaries
+
+- **Represented:** never auto-enroll in listing-agent buyer-acquisition messaging. Optional AI may later act as a buyer-agent-authorized *service assistant* for property questions, appointment coordination and document handoff, but it cannot replace or silently bypass the chosen agent.
+- **Unrepresented:** eligible only for the separate verified consent, representation and suppression gates in this document.
+- **Unknown/conflicting:** allow check-in; pause buyer-acquisition outreach and disputed agent handoffs until resolved.
+- Recheck buyer consent, verified agent identity, platform entitlement and live suppression before *every* message or invitation. Review-only policy results are never permission to send.
+
+### Success criteria for a future gated pilot
+
+Measure: represented visitors successfully checked in; accurately selected and verified buyer-agent links; invitation acceptance (without conflating it with consent); authenticated agent-to-agent threads; buyer-agent responses; showing/consultation handoffs; future compliant offers submitted/acknowledged; and genuine closed transactions. Do not count check-ins or notifications as buyer-side conversions. Pilot with synthetic accounts and isolated staging before any buyer data or real messaging is enabled.
