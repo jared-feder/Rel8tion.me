@@ -154,3 +154,26 @@ Measure: represented visitors successfully checked in; accurately selected and v
 - Measure **offer intent → verified agent engagement → draft prepared → buyer approved → official offer transmitted → acknowledged → eventual accepted/closed**, with separate funnel counts for existing REL8TION agents vs newly invited agents, including invitation-to-verified-signup and free-to-paid conversion. Neither an offer request nor an agent invite counts as a transaction.
 
 **Implementation status:** proposed future capability only. No offer request table, buyer UI, invitations, agent deep-link, electronic-signature flow, document generator, brokerage approval, notification or submission integration is deployed as part of this branch. Add product UX/security/compliance review and isolated test coverage before requesting a pilot.
+
+## Proposed buyer-free / agent-subscription monetization (owner direction, 2026-11-04)
+
+Product hypothesis: Buyers always use core REL8TION property discovery, check-in, verified agent selection, buyer-to-agent offer requests and request-status tracking for free. Agent convenience and workflow automation—not access to a client's expressed interest—fund the SaaS subscription. A buyer's agent should see a *client-initiated invitation* with a strong reason to join: their buyer is interested in making an offer on a specific property. Sign-up conversion and any optional paid upgrade are separate steps.
+
+**Proposed pricing for testing, not live catalog prices or a production entitlement change:**
+
+| Persona/plan | Target monthly price | Core capability |
+| --- | ---: | --- |
+| Buyer | Free | Check in, choose/verify their agent, request an offer amount, communicate with their agent, receive request/status updates. |
+| Agent Basic | Free | Claim/verify buyer relationship, access shared property and buyer-authorized request, respond and communicate, upload or relay an actual offer package through a lawful channel without a paywall, and view basic receipt status. |
+| Agent Deal Desk | $19/month (hypothesis) | Unlimited structured offer workspaces, reusable term checklists, document management, guided drafting, request follow-ups, reminders, status monitoring and integrations subject to cost caps. |
+| REL8TION Pro | $49/month (hypothesis / confirm against live pricing) | Deal Desk plus full Event Pass, eligible Buyer AI follow-up, lead/relationship tools and broader agent automation; avoid duplicate charges or contradictory entitlements. |
+
+**Conversion design:** Buyer initiates a permissioned request → verified selected agent receives an invitation or notification → free agent can accept and service that buyer → contextual premium trial/upgrade appears *after* seeing the value of workflow organization and time savings. Avoid compulsory checkout mid-transaction. Free agents should not be prevented from delivering legally valid offers, reading buyer requests, correcting records, or communicating with the other agent. Do not impair represented buyers, discriminate against brokerages, claim an offer was delivered unless receipt is verified, or gate essential data export/retrieval behind an active subscription.
+
+**Product positioning:** “From open-house check-in to offer preparation and agent-to-agent communication in one workflow.” Basic networking/offer exchange creates useful two-sided liquidity; paid automation saves time and reduces errors. Agent-paid features can include brokerage-specific templates, e-signature integrations, offer checklists, AI-assisted but human-approved drafting, follow-up summaries and analytics, all subject to authorization, broker supervision, regulations, licensing and real provider costs. Agent collaboration may need to be cross-brokerage and should never require an agent to switch brokerages.
+
+**Market reference points (checked 2026-11-04, require revalidation):** Present My Offer lists a $10/month listing-agent plan and free buyer-agent submissions (https://presentmyoffer.com/pricing/); ShowingTime+ Appointment Center advertises $15/month agent subscription for showing/offer tools, subject to availability (https://showingtime.com/solutions/showings-and-offers/appointment-center); Final Offer advertises free buyer/agent entry and a $25/month Channels+ tier billed annually (https://www.finaloffer.com/pricing). These are different product scopes, not proof that REL8TION can achieve this price or margin.
+
+**Validation before pricing commitment:** In an opt-in pilot, track invited-agent verification, percentage of requests serviced without subscription, first value achieved, paid trial activation, 30/90-day retention, total buyer intent → official offer conversion, and per-active-agent costs (AI inference, SMS, e-signature, document storage, compliance support). Test $9/$19/$29 entry-price willingness and whether $49 Pro upgrades outperform standalone Deal Desk, without paywalling essential transaction communication. Pricing should ultimately be set by observed adoption and contribution margin.
+
+**Status:** documentation proposal only. No billing change, entitlement change, checkout, offer submission route, data migration, new notification, or production deployment has been made.
