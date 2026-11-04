@@ -1,5 +1,15 @@
 # AGENTS.md
 
+## Agent nurture review foundation
+
+- `[PARTIAL]` `lib/agent-nurture-preview.js` is a pure offline planner, not a consent resolver, enrollment writer, scheduler or sender. `send_allowed` must remain false. Require verified person identity, exact channel/purpose/destination consent, current suppression and control evidence, and reconciliation of uncertain attempts. Existing event-only SMS consent is not recurring nurture consent. Run `npm run verify:agent-nurture` after changes.
+- `[RISK]` The `feature/rel8tion-funnel-review-2026-11-04` branch is source-review only. Its three Vercel configs disable Git deployments for that exact branch. Do not remove that guard, rename it into an automatically deploying branch, apply the SQL proposal or enable messages without separate authorization. A GitHub branch is not a production or isolated-runtime verification.
+
+## Buyer continuity foundation (review only)
+
+- `[PARTIAL]` `lib/buyer-continuity.js` is an internal, side-effect-free review policy, not an authenticated resolver or sending permission. `outbound_allowed` must remain false. Never treat check-in metadata, seller-agency acknowledgment, financing opt-in, host-agent attribution or a phone-only consent row as buyer-continuity authorization. Use verified canonical identity, listing-agent ownership, scoped consent, representation, membership and fresh suppression/control evidence. Run `npm run verify:buyer-continuity` after changes.
+- `[RISK]` `sql/proposals/20261104_buyer_followup_intake.sql` is an unapplied proposal outside automated migrations. Capture defaults off; receipts cannot enter a sendable state and suppression cannot be reversed. The proposed transaction trigger can roll back a check-in if intake persistence fails. Validate target schema, owner privileges/RLS and check-in reliability before separately approved application or capture activation. Do not bulk push migrations, backfill historical buyers or connect a sender as part of foundation work.
+
 ## Event check-in SMS outcome reporting
 
 - `[IMPLEMENTED]` Keep saved check-in success separate from SMS acceptance. Notification failures must not imply that the check-in database write rolled back or trigger blind resubmission. Require positive provider acceptance before setting `financingAlertSent`; terminal failure statuses override `ok=true`, and acceptance must never be presented as handset delivery. Preserve financing opt-in, recipient selection and send order. Run `node --test test/event-sms-outcomes.test.cjs` with mocked fetches; never send real texts for this regression check.
@@ -291,3 +301,4 @@ Every completed REL8TION work log must include an explicit `AGENTS.md` dispositi
 - [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.
 
 - [IMPLEMENTED] Loan-officer setup/recovery SMS must carry a validated assignment visit through the fixed app.rel8tion.me callback and password setup. Only preserve visits belonging to the unique approved profile. Shared or duplicate active profile emails fail closed for account access and contact capability issuance; email equality must not aggregate people.
+

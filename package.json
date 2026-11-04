@@ -4,6 +4,8 @@
     "lint": "node scripts/verify-app-architecture.cjs",
     "typecheck": "node scripts/verify-app-architecture.cjs",
     "test": "node tests/app-auth.test.cjs",
+    "verify:agent-nurture": "node --test test/agent-nurture-preview.test.cjs",
+    "verify:buyer-continuity": "node --test test/buyer-continuity.test.cjs",
     "verify:app": "node scripts/verify-app-architecture.cjs",
     "pricing:stripe:dry-run": "node scripts/sync-stripe-pricing.cjs --dry-run",
     "pricing:stripe:apply": "node scripts/sync-stripe-pricing.cjs --apply",
@@ -52,3 +54,4 @@
     "qrcode": "^1.5.4"
   }
 }
+

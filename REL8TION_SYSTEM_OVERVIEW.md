@@ -1,5 +1,9 @@
 # REL8TION System Overview
 
+- `[PARTIAL, REVIEW ONLY 2026-11-04]` Agent nurture has a deterministic offline preview planner for verified worked-with relationships. It checks exact channel/purpose consent and current contact/suppression/control evidence, but always forbids sending. It is not integrated with the relationship API, email delivery, a scheduler or a live consent store. Review-branch Git deployments are disabled; no runtime behavior is changed.
+
+- `[PARTIAL, REVIEW ONLY 2026-11-04]` Buyer relationship continuity has a tested review-policy foundation and unapplied, capture-off SQL intake proposal. It follows the documented relationship engine: contextual conversation, learned needs, relevant listing matches and showing handoff while preserving representation. This patch does not activate that engine: there is no buyer AI model, inbound routing, message generation, enrollment, scheduler or sender. Current event check-in and notification routes remain unchanged. The intake is a source receipt, never consent or buyer agency; all future communication needs fresh server-verified eligibility and separately authorized delivery.
+
 - `[IMPLEMENTED, RELEASE PENDING 2026-10-30]` The independent `apps/mockup-renderer` Vercel service supplies personalized property-image mockups before automatic outreach sends. Its recovery hardens the Node runtime, uses bounded rendering batches and image-download deadlines, and prioritizes generated future-open-house queue rows with genuine property photos. The root `/api/cron/render-agent-mockups` wrapper remains the orchestration entry point; the separate project retains a render cron. This does not change SMS provider routing, operator live/away decisions, delivery caps, opt-out rules, or follow-up policy. Successful deployment and production queue/sender inspection are required to confirm actual sends.
 
 
@@ -410,3 +414,4 @@ The administration shell itself embeds no platform data. A direct request that d
 [IMPLEMENTED] Failed COMMAND control refreshes retain the complete last successful control snapshot and display an unverified-status warning while preserving release-window drafts. Only successful reads or setting saves clear the refresh warning.
 
 - [IMPLEMENTED] Assignment deep links survive password setup and recovery SMS. Account identity requires a unique active approved profile; duplicate email identities require operator correction before access or contact-link issuance.
+

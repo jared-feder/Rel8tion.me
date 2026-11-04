@@ -1,5 +1,20 @@
 # CURRENT_STATE.md
 
+## 2026-11-04: Agent nurture and buyer foundation review branch
+
+- `[PARTIAL, REVIEW ONLY]` Added the side-effect-free agent nurture planner with channel/purpose consent, verified person identity, shared-contact collision checks, suppression, reply holds, sender controls, quiet hours, cadence and uncertain-attempt reconciliation. Every result has `send_allowed=false`; no live adapter, enrollment, dispatch route or scheduler is wired.
+- `[VERIFIED LOCALLY]` All 40 nurture regression tests and module syntax checks pass. Proposed cadence is one finite four-touch cycle, not a live campaign. Email consent/unsubscribe and current full-history adapters remain unimplemented.
+- `[REVIEW ONLY]` Buyer continuity and nurture drafts are combined on `feature/rel8tion-funnel-review-2026-11-04`, based on `ad31361d5b1a22993def74736ab769151f04f392`. Git deployment is disabled for only this branch in root, app and renderer Vercel configs. Main/staging, existing routes/crons and all provider settings remain unchanged. No SQL application, production dispatch, PR or deployment is authorized by this review task.
+- `[NEEDS VERIFICATION]` Full repository CI has not run; current workflows trigger only on PRs. The unchanged marker scan flags benign database-role literals in the SQL proposal and synthetic fixture. No secret-scan bypass was introduced. Start review at `docs/rel8tion-funnel-review.md`.
+- `AGENTS.md updated - retain non-sending invariants and exact-branch deployment guards.`
+
+## 2026-11-04: Buyer continuity foundation (review branch only)
+
+- `[PARTIAL, REVIEW ONLY]` Added side-effect-free buyer-follow-up review policy with canonical listing-agent ownership, explicit scoped consent, representation protection, recurring-membership entitlement and fail-closed suppression/control/duplicate checks. It always returns `outbound_allowed=false` and never establishes buyer agency. No resolver, model, API, browser flow, SMS sender or cron is connected.
+- `[PROPOSED, NOT APPLIED]` The isolated SQL proposal creates a minimal, private source-receipt ledger with capture OFF, pending-review/suppressed states only, one receipt per check-in and irreversible suppression. When explicitly enabled after target verification, its trigger inserts alongside the check-in transaction. An intake failure will roll back the check-in, a rollout tradeoff requiring target-environment testing.
+- `[VERIFIED LOCALLY]` Focused Node policy tests and isolated PostgreSQL-engine tests cover permission boundaries, atomic rollback, repeat-source idempotency, capture-off behavior, one-way suppression and close/reopen persistence. This does not verify the real Supabase schema, RLS, deployment or buyer delivery.
+- `[BLOCKED]` The connected Supabase account cannot access the app project. No authoritative resolver or live migration can be verified yet. The existing generic consent table lacks buyer/agent/purpose scope. Existing CI's literal private-role-marker scan also flags benign SQL role declarations in this proposal/fixture; resolve with a narrowly reviewed false-positive allowance before a future PR is considered ready, not credential changes or hidden role strings. See `docs/buyer-continuity-foundation.md` for exact scope and remaining work.
+
 ## 2026-10-30: Outreach rendering recovery (urgent)
 
 - `[IMPLEMENTED, RELEASE PENDING]` Production `mockup-renderer` builds have failed on Vercel with `BUILD_UTILS_NODE_VERSION_DISCONTINUED` because its package specified Node 20.x. The last READY deployment continued executing but emitted repeated render API and cron timeout errors during October 26–30. The isolated hotfix moves the renderer to Node 24.x, bounds both renderer entry points to four jobs, increases function execution budgets, and aborts stalled/oversized listing-image downloads.
@@ -981,3 +996,4 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - Fixed PR #54 findings: setup/recovery requests now send the visit; server validates UUID and current assignment before preserving it in the canonical callback. Token cleanup retains the visit through reloads.
 - Account and access-link APIs now require exactly one active matching approved profile; they no longer combine multiple profile UIDs by email. Production read-only check found zero duplicate active email groups.
 - All 14 focused tests pass, including invite/recovery assigned/unassigned visit cases and shared-email rejection. No test SMS sent. AGENTS.md updated with these durable boundaries.
+
