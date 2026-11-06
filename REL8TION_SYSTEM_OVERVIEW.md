@@ -410,3 +410,9 @@ The administration shell itself embeds no platform data. A direct request that d
 [IMPLEMENTED] Failed COMMAND control refreshes retain the complete last successful control snapshot and display an unverified-status warning while preserving release-window drafts. Only successful reads or setting saves clear the refresh warning.
 
 - [IMPLEMENTED] Assignment deep links survive password setup and recovery SMS. Account identity requires a unique active approved profile; duplicate email identities require operator correction before access or contact-link issuance.
+
+## 2026-11-06 — Twilio event/assignment delivery tracking
+
+- **Twilio send:** `supabase/functions/_shared/sms.ts` now supplies `StatusCallback` for event-route sends (including confirmed loan-officer assignments) when the existing callback token is configured. The outreach route keeps its explicit queue/step callback.
+- **Delivery webhook:** `supabase/functions/twilio-message-status/index.ts` validates its configured token, retains outreach event/status writes, and also patches `sms_message_log` by `external_id`/Message SID with provider status and error metadata. Terminal statuses are not downgraded by late queued/sent callbacks.
+- **Operational meaning:** Twilio returning `queued` means accepted for processing, *not* carrier delivery. Never mark confirmed coverage notifications as delivered until a `delivered` callback or a Message API status check establishes it. Older messages lacking callbacks require direct reconciliation; this patch is not retroactive.
