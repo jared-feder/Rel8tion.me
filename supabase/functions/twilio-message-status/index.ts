@@ -54,7 +54,7 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const providedToken = url.searchParams.get("token") || req.headers.get("x-rel8tion-status-token") || "";
-    if (expectedToken && providedToken !== expectedToken) {
+    if (!expectedToken || providedToken !== expectedToken) {
       return new Response(
         JSON.stringify({ ok: false, error: "Unauthorized" }, null, 2),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -157,6 +157,44 @@ serve(async (req) => {
         .eq("id", queueRow.id);
 
       if (updateError) throw updateError;
+    }
+
+    // Update all Twilio SMS logs (not only outreach queue rows). Assignment and
+    // buyer/event confirmations are identified by the Twilio message SID.
+    const { data: smsLog, error: lookupError } = await supabase
+      .from("sms_message_log")
+      .select("id,status,metadata")
+      .eq("provider", "twilio")
+      .eq("external_id", messageSid)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (smsLog?.id) {
+      const priorMetadata = smsLog.metadata && typeof smsLog.metadata === "object" && !Array.isArray(smsLog.metadata)
+        ? smsLog.metadata as Record<string, unknown> : {};
+      const priorStatus = String(priorMetadata.provider_status || smsLog.status || "").toLowerCase();
+      const rank: Record<string, number> = { accepted: 0, queued: 0, sending: 1, sent: 2, delivered: 3, failed: 3, undelivered: 3, canceled: 3, read: 4 };
+      // Callbacks can arrive out of order; do not downgrade a terminal outcome.
+      if ((rank[messageStatus] ?? 0) >= (rank[priorStatus] ?? 0)) {
+        const isFailure = messageStatus === "failed" || messageStatus === "undelivered" || messageStatus === "canceled";
+        const { error: smsUpdateError } = await supabase
+          .from("sms_message_log")
+          .update({
+            status: messageStatus,
+            error: isFailure ? (errorMessage || (errorCode ? `Twilio error ${errorCode}` : messageStatus)) : null,
+            metadata: {
+              ...priorMetadata,
+              provider_status: messageStatus,
+              delivery_status: messageStatus,
+              delivery_error_code: errorCode,
+              delivery_error_message: errorMessage,
+              delivery_status_updated_at: now,
+            },
+          })
+          .eq("id", smsLog.id);
+        if (smsUpdateError) throw smsUpdateError;
+      }
     }
 
     return new Response(
