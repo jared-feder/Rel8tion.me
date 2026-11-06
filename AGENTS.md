@@ -291,3 +291,10 @@ Every completed REL8TION work log must include an explicit `AGENTS.md` dispositi
 - [IMPLEMENTED] Failed COMMAND control reads must preserve the complete last successful sender/pause/guardrail/stat snapshot, not only release dates. Display refresh failure as unverified status; do not render default values as live sending permission.
 
 - [IMPLEMENTED] Loan-officer setup/recovery SMS must carry a validated assignment visit through the fixed app.rel8tion.me callback and password setup. Only preserve visits belonging to the unique approved profile. Shared or duplicate active profile emails fail closed for account access and contact capability issuance; email equality must not aggregate people.
+
+## [IMPLEMENTED IN PATCH / DEPLOYMENT TO VERIFY] 2026-11-06 Twilio transactional delivery tracking
+
+- The shared Supabase SMS sender now attaches an authenticated status callback URL to Twilio event-route messages (open-house assignments, buyer confirmations, loan-officer alerts) when `TWILIO_STATUS_CALLBACK_TOKEN` is configured. Outreach-specific callback URLs remain unchanged.
+- `twilio-message-status` now requires the configured callback token and updates `sms_message_log` by Twilio message SID while preserving existing outreach-specific history and status updates. This lets transactional messages show `sent`, `delivered`, `undelivered`, or `failed`, with error details, instead of indefinitely appearing `queued`.
+- Do not treat provider `queued` as delivery. Do not resend a message solely because the local log has not received a callback. Historical messages without callbacks still require a Twilio Message API status lookup before their delivery can be asserted.
+- Verify `TWILIO_STATUS_CALLBACK_TOKEN` is present in Supabase secrets, deploy both `send-lead-sms` and `twilio-message-status` together, and test a controlled transactional SMS plus a standard outreach callback before relying on live status. Keep user-triggered notifications opt-in and avoid duplicate SMS sends.
