@@ -1,5 +1,19 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Manual assistant sending and push integration
+
+- [APPLIED; APP RELEASE PENDING] Private migration 20261106203945_assistant_send_and_push is applied. A rolled-back database smoke check verified immutable content, stale dispatch reconciliation and one push claim only; zero synthetic rows/subscriptions remain and client table grants are absent. New Edge functions, inbound changes, manual-send flag and app/cron code are NOT deployed/configured yet. No VAPID credential exists. Deno check passed; 85 focused regressions passed before the final in-page confirmation refinement, followed by 14 delivery/UI regressions passing.
+- [SENT ONCE; PROVIDER ACCEPTED] At Jared's repeated explicit instruction, sent Fidel both verified public property links and the approved rough central-Lindenhurst 35-55 minute estimate. Twilio accepted SM31bb7539055041809a7aa5c3cd7f0d7b from 844-821-1802; the application log has exactly one matching request. No event assigned; proactive outreach remains paused, operator away. Receipt: ignored output/assistant-preview/fidel-options-result.json. The Queens question was already accepted earlier and was not repeated.
+- [VISUAL LIMIT] Loopback 4319 showed the real shell, calendar, draft and approval state with synthetic data. A native confirmation blocked browser automation; native Edge app-control approval timed out. Final UI now uses an in-page exact-message confirmation and its source parses/tests pass, but that last visual send step is not verified. Earlier production Dashboard Lock still requires Jared to choose his own PIN. Do not claim live panel sending or push is enabled.
+
+
+- [IMPLEMENTED ON feature/assistant-send-push; RELEASE PENDING] Added exact-message owner approval/send, atomic dispatch/provider claims, fixed REL8TION 844 sender, conservative New York window, fresh incoming/contact/opt-out checks, auditable receipts and receipt-only reconciliation. Cat capabilities retain read/draft/simulation only. Existing owner token can connect for one page session without persistent browser storage.
+- [IMPLEMENTED; CONFIGURATION PENDING] Added owner-only Web Push subscription settings, a private deduplicated important-incoming outbox, bounded minute worker, generic lock-screen content and canonical conversation deep links. No VAPID key was generated/configured and no device permission or subscription was created. Owner review alerts have no paid SMS fallback; Event Pass/assignment/buyer SMS remains intact.
+- [IMPLEMENTED; DEPLOYMENT PENDING] Signed Twilio ingress and service-authenticated downstream processing isolate direct Cat replies from old property Y/N automation. Migration source: supabase/migrations/20261106203945_assistant_send_and_push.sql.
+- [PROVIDER ACCEPTED] The separately authorized Queens question to Fidel was sent once from 844-821-1802: SM3fd2a9bc3da8557ac87f6a21a52180b0. Latest verified incoming remains his earlier Yes; no event assigned. Proactive outreach remains paused and operator away.
+- AGENTS.md updated with immutable dispatch, credential/device permission, push-only owner review and signed ingress boundaries.
+
+
 ## 2026-11-06: Assistant production release and booked-open-house calendar
 
 - `[IMPLEMENTED, RELEASE PENDING]` Rebased the isolated build onto production/main `ebcbf22` on `feature/jared-assistant-production`, retaining the current Event Pass, renderer and SMS-status fixes. Added a seven-day calendar with date navigation, Jared/all-officer filters and persistent booking/conflict context beside the reply composer. Current financing assignments are authoritative; other officers do not block Jared. Incomplete times, failed/truncated reads and candidates outside the loaded range remain unverified. This is advisory and does not reserve slots or include travel time.

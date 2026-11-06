@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendSMS } from "../_shared/sms.ts";
 
+import { assistantContact } from "../_shared/assistant-inbound.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -54,32 +56,6 @@ function toE164(phone: string | null): string {
   return `+${digits}`;
 }
 
-function shortText(text: string, max = 520): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  return `${clean.slice(0, max - 3)}...`;
-}
-
-function buildOwnerReplyAlert(opts: {
-  queueRow: Record<string, unknown> | null;
-  fromPhone: string;
-  body: string;
-  optOut: boolean;
-}): string {
-  const agentName = String(opts.queueRow?.agent_name || "Unknown agent");
-  const agentPhone = String(opts.queueRow?.agent_phone || opts.fromPhone || "");
-  const address = String(opts.queueRow?.address || opts.queueRow?.open_house_id || "Open house");
-  const status = opts.optOut ? "STOP / opt-out" : "reply";
-
-  return [
-    `Rel8tion outreach ${status}`,
-    `${agentName} (${agentPhone})`,
-    address,
-    shortText(opts.body || "(empty reply)"),
-    "Use the admin dashboard to reply.",
-  ].filter(Boolean).join("\n");
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -88,15 +64,13 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const ownerAlertPhone =
-      Deno.env.get("OUTREACH_REPLY_ALERT_PHONE") ||
-      Deno.env.get("REL8TION_OWNER_ALERT_PHONE") ||
-      "13477758059";
 
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
 
+    if(req.method!=="POST")return new Response("Method not allowed",{status:405});
+    if(req.headers.get("authorization")!==`Bearer ${serviceRoleKey}`)return new Response("Unauthorized",{status:401});
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const contentType = req.headers.get("content-type") || "";
 
@@ -128,9 +102,9 @@ serve(async (req) => {
     const optIn = optOutType === "START" || isOptIn(body);
     const intent = !optOut && !optIn ? replyIntent(body) : null;
 
-    const { data: queueRow, error: queueLookupError } = await supabase
+    const { data: matchedQueue, error: queueLookupError } = await supabase
       .from("agent_outreach_queue")
-      .select("id, open_house_id, agent_name, agent_phone, agent_phone_normalized, address, send_mode, review_status")
+      .select("id, open_house_id, agent_name, agent_phone, agent_phone_normalized, address, send_mode, review_status, last_outreach_at")
       .in("agent_phone_normalized", phoneLookupVariants(fromPhone))
       .order("last_outreach_at", { ascending: false, nullsFirst: false })
       .order("updated_at", { ascending: false })
@@ -138,6 +112,12 @@ serve(async (req) => {
       .maybeSingle();
 
     if (queueLookupError) throw queueLookupError;
+    // A reply to Cat's direct message must not acquire an old property's Y/N flow.
+    const contactUid=toPhone==="+18448211802"?await assistantContact(supabase,toE164(fromPhone),matchedQueue?.last_outreach_at||null):null;
+    const queueRow=contactUid?null:matchedQueue;
+    // Never trust a profile marker supplied by the public webhook.
+    delete payload.assistant_profile_uid;
+    if(contactUid)payload.assistant_profile_uid=contactUid;
 
     const { data: savedReply, error: insertError } = await supabase
       .from("agent_outreach_replies")
@@ -278,29 +258,8 @@ serve(async (req) => {
       }
     }
 
-    let ownerAlertStatus = "skipped";
-    const ownerAlertTo = toE164(ownerAlertPhone);
-
-    if (ownerAlertTo) {
-      try {
-        const ownerAlert = await sendSMS({
-          supabase,
-          to: ownerAlertTo,
-          body: buildOwnerReplyAlert({ queueRow, fromPhone, body, optOut }),
-          category: "owner_fallback_alert",
-          metadata: {
-            source: "twilio-inbound-reply",
-            queue_row_id: queueRow?.id || null,
-            inbound_reply_id: savedReply?.id || null,
-            internal_operational_alert: true,
-          },
-        });
-        ownerAlertStatus = String(ownerAlert.sid || ownerAlert.externalId || "sent");
-      } catch (alertErr) {
-        ownerAlertStatus = "failed";
-        console.error("Owner outreach reply alert failed", alertErr);
-      }
-    }
+    // The private outbox trigger queues important review items. No paid owner SMS.
+    const ownerAlertStatus = "push-review-queue";
 
     // Twilio/carriers provide the required toll-free STOP/START confirmation.
     // Returning an empty response avoids sending a duplicate application reply.

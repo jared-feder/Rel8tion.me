@@ -10,7 +10,7 @@ function memoryStore(seed=[]){
   return {list:async()=>structuredClone([...records.values()]),get:async id=>structuredClone(records.get(id)),insert:async record=>{
     const old=records.get(record.id);if(old){if(old.fingerprint!==record.fingerprint)throw Object.assign(new Error('Conflicting request id.'),{status:409});return structuredClone(old);}
     records.set(record.id,structuredClone(record));return structuredClone(record);
-  },transition:async(record,status,event)=>{const old=records.get(record.id);if(old.status!==record.status)throw Object.assign(new Error('Concurrent transition.'),{status:409});const next={...old,status,audit:[...old.audit,event]};records.set(next.id,next);return structuredClone(next);}};
+  },transition:async(record,status,event,patch={})=>{const old=records.get(record.id);if(old.status!==record.status)throw Object.assign(new Error('Concurrent transition.'),{status:409});const next={...old,...patch,status,audit:[...old.audit,event]};records.set(next.id,next);return structuredClone(next);}};
 }
 const calendar={verified:true,from:'2026-11-05T16:00:00Z',through:'2027-01-05T16:00:00Z',loaded_at:'2026-11-06T16:00:00Z',timezone:'America/New_York',owner_uid:'38e5ab84-c1a2-4107-9f05-47a6caeda341',bookings:[
   {id:'sample-booked-jared',queue_row_id:'other-sample-queue',agent_name:'Casey Example',address:'400 Booked Court',status:'confirmed',scheduled_start:'2026-11-07T16:00:00Z',scheduled_end:'2026-11-07T18:00:00Z',officers:[{uid:'38e5ab84-c1a2-4107-9f05-47a6caeda341',name:'Jared Feder'}]},

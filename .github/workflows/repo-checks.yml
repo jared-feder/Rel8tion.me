@@ -93,8 +93,11 @@ jobs:
             matches="$(git diff -U0 "${base}" "${head}" -- "${file}" \
               | grep -E '^\+' \
               | grep -Ev '^\+\+\+' \
-              | grep -Ev "^\\+grant select, insert, update on public\\.(weekly_production_reports|outreach_performance_reports|assistant_workspace_actions) to ${sr_token};$" \
+              | grep -Ev "^\\+grant select, insert, update on public\\.(weekly_production_reports|outreach_performance_reports|assistant_workspace_actions|assistant_push_subscriptions|assistant_push_events|assistant_push_deliveries) to ${sr_token};$" \
+              | grep -Ev "^\\+grant execute on function public\\.(assistant_verified_direct_contact\\(text,text\\)|assistant_pending_push_events\\(\\)|assistant_claim_push_delivery\\(uuid,uuid\\)|assistant_reconcile_receipts\\(\\)) to ${sr_token};$" \
               | grep -Ev "^\\+revoke all on public\\.(weekly_production_reports|outreach_performance_reports) from ${sr_token};$" \
+              | grep -Ev "^\\+  const key=Deno\\.env\\.get\\(\"${sr_name}\"\\)\\|\\|\"\";$" \
+              | grep -Ev "^\\+    const authToken=Deno\\.env\\.get\\(\"${tw_name}\"\\)\\|\\|\"\";$" \
               | grep -Ev "^\\+ *const key = process\\.env\\.${sr_name}; *$" \
               | grep -Ev "^\\+ *process:\\{ env:\\{ ${sr_name}:'test-only-signing-secret', SUPABASE_URL:'https://example.test' \\} \\}, *$" \
               | grep -E "${pattern}" || true)"

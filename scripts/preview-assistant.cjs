@@ -3,8 +3,9 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const {createWorkspace}=require('../lib/assistant-workspace');
 const {threads,memoryStore,calendar}=require('../test/fixtures/assistant-workspace.cjs');
 const root=path.resolve(__dirname,'..');
-const workspace=createWorkspace({source:{inbox:async()=>threads,thread:async key=>threads.find(t=>t.thread_key===key),calendar:async()=>calendar},store:memoryStore(),now:()=>new Date('2026-11-06T16:00:00Z')});
-const actor={owner:true,id:'jared-preview',scopes:['read','draft','approve','simulate','dismiss'],threads:[]};
+const mockStore=memoryStore();
+const workspace=createWorkspace({transport:{ready:()=>true,send:async record=>mockStore.transition(record,'accepted',{event:'mock_provider_accepted',actor:'synthetic-only',at:'2026-11-06T16:00:00Z'},{provider_receipt:{sid:'SIMULATED-'+record.id,from:'+18448211802',simulation:true}})},source:{inbox:async()=>threads,thread:async key=>threads.find(t=>t.thread_key===key),calendar:async()=>calendar},store:mockStore,now:()=>new Date('2026-11-06T16:00:00Z')});
+const actor={owner:true,id:'jared-preview',scopes:['read','draft','approve','send','simulate','dismiss'],threads:[]};
 const server=http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://127.0.0.1');
@@ -31,4 +32,4 @@ const server=http.createServer(async(req,res)=>{
     res.end(content);
   }catch(error){res.statusCode=error.status||500;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:false,error:error.message}));}
 });
-server.listen(4317,'127.0.0.1',()=>console.log('Synthetic COMMAND preview: http://127.0.0.1:4317/admin?area=assistant (no delivery; data resets on restart)'));
+server.listen(Number(process.env.ASSISTANT_PREVIEW_PORT||4317),'127.0.0.1',()=>console.log('Synthetic COMMAND preview: http://127.0.0.1:4317/admin?area=assistant (no delivery; data resets on restart)'));
