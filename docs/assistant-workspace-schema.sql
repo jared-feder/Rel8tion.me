@@ -1,5 +1,5 @@
--- REVIEW DRAFT ONLY. Not a migration, not applied by this build.
--- Generate the reviewed migration through Supabase CLI after isolated DB validation.
+-- Source copy of remote Supabase migration 20261106193635_assistant_workspace_actions.
+-- Applied through the connected migration tool; do not run this file a second time.
 begin;
 create table public.assistant_workspace_actions (
   id text primary key check (id ~ '^[a-zA-Z0-9_-]{12,100}$'),

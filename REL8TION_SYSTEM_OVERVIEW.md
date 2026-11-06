@@ -1,5 +1,7 @@
 # REL8TION System Overview
 
+- `[IMPLEMENTED, RELEASE PENDING]` Jared's Assistant now projects real COMMAND inbox context, uniquely matched direct assistant SMS/replies and a booked-open-house calendar from field visits/current financing assignments. The calendar defaults to Jared, can show other loan officers, and provides New York overlap warnings beside reply composition and in assistant latest-thread resolution. Missing, stale or out-of-range timing remains unverified; it neither reserves time nor accounts for travel. Existing COMMAND header authorization can read this business context; draft/approval/simulation writes remain owner-token or scoped-capability protected. The private action store was migrated and validated; live delivery from the panel, trusted assistant connection issuance and Web Push remain unconnected.
+
 - `[IMPLEMENTED, RELEASE PENDING 2026-10-30]` The independent `apps/mockup-renderer` Vercel service supplies personalized property-image mockups before automatic outreach sends. Its recovery hardens the Node runtime, uses bounded rendering batches and image-download deadlines, and prioritizes generated future-open-house queue rows with genuine property photos. The root `/api/cron/render-agent-mockups` wrapper remains the orchestration entry point; the separate project retains a render cron. This does not change SMS provider routing, operator live/away decisions, delivery caps, opt-out rules, or follow-up policy. Successful deployment and production queue/sender inspection are required to confirm actual sends.
 
 

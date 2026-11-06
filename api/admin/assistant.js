@@ -1,7 +1,9 @@
-const {sendJson,supabaseRest} = require('../../lib/admin-auth');
+const {sendJson,supabaseRest,adminAuthorized} = require('../../lib/admin-auth');
 const {authorize} = require('../../lib/assistant-auth');
 const {createWorkspace,fail} = require('../../lib/assistant-workspace');
 const {assistantSource} = require('./outreach-inbox');
+const {loadCalendar} = require('../../lib/assistant-calendar');
+const {directThreads} = require('../../lib/assistant-direct');
 const table = 'assistant_workspace_actions';
 const store = {
   list:()=>supabaseRest(`${table}?select=*&order=created_at.desc&limit=200`),
@@ -17,8 +19,14 @@ const store = {
   }
 };
 const workspace=createWorkspace({store,source:{
-  inbox:async()=>assistantSource.enrichInboxRows(await assistantSource.loadInboxRows(100)),
+  mode:'live_context',
+  calendar:()=>loadCalendar(supabaseRest),
+  inbox:async()=>{
+    const [outreach,direct]=await Promise.all([assistantSource.enrichInboxRows(await assistantSource.loadInboxRows(100)),directThreads(supabaseRest)]);
+    return [...direct,...outreach];
+  },
   thread:async key=>{
+    if(key.startsWith('lo:'))return (await directThreads(supabaseRest)).find(t=>t.thread_key===key)||null;
     const detail=await assistantSource.loadThread(key);
     if(!detail.thread)return null;
     const queueId=detail.thread.queue_row_id;
@@ -29,7 +37,14 @@ const workspace=createWorkspace({store,source:{
 module.exports=async(req,res)=>{
   try {
     if(!['GET','POST'].includes(req.method)){res.setHeader('Allow','GET, POST');return sendJson(res,405,{ok:false,error:'Method not allowed.'});}
-    const actor=authorize(req);
+    let actor;
+    try{actor=authorize(req);}catch(error){
+      // Existing COMMAND access can read its existing business context. All new
+      // draft/approval writes still require the stronger header token/capability.
+      const reader=req.method==='GET'&&adminAuthorized({headers:{'x-admin-uid':req.headers?.['x-admin-uid']}});
+      if(!reader?.ok)throw error;
+      actor={owner:true,id:`command-reader:${reader.uid}`,threads:[],scopes:['read']};
+    }
     let input={};
     if(req.method==='POST') { try { input=typeof req.body==='string'?JSON.parse(req.body):req.body||{}; }catch{fail(400,'Invalid JSON.');} }
     const scope=req.method==='GET'||input.action==='resolve_latest'?'read':input.action;

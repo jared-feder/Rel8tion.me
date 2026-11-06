@@ -1,9 +1,9 @@
 // Loopback-only preview: no credentials, Supabase, Twilio or outbound HTTP.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const {createWorkspace}=require('../lib/assistant-workspace');
-const {threads,memoryStore}=require('../test/fixtures/assistant-workspace.cjs');
+const {threads,memoryStore,calendar}=require('../test/fixtures/assistant-workspace.cjs');
 const root=path.resolve(__dirname,'..');
-const workspace=createWorkspace({source:{inbox:async()=>threads,thread:async key=>threads.find(t=>t.thread_key===key)},store:memoryStore(),now:()=>new Date('2026-11-06T16:00:00Z')});
+const workspace=createWorkspace({source:{inbox:async()=>threads,thread:async key=>threads.find(t=>t.thread_key===key),calendar:async()=>calendar},store:memoryStore(),now:()=>new Date('2026-11-06T16:00:00Z')});
 const actor={owner:true,id:'jared-preview',scopes:['read','draft','approve','simulate','dismiss'],threads:[]};
 const server=http.createServer(async(req,res)=>{
   try{

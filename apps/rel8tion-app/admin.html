@@ -4968,7 +4968,7 @@ ${rowsHtml}
                   ${AREAS.map(([key, label]) => `<option value="${key}"${state.area === key ? ' selected' : ''}>${esc(label)}</option>`).join('')}
                 </select>
                 <div class="header-actions">
-                  ${state.loading ? badge('Refreshing', 'info') : state.area === 'assistant' ? badge('Simulation', 'info') : badge('Live', 'ok')}
+                  ${state.loading ? badge('Refreshing', 'info') : state.area === 'assistant' ? badge('Assistant workspace', 'info') : badge('Live', 'ok')}
                   <span id="currentAreaBadge">${state.error ? badge(state.error, 'bad') : badge(areaLabel, 'info')}</span>
                   <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
                 </div>
