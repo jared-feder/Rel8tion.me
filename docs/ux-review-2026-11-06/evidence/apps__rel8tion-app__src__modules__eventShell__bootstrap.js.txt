@@ -1,0 +1,78 @@
+Source: apps/rel8tion-app/src/modules/eventShell/bootstrap.js
+Ref: main, fetched 2026-11-06
+Git blob SHA: 28d80fa65371ff0d1ce4d4f4874fe28a0aec2013
+
+897:   const context = disclosureContext();
+898:   const today = todayDateValue();
+899:   const housingUrl = getDisclosurePreviewUrl(pageState.eventRow?.id) || NYS_HOUSING_ANTI_DISCRIMINATION_DISCLOSURE_PDF_URL;
+900: 
+901:   return `
+902:     <div id="required-disclosures-modal" class="rel8tion-disclosure-modal hidden" style="${themeStyle()}" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="required-disclosure-title">
+903:       <div class="rel8tion-disclosure-panel w-full max-w-xl rounded-[28px] border border-white/80 bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.28)]" tabindex="-1">
+904:         <div class="mb-4 flex items-start justify-between gap-4">
+905:           <div>
+906:             <div id="required-disclosure-kicker" class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 mb-2">Step 1 of 5</div>
+907:             <h3 id="required-disclosure-title" class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold tracking-tight text-slate-900">New York State Agency Disclosure</h3>
+908:           </div>
+909:           <button type="button" data-disclosure-close class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600">Close</button>
+910:         </div>
+911:         <div id="guided-disclosure-error" class="mb-4 hidden rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700"></div>
+912: 
+913:         <div data-guided-disclosure-panel="agency" class="guided-disclosure-panel space-y-4">
+914:           <div class="space-y-4 text-slate-700 font-medium leading-relaxed">
+915:             <p>At this open house, the listing agent may currently represent the seller. This disclosure is meant to make the agency relationship clear from the beginning.</p>
+916:             <p>Please review the official New York State Agency Disclosure PDF before signing.</p>
+917:           </div>
+918:           <a href="${esc(NYS_AGENCY_DISCLOSURE_PDF_URL)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View NYS Agency Disclosure PDF</a>
+919:           <button type="button" data-guided-disclosure-accept="agency" class="${primaryButtonClass()} w-full bg-emerald-600">Accept / Sign</button>
+920:         </div>
+921: 
+922:         <div data-guided-disclosure-panel="housing" class="guided-disclosure-panel hidden space-y-4">
+923:           <div class="space-y-4 text-slate-700 font-medium leading-relaxed">
+924:             <p>Review the New York State Housing and Anti-Discrimination Disclosure Form before continuing.</p>
+925:             <p>Your check-in name will be used as your electronic signature for the final acknowledgement.</p>
+926:           </div>
+927:           <div class="grid grid-cols-1 gap-3 text-sm">
+928:             <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+929:               <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Provided by</div>
+930:               <div class="text-slate-900 font-black">${esc(context.agentName)}</div>
+931:             </div>
+932:             <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+933:               <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Brokerage</div>
+934:               <div class="text-slate-900 font-black">${textOrDash(context.brokerage)}</div>
+935:             </div>
+936:             <div class="rounded-[18px] border border-slate-100 bg-slate-50/90 p-4">
+937:               <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Date</div>
+938:               <div class="text-slate-900 font-black">${esc(today)}</div>
+939:             </div>
+940:           </div>
+941:           <a href="${esc(housingUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-4 text-center text-base font-black text-slate-800">View Prefilled Disclosure Packet</a>
+942:           <button type="button" data-guided-disclosure-accept="housing" class="${primaryButtonClass()} w-full bg-emerald-600">I Reviewed This Form</button>
+943:         </div>
+944: 
+945:         <div data-guided-disclosure-panel="courtesy" class="guided-disclosure-panel hidden space-y-4">
+946:           <div class="max-h-[52vh] space-y-4 overflow-y-auto pr-1 text-slate-700 font-medium leading-relaxed">
+947:             <p>Rel8tion was created to make real estate interactions clearer, faster, and more transparent for everyone involved.</p>
+948:             <p>At this open house, the listing agent may currently represent the seller. This does not mean you are alone, unwelcome, or unable to ask questions. It simply means the relationship is being disclosed clearly from the start.</p>
+949:             <p>Rel8tion supports fair housing, equal treatment, clear communication, professional accountability, and informed decision-making.</p>
+950:             <p>Rel8tion does not replace or modify any required agency disclosure. Rel8tion helps document and clarify the interaction, but does not create a buyer-agent, dual-agency, legal, lending, or fiduciary relationship unless separately agreed to in writing.</p>
+951:             <p>You may choose your own real estate agent, attorney, lender, inspector, or other professional at any time.</p>
+952:           </div>
+953:           <button type="button" data-guided-disclosure-accept="courtesy" class="${primaryButtonClass()} w-full bg-emerald-600">Accept / Sign</button>
+954:         </div>
+955: 
+956:         ${renderLendingDisclosureStep()}
+957: 
+958:         <div data-guided-disclosure-panel="final" class="guided-disclosure-panel hidden space-y-4">
+959:           <div class="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4">
+960:             <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">Electronic Signature</div>
+961:             <div id="ny-disclosure-signature-preview" class="text-slate-900 font-black">Enter your name above</div>
+962:           </div>
+963:           <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/85 px-4 py-4 text-slate-700 font-semibold">
+964:             <input type="checkbox" id="ny-disclosure-final-checkbox" form="checkin-form" name="ny_disclosure_acknowledged" value="true" class="mt-1 h-4 w-4 rounded border-slate-300">
+965:             <span>I acknowledge that I received and reviewed the New York State Housing and Anti-Discrimination Disclosure Form, and I agree that my check-in name serves as my electronic signature for this acknowledgement.</span>
+966:           </label>
+967:           <button id="guided-complete-checkin" type="submit" form="checkin-form" class="${primaryButtonClass()} hidden w-full" style="background:var(--event-gradient);">Complete Check-In</button>
+968:         </div>
+969:       </div>
+970:     </div>
