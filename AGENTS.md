@@ -14,6 +14,8 @@
 - [IMPLEMENTED] Manual assistant sends claim both an action dispatch token and provider-submission timestamp atomically. Never re-enter a claimed request or resend an uncertain outcome. Receipt reconciliation reads existing SMS logs only; accepted means provider acceptance. Recheck exact latest inbound, unique active direct contact, suppression, 844 sender and 9 AM-8 PM New York window at dispatch.
 - [IMPLEMENTED] Push subscription endpoints and private outbox are owner-only, RLS-protected and have no SMS/email fallback. New VAPID credentials require specific approval; browser subscription requires the device owner's button click and permission. Delivery is bounded and deduplicated; unknown push acceptance is not retried. Public Twilio ingress verifies its exact signed URL/form/account, and the downstream handler requires the existing service credential. Direct Cat replies must not enter stale-property automatic Y/N flows. Preserve Event Pass, assignment and buyer transactional SMS.
 
+- [IMPLEMENTED] Once Web Push VAPID credentials are configured, preserve that key pair during retries/redeploys: existing device subscriptions are bound to its public key. Check names/targets/types without decrypting secrets; do not regenerate or rotate a working pair without specific authorization. Server configuration alone does not mean a device is subscribed or received a notification.
+
 ## Recovery source and saved-photo preservation
 
 - `[IMPLEMENTED]` `tools/local-scraper` is a sanitized source snapshot. Do not copy local `.env`, browser cookies/profiles, logs or private recovery archives into Git. Deploying this repository does not update or launch `C:/Users/jared/scraper`; inspect that working copy and obtain task authorization before replacing it.
