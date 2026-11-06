@@ -981,3 +981,10 @@ There is no confirmed full automated suite for the main static app. NFC/sign/Eve
 - Fixed PR #54 findings: setup/recovery requests now send the visit; server validates UUID and current assignment before preserving it in the canonical callback. Token cleanup retains the visit through reloads.
 - Account and access-link APIs now require exactly one active matching approved profile; they no longer combine multiple profile UIDs by email. Production read-only check found zero duplicate active email groups.
 - All 14 focused tests pass, including invite/recovery assigned/unassigned visit cases and shared-email rejection. No test SMS sent. AGENTS.md updated with these durable boundaries.
+
+## 2026-11-06 — Event SMS delivery status hotfix (code patch, deployment verification required)
+
+- Root cause confirmed from source: `send-lead-sms` used the shared `sendSMS` helper without a `StatusCallback` for event-route texts. `sms_message_log` therefore recorded Twilio's initial `queued` response without automatic provider-final-state updates, while outreach delivery callbacks already worked.
+- Patch: the shared SMS helper supplies a token-authenticated default callback URL for event-route Twilio sends. The existing `twilio-message-status` Edge Function updates `sms_message_log` by Twilio SID (status, error, metadata timestamps) and guards against stale status regression. Outreach queue tracking remains intact.
+- Laura Catalan's 2026-11-06 10:40 ET assignment SMS (SID `SM35d37a2625fd6ce5cdd73287c864fb56`) remains **delivery unverified** until a direct Twilio lookup. Do not fabricate delivered/failed from the local queued status or automatically resend it.
+- Supabase live Edge Function version, `TWILIO_STATUS_CALLBACK_TOKEN` secret configuration, and a fresh controlled transaction callback must be checked before marking fully operational.
