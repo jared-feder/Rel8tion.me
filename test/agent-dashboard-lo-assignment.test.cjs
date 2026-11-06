@@ -6,11 +6,11 @@ const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'apps/rel8tion-app/agent-dashboard.html'), 'utf8');
 
-test('agent dashboard manages loan-officer assignments through REL8TION COMMAND', () => {
+test('ordinary agents request loan-officer coverage through contextual support', () => {
   assert.match(source, /function loanOfficerManagementHref\(\)/);
-  assert.match(source, /new URLSearchParams\(\{ area: 'events' \}\)/);
+  assert.match(source, /function loanOfficerManagementHref\(\) \{\s*return liveSupportHref\(\);/);
   assert.match(source, /No loan-officer Rel8tionChip scan is required/);
-  assert.match(source, />Manage Loan Officer<\/a>/);
+  assert.match(source, />Request Loan Officer Coverage<\/a>/);
   assert.equal((source.match(/href="\$\{esc\(loanOfficerManagementHref\(\)\)\}"/g) || []).length, 2);
 });
 

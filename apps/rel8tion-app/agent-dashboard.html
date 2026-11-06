@@ -22,6 +22,10 @@
         <a id="supportLink" href="mailto:jared@rel8tion.me?subject=REL8TION%20live%20event%20support" class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-white/85 px-4 py-3 text-sm font-black text-[#1f2a5a] shadow-sm ring-1 ring-white/90 md:w-auto">Get Support</a>
       </header>
 
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4">
+        <div id="refreshStatus" role="status" aria-live="polite" class="min-w-0 text-sm font-semibold text-slate-700">Opening dashboard…</div>
+        <button id="refreshButton" type="button" class="min-h-[44px] rounded-full bg-[#1f2a5a] px-5 py-3 text-sm font-black text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Refresh</button>
+      </div>
       <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
         <div class="py-14 text-center">
           <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
@@ -32,6 +36,7 @@
     </section>
   </main>
 
+  <script src="/src/agent-dashboard-refresh.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const state = {
@@ -54,6 +59,12 @@
     const app = document.getElementById('app');
     const agentLabel = document.getElementById('agentLabel');
     const supportLink = document.getElementById('supportLink');
+    const refreshStatus = document.getElementById('refreshStatus');
+    const refreshButton = document.getElementById('refreshButton');
+    let mutationBusy = false;
+    let fitWarning = '';
+    let lastUpdate = null;
+    let refresher;
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const money = (value) => {
       const number = Number(value || 0);
@@ -101,9 +112,7 @@
     }
 
     function loanOfficerManagementHref() {
-      const managementParams = new URLSearchParams({ area: 'events' });
-      if (state.event?.id) managementParams.set('event', state.event.id);
-      return `/admin?${managementParams.toString()}`;
+      return liveSupportHref();
     }
 
     function dashboardParams(action = 'snapshot') {
@@ -116,9 +125,9 @@
       };
     }
 
-    async function dashboardApi(action = 'snapshot', method = 'GET') {
+    async function dashboardApi(action = 'snapshot', method = 'GET', signal) {
       const input = dashboardParams(action);
-      const options = { method, credentials: 'same-origin', cache: 'no-store' };
+      const options = { method, credentials: 'same-origin', cache: 'no-store', signal };
       let url = '/api/agent-event-dashboard';
       if (method === 'GET') {
         url += `?${new URLSearchParams(input).toString()}`;
@@ -128,14 +137,14 @@
       }
       const response = await fetch(url, options);
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.ok === false) throw new Error(data.error || 'Private dashboard request failed.');
+      if (!response.ok || data.ok === false) throw new Error(response.status === 401 || response.status === 403 ? 'Private access needs verification. Tap your Event Pass or rear Smart Sign agent chip, then verify with your claimed Rel8tionChip keychain.' : data.error || 'Private dashboard request failed.');
       return data;
     }
 
-    async function loadAffordability(eventId, agentSlug) {
+    async function loadAffordability(eventId, agentSlug, signal) {
       if (!eventId || !agentSlug) return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
       const url = `/api/buyer-affordability?mode=event_fit_data&event_id=${encodeURIComponent(eventId)}&agent_slug=${encodeURIComponent(agentSlug)}`;
-      const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+      const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin', signal });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) throw new Error(data.error || 'Property fit data unavailable.');
       const guidanceByBuyerId = {};
@@ -209,6 +218,7 @@
     }
 
     function guidanceRequestHref(checkin) {
+      if (!state.loanOfficer) return { href: liveSupportHref(), label: 'Request Loan Officer Coverage' };
       const buyerId = checkin.buyer_id || '';
       const uid = state.loanOfficer?.verified_profile_uid || state.loanOfficer?.loan_officer_uid || '';
       const name = checkin.visitor_name || checkin.name || checkin.metadata?.name || 'Buyer';
@@ -246,7 +256,7 @@
 
     function renderScenario(scenario) {
       return `<div class="rounded-2xl border ${resultTone(scenario.result_status)} p-3">
-        <div class="flex items-start justify-between gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div class="text-sm font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
             <div class="mt-1 text-xs font-bold opacity-80">Net estimate: ${esc(formatMoney(scenario.estimated_net_monthly_payment))} / cap ${esc(formatMoney(scenario.monthly_cap))}</div>
@@ -316,7 +326,7 @@
 
     function eventSummaryStats() {
       const disclosureCount = state.checkins.filter((row) => disclosureSummary(row).signed).length;
-      const financingCount = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      const financingCount = state.checkins.filter((row) => row.metadata?.financing_requested === true).length;
       return {
         checkins: state.checkins.length,
         disclosures: disclosureCount,
@@ -343,7 +353,7 @@
         ``,
         `${stats.checkins} buyers checked in`,
         `${stats.disclosures} disclosure packets completed`,
-        `${stats.financing} buyers requested or may need financing help`,
+        `${stats.financing} buyers explicitly requested financing help`,
         ``,
         `Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.`
       ].join('\n');
@@ -354,15 +364,15 @@
       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
       const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
       const email = checkin.visitor_email || checkin.email || meta.email || '';
-      const financingStatus = checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
+      const financingStatus = meta.financing_requested === true ? 'Financing help requested' : checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Not preapproved · help not requested' : 'Financing not shared';
       const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
       const disclosure = disclosureSummary(checkin);
       const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
             <div class="text-lg font-black">${esc(name)}</div>
-            <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
+            <div class="mt-1 break-words text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
           </div>
           <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(financingStatus)}</div>
         </div>
@@ -393,8 +403,8 @@
         return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
           <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
           <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
-          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Loan-officer coverage is assigned from REL8TION COMMAND. No loan-officer Rel8tionChip scan is required.</p>
-          <a href="${esc(loanOfficerManagementHref())}" class="mt-4 block w-full rounded-full bg-amber-500 px-5 py-3 text-center text-sm font-black text-white">Manage Loan Officer</a>
+          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Ask REL8TION support to assign coverage for this event. No loan-officer Rel8tionChip scan is required.</p>
+          <a href="${esc(loanOfficerManagementHref())}" class="mt-4 block w-full rounded-full bg-amber-500 px-5 py-3 text-center text-sm font-black text-white">Request Loan Officer Coverage</a>
         </div>`;
       }
       const name = lo.loan_officer_name || 'Loan Officer';
@@ -404,8 +414,8 @@
       const isDefault = lo.is_default_fallback === true;
       const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
       const note = isDefault
-        ? 'Default Rel8tion coverage contact. Assign a specific loan officer from REL8TION COMMAND Open Houses.'
-        : 'This loan officer is assigned live to this open house. Changes are made in REL8TION COMMAND with no loan-officer chip scan.';
+        ? 'Default Rel8tion coverage contact. Ask support to assign a specific loan officer for this event.'
+        : 'This loan officer is assigned live to this open house. Ask support for coverage changes; no loan-officer chip scan is required.';
       return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
         <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
         <div class="mt-4 flex items-center gap-4">
@@ -421,11 +431,15 @@
           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
           <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
         </div>
-        <a href="${esc(loanOfficerManagementHref())}" class="mt-3 block w-full rounded-full bg-white/80 px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</a>
+        <a href="${esc(loanOfficerManagementHref())}" class="mt-3 block w-full rounded-full bg-white/80 px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Request Specific Loan Officer' : 'Request Coverage Change'}</a>
       </div>`;
     }
 
     async function submitFitScenario(form) {
+      if (mutationBusy) return;
+      mutationBusy = true;
+      refresher.stop();
+      refreshButton.disabled = true;
       const button = form.querySelector('button[type="submit"]');
       const originalText = button?.textContent || 'Check Property Fit';
       if (button) {
@@ -463,6 +477,9 @@
       } catch (error) {
         window.alert(error.message || 'Could not save property scenario.');
       } finally {
+        mutationBusy = false;
+        refreshButton.disabled = false;
+        refresher.start();
         if (button) {
           button.disabled = false;
           button.textContent = originalText;
@@ -487,7 +504,7 @@
       const baths = state.house?.baths || state.event?.setup_context?.baths || '-';
       const sqft = state.house?.sqft || state.house?.square_feet || state.event?.setup_context?.sqft || '-';
       const sentCount = state.outreach.filter((row) => row.initial_send_status === 'sent' || row.followup_send_status === 'sent').length;
-      const needsFinancing = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      const needsFinancing = state.checkins.filter((row) => row.metadata?.financing_requested === true).length;
       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
 
       agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
@@ -506,12 +523,12 @@
 
         <section class="grid gap-3 md:grid-cols-4">
           ${stat('Check-ins', state.checkins.length, 'blue')}
-          ${stat('Needs financing', needsFinancing, needsFinancing ? 'green' : 'slate')}
+          ${stat('Help requested', needsFinancing, needsFinancing ? 'green' : 'slate')}
           ${stat('Listing outreach', sentCount, 'blue')}
           ${stat('Rel8tion stage', state.event?.status || state.sign?.status || 'active', 'green')}
         </section>
 
-        <section class="mt-6 grid gap-4 lg:grid-cols-[1.4fr_.9fr]">
+        <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_.9fr]">
           <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
             <div class="mb-4 flex items-center justify-between gap-3">
               <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Leads</h2>
@@ -613,7 +630,13 @@
         : 'End this open house now? Buyer check-ins already captured will stay saved.');
       if (!ok) return;
 
-      const result = await dashboardApi('close_event', 'POST');
+      if (mutationBusy) return;
+      mutationBusy = true;
+      refresher.stop();
+      refreshButton.disabled = true;
+      let result;
+      try { result = await dashboardApi('close_event', 'POST'); }
+      catch (error) { mutationBusy = false; refreshButton.disabled = false; refresher.start(); throw error; }
 
       if (move) {
         const params = new URLSearchParams();
@@ -629,7 +652,7 @@
       renderEndedSummary();
     }
 
-    window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => renderError(error.message || 'Could not end this open house.'));
+    window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => window.alert(error.message || 'Could not end this open house. Your dashboard is still available.'));
     window.moveSignToAnotherOpenHouse = (skipConfirm = false) => {
       if (skipConfirm) {
         const params = new URLSearchParams();
@@ -639,7 +662,7 @@
         window.location.href = `/sign-demo-activate.html?${params.toString()}`;
         return;
       }
-      closeCurrentOpenHouse({ move: true }).catch((error) => renderError(error.message || 'Could not move this sign.'));
+      closeCurrentOpenHouse({ move: true }).catch((error) => window.alert(error.message || 'Could not move this sign. Your dashboard is still available.'));
     };
 
     function renderError(message) {
@@ -648,29 +671,73 @@
         <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Dashboard Not Ready</div>
         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open Dashboard</h1>
         <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">${esc(message)}</p>
+        <p class="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-600">For an Event Pass, tap the pass’s private agent chip. For a Smart Sign, tap its rear agent chip. Verify with your claimed Rel8tionChip keychain. The public buyer QR does not open private dashboard access.</p>
+        <div class="mt-6 flex flex-wrap justify-center gap-3"><button type="button" onclick="window.retryDashboard()" class="rounded-full bg-[#1f2a5a] px-5 py-3 font-bold text-white">Retry</button><a href="/" class="rounded-full bg-white px-5 py-3 font-bold text-slate-700 ring-1 ring-slate-300">Home</a><a href="${esc(liveSupportHref())}" class="rounded-full bg-white px-5 py-3 font-bold text-slate-700 ring-1 ring-slate-300">Get Support</a></div>
       </div>`;
     }
 
-    async function init() {
-      if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
-      const snapshot = await dashboardApi();
-      state.sign = snapshot.sign;
-      state.event = snapshot.event;
-      state.house = snapshot.house;
-      state.checkins = snapshot.checkins || [];
-      state.outreach = snapshot.outreach || [];
-      state.loanOfficer = snapshot.loan_officer || null;
-      state.membershipActive = snapshot.membership_active === true;
-      const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
-      if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
-      state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
-        console.log('affordability fit data skipped', error);
-        return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
-      });
-      render();
+    async function loadSnapshot(signal) {
+      if (!state.agent) throw new Error('Agent context is missing. Return through your Event Pass or Smart Sign private agent chip.');
+      const snapshot = await dashboardApi('snapshot', 'GET', signal);
+      if (!snapshot.event || !snapshot.sign) throw new Error('No active event was returned. Retap your private agent chip or contact support.');
+      if (!Array.isArray(snapshot.checkins) || !Array.isArray(snapshot.outreach) || typeof snapshot.membership_active !== 'boolean') throw new Error('The event update was incomplete. Try Refresh or contact support.');
+      const eventHost = snapshot.event.host_agent_slug || snapshot.sign.owner_agent_slug || '';
+      if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}. Retap your own private agent chip.`);
+      let affordability = state.affordability;
+      let warning = '';
+      try { affordability = await loadAffordability(snapshot.event.id, eventHost || state.agent, signal); }
+      catch (error) {
+        if (signal.aborted) throw error;
+        warning = 'Property fit could not update; any displayed fit data is from the previous load. Try Refresh.';
+      }
+      return { snapshot, affordability, warning };
     }
 
-    init().catch((error) => renderError(error.message || 'Something interrupted the dashboard lookup.'));
+    function applySnapshot({ snapshot, affordability, warning }) {
+      const saved = Rel8tionDashboardRefresh.capture(app);
+      Object.assign(state, { sign: snapshot.sign, event: snapshot.event, house: snapshot.house,
+        checkins: snapshot.checkins || [], outreach: snapshot.outreach || [],
+        loanOfficer: snapshot.loan_officer || null, membershipActive: snapshot.membership_active === true,
+        affordability });
+      fitWarning = warning;
+      if (state.event.ended_at || state.event.status === 'ended') renderEndedSummary();
+      else render();
+      Rel8tionDashboardRefresh.restore(saved, app);
+    }
+
+    function showRefreshStatus({ phase, error, updatedAt }) {
+      if (updatedAt) lastUpdate = updatedAt;
+      updatedAt = lastUpdate;
+      refreshButton.disabled = phase === 'loading' || mutationBusy;
+      refreshButton.textContent = phase === 'loading' ? 'Refreshing…' : 'Refresh';
+      const stamp = updatedAt ? 'Last updated ' + new Date(updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + '. ' : '';
+      const offline = navigator.onLine === false;
+      const messages = { loading: 'Checking for updates…', current: 'Checks every 30 seconds while this page is visible.',
+        paused: 'Updates paused while you edit. Refresh keeps your input.', stale: 'Update failed. Showing the last successful data. Try Refresh.', error: 'Dashboard unavailable. Retry or retap your private agent chip.' };
+      refreshStatus.textContent = stamp + (offline ? 'Offline. Showing the last successful data if available. Reconnect, then Refresh. ' : messages[phase] || '') + (error ? ' ' + error : '') + (fitWarning ? ' ' + fitWarning : '');
+      refreshStatus.className = 'min-w-0 text-sm font-semibold ' + (offline || phase === 'stale' || phase === 'error' || fitWarning ? 'text-amber-900' : 'text-slate-700');
+      if (phase === 'error' && !state.event) renderError(error);
+      if (phase === 'current' && (state.event?.ended_at || state.event?.status === 'ended')) {
+        refresher.stop();
+        refreshStatus.textContent = stamp + 'Event ended. Automatic updates stopped.';
+      }
+    }
+
+    refresher = Rel8tionDashboardRefresh.create({ load: loadSnapshot, apply: applySnapshot,
+      onStatus: showRefreshStatus, isVisible: () => document.visibilityState === 'visible',
+      isEditing: () => mutationBusy || !!document.activeElement?.closest('[data-fit-form]') });
+    window.retryDashboard = () => { if (!mutationBusy) return refresher.refresh(true); };
+    refreshButton.addEventListener('click', window.retryDashboard);
+    window.addEventListener('pagehide', () => refresher.stop());
+    const eventEnded = () => !!(state.event?.ended_at || state.event?.status === 'ended');
+    window.addEventListener('pageshow', () => { if (!mutationBusy && !eventEnded()) refresher.start(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') refresher.stop();
+      else if (!mutationBusy && !eventEnded()) { refresher.start(); refresher.refresh(false); }
+    });
+    window.addEventListener('offline', () => showRefreshStatus({ phase: state.event ? 'stale' : 'error', error: '', updatedAt: null }));
+    refresher.start();
+    refresher.refresh(true);
   </script>
 </body>
 </html>

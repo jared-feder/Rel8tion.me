@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Rel8tion Agent Event Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#eef8ff] text-slate-900">
+  <main class="min-h-screen px-4 py-5" style="background:linear-gradient(180deg,#55cfee 0%,#e8f8ff 44%,#f8fbff 100%);">
+    <section class="mx-auto max-w-5xl">
+      <header class="mb-4 rounded-[28px] border border-white/80 bg-white/45 p-4 shadow-[0_18px_50px_rgba(15,23,42,.10)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4">
+          <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion" class="h-9 w-auto">
+          <div class="text-right">
+            <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Agent Dashboard</div>
+            <div id="agentLabel" class="font-['Plus_Jakarta_Sans'] text-xl font-extrabold">Verifying...</div>
+          </div>
+        </div>
+        <a id="supportLink" href="mailto:jared@rel8tion.me?subject=REL8TION%20live%20event%20support" class="mt-3 inline-flex w-full items-center justify-center rounded-full bg-white/85 px-4 py-3 text-sm font-black text-[#1f2a5a] shadow-sm ring-1 ring-white/90 md:w-auto">Get Support</a>
+      </header>
+
+      <div id="app" class="rounded-[32px] border border-white/80 bg-white/55 p-5 shadow-[0_24px_70px_rgba(15,23,42,.12)] backdrop-blur md:p-8">
+        <div class="py-14 text-center">
+          <div class="mx-auto mb-5 h-14 w-14 animate-spin rounded-full border-8 border-white border-t-blue-600"></div>
+          <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Opening Dashboard</h1>
+          <p class="mt-3 text-lg font-semibold text-slate-600">Loading the live event tied to this sign.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+      agent: params.get('agent') || '',
+      uid: params.get('uid') || '',
+      eventId: params.get('event') || '',
+      signId: params.get('sign_id') || '',
+      code: params.get('code') || '',
+      sign: null,
+      event: null,
+      house: null,
+      checkins: [],
+      outreach: [],
+      loanOfficer: null,
+      membershipActive: false,
+      affordability: { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: '' },
+      error: ''
+    };
+
+    const app = document.getElementById('app');
+    const agentLabel = document.getElementById('agentLabel');
+    const supportLink = document.getElementById('supportLink');
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const money = (value) => {
+      const number = Number(value || 0);
+      return number ? `$${number.toLocaleString()}` : '';
+    };
+    const fmtDate = (value) => {
+      if (!value) return 'Not scheduled';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Not scheduled';
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    };
+    const labelSlug = (slug) => String(slug || '').split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+    const telHref = (phone) => phone ? `tel:${String(phone).replace(/[^\d+]/g, '')}` : '#';
+    const smsHref = (phone, body = '') => phone ? `sms:${String(phone).replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}` : '#';
+    const mailtoHref = (to = '', subject = '', body = '') => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+    function liveSupportHref() {
+      const address = state.house?.address || state.event?.setup_context?.address || 'Active Open House';
+      const agent = state.event?.host_agent_slug || state.agent || 'Agent';
+      const body = `I need support with my live REL8TION open house.\n\nAgent: ${labelSlug(agent)}\nProperty: ${address}\nEvent: ${state.event?.id || 'not loaded'}`;
+      return mailtoHref('jared@rel8tion.me', `REL8TION live event support - ${address}`, body);
+    }
+    const FIT_DISCLAIMER = 'This is a property scenario based on loan-officer-entered guidance and assumptions. Rel8tion does not collect financial documents, Social Security numbers, credit data, income records, or loan application information. This is not a loan approval, underwriting decision, Loan Estimate, or commitment to lend. Final approval remains subject to the lender’s review, loan program, property, documentation, and all applicable guidelines.';
+    function openHouseKitHref(address = '') {
+      const kitParams = new URLSearchParams();
+      const agentSlug = state.event?.host_agent_slug || state.agent || '';
+      if (agentSlug) kitParams.set('agent', agentSlug);
+      if (state.event?.id) kitParams.set('event', state.event.id);
+      if (state.sign?.id) kitParams.set('sign_id', state.sign.id);
+      if (address) kitParams.set('address', address);
+      if (state.loanOfficer?.loan_officer_phone) kitParams.set('lo_phone', state.loanOfficer.loan_officer_phone);
+      if (state.loanOfficer?.loan_officer_name) kitParams.set('lo_name', state.loanOfficer.loan_officer_name);
+      const sponsor = state.event?.setup_context?.sponsor_loan_officer_uid
+        || state.event?.setup_context?.sponsor_loan_officer_profile_id
+        || state.loanOfficer?.verified_profile_uid
+        || state.loanOfficer?.loan_officer_uid
+        || '';
+      if (sponsor) kitParams.set('sponsor', sponsor);
+      kitParams.set('source', isSponsoredEventPassEvent() ? 'sponsored_event_pass' : isEventPassEvent() ? 'event_pass_closeout' : 'dashboard_closeout');
+      if (state.membershipActive) {
+        kitParams.set('plan', 'member_hardware');
+        kitParams.set('source', 'member_dashboard_hardware');
+        return `/kit-intake?${kitParams.toString()}`;
+      }
+      return `/get-open-house-kit?${kitParams.toString()}`;
+    }
+
+    function loanOfficerManagementHref() {
+      const managementParams = new URLSearchParams({ area: 'events' });
+      if (state.event?.id) managementParams.set('event', state.event.id);
+      return `/admin?${managementParams.toString()}`;
+    }
+
+    function dashboardParams(action = 'snapshot') {
+      return {
+        action,
+        agent_slug: state.agent,
+        event_id: state.event?.id || state.eventId,
+        sign_id: state.sign?.id || state.signId,
+        code: state.sign?.public_code || state.code
+      };
+    }
+
+    async function dashboardApi(action = 'snapshot', method = 'GET') {
+      const input = dashboardParams(action);
+      const options = { method, credentials: 'same-origin', cache: 'no-store' };
+      let url = '/api/agent-event-dashboard';
+      if (method === 'GET') {
+        url += `?${new URLSearchParams(input).toString()}`;
+      } else {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(input);
+      }
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Private dashboard request failed.');
+      return data;
+    }
+
+    async function loadAffordability(eventId, agentSlug) {
+      if (!eventId || !agentSlug) return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
+      const url = `/api/buyer-affordability?mode=event_fit_data&event_id=${encodeURIComponent(eventId)}&agent_slug=${encodeURIComponent(agentSlug)}`;
+      const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'Property fit data unavailable.');
+      const guidanceByBuyerId = {};
+      const scenariosByBuyerId = {};
+      for (const guidance of data.guidance || []) {
+        if (guidance.buyer_id) guidanceByBuyerId[guidance.buyer_id] = guidance;
+      }
+      for (const scenario of data.scenarios || []) {
+        if (!scenario.buyer_id) continue;
+        if (!scenariosByBuyerId[scenario.buyer_id]) scenariosByBuyerId[scenario.buyer_id] = [];
+        scenariosByBuyerId[scenario.buyer_id].push(scenario);
+      }
+      return { guidanceByBuyerId, scenariosByBuyerId, disclaimer: data.disclaimer || FIT_DISCLAIMER };
+    }
+
+    function stat(label, value, tone = 'slate') {
+      const colors = tone === 'green' ? 'text-emerald-700' : tone === 'blue' ? 'text-blue-700' : 'text-slate-900';
+      return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-5"><div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-black ${colors}">${esc(value)}</div></div>`;
+    }
+
+    function fmtDisclosureDate(value) {
+      if (!value) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return value;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function disclosureSummary(checkin) {
+      const meta = checkin?.metadata || {};
+      const agency = meta.nys_agency_disclosure || {};
+      const courtesy = meta.rel8tion_courtesy_notice || {};
+      const disclosure = meta.ny_discrimination_disclosure || {};
+      const agencySigned = (agency.agency_disclosure_reviewed === true || meta.agency_disclosure_reviewed === true)
+        && (agency.seller_representation_acknowledged === true || meta.seller_representation_acknowledged === true)
+        && Boolean(agency.agency_disclosure_signed_at || meta.agency_disclosure_signed_at);
+      const housingSigned = disclosure.acknowledged === true
+        && disclosure.reviewed === true
+        && disclosure.esign_consent === true
+        && Boolean(disclosure.e_signature_value);
+      const courtesySigned = (courtesy.rel8tion_courtesy_acknowledged === true || meta.rel8tion_courtesy_acknowledged === true)
+        && Boolean(courtesy.rel8tion_courtesy_signed_at || meta.rel8tion_courtesy_signed_at);
+      const signed = agencySigned && housingSigned && courtesySigned;
+      return {
+        signed,
+        agencySigned,
+        agencyDate: fmtDisclosureDate(agency.agency_disclosure_signed_at || meta.agency_disclosure_signed_at || ''),
+        housingSigned,
+        housingDate: fmtDisclosureDate(disclosure.signed_at || disclosure.signed_date || ''),
+        courtesySigned,
+        courtesyDate: fmtDisclosureDate(courtesy.rel8tion_courtesy_signed_at || meta.rel8tion_courtesy_signed_at || ''),
+        date: fmtDisclosureDate(disclosure.signed_at || agency.agency_disclosure_signed_at || courtesy.rel8tion_courtesy_signed_at || ''),
+        pdfUrl: signed && checkin?.id ? `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1` : ''
+      };
+    }
+
+    function disclosureLine(label, signed, date) {
+      return `<div class="flex items-center justify-between gap-3 rounded-2xl bg-white/75 px-3 py-2">
+        <span class="text-xs font-black uppercase tracking-[.12em] text-slate-500">${esc(label)}</span>
+        <span class="text-right text-xs font-black ${signed ? 'text-emerald-700' : 'text-rose-700'}">${signed ? `Signed${date ? ` ${esc(date)}` : ''}` : 'Missing'}</span>
+      </div>`;
+    }
+
+    function formatMoney(value) {
+      const number = Number(value || 0);
+      return number ? `$${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-';
+    }
+
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+    }
+
+    function guidanceRequestHref(checkin) {
+      const buyerId = checkin.buyer_id || '';
+      const uid = state.loanOfficer?.verified_profile_uid || state.loanOfficer?.loan_officer_uid || '';
+      const name = checkin.visitor_name || checkin.name || checkin.metadata?.name || 'Buyer';
+      const phone = checkin.visitor_phone || checkin.phone || checkin.metadata?.phone || '';
+      const agentSlug = state.event?.host_agent_slug || state.agent || '';
+      if (isUuid(uid)) {
+        const params = new URLSearchParams({
+          uid,
+          checkin_id: checkin.id || '',
+          buyer_id: buyerId,
+          agent: agentSlug,
+          event: state.event?.id || ''
+        });
+        params.set('return_to', `/agent-dashboard?${new URLSearchParams({ agent: agentSlug, event: state.event?.id || '' }).toString()}`);
+        return { href: `/lo-affordability-guidance?${params.toString()}`, label: 'Request LO Guidance' };
+      }
+      const message = [
+        `Please add Rel8tion affordability guidance for ${name}.`,
+        phone ? `Buyer phone: ${phone}` : '',
+        state.house?.address ? `Property: ${state.house.address}` : '',
+        `Event: ${state.event?.id || ''}`
+      ].filter(Boolean).join('\n');
+      return {
+        href: smsHref(state.loanOfficer?.loan_officer_phone || '', message),
+        label: 'Request LO Guidance'
+      };
+    }
+
+    function resultTone(status) {
+      if (status === 'within_guidance') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      if (status === 'close_review_recommended') return 'border-amber-200 bg-amber-50 text-amber-800';
+      if (status === 'outside_guidance') return 'border-rose-200 bg-rose-50 text-rose-800';
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+    }
+
+    function renderScenario(scenario) {
+      return `<div class="rounded-2xl border ${resultTone(scenario.result_status)} p-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-sm font-black">${esc(scenario.result_label || 'LO Review Required')}</div>
+            <div class="mt-1 text-xs font-bold opacity-80">Net estimate: ${esc(formatMoney(scenario.estimated_net_monthly_payment))} / cap ${esc(formatMoney(scenario.monthly_cap))}</div>
+          </div>
+          <div class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em]">${esc((scenario.review_status || 'not_reviewed').replace(/_/g, ' '))}</div>
+        </div>
+        <div class="mt-2 text-xs font-bold opacity-80">Price ${esc(formatMoney(scenario.purchase_price))} • Taxes ${esc(formatMoney(scenario.annual_taxes))}/yr • Insurance ${esc(formatMoney(scenario.annual_insurance))}/yr • HOA ${esc(formatMoney(scenario.monthly_hoa))}/mo</div>
+        ${scenario.review_notes ? `<div class="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-bold">${esc(scenario.review_notes)}</div>` : ''}
+        <p class="mt-2 text-[11px] font-semibold leading-relaxed opacity-80">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
+      </div>`;
+    }
+
+    function renderPropertyFit(checkin) {
+      const buyerId = checkin.buyer_id || '';
+      const guidance = buyerId ? state.affordability.guidanceByBuyerId[buyerId] : null;
+      const scenarios = buyerId ? (state.affordability.scenariosByBuyerId[buyerId] || []) : [];
+      if (!guidance) {
+        const request = guidanceRequestHref(checkin);
+        return `<div class="mt-4 rounded-2xl border border-sky-200 bg-sky-50/85 p-4">
+          <div class="text-xs font-black uppercase tracking-[.14em] text-sky-700">Property Fit Checker</div>
+          <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance needed</h3>
+          <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-600">A licensed loan officer can add guidance after completing their own preapproval workflow outside Rel8tion.</p>
+          <a href="${esc(request.href)}" class="mt-3 inline-flex rounded-full bg-sky-600 px-4 py-2 text-sm font-black text-white">${esc(request.label)}</a>
+          <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(FIT_DISCLAIMER)}</p>
+        </div>`;
+      }
+      const defaultPrice = Number(state.house?.price || state.event?.setup_context?.price || guidance.max_purchase_price_guidance || 0);
+      const defaultTaxes = Number(state.house?.taxes || state.house?.annual_taxes || 0);
+      return `<div class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-black uppercase tracking-[.14em] text-indigo-700">Property Fit Checker</div>
+            <h3 class="mt-1 text-lg font-black text-slate-900">LO guidance on file</h3>
+          </div>
+          <div class="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700">${esc(formatMoney(guidance.max_monthly_housing_payment))}/mo cap</div>
+        </div>
+        <div class="mt-3 grid gap-2 text-xs font-bold text-slate-600 md:grid-cols-3">
+          <div class="rounded-xl bg-white/75 px-3 py-2">Max price: ${esc(formatMoney(guidance.max_purchase_price_guidance))}</div>
+          <div class="rounded-xl bg-white/75 px-3 py-2">Rate: ${guidance.rate_assumption_percent ? `${esc(guidance.rate_assumption_percent)}%` : '-'}</div>
+          <div class="rounded-xl bg-white/75 px-3 py-2">Term: ${guidance.loan_term_years ? `${esc(guidance.loan_term_years)} yrs` : '-'}</div>
+        </div>
+        <form data-fit-form data-checkin-id="${esc(checkin.id || '')}" data-buyer-id="${esc(buyerId)}" class="mt-4 grid gap-3 rounded-2xl bg-white/75 p-3 md:grid-cols-2">
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Purchase Price<input name="purchase_price" type="number" min="1" step="any" value="${esc(defaultPrice || '')}" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Property Taxes<input name="annual_taxes" type="number" min="0" step="any" value="${esc(defaultTaxes || '')}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Annual Homeowners Insurance<input name="annual_insurance" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Monthly HOA<input name="monthly_hoa" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <label class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700"><input name="apartment_present" type="checkbox" class="h-4 w-4"> Apartment present</label>
+          <label class="text-xs font-black uppercase tracking-[.12em] text-slate-500">Estimated Rent<input name="estimated_monthly_rent" type="number" min="0" step="any" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal"></label>
+          <button type="submit" class="rounded-full bg-indigo-600 px-4 py-3 text-sm font-black text-white md:col-span-2">Check Property Fit</button>
+        </form>
+        <div class="mt-3 grid gap-2">${scenarios.length ? scenarios.map(renderScenario).join('') : '<div class="rounded-2xl border border-dashed border-indigo-200 bg-white/55 p-3 text-sm font-bold text-slate-500">No saved property scenarios yet.</div>'}</div>
+        <p class="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">${esc(state.affordability.disclaimer || FIT_DISCLAIMER)}</p>
+      </div>`;
+    }
+
+    function isEventPassEvent() {
+      return state.event?.setup_context?.flow === 'event-pass'
+        || state.event?.setup_context?.qr_source === 'event_pass'
+        || Boolean(state.event?.setup_context?.event_pass_inventory_id);
+    }
+
+    function isSponsoredEventPassEvent() {
+      return state.event?.setup_context?.source === 'sponsored_event_pass'
+        || state.event?.setup_context?.qr_source === 'sponsored_event_pass'
+        || state.event?.setup_context?.pass_model === 'sponsored_agent_pass';
+    }
+
+    function eventSummaryStats() {
+      const disclosureCount = state.checkins.filter((row) => disclosureSummary(row).signed).length;
+      const financingCount = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      return {
+        checkins: state.checkins.length,
+        disclosures: disclosureCount,
+        financing: financingCount
+      };
+    }
+
+    function eventSummarySubject() {
+      return `Rel8tion open house summary - ${state.house?.address || state.event?.setup_context?.address || 'Open House'}`;
+    }
+
+    function eventSummaryBody() {
+      const stats = eventSummaryStats();
+      const address = state.house?.address || state.event?.setup_context?.address || 'Open House';
+      const coverage = state.loanOfficer?.loan_officer_name
+        ? `${state.loanOfficer.loan_officer_name}${state.loanOfficer.loan_officer_company ? `, ${state.loanOfficer.loan_officer_company}` : ''}`
+        : 'No loan officer was signed in';
+      return [
+        `REL8TION EVENT SUMMARY`,
+        ``,
+        `Property: ${address}`,
+        `Event: ${state.event?.id || ''}`,
+        `Coverage: ${coverage}`,
+        ``,
+        `${stats.checkins} buyers checked in`,
+        `${stats.disclosures} disclosure packets completed`,
+        `${stats.financing} buyers requested or may need financing help`,
+        ``,
+        `Rel8tion is not a lender, mortgage broker, or pre-approval provider. Financing help is only routed when a buyer explicitly requests it.`
+      ].join('\n');
+    }
+
+    function renderLead(checkin) {
+      const meta = checkin.metadata || {};
+      const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
+      const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
+      const email = checkin.visitor_email || checkin.email || meta.email || '';
+      const financingStatus = checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
+      const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
+      const disclosure = disclosureSummary(checkin);
+      const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
+      return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-lg font-black">${esc(name)}</div>
+            <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
+          </div>
+          <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(financingStatus)}</div>
+        </div>
+        <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">Required Disclosures</div>
+            <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Complete' : 'Incomplete'}</div>
+          </div>
+          <div class="mt-3 grid gap-2">
+            ${disclosureLine('Agency', disclosure.agencySigned, disclosure.agencyDate)}
+            ${disclosureLine('Housing', disclosure.housingSigned, disclosure.housingDate)}
+            ${disclosureLine('Courtesy', disclosure.courtesySigned, disclosure.courtesyDate)}
+          </div>
+          ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Disclosure Packet PDF</a>` : ''}
+        </div>
+        ${renderPropertyFit(checkin)}
+        ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
+          <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>
+          <a href="${esc(smsHref(phone, introBody))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text Buyer</a>
+          <a href="${esc(telHref(state.loanOfficer.loan_officer_phone))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200">Call Loan Officer</a>
+        </div>` : ''}
+      </div>`;
+    }
+
+    function renderLoanOfficerCard() {
+      const lo = state.loanOfficer;
+      if (!lo) {
+        return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-amber-900">Loan-officer coverage is assigned from REL8TION COMMAND. No loan-officer Rel8tionChip scan is required.</p>
+          <a href="${esc(loanOfficerManagementHref())}" class="mt-4 block w-full rounded-full bg-amber-500 px-5 py-3 text-center text-sm font-black text-white">Manage Loan Officer</a>
+        </div>`;
+      }
+      const name = lo.loan_officer_name || 'Loan Officer';
+      const company = lo.loan_officer_company || 'NMB';
+      const phone = lo.loan_officer_phone || '';
+      const photo = lo.loan_officer_photo_url || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png';
+      const isDefault = lo.is_default_fallback === true;
+      const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
+      const note = isDefault
+        ? 'Default Rel8tion coverage contact. Assign a specific loan officer from REL8TION COMMAND Open Houses.'
+        : 'This loan officer is assigned live to this open house. Changes are made in REL8TION COMMAND with no loan-officer chip scan.';
+      return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
+        <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
+        <div class="mt-4 flex items-center gap-4">
+          <img src="${esc(photo)}" alt="${esc(name)}" class="h-16 w-16 rounded-full object-cover ring-4 ring-white">
+          <div>
+            <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(name)}</h2>
+            <p class="text-sm font-bold text-emerald-900">${esc(company)}</p>
+            <p class="text-sm font-bold text-emerald-800">${esc(phone)}</p>
+          </div>
+        </div>
+        <p class="mt-3 text-sm font-bold leading-relaxed text-emerald-900">${esc(note)}</p>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
+          <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
+        </div>
+        <a href="${esc(loanOfficerManagementHref())}" class="mt-3 block w-full rounded-full bg-white/80 px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</a>
+      </div>`;
+    }
+
+    async function submitFitScenario(form) {
+      const button = form.querySelector('button[type="submit"]');
+      const originalText = button?.textContent || 'Check Property Fit';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Saving Scenario...';
+      }
+      try {
+        const formData = new FormData(form);
+        const payload = {
+          action: 'create_scenario',
+          event_id: state.event?.id || '',
+          agent_slug: state.event?.host_agent_slug || state.agent || '',
+          checkin_id: form.dataset.checkinId || '',
+          buyer_id: form.dataset.buyerId || '',
+          purchase_price: formData.get('purchase_price') || '',
+          annual_taxes: formData.get('annual_taxes') || '',
+          annual_insurance: formData.get('annual_insurance') || '',
+          monthly_hoa: formData.get('monthly_hoa') || '',
+          apartment_present: formData.get('apartment_present') === 'on',
+          estimated_monthly_rent: formData.get('estimated_monthly_rent') || ''
+        };
+        const response = await fetch('/api/buyer-affordability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.error || 'Could not save property scenario.');
+        const buyerId = data.scenario?.buyer_id || payload.buyer_id;
+        if (buyerId) {
+          if (!state.affordability.scenariosByBuyerId[buyerId]) state.affordability.scenariosByBuyerId[buyerId] = [];
+          state.affordability.scenariosByBuyerId[buyerId].unshift(data.scenario);
+        }
+        render();
+      } catch (error) {
+        window.alert(error.message || 'Could not save property scenario.');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+    }
+
+    function attachFitCheckerHandlers() {
+      document.querySelectorAll('[data-fit-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          submitFitScenario(form);
+        });
+      });
+    }
+
+    function render() {
+      const hostSlug = state.event?.host_agent_slug || state.sign?.owner_agent_slug || state.agent;
+      const address = state.house?.address || state.event?.setup_context?.address || 'Active Open House';
+      const price = money(state.house?.price || state.event?.setup_context?.price);
+      const beds = state.house?.beds || state.event?.setup_context?.beds || '-';
+      const baths = state.house?.baths || state.event?.setup_context?.baths || '-';
+      const sqft = state.house?.sqft || state.house?.square_feet || state.event?.setup_context?.sqft || '-';
+      const sentCount = state.outreach.filter((row) => row.initial_send_status === 'sent' || row.followup_send_status === 'sent').length;
+      const needsFinancing = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+      const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
+
+      agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
+      supportLink.href = liveSupportHref();
+      app.innerHTML = `
+        <section class="mb-6">
+          <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Live Event</div>
+          <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(address)}</h1>
+          <div class="mt-3 flex flex-wrap gap-3 text-base font-black text-slate-700">
+            ${price ? `<span>${esc(price)}</span>` : ''}
+            <span>${esc(beds)} beds</span>
+            <span>${esc(baths)} baths</span>
+            <span>${esc(sqft)} sq ft</span>
+          </div>
+        </section>
+
+        <section class="grid gap-3 md:grid-cols-4">
+          ${stat('Check-ins', state.checkins.length, 'blue')}
+          ${stat('Needs financing', needsFinancing, needsFinancing ? 'green' : 'slate')}
+          ${stat('Listing outreach', sentCount, 'blue')}
+          ${stat('Rel8tion stage', state.event?.status || state.sign?.status || 'active', 'green')}
+        </section>
+
+        <section class="mt-6 grid gap-4 lg:grid-cols-[1.4fr_.9fr]">
+          <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Leads</h2>
+              <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">${esc(fmtDate(state.event?.start_time))}</span>
+            </div>
+            <div class="grid gap-3">
+              ${state.checkins.length ? state.checkins.map(renderLead).join('') : '<div class="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-5 text-center font-bold text-slate-500">No buyer check-ins yet.</div>'}
+            </div>
+          </div>
+
+          <aside class="grid gap-4">
+            ${renderLoanOfficerCard()}
+            <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Shared Coverage Devices</div>
+              <div class="mt-2 text-xl font-black">${esc(state.sign?.public_code || state.code || '-')}</div>
+              <div class="mt-2 text-sm font-bold text-slate-500">${esc(state.event?.setup_context?.coverage_device_count || 1)} of 3 connected. The agent and loan officer can each carry an Event Pass while one Smart Sign or LO Coverage Sign stays with the property.</div>
+              <div class="mt-3 rounded-2xl bg-sky-50 p-3 text-xs font-bold leading-relaxed text-sky-900">To add another device, activate it normally and select this same agent and open house. It will join this event automatically instead of creating a duplicate.</div>
+              <div class="mt-4 grid gap-2">
+                <button onclick="window.moveSignToAnotherOpenHouse()" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-sm">Move Sign To Another Open House</button>
+                <button onclick="window.endCurrentOpenHouse()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">End This Open House</button>
+                <a href="${esc(summaryMail)}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Event Summary</a>
+              </div>
+            </div>
+            <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+              <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Listing Outreach</div>
+              <div class="mt-2 text-2xl font-black">${esc(sentCount)} sent</div>
+              <p class="mt-2 text-sm font-bold leading-relaxed text-slate-500">This is separate from buyer check-ins. It tracks automated outreach tied to the listing/open house source.</p>
+            </div>
+          </aside>
+        </section>
+      `;
+      attachFitCheckerHandlers();
+    }
+
+    function renderEndedSummary() {
+      const stats = eventSummaryStats();
+      const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
+      const sponsored = isSponsoredEventPassEvent();
+      const member = state.membershipActive === true;
+      const unpaidNormalPass = !sponsored && !member;
+      const passLabel = sponsored ? 'Sponsored Event Pass' : isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
+      const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
+      const kitUrl = openHouseKitHref(address);
+      const recapEmail = state.event?.setup_context?.event_recap_email || {};
+      const recapStatus = recapEmail.status === 'sent'
+        ? `REL8TION emailed this event-only recap to ${recapEmail.recipient || 'the email on your agent profile'}.`
+        : recapEmail.status === 'failed' || recapEmail.status === 'missing_recipient'
+          ? `REL8TION could not deliver the automatic recap yet: ${recapEmail.warning || 'check the email on your agent profile or contact support.'}`
+          : 'REL8TION is preparing the event-only recap for the email on your agent profile.';
+      const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
+      const loPhone = state.loanOfficer?.loan_officer_phone || '';
+      const secondaryCta = loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody);
+      const historyCopy = sponsored
+        ? 'Required compliance and audit evidence remains preserved internally.'
+        : member
+          ? 'Your check-in and disclosure history remains available in your permanent dashboard.'
+          : 'This event is complete. Activate REL8TION Agent to keep permanent records from future events.';
+      const nextHeading = sponsored
+        ? 'Your sponsored event copy is delivered by email.'
+        : member
+          ? 'Add permanent branded hardware to your membership.'
+          : 'Keep future open-house records in your dashboard.';
+      const nextCopy = sponsored
+        ? `${recapStatus} This event-only version will not remain in your agent dashboard, disclosure library, analytics, or reports. Activate REL8TION Agent for $29/month to keep permanent records from future events.`
+        : member
+          ? 'Your membership keeps the dashboard, permanent check-in and disclosure records, analytics, reporting, and assisted follow-up active. The $199 Open House Kit is a separate one-time purchase with a reusable Smart Sign and custom company-branded Rel8tionChips—no second membership charge.'
+          : 'REL8TION Agent is $29/month and unlocks permanent check-in and disclosure history, analytics, reporting, your digital profile, and assisted follow-up. Member-only Open House Kit pricing appears after membership is active.';
+      const primaryActions = member && !sponsored
+        ? `<a href="${esc(kitUrl)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Add My Branded Open House Kit · $199 One Time</a><a href="${esc(summaryMail)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Another Summary</a>`
+        : '<a href="/pricing?role=agent" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Activate REL8TION Agent · $29/Month</a>';
+      app.innerHTML = `<div class="py-10">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
+        <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. ${esc(historyCopy)}</p>
+
+        <div class="mt-6 grid gap-3 md:grid-cols-3">
+          ${stat('Buyers checked in', stats.checkins, 'blue')}
+          ${stat('Disclosures signed', stats.disclosures, stats.disclosures === stats.checkins && stats.checkins ? 'green' : 'slate')}
+          ${stat('Financing help', stats.financing, stats.financing ? 'green' : 'slate')}
+        </div>
+
+        <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
+          <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
+          <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(nextHeading)}</h2>
+          <p class="mt-2 font-semibold leading-relaxed text-slate-600">${esc(nextCopy)}</p>
+          <div class="mt-4 grid gap-2 md:grid-cols-2">
+            ${primaryActions}
+            <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : unpaidNormalPass ? 'Ask About Sponsored Coverage' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
+            <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function closeCurrentOpenHouse({ move = false } = {}) {
+      if (!state.event?.id || !state.sign?.id) throw new Error('Missing active event or sign.');
+      const ok = window.confirm(move
+        ? 'End this open house and move the sign to another listing? Buyer check-ins already captured will stay saved.'
+        : 'End this open house now? Buyer check-ins already captured will stay saved.');
+      if (!ok) return;
+
+      const result = await dashboardApi('close_event', 'POST');
+
+      if (move) {
+        const params = new URLSearchParams();
+        if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+        if (state.agent) params.set('agent', state.agent);
+        params.set('move', '1');
+        window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+        return;
+      }
+
+      state.event = result.event;
+      state.sign = result.sign;
+      renderEndedSummary();
+    }
+
+    window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => renderError(error.message || 'Could not end this open house.'));
+    window.moveSignToAnotherOpenHouse = (skipConfirm = false) => {
+      if (skipConfirm) {
+        const params = new URLSearchParams();
+        if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+        if (state.agent) params.set('agent', state.agent);
+        params.set('move', '1');
+        window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+        return;
+      }
+      closeCurrentOpenHouse({ move: true }).catch((error) => renderError(error.message || 'Could not move this sign.'));
+    };
+
+    function renderError(message) {
+      agentLabel.textContent = state.agent ? labelSlug(state.agent) : 'Dashboard';
+      app.innerHTML = `<div class="py-12 text-center">
+        <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Dashboard Not Ready</div>
+        <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open Dashboard</h1>
+        <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">${esc(message)}</p>
+      </div>`;
+    }
+
+    async function init() {
+      if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
+      const snapshot = await dashboardApi();
+      state.sign = snapshot.sign;
+      state.event = snapshot.event;
+      state.house = snapshot.house;
+      state.checkins = snapshot.checkins || [];
+      state.outreach = snapshot.outreach || [];
+      state.loanOfficer = snapshot.loan_officer || null;
+      state.membershipActive = snapshot.membership_active === true;
+      const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
+      if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
+      state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
+        console.log('affordability fit data skipped', error);
+        return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
+      });
+      render();
+    }
+
+    init().catch((error) => renderError(error.message || 'Something interrupted the dashboard lookup.'));
+  </script>
+</body>
+</html>

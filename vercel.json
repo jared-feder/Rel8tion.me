@@ -160,6 +160,7 @@
     { "source": "/event-shell-test.html", "destination": "/apps/rel8tion-app/event.html" },
     { "source": "/agent-home", "destination": "/apps/rel8tion-app/agent-home.html" },
     { "source": "/agent-home.html", "destination": "/apps/rel8tion-app/agent-home.html" },
+    { "source": "/src/agent-dashboard-refresh.js", "destination": "/apps/rel8tion-app/src/agent-dashboard-refresh.js" },
     { "source": "/agent-dashboard", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
     { "source": "/agent-dashboard.html", "destination": "/apps/rel8tion-app/agent-dashboard.html" },
     { "source": "/lo-affordability-guidance", "destination": "/apps/rel8tion-app/lo-affordability-guidance.html" },

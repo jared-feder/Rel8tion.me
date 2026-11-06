@@ -1,5 +1,12 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Agent UX Batch 1 — review branch only
+
+- `[IMPLEMENTED, NOT RELEASED]` The real agent event dashboard now has manual Refresh, last-successful-update time, a 30-second visible-page refresh interval and a 15-second read timeout. Reads are serialized; hidden/closed pages and writes invalidate pending results. Failed or incomplete reads retain the last good event and display a stale/error message. Background refresh defers while a fit form is focused, and refreshed rendering restores unsaved fields, details, focus and scroll.
+- `[IMPLEMENTED, NOT RELEASED]` Missing-context/session recovery explains both the Event Pass private chip and Smart Sign rear agent chip, retains claimed-keychain verification, and offers Retry, Home and existing support. Coverage requests use contextual support rather than sending ordinary agents into COMMAND. Financing-help counts and badges use explicit requests; lack of preapproval is labeled separately. Consent, existing message links, disclosures, server authorization, sponsorship and history entitlements are unchanged.
+- `[VERIFIED SYNTHETIC]` `scripts/preview-agent-ux-batch1.cjs` serves the actual changed page and pinned baseline on loopback only, with synthetic state controls and local visual assets. CSP restricts connections to self; all application writes and unmatched routes fail closed. Never deploy this harness. See `docs/ux-review-2026-11-06/batch-1/README.md` for evidence, checks, restart and review limits. No live provider invocation or production release was performed.
+- `[REVIEW BOUNDARY]` Batch 2 is waiting for Jared's feedback. PR creation remains blocked by automatic approval review; the deliverable is a committed feature branch and compare link. AGENTS.md reviewed — no durable rule change.
+
 ## 2026-11-06: Assistant production release and booked-open-house calendar
 
 - `[IMPLEMENTED, RELEASE PENDING]` Rebased the isolated build onto production/main `ebcbf22` on `feature/jared-assistant-production`, retaining the current Event Pass, renderer and SMS-status fixes. Added a seven-day calendar with date navigation, Jared/all-officer filters and persistent booking/conflict context beside the reply composer. Current financing assignments are authoritative; other officers do not block Jared. Incomplete times, failed/truncated reads and candidates outside the loaded range remain unverified. This is advisory and does not reserve slots or include travel time.

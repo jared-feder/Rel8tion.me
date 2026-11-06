@@ -2,6 +2,10 @@
 
 Jared requests implementation of the attached REL8TION agent experience review in small test batches he can view before release. This authorizes development and safe synthetic previews. It does not authorize production release, merging into main/staging, real messaging, live event mutation, billing changes, or database migration application.
 
+## Current approval boundary
+
+Opening the documentation draft pull request to staging was denied by automatic approval review because it was not explicitly authorized. Do not retry it or open a substitute PR. Deliver the committed branch and compare link until Jared explicitly approves PR creation. This supersedes earlier PR deliverable wording. Batch 1 is the only currently authorized implementation batch; stop for Jared's review before Batch 2.
+
 ## Read and reconcile first
 
 - Read AGENTS.md, CURRENT_STATE.md, REL8TION_SYSTEM_OVERVIEW.md, docs/GIT_WORKFLOW.md, docs/ENVIRONMENTS.md, both active route maps, the pricing catalog, and this folder's review.html and evidence/source-manifest.json.
@@ -11,9 +15,9 @@ Jared requests implementation of the attached REL8TION agent experience review i
 
 ## Review cadence and preview boundary
 
-Implement Batch 1 first, complete its focused checks, and provide a working, safe preview with before/after screenshots and a draft PR. Then STOP implementation at that review boundary and wait for Jared's feedback before starting Batch 2. Repeat for every batch. Approval of a test batch is not production-release approval.
+Implement Batch 1 first, complete its focused checks, and provide a working, safe preview with before/after screenshots and a committed feature branch and compare link. Then STOP implementation at that review boundary and wait for Jared's feedback before starting Batch 2. Repeat for every batch. Approval of a test batch is not production-release approval.
 
-Use a separate identifiable commit and draft PR per batch. Prefer independent branches from current staging when feasible; declare dependencies and use clearly based stacked branches only when required. Never merge, auto-merge, promote, or deploy production. Preserve each reviewed preview so Jared can compare it later. After approved changes eventually reach staging, production release still requires Jared's explicit release instruction.
+Use a separate identifiable commit and committed feature branch and compare link per batch. Prefer independent branches from current staging when feasible; declare dependencies and use clearly based stacked branches only when required. Never merge, auto-merge, promote, or deploy production. Preserve each reviewed preview so Jared can compare it later. After approved changes eventually reach staging, production release still requires Jared's explicit release instruction.
 
 Previews must use actual changed components/pages with synthetic/deidentified fixtures. Existing Vercel previews may reach production Supabase, so do not assume a Preview label makes writes safe. Use isolated test services or a loopback-only harness that intercepts all app data, auth, messaging, checkout and write calls and fails closed for unmatched requests. Keep fixture/auth bypass code out of production pages and APIs. Verify no live provider invocation or production write is possible before exercising mutations. Do not publish a synthetic auth bypass in a cloud preview. A protected server-backed preview must use isolated resources and real authorization.
 
