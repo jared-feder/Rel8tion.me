@@ -285,6 +285,25 @@ async function sendViaAndroidGateway(opts: {
   };
 }
 
+// Transactional/event SMS needs the same delivery reporting as outreach SMS.
+// Do not send an unauthenticated callback URL if the shared secret is absent.
+function eventStatusCallbackUrl(): string | undefined {
+  const token = clean(Deno.env.get("TWILIO_STATUS_CALLBACK_TOKEN"));
+  const supabaseUrl = clean(Deno.env.get("SUPABASE_URL"));
+  if (!token || !supabaseUrl) return undefined;
+  try {
+    const override = clean(Deno.env.get("TWILIO_STATUS_CALLBACK_URL"));
+    const url = new URL(override || `${supabaseUrl.replace(/\\/$/, "")}/functions/v1/twilio-message-status`);
+    if (url.protocol !== "https:") return undefined;
+    url.searchParams.delete("queue_id");
+    url.searchParams.delete("step");
+    url.searchParams.set("token", token);
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 async function sendViaTwilio(opts: {
   route: SmsRoute;
   to: string;
@@ -460,7 +479,7 @@ export async function sendSMS(options: SendSmsOptions) {
         to,
         body,
         mediaUrls: options.mediaUrls,
-        statusCallback: options.statusCallback,
+        statusCallback: options.statusCallback || (route === "events" ? eventStatusCallbackUrl() : undefined),
       });
 
     const status = result.provider === "twilio" && result.status !== "sent" ? "queued" : "sent";
