@@ -1,0 +1,73 @@
+Source: apps/rel8tion-app/src/modules/claimStyled/flow.js
+Ref: main, fetched 2026-11-06
+Git blob SHA: 79477bcb0f24687fb1e30bf3f29b77c145418d5e
+
+472: 
+473: export async function startDetection() {
+474:   showLoading('Preparing your setup');
+475:   startLoaderTextCycle();
+476: 
+477:   if (!navigator.geolocation) {
+478:     routeUnknownAgentFlow('', 'Location is not supported on this device. Continue manually.');
+479:     return;
+480:   }
+481: 
+482:   navigator.geolocation.getCurrentPosition(async (pos) => {
+483:     try {
+484:       const houses = await findNearestOpenHouses(pos.coords.latitude, pos.coords.longitude);
+485:       if (!Array.isArray(houses) || !houses.length) {
+486:         routeUnknownAgentFlow('', 'No nearby listing found. Continue manually.');
+487:         return;
+488:       }
+489: 
+490:       setNearbyHouses(houses);
+491:       setDetectedHouse(houses.find((h) => h.agent || h.agent_phone || h.agent_email) || houses[0]);
+492:       if (state.detectedHouse?.brokerage) {
+493:         setSelectedBrokerage(state.detectedHouse.brokerage);
+494:         await applyBranding(state.detectedHouse.brokerage);
+495:       }
+496:       showDetectionWithHistory();
+497:     } catch (e) {
+498:       debug('DETECTION FAILED', { message: e?.message || String(e) });
+499:       routeUnknownAgentFlow('', 'Detection failed. Continue manually.');
+500:     }
+501:   }, () => {
+502:     routeUnknownAgentFlow('', 'Location permission was denied. Continue manually.');
+503:   }, {
+504:     enableHighAccuracy: true,
+505:     timeout: 20000,
+506:     maximumAge: 0
+507:   });
+508: }
+
+---
+
+605:     }
+606: 
+607:     const fallbackBrokerage = h?.brokerage || '';
+608:     const cards = agents.map((a) => {
+609:       const photo = a.image_url || a.primary_photo_url || a.directory_photo_url || '';
+610:       const initials = String(a.name || 'Agent').split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || 'AG';
+611:       return `
+612:         <div onclick="selectAgentByEncoded(this.dataset.agent)" data-agent="${encodeURIComponent(JSON.stringify(a))}" class="flex items-center gap-4 p-4 rounded-[24px] bg-white/80 border border-white/70 shadow hover:shadow-xl cursor-pointer">
+613:           ${photo ? `<img src="${photo}" alt="${a.name || 'Agent'}" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');this.nextElementSibling.classList.add('flex')" class="w-16 h-16 rounded-full object-cover bg-white"><div class="hidden w-16 h-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 items-center justify-center text-white font-black">${initials}</div>` : `<div class="w-16 h-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 flex items-center justify-center text-white font-black">${initials}</div>`}
+614:           <div class="text-left">
+615:             <div class="font-black text-lg text-[#1f2a5a]">${a.name || 'Agent'}</div>
+616:             <div class="text-sm text-slate-500">${a.phone || ''}</div>
+617:           </div>
+618:         </div>
+619:       `;
+620:     }).join('');
+621: 
+622:     writeClaimHistory('agentSelection');
+623:     document.getElementById('app').innerHTML = `
+624:       <div class="w-full max-w-xl rounded-[38px] md:rounded-[46px] border border-white/70 bg-white/20 backdrop-blur-[10px] p-6 md:p-10 text-center transition-all duration-500 shadow-[0_25px_60px_rgba(31,42,90,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)]">
+625:         <div class="mb-8">
+626:           <img src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" class="h-16 md:h-20 mx-auto drop-shadow-sm" alt="Rel8tion">
+627:         </div>
+628:         <div>
+629:           <h1 class="font-['Poppins'] text-3xl md:text-4xl font-black mb-4 uppercase text-[#1f2a5a]">Select Yourself</h1>
+630:           <p class="text-slate-500 text-lg mb-6">We found multiple agents on this listing.</p>
+631:           <div class="space-y-3">${cards}</div>
+632:           <button onclick="routeUnknownAgentFlow('${fallbackBrokerage.replace(/'/g, "\\'")}', 'Complete your profile manually below.')" class="mt-6 text-slate-400 text-sm font-bold uppercase tracking-widest">Not Me</button>
+633:         </div>
