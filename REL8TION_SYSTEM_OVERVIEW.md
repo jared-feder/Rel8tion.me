@@ -1,5 +1,8 @@
 # REL8TION System Overview
 
+- [LIVE 2026-11-06] Jared's Assistant manual-reply integration is published through PR #91 at app.rel8tion.me/command?area=assistant. The production flag is enabled; writes still require a strong owner connection, exact immutable approval and final send confirmation. Scoped Cat access cannot approve/send and its trusted connection broker is still pending. Signed inbound routing, double dispatch claims, fixed 844 sender, fresh opt-out/contact checks and receipt-only reconciliation are active. Push infrastructure is published but delivery is inactive pending specifically approved VAPID credentials and device permission. Proactive outreach remains paused; no paid owner-review SMS fallback is used. Earlier pending/test labels below describe prior releases.
+
+
 - [IMPLEMENTED ON feature/assistant-send-push; RELEASE PENDING] Jared’s Assistant now has an owner-approved manual reply adapter with immutable recipient/body snapshots, double dispatch claims, 844 sender enforcement and receipt reconciliation. It adds private Web Push subscriptions/outbox, a bounded minute worker and conversation deep links; credentials and device permission remain separate enablement gates. Direct assistant replies avoid stale-property automation, public ingress verifies Twilio signatures and owner review alerts never fall back to SMS. Event Pass/assignment/buyer notifications and the proactive pause remain unchanged.
 
 
