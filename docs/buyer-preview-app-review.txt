@@ -1,0 +1,22 @@
+REL8TION ACTUAL-APP BUYER PREVIEW
+Run: node scripts/serve-buyer-preview.cjs
+Open on the same desktop: http://127.0.0.1:8768/event?preview=buyer
+Node.js is the only runtime needed. No npm install, environment file, database or provider credentials are required. Port can be overridden with BUYER_PREVIEW_PORT.
+
+This runs the actual REL8TION event/check-in renderer and source components. It is not the previous standalone concept design. Original event.html, live initialization and production route maps stay unchanged. A loopback-only preview initializer supplies fictional records and local handlers. Buyer continuation is added after the existing guest/property/contact flow.
+
+Try Buyer or With Agent, choose pre-approved status, walk through the existing five disclosure steps (test acknowledgments only), then Continue My Visit. Agent retains the existing source-specific path. In the continuation, edit private visit notes, compare visits in scripted AI, confirm a buyer-selected agent, create an offer-preparation request, review its agent workspace, or opt into financing help separately. Existing LO Priya Shah is preserved; event support is not automatic financing permission.
+
+All contact/real-PDF/property links are inert in this environment. Forms cannot transmit, connect-src is none, and the server has no API/data endpoints. State exists in memory only. No legal signature, message, actual offer, financing lead, model call or appointment is created. This is production-like application UI with fixture-only behavior, not a claim that Buyer AI is production-ready.
+
+Source UI: apps/rel8tion-app/event.html (blob 20cc3b5b534319cc489db407e1ba2b3826400951) and src/modules/eventShell/bootstrap.js (base blob 28d80fa65371ff0d1ce4d4f4874fe28a0aec2013), read at review branch commit c60ded17d3ab6e45890647caf17b6a7924651504. The existing logo and licensed local fonts are reused. Tailwind 3.4.17 runtime is vendored from the official CDN used by the existing app; its development-runtime warning remains expected. Do not treat this local runtime as a production build optimization.
+
+Verification: 139 focused tests pass: 22 application/component isolation tests, 23 buyer preview policy tests, 25 existing buyer continuity tests, 40 existing agent nurture tests and 29 existing mocked event SMS outcome tests. Eleven original rendering/style functions have exact baseline fingerprints. Production initialization does not read the preview adapter or query flag. Root/app/renderer deployment guards remain false for the exact review branch.
+
+Browser evidence: opened the actual /event?preview=buyer route in desktop Edge; verified original logo/sky/cloud/glass-panel styling and form, represented-buyer five-step completion, direct-buyer financing-choice validation/decline, contextual visit comparison, selected-agent connection, offer request/acknowledgment, and separate LO permission/revocation. At 390px viewport, document and body widths are 390px, shell 358px and heading 30px; no horizontal overflow. Temporary viewport override was reset. Screenshots accompany the delivery. Console has no application errors; an extension diagnostic and existing Tailwind development warning were observed.
+
+The loopback browser access issue from the previous prototype was resolved by starting the authorized local server outside the sandbox. This URL works on this desktop while the server runs; it is not a public/phone-hosted URL. No firewall or power/security setting was changed for this preview.
+
+The engineering task executing this work is Plan buyer AI build, 01a1af28-6901-7233-a614-1ff18c0f50c9. Source publication targets feature/rel8tion-funnel-review-2026-11-04 only. No new auto-deploying branch, PR, merge, deployment, production SQL, capture, enrollment, messaging, outreach, checkout or public-site change.
+
+AGENTS.md updated with the local-preview boundary and verification command.

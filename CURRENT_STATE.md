@@ -1,5 +1,12 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Actual-app buyer continuation preview
+
+- `[REVIEW ONLY, NOT DEPLOYED]` Added a loopback fixture entry using the real event/check-in renderer, original three paths, branding and guided disclosure layout. Buyer continuation is downstream of guest/property/contact content. The previous standalone concept preview is superseded; start at `docs/buyer-preview-app-review.txt`.
+- `[VERIFIED LOCALLY]` 139 focused checks pass, including 11 unchanged component fingerprints, all three check-in render paths, preview isolation and existing buyer/nurture/SMS regressions. Desktop Edge walkthrough verified represented and direct-buyer check-in, disclosure flow, contextual scripted AI, agent connection, offer preparation and separate LO permission/revocation. 390px responsive dimensions have no horizontal overflow. No application console error was observed; extension/Tailwind development diagnostics are documented.
+- `[BOUNDARY]` The running loopback `/event?preview=buyer` uses fictional data, in-memory state and scripted replies. No signatures, records, capture, enrollment, messages, offers, financing leads, model calls, production route mappings, SQL, checkout or outreach controls changed. Live initialization remains separate. No PR, merge or deployment.
+- `AGENTS.md updated - preserve explicit loopback preview isolation and original renderer components.`
+
 ## 2026-11-04: Agent nurture and buyer foundation review branch
 
 - `[PARTIAL, REVIEW ONLY]` Added the side-effect-free agent nurture planner with channel/purpose consent, verified person identity, shared-contact collision checks, suppression, reply holds, sender controls, quiet hours, cadence and uncertain-attempt reconciliation. Every result has `send_allowed=false`; no live adapter, enrollment, dispatch route or scheduler is wired.

@@ -1,3 +1,5 @@
+SUPERSEDED: Use the actual application preview at /event?preview=buyer on the isolated loopback server. See docs/buyer-preview-app-review.txt. The standalone concept HTML is retained only as an earlier design artifact.
+
 REL8TION Buyer Transaction Network — synthetic preview
 Date: 2026-11-06
 Base: ec139a19c9222df304baf78ce957643a168f9bce

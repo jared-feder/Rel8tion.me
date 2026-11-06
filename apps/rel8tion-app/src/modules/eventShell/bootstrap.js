@@ -53,6 +53,8 @@ const pageState = {
 
 let disclosureEscapeHandlerBound = false;
 let checkinPromptScrollHandler = null;
+// An explicit loopback-only preview supplies in-memory handlers. Live entry never sets this.
+let previewAdapter = null;
 
 function getEventIdFromUrl() {
   return new URLSearchParams(window.location.search).get('event') || '';
@@ -88,7 +90,7 @@ function shell(content) {
   render(`
     <section class="w-full max-w-5xl rounded-[40px] border border-white/60 bg-white/20 backdrop-blur-md p-6 md:p-10 shadow-[0_25px_50px_rgba(31,42,90,0.1)]">
       <div class="text-center mb-6">
-        <img src="${ASSETS.rel8tionLogo}" alt="Rel8tion" class="h-16 md:h-20 mx-auto w-auto">
+        <img src="${previewAdapter?.logo || ASSETS.rel8tionLogo}" alt="Rel8tion" class="h-16 md:h-20 mx-auto w-auto">
       </div>
       ${content}
     </section>
@@ -1280,6 +1282,10 @@ function nextStepCards() {
 }
 
 function attachEventHandlers() {
+  if (previewAdapter) {
+    previewAdapter.bind({ state: pageState, rerender: renderEventShell });
+    return;
+  }
   if (checkinPromptScrollHandler) {
     window.removeEventListener('scroll', checkinPromptScrollHandler);
     checkinPromptScrollHandler = null;
@@ -1868,6 +1874,8 @@ function renderEventShell() {
 
     ${pageState.mode === 'guest' ? nextStepCards() : ''}
 
+    ${pageState.mode === 'guest' && previewAdapter ? previewAdapter.continuation(pageState) : ''}
+
     <section class="${pageState.mode === 'guest' ? 'grid' : 'hidden'} grid-cols-1 gap-5">
       <article class="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_18px_40px_rgba(31,42,90,0.08)]">
         <h2 class="font-['Plus_Jakarta_Sans'] text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-3">Property Details</h2>
@@ -1892,6 +1900,28 @@ function renderEventShell() {
   `);
 
   attachEventHandlers();
+}
+
+export function initEventShellPreview(fixture, adapter) {
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
+    || !(window.location.pathname.endsWith('/buyer-preview.html')
+      || (window.location.pathname === '/event' && new URLSearchParams(window.location.search).get('preview') === 'buyer'))) {
+    throw new Error('Buyer preview is available only on the local preview route.');
+  }
+  if (fixture?.previewOnly !== true || !String(fixture.event?.id || '').startsWith('demo-')
+    || typeof adapter?.bind !== 'function' || typeof adapter?.continuation !== 'function') {
+    throw new Error('A synthetic fixture and an isolated preview adapter are required.');
+  }
+  previewAdapter = adapter;
+  pageState.eventRow = fixture.event;
+  pageState.house = fixture.house;
+  pageState.agent = fixture.agent;
+  pageState.loanOfficer = fixture.loanOfficer;
+  pageState.brand = fixture.brand;
+  pageState.mode = 'checkin';
+  pageState.selectedPath = CHECKIN_PATHS.BUYER;
+  pageState.requiredDisclosures = { agency: null, housing: null, courtesy: null };
+  renderEventShell();
 }
 
 export async function initEventShellPage() {
@@ -1985,4 +2015,5 @@ export async function initEventShellPage() {
     errorView('Event Could Not Load', error.message || 'Something went wrong while loading this open house check-in.');
   }
 }
+
 

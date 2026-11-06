@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Actual-app buyer preview (local test only)
+
+- `[REVIEW ONLY]` `apps/rel8tion-app/buyer-preview.html` and `src/modules/eventShell/buyerPreview.js` reuse the existing event/check-in renderer with synthetic records. `initEventShellPreview` requires the explicit loopback preview route and fixture marker; the live `initEventShellPage` must never select it automatically. Keep its no-network/no-provider/no-persistence adapter, inert contact/PDF links, CSP `connect-src 'none'` / `form-action 'none'`, and GET-only loopback server. This is not authentication or live consent evidence. Run `node --test test/buyer-preview-app.test.cjs test/buyer-preview-policy.test.cjs test/event-sms-outcomes.test.cjs`; preserve original check-in component fingerprints and all three exact-branch deployment guards.
+
 ## Agent nurture review foundation
 
 - `[PARTIAL]` `lib/agent-nurture-preview.js` is a pure offline planner, not a consent resolver, enrollment writer, scheduler or sender. `send_allowed` must remain false. Require verified person identity, exact channel/purpose/destination consent, current suppression and control evidence, and reconciliation of uncertain attempts. Existing event-only SMS consent is not recurring nurture consent. Run `npm run verify:agent-nurture` after changes.
