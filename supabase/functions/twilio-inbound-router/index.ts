@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { verifyTwilioForm } from "../_shared/assistant-inbound.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -59,6 +61,10 @@ serve(async (req) => {
       payload = await req.json().catch(() => ({}));
     }
 
+    const authToken=Deno.env.get("TWILIO_AUTH_TOKEN")||"";
+    const publicUrl=new URL(req.url);
+    const canonicalUrl=`${supabaseUrl}/functions/v1/twilio-inbound-router${publicUrl.search}`;
+    if(!contentType.includes("application/x-www-form-urlencoded")||String(payload.AccountSid||"")!==Deno.env.get("TWILIO_ACCOUNT_SID")||!await verifyTwilioForm(canonicalUrl,payload,req.headers.get("x-twilio-signature")||"",authToken))return new Response("Invalid Twilio signature",{status:403});
     const fromPhone = String(payload.From || payload.from || "").trim();
     const fromPhoneNormalized = normalizePhone(fromPhone);
 

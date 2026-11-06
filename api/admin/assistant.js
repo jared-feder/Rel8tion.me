@@ -4,6 +4,7 @@ const {createWorkspace,fail} = require('../../lib/assistant-workspace');
 const {assistantSource} = require('./outreach-inbox');
 const {loadCalendar} = require('../../lib/assistant-calendar');
 const {directThreads} = require('../../lib/assistant-direct');
+const {callSupabaseFunction} = require('../../lib/outreach-cron-shared');
 const table = 'assistant_workspace_actions';
 const store = {
   list:()=>supabaseRest(`${table}?select=*&order=created_at.desc&limit=200`),
@@ -12,13 +13,16 @@ const store = {
     try { return (await supabaseRest(table,{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(record)}))[0]; }
     catch(error) { if (error.status === 409) { const old=await store.get(record.id); if(old?.fingerprint===record.fingerprint)return old; } throw error; }
   },
-  transition:async(record,status,event)=>{
-    const rows=await supabaseRest(`${table}?id=eq.${encodeURIComponent(record.id)}&status=eq.${record.status}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({status,audit:[...record.audit,event]})});
+  transition:async(record,status,event,patch={})=>{
+    const rows=await supabaseRest(`${table}?id=eq.${encodeURIComponent(record.id)}&status=eq.${record.status}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({...patch,status,audit:[...record.audit,event]})});
     if(!rows.length) fail(409,'Item changed. Refresh before continuing.');
     return rows[0];
   }
 };
-const workspace=createWorkspace({store,source:{
+const workspace=createWorkspace({store,transport:{
+  ready:()=>process.env.ASSISTANT_MANUAL_SEND_ENABLED==='true',
+  send:record=>callSupabaseFunction('send-assistant-reply',{id:record.id,dispatch_token:record.dispatch_token})
+},source:{
   mode:'live_context',
   calendar:()=>loadCalendar(supabaseRest),
   inbox:async()=>{

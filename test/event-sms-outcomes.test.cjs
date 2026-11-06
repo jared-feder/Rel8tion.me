@@ -10,7 +10,7 @@ const args = { agentPhone: '+12025550101', buyerPhone: '+12025550102', buyerName
 const direct = { success: true, sms: { ok: true, status: 'queued' } };
 const lead = { success: true, results: [{ ok: true, status: 'queued' }, { ok: true, status: 'queued' }] };
 function loadHelpers(fetch, base = root) {
-  const source = fs.readFileSync(path.join(base, helperPath), 'utf8').replace(/^import .*;\n/gm, '').replace(/export async function/g, 'async function');
+  const source = fs.readFileSync(path.join(base, helperPath), 'utf8').replace(/\r\n/g, '\n').replace(/^import .*;\n/gm, '').replace(/export async function/g, 'async function');
   const context = vm.createContext({ fetch, KEY: 'test-key', SUPABASE_URL: 'https://example.invalid', debug() {}, jsonHeaders() { return {}; } });
   vm.runInContext(source + '\nthis.helpers = {' + helperNames.join(',') + '};', context);
   return context.helpers;

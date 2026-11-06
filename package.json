@@ -35,7 +35,7 @@
     "verify:production-routes": "node scripts/verify-production-routes.cjs",
     "verify:command-search": "node scripts/verify-command-search.cjs",
     "verify:command-performance": "node test/admin-command-performance.test.cjs",
-    "verify:assistant": "node --test test/assistant-workspace.test.cjs test/assistant-calendar.test.cjs test/assistant-ui.test.cjs",
+    "verify:assistant": "node --test test/assistant-workspace.test.cjs test/assistant-calendar.test.cjs test/assistant-ui.test.cjs test/assistant-delivery.test.cjs",
     "preview:assistant": "node scripts/preview-assistant.cjs",
     "verify:agent-listing-inventory": "node test/agent-listing-inventory.test.cjs && node test/agent-ranking-history.test.cjs && node test/agent-ranking-relationships.test.cjs && node test/agent-ranking-profile.test.cjs",
     "verify:live": "node docs/live-verification/verify-supabase-live.mjs",
@@ -51,6 +51,7 @@
     "jszip": "^3.10.1",
     "nodemailer": "^7.0.13",
     "pdf-lib": "^1.17.1",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "web-push": "4.0.0"
   }
 }
