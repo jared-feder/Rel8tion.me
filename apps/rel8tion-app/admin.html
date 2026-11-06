@@ -1573,11 +1573,13 @@
       .outreach-protection-list { grid-template-columns: 1fr; }
     }
   </style>
+  <link rel="stylesheet" href="/apps/rel8tion-app/src/admin-assistant.css">
 </head>
 <body>
   <div id="app"></div>
   <div id="toast" class="toast"></div>
 
+  <script src="/apps/rel8tion-app/src/admin-assistant.js"></script>
   <script>
     const ADMIN_UID_KEY = 'rel8tion_admin_uid';
     const ADMIN_TOKEN_KEY = 'rel8tion_admin_token';
@@ -1590,6 +1592,7 @@
 
     const AREAS = [
       ['outreach', 'Outreach command'],
+      ['assistant', "Jared's Assistant"],
       ['outreachControl', 'Outreach Control'],
       ['leads', 'Leads'],
       ['crm', 'Agent Performance'],
@@ -2775,6 +2778,7 @@
 
     async function refreshLiveData() {
       if (!state.verified || state.loading || state.liveRefreshing || document.visibilityState !== 'visible') return;
+      if (state.area === 'assistant') return assistantPanel.load();
       if (state.sendingKey || state.actionKey || state.coveragePickerKey || state.homekeyModal || isCommandEditing()) return;
       state.liveRefreshing = true;
       try {
@@ -4747,6 +4751,7 @@ ${rowsHtml}
 
     function areaIcon(area) {
       return {
+        assistant: 'bot',
         outreach: 'message-square-reply',
         outreachControl: 'sliders-horizontal',
         leads: 'contact-round',
@@ -4963,7 +4968,7 @@ ${rowsHtml}
                   ${AREAS.map(([key, label]) => `<option value="${key}"${state.area === key ? ' selected' : ''}>${esc(label)}</option>`).join('')}
                 </select>
                 <div class="header-actions">
-                  ${state.loading ? badge('Refreshing', 'info') : badge('Live', 'ok')}
+                  ${state.loading ? badge('Refreshing', 'info') : state.area === 'assistant' ? badge('Simulation', 'info') : badge('Live', 'ok')}
                   <span id="currentAreaBadge">${state.error ? badge(state.error, 'bad') : badge(areaLabel, 'info')}</span>
                   <button class="btn soft" id="refreshBtn"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
                 </div>
@@ -5007,7 +5012,7 @@ ${rowsHtml}
         ${renderHomeKeyModal()}
       `;
 
-      document.getElementById('refreshBtn')?.addEventListener('click', () => loadAll());
+      document.getElementById('refreshBtn')?.addEventListener('click', () => state.area === 'assistant' ? assistantPanel.load() : loadAll());
       document.getElementById('lockBtn')?.addEventListener('click', signOut);
       document.getElementById('areaSelect')?.addEventListener('change', (event) => setArea(event.target.value));
       document.querySelectorAll('[data-area-nav]').forEach((button) => {
@@ -5060,6 +5065,7 @@ ${rowsHtml}
     }
 
     function bindAreaActions() {
+      if (state.area === 'assistant') assistantPanel.bind();
       document.getElementById('refreshOutreachReports')?.addEventListener('click', () => loadOutreachReports());
       document.getElementById('generateOutreachReport')?.addEventListener('click', () => loadOutreachReports('generate'));
       document.getElementById('emailOutreachReport')?.addEventListener('click', () => loadOutreachReports('email'));
@@ -5367,7 +5373,10 @@ ${rowsHtml}
       `).join('')}</section>`;
     }
 
+    const assistantPanel = window.createAssistantPanel({api, esc, refresh: () => { if (state.verified && state.area === 'assistant') refreshAreaContent(); }});
+
     function renderArea() {
+      if (state.area === 'assistant') return assistantPanel.render();
       if (state.area === 'outreachControl') return renderOutreachControl();
       if (state.area === 'leads') return renderLeads();
       if (state.area === 'crm') return renderCrm();

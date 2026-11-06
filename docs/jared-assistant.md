@@ -1,0 +1,39 @@
+# Jared's Assistant test build
+
+This is an additive COMMAND workspace at `/command?area=assistant` (the existing `/admin` alias also works). It reuses the actual COMMAND shell, navigation, protected API helper, outreach inbox/read helpers, contact/property context and the existing outreach workflow. No production workflow was replaced. `docs/rel8tionos-api.md`, `lib/rel8tionos-outreach.js` and the existing `api/rel8tionos/*` endpoints already provide server-to-server thread/reply operations without the Twilio console; their broad shared key must not be handed to a browser or assistant.
+
+## Run the production-like local preview
+
+`node scripts/preview-assistant.cjs`
+
+Open http://127.0.0.1:4317/admin?area=assistant. The actual COMMAND page uses a loopback-only mock API with reserved 202-555-01xx contacts and fictional properties. Draft, approve, dismiss, inspect audit history and simulate reply. State resets on server restart. The clock is fixed at November 6, 2026, 11 AM New York. No provider or production database code is loaded by this preview. No production credentials are needed or created. The server's auth bypass exists only in its in-memory HTML response, never in the application file or production API.
+
+## Implemented integration contract
+
+`GET /api/admin/assistant` returns a bounded inbox (100 source rows), assistant actions (200 most recent), simulated review notifications, transparent sender identity and snapshot timestamp. This is a bounded operational view, not a complete historical archive. Existing imported outbound messages are explicitly marked as having unverified assistant authorship. The UI retains a failed-refresh snapshot with an unverified warning, and keeps unsaved drafts in memory through rerenders.
+
+`POST /api/admin/assistant` accepts:
+
+- `resolve_latest`, optional `thread_key`: resolves the newest incoming message among the permitted, loaded threads, reloads each candidate's current detail, and returns exact `thread_key` / `in_reply_to` with context. Equal timestamps fail for explicit selection. With a named contact, pass the explicit thread key. Do not claim it is globally latest outside this bounded scope.
+- `draft`, `thread_key`, `in_reply_to`, `body`, `request_id`: persists one immutable attributed reply awaiting Jared. The server adds “This is Cat from REL8TION, Jared's assistant.”
+- `approve`, `id`: owner-only approval of that exact body and incoming message.
+- `simulate`, `id`: rechecks approval, latest incoming ID, opt-outs, linked queue row, incoming destination 844-821-1802, and the conservative 9 AM–8 PM America/New_York window; atomically transitions once to `simulated`. It never calls a provider.
+- `dismiss`, `id`: owner-only closure of an unfinished draft.
+
+Idempotency uses a unique stable request ID plus a fingerprint of thread, incoming message, sender, author and attributed body. Conflicting reuse fails. Database transitions compare the saved status and preserve the append-only audit. Unknown outcomes should be read with the same request ID; do not generate a fresh ID and retry blindly. The draft idempotency record remains usable after a process restart when the private SQL store is provisioned; the preview intentionally uses memory.
+
+The new endpoint requires a header-only owner admin token (no UID or query-token authorization), or a short-lived HMAC capability in the Authorization header. Capabilities are signed by a server-side broker with `ASSISTANT_CONNECTION_SECRET` and carry `aud=rel8tion-assistant`, `sub=cat`, `iat`, `exp` at most 15 minutes later, `version` matching `ASSISTANT_CONNECTION_VERSION`, exact thread keys, and only `read`, `draft`, `simulate` scopes. The assistant cannot mint capabilities or approve itself. Rotation/version revokes outstanding tokens. No signing secret, broker, token issuance route or persistent credential was created. UI access through the legacy keychain UID alone correctly fails closed for this endpoint.
+
+## Push notification boundary
+
+Inspection found no Web Push subscription store, VAPID configuration or service worker push handler in COMMAND's current app/API source. A browser Notification permission alone would not provide durable background push. This build therefore has a simulated review feed, deduplicated by incoming provider/message ID, linking to the conversation and Cat's review task. Availability confirmations, booking changes, callback requests and decisions are heuristic candidates; routine thanks and opt-outs are excluded. It is a preview classifier, not a verified urgency model. No notification permission was requested, subscription saved, notification sent, or sound claimed. No paid owner-alert SMS fallback exists here.
+
+## Before any production connection
+
+1. Review/apply the narrow private-store schema from `docs/assistant-workspace-schema.sql` in an isolated database, test its trigger/roles/concurrency, then generate the proper migration with the installed Supabase CLI. No database or migration history was changed here. COMMAND's normal tables were inspected from checked-in source; live schema was not queried.
+2. Separately authorize the secure connection at action time: verify Jared's strong owner session, exact scopes/threads, secret storage location, lifetime and revocation. Implement the trusted capability broker using existing server/session infrastructure. Keep broad Rel8tionOS and provider credentials server-only. The browser-local PIN/passkey lock and public keychain UID do not grant this new access.
+3. Verify the actual authorized REL8TION toll-free sender and Messaging Service, incoming webhook signature validation, same-thread source/destination, contact identity, suppression and provider-health status. The 844 number here is simulated based on the repository runbook and Jared's requirement, not live-provider verification. Personal and 516 owner-alert numbers are never selected by this build.
+4. Review a real-delivery adapter to the existing shared SMS workflow. It must carry immutable assistant author/request metadata, claim a durable dispatch lease before provider submission, distinguish queued/accepted/delivered/failed/unknown, never blindly resend an uncertain submission, reconcile provider status, retain existing safety/rate-limit controls and revalidate the incoming message at dispatch. The existing Rel8tionOS reply helper alone is not sufficient for the stronger assistant identity/approval/atomic-dispatch contract. This build deliberately contains no live transport or flag that can turn simulation into sending.
+5. For push, separately authorize a device subscription and implement/test HTTPS service-worker Web Push, protected subscription storage, preference/urgency controls, a durable outbox with one notification key per inbound message, retry/receipt status, and conversation deep links. Do not substitute SMS. A simulated feed is not a delivered push.
+
+Fidel's separately approved text remains unsent and is excluded from fixtures and implementation. No outreach was resumed, message sent, credential created, production data modified, deployment made or merge performed.

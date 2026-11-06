@@ -3,6 +3,11 @@
 ## Event check-in SMS outcome reporting
 
 - `[IMPLEMENTED]` Keep saved check-in success separate from SMS acceptance. Notification failures must not imply that the check-in database write rolled back or trigger blind resubmission. Require positive provider acceptance before setting `financingAlertSent`; terminal failure statuses override `ok=true`, and acceptance must never be presented as handset delivery. Preserve financing opt-in, recipient selection and send order. Run `node --test test/event-sms-outcomes.test.cjs` with mocked fetches; never send real texts for this regression check.
+## Jared's Assistant simulation boundary
+
+- `[IMPLEMENTED, TEST BRANCH]` COMMAND's additive `assistant` area and `/api/admin/assistant` use private immutable draft/approval/simulation records. Public admin keychain UID and browser-local Dashboard Lock do not authorize this endpoint. Assistant capabilities are short-lived, thread-scoped and cannot approve themselves; broad Rel8tionOS/provider secrets remain server-only.
+- `[RISK]` `scripts/preview-assistant.cjs` is a loopback-only synthetic harness; never deploy it. Its response-only auth bypass must never enter the actual COMMAND HTML. `docs/assistant-workspace-schema.sql` is an unapplied review draft, not migration history. No flag in this build enables delivery. Preserve simulated versus actual queued/delivered distinctions and exact incoming-message revalidation.
+- `[INTENDED]` Cat owner-review notifications use authorized app push, never an automatic paid owner-SMS fallback. This restriction does not alter existing Event Pass, assignment, buyer or other transactional notification SMS. Keep the simulated feed distinct from push delivery. See `docs/jared-assistant.md` for production connection gates and `test/assistant-workspace.test.cjs` for scoped/auth/idempotency regressions.
 
 ## Recovery source and saved-photo preservation
 
