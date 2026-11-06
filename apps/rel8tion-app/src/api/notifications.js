@@ -3,6 +3,30 @@ import { debug, jsonHeaders } from '../core/utils.js';
 
 const JARED_FINANCING_ALERT_PHONE = '13477758059';
 
+// Provider acceptance is not proof of handset delivery. Keep failures visible to
+// the check-in caller without throwing after its database write has succeeded.
+async function smsAcceptance(response, fallbackError) {
+  const raw = await response.text();
+  let payload;
+  try { payload = JSON.parse(raw); } catch (_) {
+    throw new Error(fallbackError);
+  }
+  const results = Array.isArray(payload?.results) ? payload.results : [payload?.sms];
+  if (!response.ok || payload?.error || payload?.success !== true || !results.length ||
+      results.some((result) => !result || result.ok !== true || ['failed', 'blocked', 'undelivered', 'canceled', 'cancelled', 'rejected'].includes(String(result.status || '').trim().toLowerCase()))) {
+    throw new Error(payload?.error || fallbackError);
+  }
+  return { ok: true, status: 'accepted' };
+}
+
+function smsFailure(error) {
+  return { ok: false, status: 'failed', error: error?.message || String(error) };
+}
+
+function smsSkipped() {
+  return { ok: false, status: 'skipped', error: 'Missing SMS recipient phone.' };
+}
+
 export async function sendActivationSMS(phone, slug, name) {
   if (!phone) return;
   try {
@@ -29,7 +53,7 @@ export async function sendFinancingLeadAlert({
   price,
   preapproved = 'no'
 }) {
-  if (!buyerPhone && !agentPhone) return;
+  if (!buyerPhone && !agentPhone) return smsSkipped();
 
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/send-lead-sms`, {
@@ -45,12 +69,10 @@ export async function sendFinancingLeadAlert({
       })
     });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      throw new Error(raw || 'Financing lead SMS failed');
-    }
+    return await smsAcceptance(response, 'Financing lead SMS failed');
   } catch (e) {
     debug('FINANCING LEAD SMS FAILED', { message: e?.message || String(e) });
+    return smsFailure(e);
   }
 }
 
@@ -64,7 +86,7 @@ export async function sendAgentCheckinSMS({
   buyerAgentName,
   buyerAgentPhone
 }) {
-  if (!agentPhone) return;
+  if (!agentPhone) return smsSkipped();
 
   const message = [
     `New Rel8tion check-in${propertyAddress ? ` at ${propertyAddress}` : ''}.`,
@@ -88,12 +110,10 @@ export async function sendAgentCheckinSMS({
       })
     });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      throw new Error(raw || 'Agent check-in SMS failed');
-    }
+    return await smsAcceptance(response, 'Agent check-in SMS failed');
   } catch (e) {
     debug('AGENT CHECKIN SMS FAILED', { message: e?.message || String(e) });
+    return smsFailure(e);
   }
 }
 
@@ -125,7 +145,7 @@ export async function sendLiveLoanOfficerFinancingAlert({
   preapproved = 'no'
 }) {
   const loanOfficerPhone = loanOfficer?.loan_officer_phone || loanOfficer?.phone || '';
-  if (!loanOfficerPhone) return;
+  if (!loanOfficerPhone) return smsSkipped();
 
   const message = [
     `Live Rel8tion financing request${address ? ` at ${address}` : ''}.`,
@@ -150,12 +170,10 @@ export async function sendLiveLoanOfficerFinancingAlert({
       })
     });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      throw new Error(raw || 'Loan officer financing SMS failed');
-    }
+    return await smsAcceptance(response, 'Loan officer financing SMS failed');
   } catch (e) {
     debug('LOAN OFFICER FINANCING SMS FAILED', { message: e?.message || String(e) });
+    return smsFailure(e);
   }
 }
 
@@ -165,7 +183,7 @@ export async function sendBuyerLoanOfficerIntroSMS({
   loanOfficer,
   propertyAddress
 }) {
-  if (!buyerPhone || !loanOfficer?.loan_officer_phone) return;
+  if (!buyerPhone || !loanOfficer?.loan_officer_phone) return smsSkipped();
 
   const name = loanOfficer.loan_officer_name || 'your financing specialist';
   const company = loanOfficer.loan_officer_company || 'NMB';
@@ -189,12 +207,10 @@ export async function sendBuyerLoanOfficerIntroSMS({
       })
     });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      throw new Error(raw || 'Buyer loan officer intro SMS failed');
-    }
+    return await smsAcceptance(response, 'Buyer loan officer intro SMS failed');
   } catch (e) {
     debug('BUYER LOAN OFFICER INTRO SMS FAILED', { message: e?.message || String(e) });
+    return smsFailure(e);
   }
 }
 
@@ -208,7 +224,7 @@ export async function sendBuyerConfirmationSMS({
   listingUrl,
   listingLabel = 'Property page'
 }) {
-  if (!buyerPhone) return;
+  if (!buyerPhone) return smsSkipped();
 
   const message = [
     `Thanks${buyerName ? ` ${buyerName}` : ''}, your open house request was received.`,
@@ -232,11 +248,10 @@ export async function sendBuyerConfirmationSMS({
       })
     });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      throw new Error(raw || 'Buyer confirmation SMS failed');
-    }
+    return await smsAcceptance(response, 'Buyer confirmation SMS failed');
   } catch (e) {
     debug('BUYER CONFIRMATION SMS FAILED', { message: e?.message || String(e) });
+    return smsFailure(e);
   }
 }
+

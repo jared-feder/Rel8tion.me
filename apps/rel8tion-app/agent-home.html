@@ -749,6 +749,8 @@
 
     function renderMembershipGate(agent, membership) {
       const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+      // Membership gates saved history, not the path to per-event sponsorship.
+      const startOpenHouse = eventPassStartRoute(membership.event_pass_code || eventPassCode);
       app.className = '';
       app.innerHTML = `
         <section class="hero">
@@ -756,13 +758,14 @@
             <div class="profile">
               <img class="avatar" src="${esc(agentPhotoUrl(agent) || 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png')}" alt="${esc(agent.name || 'Agent')}">
               <div>
-                <div class="badge">Event Pass · Membership Available</div>
+                <div class="badge">Event Pass · Ready For Your Next Open House</div>
                 <h1>${esc(agent.name || agentSlug)}</h1>
                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
               </div>
             </div>
             <div class="actions">
-              <button id="membershipCheckoutButton" class="btn" type="button" onclick="startEventPassMembershipCheckout()">Continue for ${esc(membership.checkout_label || 'monthly membership')}</button>
+              ${startOpenHouse ? `<a id="eventPassStartButton" class="btn" href="${esc(startOpenHouse)}">Start Open House · Sponsor Options</a>` : ''}
+              <button id="membershipCheckoutButton" class="btn secondary" type="button" onclick="startEventPassMembershipCheckout()">Full REL8TION · ${esc(membership.checkout_label || 'monthly membership')}</button>
               <a class="btn secondary" href="${esc(publicProfile)}">Open Digital Business Card</a>
               <a class="btn secondary" href="/pricing?role=agent">Compare Plans</a>
               <p id="membershipCheckoutStatus" class="sub" style="margin:0;"></p>
@@ -770,6 +773,10 @@
           </div>
         </section>
         <section class="layout" style="grid-template-columns:1fr;">
+          <div class="panel">
+            <h2>Continue with a loan officer sponsoring</h2>
+            <p class="empty">${startOpenHouse ? 'Select your next listing to see your loan officer sponsor and confirm free, event-only access. You will review and authorize the sponsor before the open house goes live. Full membership is optional.' : 'Scan the printed QR on this Event Pass to reconnect it, then select your next listing to review sponsorship options.'}</p>
+          </div>
           <div class="panel">
             <h2>Keep every event in your dashboard</h2>
             <p class="empty">REL8TION Agent is the ${esc(membership.checkout_label || '$29/month')} software membership for permanent check-in and disclosure records, event analytics and reporting, your digital profile, and assisted follow-up. The Event Pass remains event hardware. After membership, you can add the reusable $199 Open House Kit with a Smart Sign and custom company-branded Rel8tionChips as a separate one-time hardware purchase.</p>

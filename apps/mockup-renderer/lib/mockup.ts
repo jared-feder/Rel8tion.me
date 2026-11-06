@@ -18,10 +18,14 @@ export type MockupRenderInput = {
 async function fetchImageBuffer(url: string | null): Promise<Buffer | null> {
   if (!url) return null;
   try {
-    const res = await fetch(url);
+    // One stalled image CDN must not consume the entire cron invocation.
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const maxBytes = 12 * 1024 * 1024;
+    const advertisedBytes = Number(res.headers.get("content-length") || 0);
+    if (advertisedBytes > maxBytes) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    return bytes.length <= maxBytes ? bytes : null;
   } catch {
     return null;
   }
