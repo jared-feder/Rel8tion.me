@@ -411,3 +411,6 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+// Shared read-only source for the assistant; authorization belongs to its API.
+module.exports.assistantSource = { loadInboxRows, enrichInboxRows, loadThread };
