@@ -293,7 +293,7 @@ function eventStatusCallbackUrl(): string | undefined {
   if (!token || !supabaseUrl) return undefined;
   try {
     const override = clean(Deno.env.get("TWILIO_STATUS_CALLBACK_URL"));
-    const url = new URL(override || `${supabaseUrl.replace(/\\/$/, "")}/functions/v1/twilio-message-status`);
+    const url = new URL(override || `${supabaseUrl.replace(/\/$/, "")}/functions/v1/twilio-message-status`);
     if (url.protocol !== "https:") return undefined;
     url.searchParams.delete("queue_id");
     url.searchParams.delete("step");
