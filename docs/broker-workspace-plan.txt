@@ -1,0 +1,84 @@
+REL8TION broker workspace: implementation, compliance research and adoption plan
+November 6, 2026 | New York provisional first jurisdiction
+Branch: feature/broker-workspace-review-2026-11-06
+Base: buyer-AI test commit 7b70225533c1961719b64a1762ca1de530d2bf26
+
+Product direction
+The broker workspace sits above authorized agents in one office. Its first job is to make the broker's weekly supervision useful: see what happened, find the evidence, resolve exceptions, and move responsibility without losing relationships. Competition and recognition encourage participation; they should grow from reliable operating data. No pricing, paid entitlement, public ranking or production-data contract is changed by this work.
+
+What already exists (source inspected, not proof of live end-to-end behavior)
+1. apps/rel8tion-app/agent-dashboard.html:167-191 and 359-379 show buyer-level Agency, Housing and Courtesy status/date, and Open Disclosure Packet PDF when the current metadata checks pass. The personal home has signed counts, event-level counts and a Disclosure Packet link at agent-home.html:818-831, 909, 929, 995-1007. The home and event views use slightly different completion checks; reconcile these before representing a count as authoritative evidence.
+2. api/compliance/ny-disclosure.js builds official agency/housing forms plus the REL8TION courtesy notice and stores packet metadata including version, event/check-in IDs, host, buyer, storage path and SHA-256. Tests confirm versioned paths and prior packet descriptor history. A screenshot of a green status is not proof a retrievable, correctly executed original exists.
+3. Main-branch source was re-read through GitHub on Nov 6. Agent dashboard blob 2a0b97db70ad581957ecce8834d8e8730f190f94; disclosure API blob 84048b06056f84d9649b23490005d46fd6985b24. Source links:
+https://github.com/jared-feder/Rel8tion.me/blob/main/apps/rel8tion-app/agent-dashboard.html
+https://github.com/jared-feder/Rel8tion.me/blob/main/api/compliance/ny-disclosure.js
+4. lib/app-auth.js already defines broker/team.read/team.manage/team.invite, and lib/app-data.js:309 has workspace-assigned team event metrics. app.html provides the actual universal workspace shell; many secondary views remain module placeholders. There was no complete broker roster, custom-form publishing, cross-agent archive, reassignment workflow or office leaderboard in the inspected implementation.
+5. Permanent agent history and free sponsored-event visibility differ commercially. Required compliance evidence must remain preserved; the broker's compliance-access policy must be defined independently of an agent's paid history UI. Do not erase records when an agent leaves or stops paying.
+
+Built in this test branch
+- The actual universal app.html shell imports a broker domain module only for broker_preview=1 on localhost/127.0.0.1. Default authentication, other roles and existing domain routes remain intact. No standalone HTML redesign was created.
+- lib/broker-workspace.js holds synthetic per-session office state, an organization/role boundary, reporting calculations, roster drafts, safe removal, lead responsibility changes, form policy, evidence index and audit records.
+- api/broker-preview.js exports a disabled default. Only the dedicated loopback server enables it; Vercel, non-loopback peers and foreign origins are rejected. HttpOnly same-site session plus CSRF binds mutations to the server's fictional broker. Submitted actor/organization fields are ignored. This is a fixture auth boundary, not completed production RBAC.
+- Overview derives 8 distinct hosts, 12 held events, 11 with recorded check-ins, 134 attendance records and 124 distinct synthetic visitor identities for Nov 7-8. Individual event leader: Jackie Chen, Cedarhurst, 22. Report shows 131 signed-record flags, one refusal-record flag and two missing-record flags. All are explicitly fictional. An upcoming Nov 14 event and another office's adversarial records are excluded from the weekend totals.
+- Reports drill into individual events and distinguish host from listing agent; event CSV export is local. Calendar is an agenda of dated event slots, with both agents shown. A complete listing inventory, calendar write/swap workflow and overlap resolution are not built.
+- Roster adds a pending-verification draft using example.test addresses. No real account/invitation is created. Remove office access is a reversible-status model preserving history; assigned leads/upcoming events block removal until resolved. It does not change eAccessNY license affiliation.
+- An unrepresented fictional lead can be reassigned within the office with an audit reason. Origin, representation and independent channel consent are preserved. Existing representation, other-office or inactive targets are blocked. No message, AI enrollment or real CRM update occurs.
+- Evidence archive lists immutable synthetic check-in records per event and provides a synthetic JSON manifest. No actual executed disclosure PDF, refusal declaration or ZIP archive is delivered by this test API.
+- Form upload parses an unencrypted PDF up to 2 MB, hashes it, and holds it as an unpublished local draft pending scanning/review. Raw bytes are not returned in snapshots or rendered. A separate approved fictional supplemental form can be toggled for future Nov 14 policy preview. Live buyer check-in integration, field mapping, signature capture and publication of uploaded forms are not built. Required state disclosures cannot be replaced by this toggle; old evidence is unchanged.
+- Office challenge ranks attendance from the selected period, with shared ranks for ties. Sales production stays Not connected. Buyer/seller/peer badges appear only as a clearly labeled roadmap, with no fabricated votes or awards.
+- All state is session-local memory; restart loses it. Dedicated server port 8772, loopback only. No production database/env, real buyers, provider, billing, enrollment, invitation, outreach or deployment is used.
+
+Run and review
+node scripts/serve-broker-preview.cjs
+http://127.0.0.1:8772/broker?broker_preview=1
+This is a desktop-local URL, not a phone share link. Test on a narrow viewport via the same application. The exact branch has Git deployment disabled in all three Vercel configs.
+
+New York compliance research -> product requirements (reviewed Nov 6, 2026)
+This is a workflow baseline, not a certification of legal compliance or a complete transaction-management checklist. Confirm additional state, brokerage, association, MLS, transaction and insurer obligations with the broker's counsel before publication. The user has not yet confirmed jurisdictions; New York follows the Cedarhurst example.
+
+A. Agency relationship: RPL 443 addresses applicable residential disclosure timing, acknowledgement/copy delivery and minimum three-year retention. Refusal requires the prescribed sworn/affirmed factual declaration, not a manufactured signature. Implement separate delivered, signed, refused-with-declaration, missing and needs-review states; preserve declared agency and source evidence.
+Source: https://www.nysenate.gov/legislation/laws/RPP/443
+
+B. 19 NYCRR 175.21 calls for regular broker supervision and identifiable listing/transaction records. 175.23 specifies three-year recordkeeping for covered transactions, including relevant agreements. 175.28 governs fair-housing notice delivery and evidence retention, including electronic copies and refusal declarations. 175.29 includes office/website and open-house posting/availability requirements. Product: exception review queue, evidence export, dated supervision notes, transaction-file links, and an on-site posting checklist. A digital checkbox cannot prove the physical poster was displayed. Set retention by document type and applicable trigger; counsel must settle policy and legal holds, rather than auto-deleting every file exactly three years after check-in.
+Official DOS law/rules source: https://dos.ny.gov/real-estate-license-law (sections 175.21, 175.23, 175.28, 175.29)
+
+C. RPL 442-h(4) requires broker SOPs addressing specified buyer-service prerequisites, with dating/notarization, public site/app posting, availability and change-history obligations. DOS explains that filing a copy with the Department was removed. Product: approved office policy version, publication targets, effective dates, agent acknowledgements and update checks. Uploading a file alone does not establish notarization or legal approval.
+Sources: https://www.nysenate.gov/legislation/laws/RPP/442-H
+https://dos.ny.gov/standardized-operating-procedures
+
+D. Distinguish law from association rules. NAR's open-house guide says simply attending an open house without an agent does not require a written buyer agreement under its described policy. Product: no automatic conversion from visitor sign-in to exclusive representation. Buyer-agency agreements, marketing permission and financing consent require their own applicable workflow.
+Source: https://www.nar.realtor/the-facts/consumer-guide-to-open-houses-and-written-agreements
+
+E. Advertising: DOS describes listing-agent attribution and paid-advertisement disclosures for applicable third-party advertising. Product: public cards/listing promotion retain correct broker/listing identity and approved required notices. These are separate from an internal event attendance leaderboard.
+Source: https://dos.ny.gov/real-estate-advertising
+
+Immediate production blockers / first real rollout sequence
+1. Protect the existing signed-record API before expanding access. The inspected ny-disclosure handler has no visible session/agent/broker authorization check and uses service-role reads when given a check-in ID. Its GET download can regenerate/store a packet. No live exploit or real buyer document retrieval was attempted. Add server-verified agent/broker/compliance access, event/organization authorization and appropriate scoped consumer receipt access; preserve public unsigned form preview. Make archival reads non-mutating, and make any regeneration an explicit authorized audited operation preserving earlier artifacts. Deploy only after separate review and production authorization.
+2. Add authoritative organization, office and historical affiliation mappings on existing universal organizations/workspaces/memberships/domain assignments. Never grant access by matching a brokerage display-name string or user-editable metadata. Separate broker admin, office manager/compliance read, agent own scope and LO consent scope. Joining a new firm must not automatically reveal all prior-firm history.
+3. Durable private evidence storage: exact template bytes/hash, form version and effective policy snapshot, check-in/event/buyer/agent linkage, e-sign intent/consent evidence, timestamps and delivery records, immutable revisions, access/download log, retention/legal holds, encrypted backup/recovery and searchable metadata. At closeout enqueue an idempotent archiving job keyed by event/check-in/form version; failure stays visible and retryable without resending the recap or closing an event twice. Broker exports include an evidence manifest and authorized originals, with missing files explicitly listed. No fabricated or regenerated original.
+4. Form lifecycle: draft upload -> file validation/scanning -> field/schema mapping -> broker/legal approval -> office/state/transaction applicability -> future effective version -> visible buyer review and separately applicable acknowledgement/signature -> immutable archived receipt. Do not embed arbitrary executable PDF content or allow upload to silently replace required state forms. Provide accessible language/assistance routes and refusal handling approved by counsel.
+5. Real roster membership/invitation and lead transfer: verified identities, server-owned membership roles, explicit office scope, audited before/after, offboarding handoff and session revocation. Route transfer of represented clients through documented authorization/review; do not broaden marketing/LO consent or transfer financial application data. Preserve original agent credit and separate current responsibility.
+6. Connect broker-scoped read adapters and paginate full reporting data; never reuse the current limited agent list as a complete brokerage universe. Reconcile canonical check-in/disclosure status logic. Broker counts must distinguish scheduled, held, cancelled, incomplete setup and no recorded attendance. Publish data freshness, unavailable-source warnings and date scope.
+Supabase guidance used for this design (no schema or storage policy was applied):
+https://supabase.com/docs/guides/database/postgres/row-level-security
+https://supabase.com/docs/guides/storage/security/access-control
+
+Analytics that are useful enough to sell
+Weekend brief -> office -> agent -> property -> event -> evidence. Show total hosting agents; scheduled/held/cancelled events; held events with check-ins (11/12 = 91.7%); visits versus deduplicated identities; median attendance per held event including zeros; unique new relationships versus represented visitors; missing-record exceptions; follow-up eligibility/review/response and handoff counts when real channels exist. Give conversion stages explicit denominators and attribution windows; check-in is not an exclusive lead, a qualified buyer or a closed sale. Track listing-agent and host contributions separately. Add week-over-week changes only when coverage is comparable. Exports should support seller reports and broker meetings without exposing the visitor roster publicly.
+
+Gamification and awards roadmap
+Office-first, optional weekly/monthly challenges: consistent hosting, verified follow-through, teamwork and personal improvement. Keep activity, recognition and verified closed production separate; use appropriate office/market/time/tenure cohorts. Display how each rank is calculated; handle ties, corrections, duplicate/self/test activity and stale feeds. Avoid an opaque paid-placement score.
+Buyer/seller/peer recognition: one verified interaction can nominate a narrowly described badge such as Great communicator or Helpful teammate. Relationship type, date window, duplicate control, moderation, appeals and optional public display are required. Do not expose buyer identities or permit anonymous fabricated endorsements. An achievement badge reflects its published rule; it is not a state certification or a guarantee of results.
+Global production: only with an authorized, licensed MLS/broker/CRM source, defined closed-date window, sides versus transactions, team/member attribution rules, market scope and correction process. Self-reported numbers must be labeled separately from verified data. Do not scrape or invent external production. Broker permission does not substitute for the data provider's license. Public leaderboard/privacy choices are a later product release, not enabled here.
+
+Suggested release order
+First: protected evidence archive + exception queue + trusted office/event analytics.
+Second: complete roster/lead handoff, shared event/listing calendar and approved custom-form capture.
+Third: office challenges, private milestones and moderated recognition.
+Fourth: licensed verified production comparison and optional public/global profiles.
+Commercial hypothesis: brokers buy operating visibility, less document chasing and accountable follow-up; agents use it because check-in and work capture are easy, with recognition as a bonus. Measure time to first live event, weekly active offices/agents, complete evidence coverage, missing-record resolution time and verified follow-up outcomes before claiming savings or revenue gains.
+
+Verification and boundaries
+Focused unit/API tests cover derived totals, zeros/repeats, range and DST boundaries, tenant/role isolation, origin/consent preservation, representation blocking, roster history, audit trail, form draft validation/publication hold, unchanged historical evidence, API CSRF and deployment guard. Existing disclosure PDF, weekly production archive, universal auth and buyer AI tests run alongside them. Browser walkthrough and screenshot evidence are recorded in the completion handoff. No claim of production authentication, real signed PDFs, state compliance certification, live custom forms, badges, MLS feed or global leaderboard is made.
+
+AGENTS.md disposition: updated with the durable broker archive, attribution and preview boundaries. Existing paid buyer-AI work is retained; this branch is additive. Jared's Assistant COMMAND files and the separate worktree are untouched.

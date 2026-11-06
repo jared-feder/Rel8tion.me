@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Broker workspace and office analytics - isolated test branch
+
+- `[PARTIAL, TEST ONLY]` `feature/broker-workspace-review-2026-11-06` builds on buyer-AI commit `7b70225`. The actual universal app shell has an explicit loopback broker fixture module, derived office/event attendance reports, event evidence index, shared agenda, pending roster drafts, guarded lead reassignment, audit records, PDF draft intake, future supplemental-form policy preview and office attendance ranks. Synthetic office/visitor data only; no production adapter, signed-PDF archive, invitations, live custom-form capture, awarded badges or production feed is connected.
+- `[RESEARCH]` New York compliance sources reviewed Nov 6; state scope remains provisional. See `docs/broker-workspace-plan.txt` for exact current disclosure UI, broker foundation, legal sources, release order, gamification/production-data requirements and missing functionality.
+- `[BLOCKER]` Main disclosure API source lacks a visible per-record authorization gate and can regenerate/store packets on GET; protect access and preserve originals before broker expansion. No real buyer document was retrieved or live security exploit attempted.
+- `[PRESERVED]` Buyer AI, free Event Pass notifications, production auth/billing, COMMAND and Jared's Assistant worktree are unchanged. Broker API is disabled by default and Vercel/non-loopback requests fail closed. Exact review branch deployments are disabled in all three configs.
+- `[VERIFIED]` 65 focused tests passed: 14 broker policy/API/date cases plus existing disclosure PDF, weekly archive, universal auth and buyer AI coverage. Architecture and route checks passed. Browser verified roster draft, originating-agent-preserving lead transfer, future-form policy, evidence drill-down and attendance ranking; 430px overview/compliance layouts had no document overflow. Form PDF validation was API-tested; browser file-picker upload, production auth/storage/consent, real originals, live form publication, licenses/MLS data and actual phone hardware were not tested.
+
 ## 2026-11-06: Paid-agent buyer conversation integration — isolated test branch
 
 - `[PARTIAL, TEST ONLY]` Added a server-side buyer conversation service and UI section inside the existing personal `/agent-home` renderer. Synthetic event/profile leads retain originating-agent context across visits. A session-scoped loopback API runs eligible first-touch drafts, simulated SMS/email attempts, buyer replies, sourced preference memory, fictional property matches and agent-reviewed showing/consultation/offer-preparation handoffs.

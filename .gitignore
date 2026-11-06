@@ -27,3 +27,5 @@ buyer-ai-server.log
 buyer-ai-server-errors.log
 buyer-ai-server.pid
 buyer-ai-verification.log
+broker-preview*.log
+broker-preview*.pid

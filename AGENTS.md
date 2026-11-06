@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Broker Workspace Boundaries
+
+- Broker compliance evidence must remain preserved independently of paid agent history UI or roster offboarding. Never delete or rewrite original signed packets to remove office access. Separate captured, delivered, signed, refusal-declaration, missing and reviewed evidence states; do not infer legal execution from a dashboard badge.
+- Before broker archive integration, resolve per-record server authorization and mutating GET behavior in `api/compliance/ny-disclosure.js`. Preserve the unsigned consumer form preview and legitimate scoped consumer receipts; do not expose signed evidence by a guessed record ID or regenerate it silently as an original.
+- Broker lead reassignment must preserve originating-agent credit, representation, per-channel permission, suppression and LO consent. Listing agent, hosting agent, source agent and current responsible agent are distinct. An office role does not override an existing buyer relationship.
+- Broker preview is explicit loopback-only fixture work in the actual universal shell. The deployed API default is disabled, synthetic records are not production compliance proof, and uploaded drafts are not automatically approved/published. Keep review-branch auto-deployment disabled; do not claim private badges, global ranks or MLS production verified until their sources and controls are implemented.
+
 ## Paid-agent buyer AI test slice
 
 - `lib/buyer-ai/*`, `/api/buyer-ai-preview` and the explicit loopback `agent-home?buyer_ai_preview=1` entry are synthetic integration work only. The default API handler is disabled; the dedicated local server enables only fictional workspaces. Preserve the Vercel/loopback/session/CSRF guards and exact-branch deployment disablement for `feature/buyer-ai-paid-agent-slice-2026-11-06` in all three Vercel configs.

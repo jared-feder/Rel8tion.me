@@ -8,6 +8,8 @@
     "verify:buyer-continuity": "node --test test/buyer-continuity.test.cjs",
     "verify:buyer-ai": "node --test test/buyer-ai-workspace.test.cjs",
     "preview:buyer-ai": "node scripts/serve-buyer-ai-preview.cjs",
+    "preview:broker": "node scripts/serve-broker-preview.cjs",
+    "verify:broker": "node --test test/broker-workspace.test.cjs",
     "verify:app": "node scripts/verify-app-architecture.cjs",
     "pricing:stripe:dry-run": "node scripts/sync-stripe-pricing.cjs --dry-run",
     "pricing:stripe:apply": "node scripts/sync-stripe-pricing.cjs --apply",

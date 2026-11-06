@@ -645,6 +645,8 @@
   <script>
     (() => {
       const root = document.getElementById('app');
+      const brokerFixture = ['127.0.0.1', 'localhost'].includes(location.hostname)
+        && new URLSearchParams(location.search).get('broker_preview') === '1';
       const state = {
         session: null,
         home: null,
@@ -655,7 +657,15 @@
         view: routeView(location.pathname)
       };
 
-      const NAV = [
+      const NAV = brokerFixture ? [
+        ['home', 'Overview', '', 'app.home'],
+        ['team', 'Agent roster', '', 'team.read'],
+        ['contacts', 'Lead assignment', '', 'contacts.read'],
+        ['events', 'Office calendar', '', 'events.read'],
+        ['reports', 'Open-house results', '', 'reports.read'],
+        ['compliance', 'Compliance', '', 'team.read'],
+        ['leaderboard', 'Office challenge', '', 'reports.read']
+      ] : [
         ['home', 'Home', '⌂', 'app.home'],
         ['relationships', 'Relationships', '◎', 'relationships.read'],
         ['contacts', 'Contacts', '◇', 'contacts.read'],
@@ -871,8 +881,8 @@
 
       function navMarkup(mobile = false) {
         const items = permittedNav();
-        const visible = mobile ? items.slice(0, 4) : items;
-        const withMore = mobile && items.length > 4 ? [...visible, ['settings', 'More', '•••', 'settings.manage']] : visible;
+        const visible = mobile && !brokerFixture ? items.slice(0, 4) : items;
+        const withMore = mobile && !brokerFixture && items.length > 4 ? [...visible, ['settings', 'More', '•••', 'settings.manage']] : visible;
         return withMore.map(([view, label, icon]) => `
           <a class="${mobile ? '' : 'nav-link '}${state.view === view ? 'active' : ''}" href="${view === 'home' ? '/' : `/${view}`}" data-view="${esc(view)}">
             ${mobile ? `<b>${esc(icon)}</b><span>${esc(label)}</span>` : `<span class="nav-icon">${esc(icon)}</span><span>${esc(label)}</span>`}
@@ -913,6 +923,11 @@
           </div>
           <nav class="mobile-nav" aria-label="Mobile application navigation">${navMarkup(true)}</nav>`;
         bindShell();
+        if (brokerFixture && workspace.role === 'broker') {
+          import('/apps/rel8tion-app/src/modules/broker/workspace.js')
+            .then(({ mountBrokerWorkspace }) => mountBrokerWorkspace(state.view))
+            .catch((error) => { document.getElementById('viewContent').textContent = error.message; });
+        }
       }
 
       function homeView() {
@@ -1034,7 +1049,7 @@
           if (event.currentTarget.origin && event.currentTarget.origin !== location.origin) return;
           event.preventDefault();
           state.view = event.currentTarget.dataset.view || 'home';
-          history.pushState({}, '', state.view === 'home' ? '/' : `/${state.view}`);
+            history.pushState({}, '', (state.view === 'home' ? '/' : `/${state.view}`) + (brokerFixture ? '?broker_preview=1' : ''));
           appShell();
         }));
         document.getElementById('aiForm')?.addEventListener('submit', (event) => {
