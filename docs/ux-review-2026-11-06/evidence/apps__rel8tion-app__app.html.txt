@@ -1,0 +1,132 @@
+Source: apps/rel8tion-app/app.html
+Ref: main, fetched 2026-11-06
+Git blob SHA: 6a533da409a425d7dda4a80a5dd8ee30cfe2d2a2
+
+720:         const showAuth = ['signin', 'invite'].includes(state.intent) || Boolean(state.error) || Boolean(noticeText());
+721:         root.innerHTML = `
+722:           <div class="gateway">
+723:             <header class="gateway-header">
+724:               <a class="brand" href="/" aria-label="Rel8tion application home"><img class="brand-logo" src="https://rel8tion.me/wp-content/uploads/2026/04/logo150x100trans.png" alt="Rel8tion"></a>
+725:               <a class="quiet-link" href="https://rel8tion.me">Visit rel8tion.me</a>
+726:             </header>
+727:             <main class="gateway-main">
+728:               <section class="gateway-copy">
+729:                 <p class="eyebrow">The relationship operating system</p>
+730:                 <h1>Know what matters. Do what’s next.</h1>
+731:                 <p class="gateway-lede">One secure application for open houses, buyer follow-up, lending support, team accountability, and the relationships that move real estate forward.</p>
+732:                 <div class="gateway-points" aria-label="Rel8tion application capabilities">
+733:                   <span>Role-aware</span><span>Action-first</span><span>Mobile-ready</span><span>Permission-scoped</span>
+734:                 </div>
+735:               </section>
+736:               <section class="gateway-card" aria-labelledby="gateway-title">
+737:                 <h2 id="gateway-title">Open Rel8tion</h2>
+738:                 <p>Choose the path that matches why you’re here.</p>
+739:                 ${noticeText() ? `<div class="notice">${esc(noticeText())}</div>` : ''}
+740:                 <div class="gateway-actions">
+741:                   <button class="action-button primary" type="button" data-intent="signin"><span>Sign in</span><span class="arrow">→</span></button>
+742:                   <a class="action-button" href="/claim"><span>Activate my Rel8tion device</span><span class="arrow">↗</span></a>
+743:                   <button class="action-button" type="button" data-intent="invite"><span>I was invited</span><span class="arrow">→</span></button>
+744:                   <button class="action-button" type="button" data-intent="code"><span>Enter event or activation code</span><span class="arrow">→</span></button>
+745:                 </div>
+746:                 <div class="auth-panel" ${showAuth ? '' : 'hidden'}>
+747:                   ${authPanel()}
+748:                 </div>
+749:               </section>
+750:             </main>
+751:             <footer class="gateway-footer">Rel8tion keeps application access separate from the public marketing website and internal platform administration.</footer>
+752:           </div>`;
+753:         bindGateway();
+754:       }
+755: 
+756:       function authPanel() {
+757:         if (state.intent === 'code') {
+758:           return `
+759:             <form id="codeForm" class="form-grid">
+760:               <div class="notice info">Enter the code printed on the Event Pass, Smart Sign, or activation material.</div>
+761:               <label class="form-label">Event or activation code<input class="form-input" name="code" autocomplete="one-time-code" required placeholder="Enter code"></label>
+762:               <button class="submit-button" type="submit">Continue securely</button>
+763:             </form>`;
+764:         }
+765:         const invited = state.intent === 'invite';
+766:         return `
+767:           <form id="signinForm" class="form-grid">
+768:             ${invited ? '<div class="notice info">Use the account credentials from your invitation. If your invitation includes a secure link, open that original link to finish setup.</div>' : ''}
+769:             ${state.error ? `<div class="notice">${esc(state.error)}</div>` : ''}
+770:             <label class="form-label">Email<input class="form-input" type="email" name="email" autocomplete="username" required></label>
+771:             <label class="form-label">Password<input class="form-input" type="password" name="password" autocomplete="current-password" required></label>
+772:             <button class="submit-button" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Signing in…' : 'Sign in to Rel8tion'}</button>
+773:           </form>`;
+774:       }
+775: 
+776:       function bindGateway() {
+777:         document.querySelectorAll('[data-intent]').forEach((button) => button.addEventListener('click', () => {
+778:           state.intent = button.dataset.intent;
+779:           state.error = '';
+
+---
+
+940:               </section>
+941:               <section class="panel">
+942:                 <div class="panel-heading"><h2>Today</h2><span class="panel-kicker">Only your authorized scope</span></div>
+943:                 <div class="metrics">${metricsMarkup(data.today)}</div>
+944:               </section>
+945:               <section class="panel">
+946:                 <div class="panel-heading"><h2>Relationships requiring attention</h2><span class="panel-kicker">${data.relationships.length} assigned</span></div>
+947:                 <div class="relationship-list">${relationshipsMarkup(data.relationships)}</div>
+948:               </section>
+949:             </div>
+950:             <div class="stack">
+951:               <section class="panel">
+952:                 <div class="panel-heading"><h2>Quick actions</h2><span class="panel-kicker">Permission-based</span></div>
+953:                 <div class="quick-grid">${data.quick_actions.length ? data.quick_actions.map((item) => `<a class="quick-action" href="${esc(item.href)}">${esc(item.label)} →</a>`).join('') : emptyMarkup('No actions available', 'This workspace has not been granted action permissions.')}</div>
+954:               </section>
+955:               <section class="panel">
+956:                 <div class="panel-heading"><h2>Recent activity</h2><span class="panel-kicker">Workspace scoped</span></div>
+957:                 <div class="activity-list">${activityMarkup(data.activity)}</div>
+958:               </section>
+959:               <section class="panel ai-panel">
+960:                 <div class="panel-heading"><h2>Ask Rel8tion</h2><span class="panel-kicker">Command preview</span></div>
+961:                 <form class="ai-form" id="aiForm">
+962:                   <input class="ai-input" name="command" required placeholder="Build today’s priority list…">
+963:                   <button class="button" type="submit">Ask</button>
+964:                 </form>
+965:                 <p class="ai-help" id="aiHelp">The command service is intentionally read-only and not connected in this preview. Rel8tion will never claim an action completed when it did not.</p>
+966:               </section>
+967:             </div>
+
+---
+
+1014:           </details>`;
+1015:       }
+1016: 
+1017:       function secondaryView() {
+1018:         const labels = Object.fromEntries(NAV.map(([key, label]) => [key, label]));
+1019:         const label = labels[state.view] || 'Workspace';
+1020:         const role = state.home.workspace.role_label;
+1021:         return `
+1022:           <section class="hero">
+1023:             <div><p class="eyebrow">${esc(role)}</p><h1>${esc(label)}</h1><p>This section uses the same server-verified workspace and permission scope as your home dashboard.</p></div>
+1024:           </section>
+1025:           <section class="panel view-panel">
+1026:             ${emptyMarkup(`${label} workspace is ready for domain modules`, 'The shared shell and authorization boundary are active. Existing production workflows remain available through their current routes while this module is connected incrementally.')}
+1027:           </section>`;
+1028:       }
+1029: 
+1030:       function bindShell() {
+1031:         document.getElementById('workspaceSelect')?.addEventListener('change', (event) => loadHome(event.target.value));
+1032:         document.getElementById('signOutButton')?.addEventListener('click', signOut);
+1033:         document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => {
+1034:           if (event.currentTarget.origin && event.currentTarget.origin !== location.origin) return;
+1035:           event.preventDefault();
+1036:           state.view = event.currentTarget.dataset.view || 'home';
+1037:           history.pushState({}, '', state.view === 'home' ? '/' : `/${state.view}`);
+1038:           appShell();
+1039:         }));
+1040:         document.getElementById('aiForm')?.addEventListener('submit', (event) => {
+1041:           event.preventDefault();
+1042:           const command = String(new FormData(event.currentTarget).get('command') || '').trim();
+1043:           const help = document.getElementById('aiHelp');
+1044:           if (help) help.textContent = command
+1045:             ? `“${command}” was not executed. The AI command service is not connected in this preview.`
+1046:             : 'Enter a command to preview the interaction.';
+1047:         });
