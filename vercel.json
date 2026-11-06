@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": {
+    "api/admin/assistant.js": { "maxDuration": 60 },
     "api/cron/assistant-notifications.js": { "maxDuration": 60 },
     "api/cron/refresh-open-house-data.js": {
       "maxDuration": 300

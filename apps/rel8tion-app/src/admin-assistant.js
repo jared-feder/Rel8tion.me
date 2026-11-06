@@ -114,7 +114,7 @@ window.createAssistantPanel = function ({api, esc, refresh}) {
     document.getElementById('assistant-search')?.addEventListener('change',e=>{search=e.target.value;refresh();});
     document.getElementById('assistant-draft')?.addEventListener('input',e=>{drafts.set(selected,e.target.value);request=null;});
     document.getElementById('assistant-compose')?.addEventListener('submit',e=>{e.preventDefault();const t=current(),m=inbound(t);if(!m)return;request=request||{request_id:crypto.randomUUID(),thread_key:selected,in_reply_to:m.id,body:drafts.get(selected)||'',action:'draft'};act(request);});
-    document.querySelectorAll('[data-assistant-action]').forEach(b=>{b.disabled=busy;b.addEventListener('click',()=>{const action=b.dataset.assistantAction,record=data.actions.find(a=>a.id===b.dataset.id);if(action==='send'){sendReview={id:record.id,fingerprint:record.fingerprint,body:record.body,recipient_phone:record.recipient_phone};refresh();return;}act({action,id:b.dataset.id,...(action==='send'?{fingerprint:record?.fingerprint}:{})});});});
+    document.querySelectorAll('[data-assistant-action]').forEach(b=>{b.disabled=busy||!data?.permissions?.includes(b.dataset.assistantAction);b.addEventListener('click',()=>{const action=b.dataset.assistantAction,record=data.actions.find(a=>a.id===b.dataset.id);if(action==='send'){sendReview={id:record.id,fingerprint:record.fingerprint,body:record.body,recipient_phone:record.recipient_phone};refresh();return;}act({action,id:b.dataset.id,...(action==='send'?{fingerprint:record?.fingerprint}:{})});});});
   }
   return {render,bind,load};
 };
