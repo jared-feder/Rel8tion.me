@@ -1,0 +1,199 @@
+Source: apps/rel8tion-app/agent-home.html
+Ref: main, fetched 2026-11-06
+Git blob SHA: 613d4f491f0dee9fc110118279cb314978cc1cef
+
+750:     function renderMembershipGate(agent, membership) {
+751:       const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+752:       // Membership gates saved history, not the path to per-event sponsorship.
+753:       const startOpenHouse = eventPassStartRoute(membership.event_pass_code || eventPassCode);
+754:       app.className = '';
+755:       app.innerHTML = `
+756:         <section class="hero">
+757:           <div class="hero-grid">
+758:             <div class="profile">
+759:               <img class="avatar" src="${esc(agentPhotoUrl(agent) || 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png')}" alt="${esc(agent.name || 'Agent')}">
+760:               <div>
+761:                 <div class="badge">Event Pass · Ready For Your Next Open House</div>
+762:                 <h1>${esc(agent.name || agentSlug)}</h1>
+763:                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
+764:               </div>
+765:             </div>
+766:             <div class="actions">
+767:               ${startOpenHouse ? `<a id="eventPassStartButton" class="btn" href="${esc(startOpenHouse)}">Start Open House · Sponsor Options</a>` : ''}
+768:               <button id="membershipCheckoutButton" class="btn secondary" type="button" onclick="startEventPassMembershipCheckout()">Full REL8TION · ${esc(membership.checkout_label || 'monthly membership')}</button>
+769:               <a class="btn secondary" href="${esc(publicProfile)}">Open Digital Business Card</a>
+770:               <a class="btn secondary" href="/pricing?role=agent">Compare Plans</a>
+771:               <p id="membershipCheckoutStatus" class="sub" style="margin:0;"></p>
+772:             </div>
+773:           </div>
+774:         </section>
+775:         <section class="layout" style="grid-template-columns:1fr;">
+776:           <div class="panel">
+777:             <h2>Continue with a loan officer sponsoring</h2>
+778:             <p class="empty">${startOpenHouse ? 'Select your next listing to see your loan officer sponsor and confirm free, event-only access. You will review and authorize the sponsor before the open house goes live. Full membership is optional.' : 'Scan the printed QR on this Event Pass to reconnect it, then select your next listing to review sponsorship options.'}</p>
+779:           </div>
+780:           <div class="panel">
+781:             <h2>Keep every event in your dashboard</h2>
+782:             <p class="empty">REL8TION Agent is the ${esc(membership.checkout_label || '$29/month')} software membership for permanent check-in and disclosure records, event analytics and reporting, your digital profile, and assisted follow-up. The Event Pass remains event hardware. After membership, you can add the reusable $199 Open House Kit with a Smart Sign and custom company-branded Rel8tionChips as a separate one-time hardware purchase.</p>
+783:             ${membershipNotice === 'canceled' ? '<p class="empty" style="color:#b45309;">Checkout was canceled. Nothing was charged.</p>' : ''}
+784:             ${membershipError ? `<p class="empty" style="color:#b91c1c;">${esc(membershipError)}</p>` : ''}
+785:           </div>
+
+---
+
+844:     function renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard, membership }) {
+845:       const checkinsByEvent = checkins.reduce((map, row) => {
+846:         const key = row.open_house_event_id || '';
+847:         if (!map[key]) map[key] = [];
+848:         map[key].push(row);
+849:         return map;
+850:       }, {});
+851:       const signedCount = checkins.filter((row) => disclosureSummary(row).signed).length;
+852:       const activeEvents = events.filter((event) => eventStatus(event) === 'live');
+853:       const fallbackPhoto = 'https://rel8tion.me/wp-content/uploads/2026/04/updateprofile.png';
+854:       const photo = agentPhotoUrl(agent) || fallbackPhoto;
+855:       const publicProfile = `/b?agent=${encodeURIComponent(agentSlug)}`;
+856:       const memberHardware = `/kit-intake?plan=member_hardware&source=agent_dashboard&uid=${encodeURIComponent(uid)}&agent=${encodeURIComponent(agentSlug)}`;
+857:       const onboarding = `/onboarding?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
+858:       const resolvedEventPassCode = eventPassCode || membership?.event_pass_code || '';
+859:       const activateSign = membership?.event_pass_device
+860:         ? eventPassStartRoute(resolvedEventPassCode)
+861:         : `/sign-demo-activate?agent=${encodeURIComponent(agentSlug)}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`;
+862:       const editProfile = uid ? `/claim?uid=${encodeURIComponent(uid)}&edit=profile` : '';
+863:       const pendingQrCode = readPendingChipQrCode();
+864:       let qrLinkError = '';
+865:       try {
+866:         qrLinkError = window.sessionStorage.getItem('rel8tion_chip_qr_link_error') || '';
+867:         if (qrLinkError) window.sessionStorage.removeItem('rel8tion_chip_qr_link_error');
+868:       } catch (_) {}
+869: 
+870:       app.className = '';
+871:       app.innerHTML = `
+872:         <section class="hero">
+873:           <div class="hero-grid">
+874:             <div class="profile">
+875:               <img class="avatar" src="${esc(photo)}" onerror="this.onerror=null;this.src='${esc(fallbackPhoto)}';" alt="${esc(agent.name || 'Agent')}">
+876:               <div>
+877:                 <div class="badge">${membership?.event_pass_device ? 'REL8TION Agent · Event Pass Connected' : 'Personal Agent Dashboard'}</div>
+878:                 <h1>${esc(agent.name || agentSlug || 'Agent')}</h1>
+879:                 <div class="meta">${esc([agent.brokerage, displayPhone(agent.phone || agent.phone_normalized), agent.email].filter(Boolean).join(' | '))}</div>
+880:               </div>
+881:             </div>
+882:             <div class="actions">
+883:               ${membership?.event_pass_device && activateSign ? `<a class="btn" href="${esc(activateSign)}">Start Open House</a>` : ''}
+884:               <a class="btn${membership?.event_pass_device ? ' secondary' : ''}" href="${esc(publicProfile)}">Open Digital Business Card</a>
+885:               ${editProfile ? `<a class="btn secondary" href="${esc(editProfile)}">Edit Profile</a>` : ''}
+886:               ${!membership?.event_pass_device ? `<a class="btn secondary" href="${esc(activateSign)}">Activate Smart Sign</a>` : ''}
+887:               <a class="btn secondary" href="${esc(onboarding)}">Manage Setup</a>
+888:             </div>
+889:           </div>
+890:           <div class="stats">
+891:             <div class="stat"><span>Open houses</span><strong>${events.length}</strong></div>
+892:             <div class="stat"><span>Event check-ins</span><strong>${checkins.length}</strong></div>
+893:             <div class="stat"><span>Signed docs</span><strong>${signedCount}</strong></div>
+894:             <div class="stat"><span>LO guidance</span><strong>${guidance.length}</strong></div>
+895:           </div>
+896:           ${profileSaved ? '<div class="mini" style="margin-top:14px;display:inline-flex;background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.28);color:#047857;">Profile saved</div>' : ''}
+897:         </section>
+898: 
+899:         <section class="layout">
+900:           <div class="panel">
+901:             <h2>Open Houses</h2>
+902:             <div class="list">
+903:               ${events.length ? events.map((event) => {
+904:                 const status = eventStatus(event);
+905:                 const rows = checkinsByEvent[event.id] || [];
+906:                 const address = eventAddress(event, houseMap);
+907:                 const dashboard = `/agent-dashboard?agent=${encodeURIComponent(agentSlug)}&event=${encodeURIComponent(event.id)}${event.smart_sign_id ? `&sign_id=${encodeURIComponent(event.smart_sign_id)}` : ''}`;
+908:                 return `
+909:                   <article class="event-card">
+910:                     <div class="row">
+911:                       <div>
+912:                         <p class="title">${esc(address)}</p>
+913:                         <p class="sub">${esc(fmtDate(event.start_time || event.created_at))} | ${rows.length} check-ins | ${rows.filter((row) => disclosureSummary(row).signed).length} signed disclosure sets</p>
+914:                       </div>
+915:                       <span class="status ${esc(status)}">${esc(status)}</span>
+916:                     </div>
+917:                     <div class="mini-actions">
+918:                       <a class="mini" href="${esc(dashboard)}">Open Event Dashboard</a>
+919:                       ${rows.length ? `<a class="mini" href="#leads">View Leads</a>` : ''}
+920:                     </div>
+921:                   </article>
+922:                 `;
+923:               }).join('') : '<p class="empty">No open houses are saved to this agent yet. Event Pass and Smart Sign events will appear here after setup.</p>'}
+924:             </div>
+925:           </div>
+926: 
+927:           <aside class="panel">
+928:             <h2>Next Tools</h2>
+929:             <div class="list">
+930:               <div class="event-card">
+931:                 <p class="title">Public QR profile stays public.</p>
+932:                 <p class="sub">Printed QR codes should open the share/contact profile. NFC opens this owner dashboard.</p>
+933:                 <div class="mini-actions"><a class="mini" href="${esc(publicProfile)}">Preview Public Page</a></div>
+934:               </div>
+935:               ${kitDashboard?.dashboard_url ? `
+936:                 <div class="event-card">
+937:                   <p class="title">Open House Kit Setup</p>
+938:                   <p class="sub">This Rel8tionChip is connected to a paid Open House Kit order.</p>
+939:                   <div class="mini-actions"><a class="mini" href="${esc(kitDashboard.dashboard_url)}">Open Kit Dashboard</a></div>
+940:                 </div>
+941:               ` : ''}
+942:               ${membership?.event_pass_device && !kitDashboard?.dashboard_url ? `
+943:                 <div class="event-card">
+944:                   <p class="title">Make it your permanent branded system</p>
+945:                   <p class="sub">Your $29/month membership keeps the software, history, analytics, and reporting active. Add the reusable Smart Sign and custom company-branded Rel8tionChips for $199 one time—no second membership charge.</p>
+946:                   <div class="mini-actions"><a class="mini" href="${esc(memberHardware)}">Get My Branded Open House Kit</a></div>
+947:                 </div>
+948:               ` : ''}
+949:               <div class="event-card">
+950:                 <p class="title">Link My Keychain QR</p>
+951:                 <p class="sub">${qrLinks.length ? 'This keychain QR is connected to your public profile.' : 'Enter the printed QR code or paste the QR URL from your Rel8tionChip.'}</p>
+952:                 ${qrLinks.length ? qrLinks.map((row) => `
+953:                   <div class="mini-actions">
+954:                     <a class="mini" href="${esc(row.qr_url || `/c/${row.chip_code}`)}" target="_blank" rel="noopener">${esc(row.chip_code || 'Open QR')}</a>
+955:                     <span class="mini">linked</span>
+956:                   </div>
+957:                 `).join('') : `
+958:                   <input id="keychain_qr_code" value="${esc(pendingQrCode)}" placeholder="Code or QR URL" style="width:100%;margin-top:12px;border:1px solid rgba(23,44,118,.12);border-radius:16px;background:rgba(255,255,255,.86);padding:12px 14px;font:800 14px/1.2 Inter,sans-serif;color:#17224f;">
+959:                   <div class="mini-actions"><button class="mini" type="button" onclick="linkKeychainQr()">Link QR</button></div>
+960:                   <p id="keychain_qr_status" class="sub">${esc(qrLinkError)}</p>
+961:                 `}
+962:               </div>
+963:               <div class="event-card">
+964:                 <p class="title">Follow-up engine</p>
+965:                 <p class="sub">SMS drips, buyer follow-up, LO review requests, and review/social prompts will hang off this permanent dashboard.</p>
+966:               </div>
+967:               <div class="event-card">
+968:                 <p class="title">Affordability guidance</p>
+969:                 <p class="sub">${scenarios.length} saved property scenarios and ${guidance.length} active LO guidance records are connected to this agent.</p>
+970:               </div>
+971:             </div>
+972:           </aside>
+973:         </section>
+974: 
+975:         <section id="leads" class="panel" style="margin-top:18px;">
+976:           <h2>Recent Leads & Compliance</h2>
+977:           <div class="list">
+978:             ${checkins.length ? checkins.slice(0, 40).map((lead) => {
+979:               const docs = disclosureSummary(lead);
+980:               const event = events.find((row) => row.id === lead.open_house_event_id) || {};
+981:               return `
+982:                 <article class="lead-card">
+983:                   <div class="row">
+984:                     <div>
+985:                       <p class="title">${esc(lead.visitor_name || lead.name || 'Open house visitor')}</p>
+986:                       <p class="sub">${esc([displayPhone(lead.visitor_phone || lead.phone), lead.visitor_email || lead.email, eventAddress(event, houseMap)].filter(Boolean).join(' | '))}</p>
+987:                     </div>
+988:                     <span class="status ${docs.signed ? 'live' : 'missing'}">${docs.signed ? 'docs signed' : 'docs missing'}</span>
+989:                   </div>
+990:                   <div class="mini-actions">
+991:                     ${docs.pdfUrl ? `<a class="mini" href="${esc(docs.pdfUrl)}" target="_blank" rel="noopener">Disclosure Packet</a>` : ''}
+992:                     ${lead.buyer_id ? `<span class="mini">Buyer linked</span>` : '<span class="mini">Buyer sync pending</span>'}
+993:                   </div>
+994:                 </article>
+995:               `;
+996:             }).join('') : '<p class="empty">No event check-ins yet. Buyer leads will collect here permanently once events are run through Rel8tion.</p>'}
+997:           </div>
+998:         </section>
+999:       `;
