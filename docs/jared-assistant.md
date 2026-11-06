@@ -2,7 +2,7 @@
 
 ## Current manual-send and push patch
 
-Branch: feature/assistant-send-push. The sections below describing the earlier simulation release are historical until this patch is released.
+Published through PR #91, production commit 188cb69b2ea22ed6e719514d85659bde9bb9fc4a. Manual sending is enabled for strongly authenticated owner-approved replies. Push delivery remains inactive pending key approval and device permission. The sections below describing the earlier simulation release are historical.
 
 POST action send requires the existing strong owner token, an approved saved id and its fingerprint. The API compare-and-set claims a dispatch UUID; the protected send-assistant-reply Edge function claims provider submission separately before rechecking the latest inbound, unique active recipient, global suppression, exact 844-821-1802 sender and 9 AM-8 PM New York window. Cat's existing scoped capabilities cannot approve or send. A duplicate, timeout or unknown outcome cannot submit again. Cron reconciliation reads uniquely matched existing Twilio receipts only; acceptance is distinct from delivery. New direct inbound replies are resolved against recent attributed SMS and a unique verified profile, so an old queue property cannot trigger its automatic Y/N text.
 

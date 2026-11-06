@@ -1,5 +1,14 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Assistant sending release verified live
+
+- [LIVE] PR #90 staged and PR #91 released the reviewed integration. Production commit 188cb69b2ea22ed6e719514d85659bde9bb9fc4a is READY on Vercel deployment dpl_2pUp1DcsgUWLS6AoBobVZmno3zK5, aliased to app.rel8tion.me. Production-only ASSISTANT_MANUAL_SEND_ENABLED=true is configured. Manual replies still require the existing strong owner token, immutable approval and final exact-message confirmation; Cat capabilities cannot approve/send, and trusted broker issuance remains unconfigured.
+- [LIVE BACKEND] send-assistant-reply version 1 and twilio-inbound-reply version 74 keep JWT verification enabled; the existing public twilio-inbound-router version 55 verifies Twilio signatures/account before forwarding. Public anon calls to protected functions returned 401 and an unsigned router probe returned 403, without contacting real recipients. Owner review SMS fallback is removed; Event Pass/assignment/buyer SMS remains intact.
+- [VERIFIED] All 85 focused regressions, Deno checks, route-map/architecture/Rel8tionOS checks, GitHub Branch Safety/Repo Checks and 28 production route probes passed. Live assistant GET reports sending_ready=true, calendar_verified=true and read-only permissions/no private actions for legacy COMMAND UID access. Page, final confirmation module and push worker return 200. No live delivery or notification test was sent.
+- [PUSH INACTIVE] Web Push routes/outbox/worker are published, but no VAPID key pair was created or configured and there are zero subscriptions. Specific approval for a persistent VAPID credential in Vercel production and permission on each device remain required. No paid SMS fallback exists. Provider acceptance does not prove notification display or sound.
+- [UNCHANGED] Proactive outreach paused=true and operator mode=away. No event assignment or duplicate Fidel text was made during this release. AGENTS.md updated with the deployed boundaries; earlier dated patch/release-pending entries below are historical.
+
+
 ## 2026-11-06: Manual assistant sending and push integration
 
 - [APPLIED; APP RELEASE PENDING] Private migration 20261106203945_assistant_send_and_push is applied. A rolled-back database smoke check verified immutable content, stale dispatch reconciliation and one push claim only; zero synthetic rows/subscriptions remain and client table grants are absent. New Edge functions, inbound changes, manual-send flag and app/cron code are NOT deployed/configured yet. No VAPID credential exists. Deno check passed; 85 focused regressions passed before the final in-page confirmation refinement, followed by 14 delivery/UI regressions passing.
