@@ -1,0 +1,110 @@
+Source: apps/rel8tion-app/src/modules/claimStyled/renderer.js
+Ref: main, fetched 2026-11-06
+Git blob SHA: 52f7cc2e41e5889a8d930224b6d195b469fcac26
+
+200: 
+201: export function showBrokerageStep(notice = '') {
+202:   const selected = state.selectedBrokerage || state.prefilledAgent?.brokerage || state.detectedHouse?.brokerage || '';
+203: 
+204:   render(`
+205:     <div>
+206:       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">Select Brokerage</h1>
+207:       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Choose your brokerage to continue.</p>
+208:       ${notice ? `<div class="claim-form-notice mb-6 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+209:       <div class="claim-profile-fields space-y-4 text-left">
+210:         <select id="brokerage_step_select" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+211:           ${getBrokerageOptions().map((opt) => {
+212:             const label = opt === '' ? 'Select Brokerage' : (opt === '__other__' ? "Other / My Brokerage Isn't Listed" : opt);
+213:             const selectedAttr = (opt === selected || (opt === '__other__' && selected && !isKnownBrokerage(selected))) ? 'selected' : '';
+214:             return `<option value="${esc(opt)}" ${selectedAttr}>${esc(label)}</option>`;
+215:           }).join('')}
+216:         </select>
+217:         <input id="brokerage_step_custom" value="${esc(selected && !isKnownBrokerage(selected) ? selected : '')}" placeholder="Enter Brokerage Name" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 ${(selected && !isKnownBrokerage(selected)) ? '' : 'hidden'}">
+218:       </div>
+219:       <div class="mt-6 space-y-3">
+220:         <button onclick="continueFromBrokerageStep()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Continue</button>
+221:         <button onclick="backToClaimIntro()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Back</button>
+222:       </div>
+223:     </div>
+
+---
+
+256: export function showListingSearch(notice = '') {
+257:   render(`
+258:     <div>
+259:       <h1 class="font-['Poppins'] text-2xl md:text-3xl font-black mb-4 uppercase text-[#1f2a5a]">Find Your Listing</h1>
+260:       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Search by address or MLS/source ID if location detection did not show the right property.</p>
+261:       ${notice ? `<div class="mb-5 rounded-[22px] border border-blue-100 bg-blue-50/70 backdrop-blur-sm text-blue-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+262:       <div class="space-y-4 text-left">
+263:         <input id="listing_search_input" placeholder="Address or MLS ID" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+264:       </div>
+265:       <div class="mt-6 space-y-3">
+266:         <button onclick="searchListingByQuery()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Search Listings</button>
+267:         <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Set Up Manually</button>
+268:         <button onclick="showOtherListings()" class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Back To Listings</button>
+269:       </div>
+270:     </div>
+271:   `);
+272: }
+273: 
+274: export function showOtherListings() {
+275:   const unique = [...new Map((state.nearbyHouses || []).map((h) => [h.id, h])).values()].slice(0, 10);
+276:   render(`
+277:     <div>
+278:       <h1 class="font-['Poppins'] text-2xl md:text-3xl font-black mb-6 uppercase text-[#1f2a5a]">Select Your Listing</h1>
+279:       <div class="space-y-4 mb-8 max-h-[480px] overflow-y-auto pr-2">
+280:         ${unique.length ? unique.map((h) => {
+281:           const s = getStatus(h);
+282:           return `
+283:             <div onclick="selectHouse('${esc(h.id)}')" class="flex items-start gap-4 p-4 rounded-[28px] border-2 border-white/70 hover:border-blue-400 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all cursor-pointer">
+284:               ${h.image ? `<img src="${esc(h.image)}" class="w-20 h-20 rounded-2xl object-cover bg-slate-100 shadow-inner">` : `<div class="w-20 h-20 rounded-2xl bg-slate-100 shadow-inner flex items-center justify-center text-slate-400 text-xs font-bold">No Image</div>`}
+285:               <div class="text-left flex-1 min-w-0">
+286:                 <div class="text-[10px] font-black mb-1" style="color:${s.color}">${esc(s.label)}</div>
+287:                 <div class="font-black text-base text-[#1F2A5A] leading-tight mb-1">${esc(h.address || '')}</div>
+288:                 ${h.price ? `<div class="text-blue-600 text-sm font-black mb-1">${money(h.price)}</div>` : ''}
+289:                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${esc(h.brokerage || '')}</div>
+290:               </div>
+291:             </div>`;
+292:         }).join('') : `<div class="rounded-[28px] border border-white/70 bg-white/70 px-5 py-6 text-slate-500 font-bold">No listings are loaded yet. Search by address or MLS/source ID.</div>`}
+293:       </div>
+294:       <div class="space-y-3">
+295:         <button onclick="showListingSearch()" class="w-full py-5 rounded-full bg-white/85 border border-slate-200 text-slate-700 font-black text-[17px] uppercase tracking-[-0.02em] shadow-sm active:scale-[0.99] transition-all">Search By Address Or MLS</button>
+296:         <button onclick="routeUnknownAgentFlow('', 'Complete your setup manually.')" class="text-slate-400 text-sm font-bold uppercase tracking-widest">None of These</button>
+297:       </div>
+298:     </div>
+
+---
+
+410:   render(`
+411:     <div>
+412:       ${state.currentBrand?.logo_url ? `<img src="${esc(state.currentBrand.logo_url)}?v=${Date.now()}" class="max-h-28 md:max-h-36 max-w-[280px] md:max-w-[380px] object-contain mx-auto mb-6">` : ''}
+413:       <h1 class="font-['Poppins'] text-[28px] md:text-[38px] leading-[0.98] font-black tracking-[-0.04em] text-slate-900 mb-3 uppercase">Complete Your Profile</h1>
+414:       <p class="text-slate-500 text-[16px] md:text-[18px] leading-relaxed font-medium max-w-md mx-auto mb-6">Enter your details to activate your Rel8tionchip.</p>
+415:       ${notice && noticeIsError ? `<div class="claim-form-notice mb-6 rounded-[22px] border border-rose-200 bg-rose-50/80 backdrop-blur-sm text-rose-700 px-5 py-4 text-sm font-semibold">${esc(notice)}</div>` : ''}
+416:       <div class="claim-profile-fields space-y-4 text-left">
+417:         <input id="full_name" value="${esc(name)}" placeholder="Full Name *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+418:         <input id="full_phone" value="${esc(phone)}" placeholder="Phone Number *" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+419:         <select id="full_brokerage_select" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+420:           ${getBrokerageOptions().map((opt) => {
+421:             const selected = ((opt !== '__other__' && opt === brokerage) || (opt === '__other__' && brokerage && !isKnownBrokerage(brokerage))) ? 'selected' : '';
+422:             const label = opt === '' ? 'Select Brokerage' : (opt === '__other__' ? "Other / My Brokerage Isn't Listed" : opt);
+423:             return `<option value="${esc(opt)}" ${selected}>${esc(label)}</option>`;
+424:           }).join('')}
+425:         </select>
+426:         <input id="full_brokerage_custom" value="${esc(isKnownBrokerage(brokerage) ? '' : brokerage)}" placeholder="Enter Brokerage Name" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 ${(brokerage && !isKnownBrokerage(brokerage)) ? '' : 'hidden'}">
+427:         <button onclick="saveFullProfile()" class="w-full py-5 rounded-full font-black text-[18px] md:text-[20px] uppercase tracking-[-0.02em] shadow-[0_18px_40px_rgba(59,130,246,0.28)] active:scale-[0.99] transition-all" style="${primaryButtonStyle()}">Save and Activate</button>
+428:         ${notice && !noticeIsError ? `<div class="claim-form-notice rounded-[18px] border border-blue-100 bg-blue-50/70 text-center text-blue-700 px-4 py-3 text-sm font-semibold">${esc(notice)}</div>` : ''}
+429:         <details class="claim-optional-details rounded-[20px] border border-slate-200 bg-white/65 px-4">
+430:           <summary class="cursor-pointer py-4 font-black text-slate-600">Add photo, email, or bio (optional)</summary>
+431:           <div class="space-y-4 border-t border-slate-200 pb-4 pt-4">
+432:             <input id="full_email" value="${esc(email)}" placeholder="Email" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400">
+433:             <label class="block rounded-[24px] border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-slate-50/90 px-5 py-5 text-center cursor-pointer hover:scale-[1.01] transition-all backdrop-blur-sm">
+434:               <div class="text-slate-900 font-black text-lg mb-1">Add or Update Photo</div>
+435:               <div class="text-slate-500 text-sm font-semibold">Tap to upload</div>
+436:               <input type="file" id="full_photo" accept="image/*" hidden>
+437:             </label>
+438:             <img id="full_preview" src="${esc(storedImage)}" class="${storedImage ? 'block' : 'hidden'} w-full rounded-[24px] max-h-[280px] object-cover shadow-sm bg-white">
+439:             <textarea id="full_bio" placeholder="Short Bio" class="w-full rounded-[20px] border border-slate-200 bg-white/80 px-5 py-4 text-[16px] font-semibold text-slate-900 outline-none focus:border-blue-400 min-h-[120px] resize-y">${esc(bio)}</textarea>
+440:           </div>
+441:         </details>
+442:       </div>
