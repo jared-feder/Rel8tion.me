@@ -1,0 +1,36 @@
+{
+  "reviewed_at": "2026-11-06",
+  "repository": "jared-feder/Rel8tion.me",
+  "ref": "main",
+  "note": "Fetched current main via connected GitHub; blob hashes pin individual evidence files. This is not a verification of production deployment SHA.",
+  "files": [
+    {
+      "path": "apps/rel8tion-app/app.html",
+      "blob_sha": "6a533da409a425d7dda4a80a5dd8ee30cfe2d2a2"
+    },
+    {
+      "path": "apps/rel8tion-app/agent-home.html",
+      "blob_sha": "613d4f491f0dee9fc110118279cb314978cc1cef"
+    },
+    {
+      "path": "apps/rel8tion-app/agent-dashboard.html",
+      "blob_sha": "2a0b97db70ad581957ecce8834d8e8730f190f94"
+    },
+    {
+      "path": "apps/rel8tion-app/src/modules/claimStyled/flow.js",
+      "blob_sha": "79477bcb0f24687fb1e30bf3f29b77c145418d5e"
+    },
+    {
+      "path": "apps/rel8tion-app/src/modules/claimStyled/renderer.js",
+      "blob_sha": "52f7cc2e41e5889a8d930224b6d195b469fcac26"
+    },
+    {
+      "path": "apps/rel8tion-app/event-pass-reuse.html",
+      "blob_sha": "8c654e7fef71fa1fd82fe05d40d2feba3f5ebce1"
+    },
+    {
+      "path": "apps/rel8tion-app/src/modules/eventShell/bootstrap.js",
+      "blob_sha": "28d80fa65371ff0d1ce4d4f4874fe28a0aec2013"
+    }
+  ]
+}
