@@ -25,6 +25,8 @@ type SendSmsOptions = {
   mediaUrls?: string[];
   providerOverride?: SmsProvider | string;
   statusCallback?: string;
+  expectedFrom?: string;
+  timeoutMs?: number;
   supabase?: any;
 };
 
@@ -310,6 +312,8 @@ async function sendViaTwilio(opts: {
   body: string;
   mediaUrls?: string[];
   statusCallback?: string;
+  expectedFrom?: string;
+  timeoutMs?: number;
 }) {
   const accountSid = clean(Deno.env.get("TWILIO_ACCOUNT_SID"));
   const authToken = clean(Deno.env.get("TWILIO_AUTH_TOKEN"));
@@ -343,6 +347,12 @@ async function sendViaTwilio(opts: {
   } else {
     form.set("From", configuredFrom);
   }
+  if (opts.expectedFrom) {
+    if (opts.route !== "outreach" || opts.expectedFrom !== "+18448211802") throw new SmsSendError("Assistant sender is not authorized", { code: "sms_sender_mismatch", status: "blocked" });
+    // Twilio validates membership when both a service and explicit From are set.
+    // Never let its sender pool silently select the personal/event number.
+    form.set("From", opts.expectedFrom);
+  }
   form.set("To", opts.to);
   form.set("Body", opts.body);
   if (opts.statusCallback) form.set("StatusCallback", opts.statusCallback);
@@ -357,15 +367,18 @@ async function sendViaTwilio(opts: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: form.toString(),
+    signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new SmsSendError(clean(data?.message) || `Twilio error ${response.status}`, {
+    const error = new SmsSendError(clean(data?.message) || `Twilio error ${response.status}`, {
       code: "sms_twilio_failed",
       provider: "twilio",
       route: opts.route,
     });
+    Object.assign(error, { providerHttpStatus: response.status });
+    throw error;
   }
 
   const from = clean(data.from || configuredFrom);
@@ -479,7 +492,9 @@ export async function sendSMS(options: SendSmsOptions) {
         to,
         body,
         mediaUrls: options.mediaUrls,
-        statusCallback: options.statusCallback || (route === "events" ? eventStatusCallbackUrl() : undefined),
+        statusCallback: options.statusCallback || (route === "events" || metadata.source === "jared-assistant" ? eventStatusCallbackUrl() : undefined),
+        expectedFrom: options.expectedFrom,
+        timeoutMs: options.timeoutMs,
       });
 
     const status = result.provider === "twilio" && result.status !== "sent" ? "queued" : "sent";

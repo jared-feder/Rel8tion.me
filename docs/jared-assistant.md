@@ -1,5 +1,22 @@
 # Jared's Assistant
 
+## Current manual-send and push patch
+
+Branch: feature/assistant-send-push. The sections below describing the earlier simulation release are historical until this patch is released.
+
+POST action send requires the existing strong owner token, an approved saved id and its fingerprint. The API compare-and-set claims a dispatch UUID; the protected send-assistant-reply Edge function claims provider submission separately before rechecking the latest inbound, unique active recipient, global suppression, exact 844-821-1802 sender and 9 AM-8 PM New York window. Cat's existing scoped capabilities cannot approve or send. A duplicate, timeout or unknown outcome cannot submit again. Cron reconciliation reads uniquely matched existing Twilio receipts only; acceptance is distinct from delivery. New direct inbound replies are resolved against recent attributed SMS and a unique verified profile, so an old queue property cannot trigger its automatic Y/N text.
+
+The browser can connect with the existing owner token for this page session only; it never persists or displays that token. This does not create a new assistant broker or authorize unattended operation. The server-only production flag ASSISTANT_MANUAL_SEND_ENABLED enables the reviewed adapter. The existing scoped broker is still unconfigured; broad provider credentials are never handed to Cat or browser code.
+
+Web Push uses api/admin/assistant-push, assistant-sw.js, private RLS-protected subscriptions/events/deliveries and api/cron/assistant-notifications every minute. Important new incoming replies create one event per message; routine replies stay in the inbox. Only events after device registration, within 24 hours, are eligible. The worker claims at most five deliveries per run, retries explicit 429 throttling up to five attempts, disables expired endpoints and records other uncertain submissions without retry. Lock-screen text is generic and opens the conversation. Queue acceptance does not prove visible or audible delivery. Owner review SMS fallback is removed from the outreach inbound handler only; transactional Event Pass, booking and buyer SMS are preserved.
+
+Production push still requires specific approval to generate one VAPID P-256 key pair and store ASSISTANT_VAPID_PRIVATE_KEY as a sensitive Vercel production value, ASSISTANT_VAPID_PUBLIC_KEY as the corresponding public key, and ASSISTANT_VAPID_SUBJECT=https://app.rel8tion.me. No key has been generated. After secure configuration/redeployment, Jared must press Enable push on each device and grant browser permission; on iPhone this requires the installed Home Screen app. No subscription or notification is silently created, no SMS fallback exists, and no real notification testing is authorized by this patch.
+
+Schema: supabase/migrations/20261106203945_assistant_send_and_push.sql. Deployment order: private schema, protected sending Edge function plus signed inbound router/handler (preserve router JWT=false and handler JWT=true), tested main app release and the nonsecret production manual-send flag. Check sender receipts, exact live SHA, owner authentication and pause state read-only. Real send/push smoke tests need separate recipient authorization.
+
+Verification: node --test test/assistant-delivery.test.cjs test/assistant-workspace.test.cjs test/assistant-calendar.test.cjs test/assistant-ui.test.cjs. All transport and push tests use memory/mocks; the loopback preview supports synthetic provider acceptance only. No real test message is sent.
+
+
 The production release is an additive COMMAND workspace at `/command?area=assistant` (the existing `/admin` alias also works). It reuses the actual COMMAND shell, navigation, protected API helper, outreach inbox/read helpers, contact/property context and the existing outreach workflow. No production workflow was replaced. `docs/rel8tionos-api.md`, `lib/rel8tionos-outreach.js` and the existing `api/rel8tionos/*` endpoints already provide server-to-server thread/reply operations without the Twilio console; their broad shared key must not be handed to a browser or assistant.
 
 ## Run the production-like local preview
