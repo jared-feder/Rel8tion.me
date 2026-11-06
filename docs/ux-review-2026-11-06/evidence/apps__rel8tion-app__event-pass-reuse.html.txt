@@ -1,0 +1,95 @@
+Source: apps/rel8tion-app/event-pass-reuse.html
+Ref: main, fetched 2026-11-06
+Git blob SHA: 8c654e7fef71fa1fd82fe05d40d2feba3f5ebce1
+
+60:         app.innerHTML = `<section class="hero"><div class="eyebrow">Event Pass registration</div><h1>Start your open house.</h1><p>This registration is included with your Event Pass.</p><div class="property"><div><span>Selected open house</span>${esc(data.house.address || 'Open house')}</div></div><button id="firstUseButton" class="btn" type="button" style="margin-top:20px">Activate Open House</button><p id="firstUseStatus" class="status"></p></section>`;
+61:         document.getElementById('firstUseButton').addEventListener('click', () => activate('first_use', 'firstUseStatus'));
+62:         return;
+63:       }
+64:       const sponsor = data.sponsor;
+65:       const membershipActive = data.membership_active || value('membership') === 'active';
+66:       const sponsorCard = sponsor ? `
+67:         <article class="card primary">
+68:           <div class="option-label">Option 1 · Sponsored open house · Free and event-only</div>
+69:           <div class="officer">${officerPhoto(sponsor)}<div><h2>${esc(sponsor.name || 'Your loan officer')}</h2><p>${esc([sponsor.title,sponsor.company].filter(Boolean).join(' · ') || 'Loan officer sponsor')}</p></div></div>
+70:           <p class="copy"><strong>Your loan officer will sponsor this open house as well.</strong> Just make sure you thank them and stay in contact so you can continue building a lasting REL8TIONship.</p>
+71:           <div class="notice"><strong>Free, event-only version:</strong> This is a limited version of REL8TION. Use the live dashboard during this open house, then REL8TION emails the event recap to the email on your agent profile. It will not remain in your permanent dashboard, disclosure library, analytics, or reports. REL8TION still preserves required compliance and audit evidence internally. ${esc(sponsor.name || 'Your loan officer')} will appear as the sponsor and receive event check-in visibility. Financing help is shared only when a buyer requests it.</div>
+72:           <label class="consent"><input id="sponsorConsent" type="checkbox"><span>I authorize ${esc(sponsor.name || 'this loan officer')} to sponsor and support this open house.</span></label>
+73:           <button id="sponsorButton" class="btn" type="button" disabled>Continue With ${esc(sponsor.name || 'My Loan Officer')} Sponsoring</button>
+74:           <p id="sponsorStatus" class="status"></p>
+75:         </article>` : `
+76:         <article class="card primary">
+77:           <div class="option-label">Sponsored option unavailable</div>
+78:           <h2 style="margin-top:14px">No loan officer is assigned yet</h2>
+79:           <p class="copy">REL8TION could not verify an active loan officer relationship for this open house. Choose full REL8TION Agent membership below or contact support to assign coverage.</p>
+80:         </article>`;
+81:       const memberHardwareUrl = `/kit-intake?plan=member_hardware&source=event_pass_membership&uid=${encodeURIComponent(value('uid'))}&agent=${encodeURIComponent(state.context?.agent?.slug || value('agent'))}`;
+82:       const membershipAction = membershipActive
+83:         ? `<button id="memberContinueButton" class="btn" type="button">Continue With Full REL8TION</button><a class="btn secondary" href="${esc(memberHardwareUrl)}">Add My Branded Open House Kit · $199 One Time</a>`
+84:         : `<button id="membershipCheckoutButton" class="btn" type="button">Enroll for ${esc(data.plan.label)}</button>`;
+85:       const paidReturnNotice = membershipActive && value('membership') === 'active'
+86:         ? '<div class="notice"><strong>Your $29 membership is active.</strong> Your starter profile is already connected to the verified agent on this Event Pass. Start the selected open house now; after it is live, tap <strong>Complete My Profile</strong> to add or update your photo, brokerage, contact information, and bio.</div>'
+87:         : '';
+88:       app.innerHTML = `
+89:         <section class="hero">
+90:           <div class="eyebrow">Event Pass reuse</div>
+91:           <h1>Choose how to continue this open house.</h1>
+92:           <p>REL8TION Agent membership is required to reuse this Event Pass unless your assigned loan officer sponsors this event.</p>
+93:           <div class="property"><div><span>Selected open house</span>${esc(data.house.address || 'Open house')}</div></div>
+94:           ${value('membership') === 'canceled' ? '<div class="notice">Checkout was canceled. Nothing was charged and your open house selection is still here.</div>' : ''}
+95:         </section>
+96:         <section class="options">
+97:           ${sponsorCard}
+98:           <article class="card membership-card">
+99:             <div class="option-label">Option 2 · Full REL8TION · Paid membership and permanent records</div>
+100:             <h2 style="margin-top:14px">Keep every event record and unlock the full agent system.</h2>
+101:             <div class="price"><strong>${esc(data.plan.label.replace('/month',''))}</strong><span>/month</span></div>
+102:             <p class="copy">REL8TION Agent is the ${esc(data.plan.label)} software membership. Your Event Pass remains event hardware; membership unlocks your permanent dashboard, digital profile, and networking tools.</p>
+103:             <ul class="features">
+104:               <li>Permanent check-in records from current and future events</li>
+105:               <li>Permanent signed disclosure records</li>
+106:               <li>Event analytics and reporting</li>
+107:               <li>Your public profile and digital business card</li>
+108:               <li>Automated and REL8TION-assisted follow-up</li>
+109:             </ul>
+110:             <div class="notice"><strong>Hardware is separate:</strong> after membership, add the reusable REL8TION Open House Kit with a Smart Sign and custom company-branded Rel8tionChips for <strong>$199 one time</strong>. It does not add another membership charge.</div>
+111:             ${paidReturnNotice}
+112:             ${membershipAction}
+113:             <p id="membershipStatus" class="status">${membershipActive ? 'Your membership is active. Continue to register the selected open house.' : 'Secure monthly subscription. Current catalog price: ' + esc(data.plan.label) + '.'}</p>
+114:           </article>
+115:         </section>`;
+116: 
+117:       const consent = document.getElementById('sponsorConsent');
+118:       const sponsorButton = document.getElementById('sponsorButton');
+119:       consent?.addEventListener('change', () => { sponsorButton.disabled = !consent.checked || state.busy; });
+120:       sponsorButton?.addEventListener('click', () => activate('loan_officer_sponsored', 'sponsorStatus'));
+121:       document.getElementById('memberContinueButton')?.addEventListener('click', () => activate('membership', 'membershipStatus'));
+122:       document.getElementById('membershipCheckoutButton')?.addEventListener('click', startCheckout);
+123:     }
+124: 
+125:     async function activate(mode, statusId) {
+126:       if (state.busy) return;
+127:       state.busy = true;
+128:       const status = document.getElementById(statusId);
+129:       document.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+130:       if (status) status.textContent = mode === 'loan_officer_sponsored' ? 'Recording sponsorship and activating your open house…' : 'Activating your open house…';
+131:       try {
+132:         const response = await fetch('/api/event-pass/action', {
+133:           method: 'POST',
+134:           headers: {'Content-Type':'application/json'},
+135:           body: JSON.stringify(activationBody(mode))
+136:         });
+137:         const result = await response.json().catch(() => ({}));
+138:         if (!response.ok || result.ok === false) throw new Error(result.error || 'This Event Pass could not be activated.');
+139:         const sponsorLine = result.limited_sponsored && state.context?.sponsor
+140:           ? `<p class="copy">${esc(state.context.sponsor.name)} is now sponsoring this open house. Thank them and keep building the relationship.</p>`
+141:           : state.context?.membership_active
+142:             ? '<p class="copy">Your full REL8TION Agent membership is active for this open house.</p>'
+143:             : '<p class="copy">Your Event Pass is ready for this open house.</p>';
+144:         const paidProfileActions = result.limited_sponsored ? '' : `
+145:           <div class="notice"><strong>Your starter profile is ready.</strong> It uses the verified agent already connected to this Event Pass, so you do not need to create another account. Complete it now or after the open house starts; your live event will stay connected.</div>
+146:           <a class="btn secondary" href="${esc(result.profile_setup_url || '')}">Complete My Profile</a>
+147:           <a class="btn secondary" href="${esc(result.profile_url || '')}">Preview My Digital Business Card</a>`;
+148:         app.innerHTML = `<section class="hero success"><div class="eyebrow">Success</div><h1>Your Open House Is Live</h1>${sponsorLine}<a class="btn" href="${esc(result.dashboard_url || '/agent-dashboard')}">Open Live Dashboard</a>${paidProfileActions}</section>`;
+149:       } catch (error) {
+150:         state.busy = false;
