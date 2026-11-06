@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Disclosure endpoint authorization and original-preserving downloads - test branch
+
+- `[IMPLEMENTED, NOT DEPLOYED]` Signed disclosure GET/POST now require an authorized check-in receipt, current claimed agent session or verified universal workspace with exact scope. Broker access requires active organization + explicit event/compliance assignment; no brokerage-name, supplied UID or LO coverage shortcut. Public unsigned event preview remains available.
+- `[PRESERVATION]` Downloads serve saved bytes, including old versions/history, with stored-hash checks and no generation/write fallback. Missing/corrupt originals return an error. POST retries reuse originals; only fresh complete captures can initially archive, with content-addressed create-only storage and compare-and-set metadata. No legacy visitor-name reconstruction.
+- `[CHECK-IN]` Creation issues a 24-hour HttpOnly scoped receipt, with 15-minute initial generation window. Public metadata updates require that receipt, preserve captured evidence/consent and merge only listing-link fields. Client-supplied archive pointers are stripped at capture.
+- `[RELEASE BLOCKER]` Source legacy non-Event-Pass RLS/grants still allow direct browser access outside this API. Actual production policies/storage were not inspected or changed; complete confidentiality/immutability remains unverified until those paths are restricted and tested. A rollback-ended review proposal is in `sql/proposals/disclosure_private_rows_review.sql`; no SQL was applied. See `docs/disclosure-archive-hardening.txt`.
+- `[VERIFIED]` 122 focused security/storage and existing disclosure, universal RBAC, Event Pass security/SMS, broker, weekly report and buyer-AI tests passed. Architecture, route map, syntax and diff checks passed. Tests use synthetic data and mocked identity/DB/storage; real Supabase CAS/grants/bucket and physical browser-cookie behavior remain release checks. No real document or signing secret was accessed.
+
 ## 2026-11-06: Broker workspace and office analytics - isolated test branch
 
 - `[PARTIAL, TEST ONLY]` `feature/broker-workspace-review-2026-11-06` builds on buyer-AI commit `7b70225`. The actual universal app shell has an explicit loopback broker fixture module, derived office/event attendance reports, event evidence index, shared agenda, pending roster drafts, guarded lead reassignment, audit records, PDF draft intake, future supplemental-form policy preview and office attendance ranks. Synthetic office/visitor data only; no production adapter, signed-PDF archive, invitations, live custom-form capture, awarded badges or production feed is connected.

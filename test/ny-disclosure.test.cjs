@@ -99,16 +99,6 @@ test('source fetch rejects an HTML response even when the server returns 200', a
   }
 });
 
-test('only the corrected packet version is reused from storage', () => {
-  const common = {
-    storage_bucket: 'signed-disclosures',
-    storage_path: 'agent/event/packet.pdf',
-    document_type: disclosure.DISCLOSURE_PACKET_TYPE
-  };
-  assert.equal(disclosure.isCurrentStoredPacket({ ...common, packet_version: '2026-05-09-three-step-v1' }), false);
-  assert.equal(disclosure.isCurrentStoredPacket({ ...common, packet_version: disclosure.DISCLOSURE_PACKET_VERSION }), true);
-});
-
 test('corrected packet uses a versioned path and preserves the prior packet descriptor', () => {
   const oldPacket = {
     document_type: disclosure.DISCLOSURE_PACKET_TYPE,
@@ -175,13 +165,13 @@ test('date-only disclosure values do not shift backward across the New York time
   assert.equal(disclosure.formatFormDate('2026-08-13'), '08/13/2026');
 });
 
-test('legacy completed check-ins can use the saved visitor name when regenerating', () => {
+test('a legacy visitor name cannot substitute for a captured signed sequence during initial archival', () => {
   const context = {
     checkin: {
       visitor_name: 'Jordan Buyer',
       metadata: { ny_discrimination_disclosure: { acknowledged: true } }
     }
   };
-  assert.equal(disclosure.hasCompletedDisclosure(context), true);
-  assert.equal(disclosure.signedPacketOptions(context).signature, 'Jordan Buyer');
+  assert.equal(disclosure.hasCompletedDisclosure(context), false);
+  assert.equal(disclosure.signedPacketOptions(context).signature, undefined);
 });

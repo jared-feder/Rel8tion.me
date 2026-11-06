@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { createAccess, assertSameOrigin } = require('../../lib/disclosure-access');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -487,7 +488,7 @@ async function uploadSignedPdf(path, bytes) {
       apikey: SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/pdf',
-      'x-upsert': 'true'
+      'x-upsert': 'false'
     },
     body: Buffer.from(bytes)
   });
@@ -503,7 +504,7 @@ async function downloadStoredPdf(bucket, path) {
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`
     }
   });
-  if (!response.ok) throw new Error(`Signed disclosure download failed: ${response.status}`);
+  if (!response.ok) throw Object.assign(new Error('The preserved archive could not be retrieved; no replacement was generated.'), { status: response.status === 404 ? 409 : 503 });
   return new Uint8Array(await response.arrayBuffer());
 }
 
@@ -548,12 +549,13 @@ function buildDisclosureMetadata(checkin, signedPdf) {
 
 async function patchCheckinMetadata(checkin, signedPdf) {
   const updatedMetadata = buildDisclosureMetadata(checkin, signedPdf);
-  const rows = await supabaseRest(`event_checkins?id=eq.${enc(checkin.id)}`, {
+  const rows = await supabaseRest(`event_checkins?id=eq.${enc(checkin.id)}&metadata=eq.${enc(JSON.stringify(checkin.metadata || {}))}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ metadata: updatedMetadata })
   }, true);
-  return one(rows) || { ...checkin, metadata: updatedMetadata };
+  if (!one(rows)) throw Object.assign(new Error('Check-in changed during archival; the existing record was preserved. Reload before retrying.'), { status: 409 });
+  return one(rows);
 }
 
 function signedPacketOptions(context) {
@@ -561,8 +563,8 @@ function signedPacketOptions(context) {
   const disclosure = metadata.ny_discrimination_disclosure || {};
   return {
     signed: true,
-    signature: disclosure.e_signature_value || context.checkin.visitor_name,
-    signedAt: disclosure.signed_at || context.checkin.created_at,
+    signature: disclosure.e_signature_value,
+    signedAt: disclosure.signed_at,
     signedDate: disclosure.signed_date,
     consumerRole: disclosure.consumer_role || context.checkin.visitor_type || 'Buyer',
     housingReviewedAt: disclosure.reviewed_at || disclosure.signed_at || context.checkin.created_at,
@@ -572,22 +574,21 @@ function signedPacketOptions(context) {
 }
 
 function hasCompletedDisclosure(context) {
-  const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
-  return disclosure.acknowledged === true && Boolean(disclosure.e_signature_value || context.checkin.visitor_name);
-}
-
-function isCurrentStoredPacket(signedPdf) {
-  return Boolean(signedPdf?.storage_bucket
-    && signedPdf?.storage_path
-    && signedPdf?.document_type === DISCLOSURE_PACKET_TYPE
-    && signedPdf?.packet_version === DISCLOSURE_PACKET_VERSION);
+  const metadata = context.checkin.metadata || {}, disclosure = metadata.ny_discrimination_disclosure || {};
+  const agency = metadata.nys_agency_disclosure || {}, courtesy = metadata.rel8tion_courtesy_notice || {};
+  return disclosure.acknowledged === true && disclosure.reviewed === true && disclosure.esign_consent === true
+    && Boolean(cleanText(disclosure.e_signature_value)) && Number.isFinite(Date.parse(disclosure.signed_at))
+    && agency.agency_disclosure_reviewed === true && agency.seller_representation_acknowledged === true
+    && Number.isFinite(Date.parse(agency.agency_disclosure_signed_at))
+    && courtesy.rel8tion_courtesy_acknowledged === true && Number.isFinite(Date.parse(courtesy.rel8tion_courtesy_signed_at));
 }
 
 async function generateAndStoreSignedPacket(context) {
   const checkin = context.checkin;
   const bytes = await buildDisclosurePdf(context, signedPacketOptions(context));
   const generatedAt = new Date().toISOString();
-  const fileName = buildSignedDisclosureFileName(context, checkin);
+  const digest = sha256Hex(bytes);
+  const fileName = buildSignedDisclosureFileName(context, checkin).replace(/\.pdf$/, `-${digest}.pdf`);
   const path = buildSignedDisclosureStoragePath(context, checkin, fileName);
   const signedPdf = {
     generated: true,
@@ -604,7 +605,7 @@ async function generateAndStoreSignedPacket(context) {
     storage_file_name: fileName,
     download_url: `/api/compliance/ny-disclosure?checkin=${encodeURIComponent(checkin.id)}&download=1`,
     generated_at: generatedAt,
-    document_sha256: sha256Hex(bytes),
+    document_sha256: digest,
     event_id: context.eventId || '',
     checkin_id: checkin.id,
     open_house_source_id: context.openHouseSourceId || '',
@@ -628,66 +629,69 @@ async function handlePreview(req, res) {
   return sendPdf(res, `rel8tion-disclosure-packet-${safeFilenamePart(context.address)}.pdf`, bytes);
 }
 
-async function handleDownloadSigned(req, res) {
-  const checkinId = cleanText(req.query.checkin);
-  if (!checkinId) return sendJson(res, 400, { ok: false, error: 'Missing checkin.' });
-  const context = await loadCheckinContext(checkinId);
-  const metadata = context.checkin.metadata || {};
-  const disclosure = metadata.ny_discrimination_disclosure || {};
-  const signedPdf = disclosure.signed_pdf || {};
-
-  let bytes;
-  let filename;
-  if (isCurrentStoredPacket(signedPdf)) {
-    bytes = await downloadStoredPdf(signedPdf.storage_bucket, signedPdf.storage_path);
-    filename = signedPdf.storage_file_name;
-  } else {
-    if (!hasCompletedDisclosure(context)) {
-      return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
-    }
-    const regenerated = await generateAndStoreSignedPacket(context);
-    bytes = regenerated.bytes;
-    filename = regenerated.signedPdf.storage_file_name;
+function storedPacket(context, requestedHash) {
+  const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
+  const history = Array.isArray(disclosure.signed_pdf_history) ? disclosure.signed_pdf_history.filter(Boolean) : [];
+  const packets = [disclosure.signed_pdf, ...history].filter(Boolean);
+  const packet = requestedHash ? packets.find(p => p.document_sha256 === requestedHash) : packets[0];
+  if (!packet?.storage_bucket || !packet.storage_path) throw Object.assign(new Error('Original archive is unavailable. No replacement was generated; request a reviewed recovery.'), { status: 409 });
+  const path = typeof packet.storage_path === 'string' ? packet.storage_path : '';
+  const bound = packet.checkin_id === context.checkin.id && (!packet.event_id || packet.event_id === context.eventId);
+  const legacyBound = !packet.checkin_id && path.startsWith(`${safeFilenamePart(context.event?.host_agent_slug)}/`)
+    && path.split('/').at(-1).includes(`-${shortToken(context.checkin.id)}-`);
+  if (packet.storage_bucket !== SIGNED_DISCLOSURE_BUCKET || !path || path.length > 1500
+      || path.split('/').some(p => !p || p === '.' || p === '..') || /[\\\x00-\x1f]/.test(path) || (!bound && !legacyBound)
+      || (packet.document_sha256 && (typeof packet.document_sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(packet.document_sha256)))) {
+    throw Object.assign(new Error('Archive descriptor requires integrity review; no replacement was generated.'), { status: 409 });
   }
-
-  filename ||= buildSignedDisclosureFileName(context, context.checkin);
-  return sendPdf(res, filename, bytes);
+  return packet;
 }
 
-async function handleGenerateSigned(req, res) {
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const checkinId = cleanText(body.checkin_id || body.checkinId);
-  if (!checkinId) return sendJson(res, 400, { ok: false, error: 'Missing checkin_id.' });
-
-  const context = await loadCheckinContext(checkinId);
-  const checkin = context.checkin;
-  if (!hasCompletedDisclosure(context)) {
-    return sendJson(res, 400, { ok: false, error: 'Check-in does not contain a completed NYS disclosure acknowledgement.' });
-  }
-
-  const generated = await generateAndStoreSignedPacket(context);
-
-  return sendJson(res, 200, {
-    ok: true,
-    signed_pdf: generated.signedPdf,
-    checkin: generated.updatedCheckin
-  });
-}
-
-module.exports = async function handler(req, res) {
-  try {
-    if (req.method === 'GET') {
-      if (req.query.checkin) return handleDownloadSigned(req, res);
-      return handlePreview(req, res);
+function createHandler({ access = createAccess(), load = loadCheckinContext, download = downloadStoredPdf, generate = generateAndStoreSignedPacket, preview = handlePreview } = {}) {
+  return async function handler(req, res) {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0'); res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Vary', 'Cookie, Authorization');
+    try {
+      req.query ||= {};
+      if (!['GET', 'POST'].includes(req.method)) { res.setHeader('Allow', 'GET, POST'); return sendJson(res, 405, { ok: false, error: 'Method not allowed.' }); }
+      if (req.method === 'GET' && !req.query.checkin) return await preview(req, res);
+      if (req.method === 'POST') assertSameOrigin(req);
+      const body = req.method === 'POST' ? (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}) : {};
+      const id = req.method === 'GET' ? req.query.checkin : body.checkin_id || body.checkinId;
+      if (typeof id !== 'string' || !id.trim() || id.length > 100) return sendJson(res, 400, { ok: false, error: 'Missing or invalid check-in ID.' });
+      if (req.query.packet && !/^[a-f0-9]{64}$/i.test(req.query.packet)) return sendJson(res, 400, { ok: false, error: 'Invalid archive version.' });
+      // Authenticate before reading personal data, then authorize this exact event.
+      const principal = await access.principal(req, res, id);
+      const context = await load(id);
+      const disclosure = context.checkin.metadata?.ny_discrimination_disclosure || {};
+      const hasArchive = Boolean(disclosure.signed_pdf || disclosure.signed_pdf_history?.length);
+      await access.authorize(principal, context, req.method === 'POST' && !hasArchive);
+      if (req.method === 'GET' || hasArchive) {
+        const packet = storedPacket(context, req.query.packet);
+        const bytes = await download(packet.storage_bucket, packet.storage_path);
+        if (Buffer.from(bytes).subarray(0, 5).toString() !== '%PDF-' || (packet.document_sha256 && sha256Hex(bytes) !== packet.document_sha256.toLowerCase())) {
+          throw Object.assign(new Error('Preserved archive failed its integrity check; no replacement was generated.'), { status: 409 });
+        }
+        res.setHeader('X-Rel8tion-Archive-Integrity', packet.document_sha256 ? 'sha256-verified' : 'legacy-hash-unavailable');
+        if (req.method === 'POST') return sendJson(res, 200, { ok: true, existing: true, signed_pdf: packet });
+        const filename = cleanText(packet.storage_file_name).replace(/[^a-zA-Z0-9._-]/g, '_') || 'preserved-disclosure.pdf';
+        return sendPdf(res, filename, bytes);
+      }
+      if (!hasCompletedDisclosure(context)) return sendJson(res, 409, { ok: false, error: 'The captured disclosure sequence is incomplete. No signature or archive was manufactured.' });
+      const capturedAt = Date.parse(context.checkin.created_at);
+      if (!Number.isFinite(capturedAt) || capturedAt > Date.now() + 60000 || Date.now() - capturedAt > 900000) {
+        return sendJson(res, 409, { ok: false, error: 'Initial archive creation window has expired. Historical missing records require a reviewed recovery, not silent reconstruction.' });
+      }
+      const generated = await generate(context);
+      return sendJson(res, 201, { ok: true, signed_pdf: generated.signedPdf, checkin: generated.updatedCheckin });
+    } catch (error) {
+      const status = error.status || (error instanceof SyntaxError ? 400 : 500);
+      return sendJson(res, status, { ok: false, error: error.status ? error.message : status === 400 ? 'Invalid request.' : 'Disclosure request failed; no replacement archive was generated by download.' });
     }
-    if (req.method === 'POST') return handleGenerateSigned(req, res);
-    res.setHeader('Allow', 'GET, POST');
-    return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
-  } catch (error) {
-    console.error('[ny-disclosure] failed', error);
-    return sendJson(res, 500, { ok: false, error: error.message || 'Unable to generate NYS disclosure PDF.' });
-  }
-};
+  };
+}
+module.exports = createHandler();
+module.exports.createHandler = createHandler;
 
 module.exports.__test = {
   AGENCY_SOURCE_PDF_URL,
@@ -701,6 +705,8 @@ module.exports.__test = {
   fetchSourcePdf,
   formatFormDate,
   hasCompletedDisclosure,
-  isCurrentStoredPacket,
+  storedPacket,
+  sha256Hex,
+  generateAndStoreSignedPacket,
   signedPacketOptions
 };

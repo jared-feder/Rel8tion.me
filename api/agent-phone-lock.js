@@ -91,6 +91,13 @@ async function sendOtp(phone, name, code, metadata) {
   return payload;
 }
 
+async function requirePhoneSession(req) {
+  const session = readSession(req);
+  if (!session?.slug || !session.uid) throw Object.assign(new Error('Agent phone sign-in required.'), { status: 401 });
+  await claimedSubject(session.slug, session.uid);
+  return session;
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return sendJson(res, 405, { ok: false, error: 'Method not allowed.' }); }
@@ -153,3 +160,4 @@ module.exports = async function handler(req, res) {
     return sendJson(res, error.status || 500, { ok: false, error: error.message || 'Phone verification failed.' });
   }
 };
+module.exports.requirePhoneSession = requirePhoneSession;

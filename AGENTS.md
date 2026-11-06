@@ -2,6 +2,11 @@
 
 ## Broker Workspace Boundaries
 
+- Signed disclosure downloads are immutable reads: authenticate before personal row reads, authorize the exact record/event, return preserved bytes regardless of generator version, and fail on missing/corrupt archives without reconstruction. Do not restore a generator fallback on GET or silently supersede a saved original on POST retry.
+- Initial archival requires a fresh complete saved signature sequence and an authorized scoped caller. Never substitute visitor_name for missing signature evidence. Keep content-addressed create-only uploads and conditional metadata writes; racing or uncertain writes require reconciliation, not object overwrite.
+- Public check-in creation issues an HttpOnly check-in/event receipt; reserved archive pointers are server-owned. Receipt-scoped metadata updates may merge only the allowed listing-link fields and must preserve signatures, archived descriptors, representation and channel/LO consent. Do not expose receipt secrets or put receipt tokens in URLs.
+- Broker compliance access requires a verified active organization/workspace and explicit event compliance assignment. Team membership, brokerage-name equality, supplied agent/device/admin UID or LO coverage must never grant private disclosure access. Verify database/storage policies too: the legacy non-Event-Pass grants can bypass API-only protections and must be reviewed before release.
+
 - Broker compliance evidence must remain preserved independently of paid agent history UI or roster offboarding. Never delete or rewrite original signed packets to remove office access. Separate captured, delivered, signed, refusal-declaration, missing and reviewed evidence states; do not infer legal execution from a dashboard badge.
 - Before broker archive integration, resolve per-record server authorization and mutating GET behavior in `api/compliance/ny-disclosure.js`. Preserve the unsigned consumer form preview and legitimate scoped consumer receipts; do not expose signed evidence by a guessed record ID or regenerate it silently as an original.
 - Broker lead reassignment must preserve originating-agent credit, representation, per-channel permission, suppression and LO consent. Listing agent, hosting agent, source agent and current responsible agent are distinct. An office role does not override an existing buyer relationship.

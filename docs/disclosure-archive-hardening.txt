@@ -1,0 +1,49 @@
+Disclosure endpoint authorization and preservation fix — November 6, 2026
+Test branch: feature/broker-workspace-review-2026-11-06
+No deployment, production SQL, real check-in, real document retrieval or messaging performed.
+
+Changed behavior
+GET /api/compliance/ny-disclosure?event=<event> remains an unsigned public preview. It has no private check-in data.
+GET ...?checkin=<id>&download=1 authenticates before private record loading, then authorizes the exact event before storage access. It serves the existing stored packet even when its version is older than the current form generator. It cannot call generation, upload or metadata patching. Optional packet=<stored SHA-256> chooses an existing history version; arbitrary storage paths are not accepted.
+Missing descriptor/file, invalid binding or a checksum mismatch produces a visible error with no reconstruction. Stored SHA-256 is verified when available. A legacy file with no saved checksum is explicitly labeled legacy-hash-unavailable; it is not rewritten to add one. Legacy descriptors without check-in IDs need recognized host/check-in path binding or a reviewed recovery. Filename headers are sanitized, private responses are no-store, and errors do not return raw database/provider details.
+
+Authorization
+- A new public check-in creation returns an HttpOnly, Secure (non-localhost), SameSite=Strict receipt cookie scoped to that inserted check-in/event. The receipt is valid for 24 hours on that browser; initial archival is limited to the first 15 minutes. It is not a marketing consent, proof of identity or an unrestricted buyer account. No token is placed in a URL or returned as a public database field.
+- Existing NFC/phone session signatures and expiry are verified, and the device must still be claimed. Access must match the event's host agent; slug, UID or admin UID request parameters grant nothing. These are the platform's existing agent authentication mechanisms; their enrollment/issuance model is not redesigned by this patch.
+- A verified universal session takes precedence over stale legacy cookies and must have compliance.read. Agent workspaces require an active server-side agent_slug assignment matching the host. Broker workspaces require an active organization and an explicit active open_house_event assignment with relationship_type=compliance. A team agent list or brokerage display-name match does not expose historical documents.
+- Platform administrators require their authenticated role and platform.audit.read. Loan officers, buyers, staff and founder roles receive no implicit access. Permission overrides can deny the new compliance permissions. Broker default is read-only; agent/platform roles have initial-generation permission, still constrained by record scope and capture freshness.
+- Cookie-based mutations reject foreign Origin / cross-site Fetch Metadata. Valid scoped receipt access is distinct from agent paid-history entitlements, preserving the compliance/commercial boundary.
+
+Initial packet creation and retry safety
+POST is authenticated and record scoped too. When a preserved archive exists, POST verifies and returns that original; it does not create a new version. Incomplete captures and historical missing archives are not backfilled by borrowing the visitor name or applying today's form silently.
+Fresh initial creation requires the saved complete agency/housing/courtesy sequence, electronic-signature value, valid capture timestamps and a server-created check-in no older than 15 minutes. New object names include the content hash; upload is create-only (x-upsert=false). The metadata pointer is compare-and-set against the loaded JSON snapshot. A race returns 409 rather than replacing another saved archive. Storage and database updates are not one transaction: a failed/racing metadata write can leave an unreferenced immutable object requiring operational reconciliation. Do not blindly remove such objects or overwrite a saved pointer.
+
+Check-in metadata protection
+Public creation strips signed_pdf/signed_pdf_history pointers recursively. The public update_metadata action now needs that check-in's valid receipt. It merges only the existing listing-link fields and preserves the saved disclosure, archive descriptors, representation and financing/marketing permission fields, even when the UI sends an old full snapshot. Concurrent metadata changes return 409. The existing buyer API uses same-origin fetches, so no browser-readable receipt token or changed check-in form is needed. A buyer who loses the cookie needs authorized host assistance; existing anonymous receipt links intentionally stop granting access by ID alone.
+
+Implementation map
+lib/disclosure-access.js — scoped receipts, same-origin guard, identity and exact-record authorization.
+api/compliance/ny-disclosure.js — authenticated non-mutating reads, stored version/integrity selection, constrained initial creation and immutable storage/CAS.
+api/event-checkin.js — receipt issuance, reserved-field stripping, receipt-scoped listing metadata update.
+api/agent-phone-lock.js — reusable verifier for the existing signed phone session; no OTP sends in this work.
+lib/app-auth.js — explicit compliance.read / compliance.generate permissions; broker remains read-only by default.
+test/disclosure-access.test.cjs, test/disclosure-archive-storage.test.cjs — new security and preservation regressions.
+
+Production release checks / remaining blockers
+1. Verify receipt signing configuration without exposing values. DISCLOSURE_RECEIPT_SECRET is preferred; the existing NFC/phone/admin secret fallbacks support current installations. No secret was read, added or rotated. Rotation invalidates outstanding receipt cookies; they are short-lived browser capabilities.
+2. Inspect actual database grants/RLS and the private signed-disclosures bucket. Source sql/migrations/20260818143000_lock_event_pass_private_rows.sql intentionally permits direct anon/authenticated access to older non-Event-Pass check-in rows. If those grants are live, requests can bypass endpoint protections. This patch cannot claim complete record confidentiality/immutability until those paths and storage policies are verified and restricted.
+3. sql/proposals/disclosure_private_rows_review.sql is a non-applying, rollback-ended review proposal. Inventory and migrate all legacy direct browser readers/writers, test in an isolated database, run advisors and generate the normal reviewed migration before changing production. Do not apply the proposal as a quick production fix. No schema, policy or storage setting was applied here.
+4. Verify JSONB compare-and-set requests with the deployed PostgREST version, actual metadata sizes and the test database. Test real auth cookies across supported app aliases, new check-in -> receipt -> initial archive -> PDF download, host/broker isolation, receipt expiry and concurrent retries. Unit tests use mocked DB/storage/identity services and valid synthetic PDFs; they are not a live Supabase integration test.
+5. Provision explicit broker event compliance assignments through an authorized administrative workflow. This change does not grant a real broker access or bulk-share historical evidence. Existing signed documents are not migrated, reconstructed or re-signed.
+6. Review and deploy the code and the separately validated database/storage restriction together. The review branch still has automatic Git deployments disabled. Production continues using its prior implementation until an authorized release.
+
+Verification
+Focused suite covers anonymous denial before personal reads; exact host and broker/event boundaries; denied roles and stale session precedence; receipt tampering/expiry; unchanged legacy bytes and history selection; missing/corrupt archive behavior; initial capture versus historical reconstruction; retry reuse; create-only content-addressed upload; metadata CAS race; reserved-pointer stripping and consent/disclosure preservation. Existing disclosure PDF rendering, Event Pass security, SMS behavior, weekly reports, broker workspace, buyer AI and universal RBAC regressions also run.
+No real buyer PII, signatures, production credentials or production network responses are used as test fixtures.
+
+AGENTS.md disposition: updated with durable read-only download, scoped access, receipt and immutable-archive rules. CURRENT_STATE.md and REL8TION_SYSTEM_OVERVIEW.md updated. Existing broker/buyer previews, COMMAND and Jared's Assistant worktree preserved.
+
+Reference documentation used (implementation guidance, not evidence of live deployment):
+https://supabase.com/docs/guides/storage/security/access-control
+https://supabase.com/docs/guides/database/postgres/row-level-security
+https://supabase.github.io/postgrest-js/v2/classes/PostgrestFilterBuilder.html
