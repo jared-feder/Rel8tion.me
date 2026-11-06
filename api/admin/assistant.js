@@ -43,7 +43,7 @@ module.exports=async(req,res)=>{
       // draft/approval writes still require the stronger header token/capability.
       const reader=req.method==='GET'&&adminAuthorized({headers:{'x-admin-uid':req.headers?.['x-admin-uid']}});
       if(!reader?.ok)throw error;
-      actor={owner:true,id:`command-reader:${reader.uid}`,threads:[],scopes:['read']};
+      actor={owner:false,businessOnly:true,id:`command-reader:${reader.uid}`,threads:[],scopes:['read']};
     }
     let input={};
     if(req.method==='POST') { try { input=typeof req.body==='string'?JSON.parse(req.body):req.body||{}; }catch{fail(400,'Invalid JSON.');} }

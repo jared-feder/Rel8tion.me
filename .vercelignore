@@ -10,3 +10,6 @@ docs
 wordpress
 output
 claim2.html
+
+scripts/preview-assistant.cjs
+test/fixtures/assistant-workspace.cjs

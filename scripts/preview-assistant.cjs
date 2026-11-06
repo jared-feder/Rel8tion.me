@@ -19,7 +19,7 @@ const server=http.createServer(async(req,res)=>{
       return res.end(JSON.stringify(await workspace.act(actor,JSON.parse(body))));
     }
     if(url.pathname.startsWith('/api/')){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,inbox:[],agents:[],counts:{}}));}
-    const relative=['/','/admin','/admin.html'].includes(url.pathname)?'apps/rel8tion-app/admin.html':decodeURIComponent(url.pathname).replace(/^\//,'');
+    const relative=['/','/admin','/admin.html','/command','/command.html'].includes(url.pathname)?'apps/rel8tion-app/admin.html':decodeURIComponent(url.pathname).replace(/^\//,'');
     const file=path.resolve(root,relative);
     if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;return res.end('Not found');}
     // Only public app/asset files are available; never expose repo or env files.
