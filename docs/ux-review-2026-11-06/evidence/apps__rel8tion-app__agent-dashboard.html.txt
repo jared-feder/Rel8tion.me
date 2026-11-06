@@ -1,0 +1,274 @@
+Source: apps/rel8tion-app/agent-dashboard.html
+Ref: main, fetched 2026-11-06
+Git blob SHA: 2a0b97db70ad581957ecce8834d8e8730f190f94
+
+352:     function renderLead(checkin) {
+353:       const meta = checkin.metadata || {};
+354:       const name = checkin.visitor_name || checkin.name || meta.name || 'Buyer';
+355:       const phone = checkin.visitor_phone || checkin.phone || meta.phone || '';
+356:       const email = checkin.visitor_email || checkin.email || meta.email || '';
+357:       const financingStatus = checkin.pre_approved === true ? 'Financing already arranged' : checkin.pre_approved === false ? 'Needs financing' : 'Not shared';
+358:       const needsFinancing = checkin.pre_approved === false || meta.financing_requested === true;
+359:       const disclosure = disclosureSummary(checkin);
+360:       const introBody = `Hi${name ? ` ${name}` : ''}, this is ${state.loanOfficer?.loan_officer_name || 'the NMB loan officer'} from ${state.loanOfficer?.loan_officer_company || 'NMB'}. I saw you requested financing help at ${state.house?.address || 'the open house'}.`;
+361:       return `<div class="rounded-3xl border border-slate-200 bg-white/80 p-4">
+362:         <div class="flex items-start justify-between gap-3">
+363:           <div>
+364:             <div class="text-lg font-black">${esc(name)}</div>
+365:             <div class="mt-1 text-sm font-bold text-slate-500">${esc([phone, email].filter(Boolean).join(' • ') || 'No contact shown')}</div>
+366:           </div>
+367:           <div class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black uppercase tracking-[.08em] text-sky-700">${esc(financingStatus)}</div>
+368:         </div>
+369:         <div class="mt-4 rounded-2xl border ${disclosure.signed ? 'border-emerald-200 bg-emerald-50/80' : 'border-rose-200 bg-rose-50/80'} px-4 py-3">
+370:           <div class="flex flex-wrap items-center justify-between gap-2">
+371:             <div class="text-xs font-black uppercase tracking-[.14em] ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">Required Disclosures</div>
+372:             <div class="rounded-full bg-white/80 px-3 py-1 text-xs font-black ${disclosure.signed ? 'text-emerald-700' : 'text-rose-700'}">${disclosure.signed ? 'Complete' : 'Incomplete'}</div>
+373:           </div>
+374:           <div class="mt-3 grid gap-2">
+375:             ${disclosureLine('Agency', disclosure.agencySigned, disclosure.agencyDate)}
+376:             ${disclosureLine('Housing', disclosure.housingSigned, disclosure.housingDate)}
+377:             ${disclosureLine('Courtesy', disclosure.courtesySigned, disclosure.courtesyDate)}
+378:           </div>
+379:           ${disclosure.pdfUrl ? `<a href="${esc(disclosure.pdfUrl)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">Open Disclosure Packet PDF</a>` : ''}
+380:         </div>
+381:         ${renderPropertyFit(checkin)}
+382:         ${needsFinancing && state.loanOfficer ? `<div class="mt-4 flex flex-wrap gap-2">
+383:           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call Buyer</a>
+384:           <a href="${esc(smsHref(phone, introBody))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text Buyer</a>
+385:           <a href="${esc(telHref(state.loanOfficer.loan_officer_phone))}" class="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200">Call Loan Officer</a>
+386:         </div>` : ''}
+
+---
+
+390:     function renderLoanOfficerCard() {
+391:       const lo = state.loanOfficer;
+392:       if (!lo) {
+393:         return `<div class="rounded-[28px] border border-amber-200 bg-amber-50/85 p-5">
+394:           <div class="text-xs font-black uppercase tracking-[.16em] text-amber-700">NMB Coverage</div>
+395:           <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">No loan officer live yet</h2>
+396:           <p class="mt-2 font-semibold leading-relaxed text-amber-900">Loan-officer coverage is assigned from REL8TION COMMAND. No loan-officer Rel8tionChip scan is required.</p>
+397:           <a href="${esc(loanOfficerManagementHref())}" class="mt-4 block w-full rounded-full bg-amber-500 px-5 py-3 text-center text-sm font-black text-white">Manage Loan Officer</a>
+398:         </div>`;
+399:       }
+400:       const name = lo.loan_officer_name || 'Loan Officer';
+401:       const company = lo.loan_officer_company || 'NMB';
+402:       const phone = lo.loan_officer_phone || '';
+403:       const photo = lo.loan_officer_photo_url || 'https://nicanqrfqlbnlmnoernb.supabase.co/storage/v1/object/public/verified-assets/company-logos/nationwide.png';
+404:       const isDefault = lo.is_default_fallback === true;
+405:       const badge = isDefault ? 'NMB Coverage Available' : 'NMB Coverage Live';
+406:       const note = isDefault
+407:         ? 'Default Rel8tion coverage contact. Assign a specific loan officer from REL8TION COMMAND Open Houses.'
+408:         : 'This loan officer is assigned live to this open house. Changes are made in REL8TION COMMAND with no loan-officer chip scan.';
+409:       return `<div class="rounded-[28px] border border-emerald-200 bg-emerald-50/90 p-5">
+410:         <div class="text-xs font-black uppercase tracking-[.16em] text-emerald-700">${esc(badge)}</div>
+411:         <div class="mt-4 flex items-center gap-4">
+412:           <img src="${esc(photo)}" alt="${esc(name)}" class="h-16 w-16 rounded-full object-cover ring-4 ring-white">
+413:           <div>
+414:             <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(name)}</h2>
+415:             <p class="text-sm font-bold text-emerald-900">${esc(company)}</p>
+416:             <p class="text-sm font-bold text-emerald-800">${esc(phone)}</p>
+417:           </div>
+418:         </div>
+419:         <p class="mt-3 text-sm font-bold leading-relaxed text-emerald-900">${esc(note)}</p>
+420:         <div class="mt-4 grid grid-cols-2 gap-2">
+421:           <a href="${esc(telHref(phone))}" class="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white ${phone ? '' : 'pointer-events-none opacity-50'}">Call</a>
+422:           <a href="${esc(smsHref(phone, `You are live for ${state.house?.address || 'this Rel8tion event'}.`))}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 ring-1 ring-emerald-200 ${phone ? '' : 'pointer-events-none opacity-50'}">Text</a>
+423:         </div>
+424:         <a href="${esc(loanOfficerManagementHref())}" class="mt-3 block w-full rounded-full bg-white/80 px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-emerald-200">${isDefault ? 'Assign Specific Loan Officer' : 'Replace Loan Officer'}</a>
+425:       </div>`;
+
+---
+
+482:     function render() {
+483:       const hostSlug = state.event?.host_agent_slug || state.sign?.owner_agent_slug || state.agent;
+484:       const address = state.house?.address || state.event?.setup_context?.address || 'Active Open House';
+485:       const price = money(state.house?.price || state.event?.setup_context?.price);
+486:       const beds = state.house?.beds || state.event?.setup_context?.beds || '-';
+487:       const baths = state.house?.baths || state.event?.setup_context?.baths || '-';
+488:       const sqft = state.house?.sqft || state.house?.square_feet || state.event?.setup_context?.sqft || '-';
+489:       const sentCount = state.outreach.filter((row) => row.initial_send_status === 'sent' || row.followup_send_status === 'sent').length;
+490:       const needsFinancing = state.checkins.filter((row) => row.pre_approved === false || row.metadata?.financing_requested === true).length;
+491:       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
+492: 
+493:       agentLabel.textContent = labelSlug(hostSlug || state.agent || 'Agent');
+494:       supportLink.href = liveSupportHref();
+495:       app.innerHTML = `
+496:         <section class="mb-6">
+497:           <div class="text-xs font-black uppercase tracking-[.18em] text-sky-700">Live Event</div>
+498:           <h1 class="mt-2 font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-6xl">${esc(address)}</h1>
+499:           <div class="mt-3 flex flex-wrap gap-3 text-base font-black text-slate-700">
+500:             ${price ? `<span>${esc(price)}</span>` : ''}
+501:             <span>${esc(beds)} beds</span>
+502:             <span>${esc(baths)} baths</span>
+503:             <span>${esc(sqft)} sq ft</span>
+504:           </div>
+505:         </section>
+506: 
+507:         <section class="grid gap-3 md:grid-cols-4">
+508:           ${stat('Check-ins', state.checkins.length, 'blue')}
+509:           ${stat('Needs financing', needsFinancing, needsFinancing ? 'green' : 'slate')}
+510:           ${stat('Listing outreach', sentCount, 'blue')}
+511:           ${stat('Rel8tion stage', state.event?.status || state.sign?.status || 'active', 'green')}
+512:         </section>
+513: 
+514:         <section class="mt-6 grid gap-4 lg:grid-cols-[1.4fr_.9fr]">
+515:           <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+516:             <div class="mb-4 flex items-center justify-between gap-3">
+517:               <h2 class="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">Leads</h2>
+518:               <span class="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-slate-500">${esc(fmtDate(state.event?.start_time))}</span>
+519:             </div>
+520:             <div class="grid gap-3">
+521:               ${state.checkins.length ? state.checkins.map(renderLead).join('') : '<div class="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-5 text-center font-bold text-slate-500">No buyer check-ins yet.</div>'}
+522:             </div>
+523:           </div>
+524: 
+525:           <aside class="grid gap-4">
+526:             ${renderLoanOfficerCard()}
+527:             <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+528:               <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Shared Coverage Devices</div>
+529:               <div class="mt-2 text-xl font-black">${esc(state.sign?.public_code || state.code || '-')}</div>
+530:               <div class="mt-2 text-sm font-bold text-slate-500">${esc(state.event?.setup_context?.coverage_device_count || 1)} of 3 connected. The agent and loan officer can each carry an Event Pass while one Smart Sign or LO Coverage Sign stays with the property.</div>
+531:               <div class="mt-3 rounded-2xl bg-sky-50 p-3 text-xs font-bold leading-relaxed text-sky-900">To add another device, activate it normally and select this same agent and open house. It will join this event automatically instead of creating a duplicate.</div>
+532:               <div class="mt-4 grid gap-2">
+533:                 <button onclick="window.moveSignToAnotherOpenHouse()" class="rounded-full bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-sm">Move Sign To Another Open House</button>
+534:                 <button onclick="window.endCurrentOpenHouse()" class="rounded-full bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">End This Open House</button>
+535:                 <a href="${esc(summaryMail)}" class="rounded-full bg-white px-4 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Event Summary</a>
+536:               </div>
+537:             </div>
+538:             <div class="rounded-[28px] border border-slate-200 bg-white/70 p-5">
+539:               <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Listing Outreach</div>
+540:               <div class="mt-2 text-2xl font-black">${esc(sentCount)} sent</div>
+541:               <p class="mt-2 text-sm font-bold leading-relaxed text-slate-500">This is separate from buyer check-ins. It tracks automated outreach tied to the listing/open house source.</p>
+542:             </div>
+543:           </aside>
+544:         </section>
+545:       `;
+546:       attachFitCheckerHandlers();
+547:     }
+548: 
+549:     function renderEndedSummary() {
+550:       const stats = eventSummaryStats();
+551:       const address = state.house?.address || state.event?.setup_context?.address || 'this open house';
+552:       const sponsored = isSponsoredEventPassEvent();
+553:       const member = state.membershipActive === true;
+554:       const unpaidNormalPass = !sponsored && !member;
+555:       const passLabel = sponsored ? 'Sponsored Event Pass' : isEventPassEvent() ? 'Event Pass' : 'Smart Sign';
+556:       const summaryMail = mailtoHref('', eventSummarySubject(), eventSummaryBody());
+557:       const kitUrl = openHouseKitHref(address);
+558:       const recapEmail = state.event?.setup_context?.event_recap_email || {};
+559:       const recapStatus = recapEmail.status === 'sent'
+560:         ? `REL8TION emailed this event-only recap to ${recapEmail.recipient || 'the email on your agent profile'}.`
+561:         : recapEmail.status === 'failed' || recapEmail.status === 'missing_recipient'
+562:           ? `REL8TION could not deliver the automatic recap yet: ${recapEmail.warning || 'check the email on your agent profile or contact support.'}`
+563:           : 'REL8TION is preparing the event-only recap for the email on your agent profile.';
+564:       const nextBody = `I finished the Rel8tion Event Pass at ${address}. I need loan officer coverage for my next open house.`;
+565:       const loPhone = state.loanOfficer?.loan_officer_phone || '';
+566:       const secondaryCta = loPhone ? telHref(loPhone) : smsHref('3477758059', nextBody);
+567:       const historyCopy = sponsored
+568:         ? 'Required compliance and audit evidence remains preserved internally.'
+569:         : member
+570:           ? 'Your check-in and disclosure history remains available in your permanent dashboard.'
+571:           : 'This event is complete. Activate REL8TION Agent to keep permanent records from future events.';
+572:       const nextHeading = sponsored
+573:         ? 'Your sponsored event copy is delivered by email.'
+574:         : member
+575:           ? 'Add permanent branded hardware to your membership.'
+576:           : 'Keep future open-house records in your dashboard.';
+577:       const nextCopy = sponsored
+578:         ? `${recapStatus} This event-only version will not remain in your agent dashboard, disclosure library, analytics, or reports. Activate REL8TION Agent for $29/month to keep permanent records from future events.`
+579:         : member
+580:           ? 'Your membership keeps the dashboard, permanent check-in and disclosure records, analytics, reporting, and assisted follow-up active. The $199 Open House Kit is a separate one-time purchase with a reusable Smart Sign and custom company-branded Rel8tionChips—no second membership charge.'
+581:           : 'REL8TION Agent is $29/month and unlocks permanent check-in and disclosure history, analytics, reporting, your digital profile, and assisted follow-up. Member-only Open House Kit pricing appears after membership is active.';
+582:       const primaryActions = member && !sponsored
+583:         ? `<a href="${esc(kitUrl)}" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Add My Branded Open House Kit · $199 One Time</a><a href="${esc(summaryMail)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">Email Another Summary</a>`
+584:         : '<a href="/pricing?role=agent" class="rounded-full bg-sky-600 px-5 py-3 text-center text-sm font-black text-white">Activate REL8TION Agent · $29/Month</a>';
+585:       app.innerHTML = `<div class="py-10">
+586:         <div class="mx-auto mb-4 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-emerald-700">Open House Ended</div>
+587:         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold leading-tight md:text-5xl">Event Summary</h1>
+588:         <p class="mt-3 max-w-2xl text-lg font-semibold leading-relaxed text-slate-600">${esc(passLabel)} coverage is closed for ${esc(address)}. ${esc(historyCopy)}</p>
+589: 
+590:         <div class="mt-6 grid gap-3 md:grid-cols-3">
+591:           ${stat('Buyers checked in', stats.checkins, 'blue')}
+592:           ${stat('Disclosures signed', stats.disclosures, stats.disclosures === stats.checkins && stats.checkins ? 'green' : 'slate')}
+593:           ${stat('Financing help', stats.financing, stats.financing ? 'green' : 'slate')}
+594:         </div>
+595: 
+596:         <div class="mt-6 rounded-[28px] border border-slate-200 bg-white/75 p-5">
+597:           <div class="text-xs font-black uppercase tracking-[.16em] text-slate-500">Next Open House</div>
+598:           <h2 class="mt-2 font-['Plus_Jakarta_Sans'] text-2xl font-extrabold">${esc(nextHeading)}</h2>
+599:           <p class="mt-2 font-semibold leading-relaxed text-slate-600">${esc(nextCopy)}</p>
+600:           <div class="mt-4 grid gap-2 md:grid-cols-2">
+601:             ${primaryActions}
+602:             <a href="${esc(secondaryCta)}" class="rounded-full bg-white px-5 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-200">${sponsored ? 'Keep Using Sponsored Event Pass' : unpaidNormalPass ? 'Ask About Sponsored Coverage' : loPhone ? 'Call Loan Officer' : 'Ask Rel8tion For Coverage'}</a>
+603:             <button onclick="window.moveSignToAnotherOpenHouse(true)" class="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200">Start Another Open House</button>
+604:           </div>
+605:         </div>
+606:       </div>`;
+607:     }
+608: 
+609:     async function closeCurrentOpenHouse({ move = false } = {}) {
+610:       if (!state.event?.id || !state.sign?.id) throw new Error('Missing active event or sign.');
+611:       const ok = window.confirm(move
+612:         ? 'End this open house and move the sign to another listing? Buyer check-ins already captured will stay saved.'
+613:         : 'End this open house now? Buyer check-ins already captured will stay saved.');
+614:       if (!ok) return;
+615: 
+616:       const result = await dashboardApi('close_event', 'POST');
+617: 
+618:       if (move) {
+619:         const params = new URLSearchParams();
+620:         if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+621:         if (state.agent) params.set('agent', state.agent);
+622:         params.set('move', '1');
+623:         window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+624:         return;
+625:       }
+626: 
+627:       state.event = result.event;
+628:       state.sign = result.sign;
+629:       renderEndedSummary();
+630:     }
+631: 
+632:     window.endCurrentOpenHouse = () => closeCurrentOpenHouse({ move: false }).catch((error) => renderError(error.message || 'Could not end this open house.'));
+633:     window.moveSignToAnotherOpenHouse = (skipConfirm = false) => {
+634:       if (skipConfirm) {
+635:         const params = new URLSearchParams();
+636:         if (state.sign?.public_code || state.code) params.set('code', state.sign?.public_code || state.code);
+637:         if (state.agent) params.set('agent', state.agent);
+638:         params.set('move', '1');
+639:         window.location.href = `/sign-demo-activate.html?${params.toString()}`;
+640:         return;
+641:       }
+642:       closeCurrentOpenHouse({ move: true }).catch((error) => renderError(error.message || 'Could not move this sign.'));
+643:     };
+644: 
+645:     function renderError(message) {
+646:       agentLabel.textContent = state.agent ? labelSlug(state.agent) : 'Dashboard';
+647:       app.innerHTML = `<div class="py-12 text-center">
+648:         <div class="mx-auto mb-4 inline-flex rounded-full bg-red-50 px-4 py-2 text-sm font-black uppercase tracking-[.14em] text-red-700">Dashboard Not Ready</div>
+649:         <h1 class="font-['Plus_Jakarta_Sans'] text-4xl font-extrabold">Could Not Open Dashboard</h1>
+650:         <p class="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-slate-600">${esc(message)}</p>
+651:       </div>`;
+652:     }
+653: 
+654:     async function init() {
+655:       if (!state.agent) throw new Error('Tap the rear agent chip first, then verify with your claimed Rel8tionChip keychain.');
+656:       const snapshot = await dashboardApi();
+657:       state.sign = snapshot.sign;
+658:       state.event = snapshot.event;
+659:       state.house = snapshot.house;
+660:       state.checkins = snapshot.checkins || [];
+661:       state.outreach = snapshot.outreach || [];
+662:       state.loanOfficer = snapshot.loan_officer || null;
+663:       state.membershipActive = snapshot.membership_active === true;
+664:       const eventHost = state.event.host_agent_slug || state.sign?.owner_agent_slug || '';
+665:       if (eventHost && eventHost !== state.agent) throw new Error(`This event belongs to ${eventHost}.`);
+666:       state.affordability = await loadAffordability(state.event.id, eventHost || state.agent).catch((error) => {
+667:         console.log('affordability fit data skipped', error);
+668:         return { guidanceByBuyerId: {}, scenariosByBuyerId: {}, disclaimer: FIT_DISCLAIMER };
+669:       });
+670:       render();
+671:     }
+672: 
+673:     init().catch((error) => renderError(error.message || 'Something interrupted the dashboard lookup.'));
+674:   </script>
