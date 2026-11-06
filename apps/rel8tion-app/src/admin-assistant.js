@@ -12,7 +12,13 @@ window.createAssistantPanel = function ({api, esc, refresh}) {
   async function load(){
     if(loading)return; loading=true; error=''; refresh();
     try { const next=await api('/api/admin/assistant');if(!next.calendar?.verified&&data?.calendar?.bookings?.length)next.calendar={...data.calendar,verified:false,error:next.calendar?.error||'Calendar refresh failed.'};data=next;calendarDay=calendarDay||dayKey(data.loaded_at);if(!current())selected=data.threads[0]?.thread_key||''; }
-    catch(e){error=e.message;} finally{loading=false;refresh();}
+    catch(e){
+      error=e.message;
+      if(data){
+        data.calendar={...(data.calendar||{}),verified:false,error:'Calendar refresh failed. Saved bookings are shown as unverified.'};
+        data.booking_checks=Object.fromEntries((data.threads||[]).map(t=>[t.thread_key,{status:'unverified',rows:[],reason:'Calendar refresh failed. Verify the schedule before offering coverage.'}]));
+      }
+    } finally{loading=false;refresh();}
   }
   function visible(){return (data?.threads||[]).filter(t=>{
     const actions=data.actions.filter(a=>a.thread_key===t.thread_key);

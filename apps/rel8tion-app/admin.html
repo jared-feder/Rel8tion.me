@@ -2778,8 +2778,8 @@
 
     async function refreshLiveData() {
       if (!state.verified || state.loading || state.liveRefreshing || document.visibilityState !== 'visible') return;
-      if (state.area === 'assistant') return assistantPanel.load();
       if (state.sendingKey || state.actionKey || state.coveragePickerKey || state.homekeyModal || isCommandEditing()) return;
+      if (state.area === 'assistant') return assistantPanel.load();
       state.liveRefreshing = true;
       try {
         const controlRequest = state.area === 'outreachControl'
@@ -5373,7 +5373,13 @@ ${rowsHtml}
       `).join('')}</section>`;
     }
 
-    const assistantPanel = window.createAssistantPanel({api, esc, refresh: () => { if (state.verified && state.area === 'assistant') refreshAreaContent(); }});
+    const assistantPanel = window.createAssistantPanel({api, esc, refresh: () => {
+      if (state.verified && state.area === 'assistant') {
+        const snapshot = captureUiState();
+        refreshAreaContent();
+        restoreUiState(snapshot);
+      }
+    }});
 
     function renderArea() {
       if (state.area === 'assistant') return assistantPanel.render();
