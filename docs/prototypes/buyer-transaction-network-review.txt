@@ -1,0 +1,25 @@
+REL8TION Buyer Transaction Network — synthetic preview
+Date: 2026-11-06
+Base: ec139a19c9222df304baf78ce957643a168f9bce
+Branch: feature/rel8tion-funnel-review-2026-11-04
+
+Open buyer-transaction-network.html in a browser after downloading. It is standalone, with inline styles/scripts, no external dependencies, no network calls, no backend and no persistent storage. All people, locations, licenses, notes and amounts are fictional. Refresh restarts the experience.
+
+Walkthrough: acknowledge simulated check-in; try represented/unrepresented/unknown states; choose Maya or distinguish two Alex Morgan records; simulate agent verification or an unsent invitation; edit private visit notes and priorities; try scripted contextual AI; request offer preparation for the chosen agent with separate sharing permission; simulate agent acknowledgment/cancellation; try financing consent and revocation while preserving existing LO Priya Shah. Basic buyer experience remains free. Listing agent Elena Rivera never receives buyer-agent offer intent. No actual agency, invitation, offer, notification, AI call, appointment or financing lead is created.
+
+Files added:
+- docs/prototypes/buyer-transaction-network.html
+- test/buyer-transaction-network-preview.test.cjs
+- docs/prototypes/buyer-transaction-network-review.txt
+
+Validation: 23 new offline policy/syntax/source checks passed. The 25 buyer continuity, 40 agent nurture and 29 mocked event notification tests also passed (117 total). No provider called. New tests cover exact agent choice, same-name ambiguity, pending invitation privacy, representation holds, scoped consent, integer USD cents, idempotency, cancellation, acknowledgment vs submission, contextual visit recall and absence of external communication/storage.
+
+Visual verification: NOT COMPLETED. Both in-app and desktop Edge browser attempts to the local loopback preview server timed out. Browser security then denied the file:// URL because only HTTP/HTTPS protocols are allowed. No bypass or alternate browser automation was attempted. Native Library HTML artifact supplied for user opening. This limitation is explicit; passing source/policy tests is not a browser interaction pass.
+
+Desktop clone failed because the sandbox Git subprocess could not create its runtime IPC object; HTTPS Git clone could not resolve github.com. GitHub connector was used for source-only publication to the existing exact guarded branch. No new automatically deploying branch, PR, merge or deployment.
+
+Limits: No production data, credentials, SQL, capture activation, enrollment, actual messaging, sender/cron change, checkout change, production route change or live model. Identity verification and authorization are simulated UX only, not reusable security. The prototype contains pure demo policies inside its HTML so it remains self-contained; production adapters must be independently authenticated and reviewed. Keep the existing three branch-specific Vercel guards unchanged.
+
+Next step: obtain visual/mobile walkthrough feedback, then resolve actual nonproduction Auth/schema/RLS and canonical identity authorities before implementing a connected adapter. Keep current check-in/disclosures, physical products, host/listing attribution, existing buyer agents, loan-officer sponsorship/assignments, Digital You and pricing intact.
+
+AGENTS.md reviewed - no durable rule change.
