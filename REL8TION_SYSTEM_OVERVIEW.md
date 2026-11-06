@@ -1,5 +1,8 @@
 # REL8TION System Overview
 
+- [CONFIGURED LIVE 2026-11-06] Jared approved the Web Push credential, now stored production-only with a sensitive private key in Vercel. The current app was rebuilt with it. Device enrollment is still pending: zero subscriptions, a human-only Admin Lock PIN setup in the user's browser, then strong owner connection and explicit notification permission. Server configuration is not proof of a delivered notification. Keep the same VAPID pair for existing devices unless a separate rotation is authorized.
+
+
 - [LIVE 2026-11-06] Jared's Assistant manual-reply integration is published through PR #91 at app.rel8tion.me/command?area=assistant. The production flag is enabled; writes still require a strong owner connection, exact immutable approval and final send confirmation. Scoped Cat access cannot approve/send and its trusted connection broker is still pending. Signed inbound routing, double dispatch claims, fixed 844 sender, fresh opt-out/contact checks and receipt-only reconciliation are active. Push infrastructure is published but delivery is inactive pending specifically approved VAPID credentials and device permission. Proactive outreach remains paused; no paid owner-review SMS fallback is used. Earlier pending/test labels below describe prior releases.
 
 

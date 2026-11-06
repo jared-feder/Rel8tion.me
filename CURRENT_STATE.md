@@ -1,5 +1,13 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Approved Web Push key configured
+
+- [CONFIGURED LIVE] Jared explicitly approved creating and securely storing the notification key. Generated one validated VAPID P-256 pair in memory and stored ASSISTANT_VAPID_PRIVATE_KEY as a sensitive production-only Vercel value; public key and https://app.rel8tion.me subject are production-only. No private key was written to repository/local files, printed to the chat, or exposed to clients. Existing-key metadata was checked first; no key was rotated.
+- [DEPLOYED] Production source 4cc63def7af2f14a14217c4e8ca3805f5b6ad615 was rebuilt as dpl_CjLi5koPu9ZTSKsYUc1b1Rb1fUUs, READY and aliased to app.rel8tion.me with the new configuration. Manual sending/strong-owner boundaries remain unchanged. Proactive outreach remains paused and operator away; no paid owner-SMS fallback.
+- [DEVICE HANDOFF PENDING] Active subscriptions remain zero. The user's COMMAND browser tab is stopped at Set Admin Lock. Jared must choose/enter/save the new PIN directly; the agent did not create a credential for him or bypass the lock. Owner authentication and a user-clicked Enable push/browser permission are still required for enrollment. No real push was sent and visible/audible delivery is unverified.
+- AGENTS.md updated: preserve the configured key pair and do not rotate it on retries; device subscriptions are tied to that public key. Earlier key-pending entries below are historical.
+
+
 ## 2026-11-06: Assistant sending release verified live
 
 - [LIVE] PR #90 staged and PR #91 released the reviewed integration. Production commit 188cb69b2ea22ed6e719514d85659bde9bb9fc4a is READY on Vercel deployment dpl_2pUp1DcsgUWLS6AoBobVZmno3zK5, aliased to app.rel8tion.me. Production-only ASSISTANT_MANUAL_SEND_ENABLED=true is configured. Manual replies still require the existing strong owner token, immutable approval and final exact-message confirmation; Cat capabilities cannot approve/send, and trusted broker issuance remains unconfigured.
