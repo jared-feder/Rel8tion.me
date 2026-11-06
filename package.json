@@ -6,6 +6,8 @@
     "test": "node tests/app-auth.test.cjs",
     "verify:agent-nurture": "node --test test/agent-nurture-preview.test.cjs",
     "verify:buyer-continuity": "node --test test/buyer-continuity.test.cjs",
+    "verify:buyer-ai": "node --test test/buyer-ai-workspace.test.cjs",
+    "preview:buyer-ai": "node scripts/serve-buyer-ai-preview.cjs",
     "verify:app": "node scripts/verify-app-architecture.cjs",
     "pricing:stripe:dry-run": "node scripts/sync-stripe-pricing.cjs --dry-run",
     "pricing:stripe:apply": "node scripts/sync-stripe-pricing.cjs --apply",
@@ -47,6 +49,7 @@
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
+    "ai": "7.0.163",
     "cheerio": "^1.0.0",
     "jszip": "^3.10.1",
     "nodemailer": "^7.0.13",
@@ -54,4 +57,3 @@
     "qrcode": "^1.5.4"
   }
 }
-

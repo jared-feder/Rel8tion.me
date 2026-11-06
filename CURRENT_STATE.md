@@ -1,5 +1,14 @@
 # CURRENT_STATE.md
 
+## 2026-11-06: Paid-agent buyer conversation integration — isolated test branch
+
+- `[PARTIAL, TEST ONLY]` Added a server-side buyer conversation service and UI section inside the existing personal `/agent-home` renderer. Synthetic event/profile leads retain originating-agent context across visits. A session-scoped loopback API runs eligible first-touch drafts, simulated SMS/email attempts, buyer replies, sourced preference memory, fictional property matches and agent-reviewed showing/consultation/offer-preparation handoffs.
+- `[BOUNDARY]` AI SDK 7.0.163 executes an offline fixture model; no live LLM or SMS/email provider is connected. Preview state is memory-only and resets on server restart or new fixture workspace. The API exports a disabled default handler, rejects Vercel/non-loopback access, and uses an HttpOnly same-site fixture session plus CSRF token. This is not production authentication or production consent verification.
+- `[PRESERVED]` Event Pass, QR/NFC routing, sponsored access, check-in notifications, billing, COMMAND and Jared’s Assistant worktree are unchanged. This branch is `feature/buyer-ai-paid-agent-slice-2026-11-06`, based on review commit `ae2c944d010fb72ee75dc05f823f6ef8936857bc`; Git deployment is disabled for that exact branch in all three configs.
+- `[NEEDS IMPLEMENTATION]` Real tenant/auth/data adapters, OS identity crosswalk, scoped audited consent, real model evaluation, durable enrollment/inbound/retry/cadence, channel provider confirmation and a bounded approved pilot. The separate gateway audit identified prior-use versus distinct-property semantics, separate sponsored-inventory behavior, sponsor-specific notification and paid-plus-sponsor continuity gaps; this build does not modify those flows.
+- `AGENTS.md updated — synthetic-only API/model/delivery and deployment guards.`
+- `[VERIFIED LOCALLY]` 189 focused/regression tests pass, plus universal app architecture/static syntax and route-map checks. Browser walkthrough verified contextual SMS/email simulation, same-agent represented client, memory recall, factual fixture match and human handoff; 430px viewport has 415px document width. Full-page captures were saved. No live LLM, production data/provider, physical-device, checkout or delivery test was performed.
+
 ## 2026-11-06: Actual-app buyer continuation preview
 
 - `[REVIEW ONLY, NOT DEPLOYED]` Added a loopback fixture entry using the real event/check-in renderer, original three paths, branding and guided disclosure layout. Buyer continuation is downstream of guest/property/contact content. The previous standalone concept preview is superseded; start at `docs/buyer-preview-app-review.txt`.

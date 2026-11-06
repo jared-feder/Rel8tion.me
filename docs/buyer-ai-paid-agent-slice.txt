@@ -1,0 +1,63 @@
+Paid-agent buyer AI — first application integration slice
+2026-11-06 | feature/buyer-ai-paid-agent-slice-2026-11-06
+Base: feature/rel8tion-funnel-review-2026-11-04 @ ae2c944d010fb72ee75dc05f823f6ef8936857bc
+
+What works in this slice
+The existing apps/rel8tion-app/agent-home.html personal agent dashboard now has a downstream Buyer Relationship Assistant section on its explicit local fixture entry. The original renderShell(), NFC/phone gates and production initialization are retained. There is no new standalone HTML application.
+
+The server-owned fixture contexts include two synthetic agent workspaces, two event-history rows, event/profile leads, originating agent versus substitute host, canonical-contact crosswalk fields, membership, representation, SMS/email consent and separate LO context. Paid-agent lead lists appear together in the new section. These are simulated resolver outputs, not imports from the real OS or application database.
+
+Run eligible follow-up starts one contextual conversation per eligible synthetic buyer. Both SMS/email are simulated when independently permitted; an email address alone does not grant email permission. The same agent's existing verified buyer can receive service; another/unknown agent relationship is held. Buyer replies retain exact sourced preference quotes, match the fictional property catalog and produce explicit agent-review opportunities. Showing/offer preparation is never represented as booking or submission. Pause, takeover, revocation, STOP and email unsubscribe alter future preview behavior without notifying anyone.
+
+Code map
+- lib/buyer-ai/fixtures.js: server-owned synthetic data only; no database/provider imports.
+- lib/buyer-ai/service.js: per-workspace checks, serialized actions, idempotency, conversation state, sourced facts, matches and handoff; no delivery adapter.
+- lib/buyer-ai/model.js: AI SDK 7.0.163 generateText boundary and explicit offline fixture language model. generateWithModel is an injection seam; no real provider/model is configured or tested. Input is contextual but this fixture's language behavior is deterministic; do not present it as live LLM intelligence.
+- api/buyer-ai-preview.js: disabled default export; only dedicated loopback server enables fixtures. Rejects Vercel, non-loopback hosts/clients, foreign origins, missing fixture session or wrong CSRF token. Actor comes from the server session rather than POST data.
+- apps/rel8tion-app/src/modules/buyerAi/workspace.js: actual agent-home add-on UI; existing navigation is inert only in fixture mode.
+- scripts/serve-buyer-ai-preview.cjs: loopback allowlist; only the new fixture API and required static source/assets. Production routes, credentials and databases are not mounted.
+- test/buyer-ai-workspace.test.cjs: focused integration/security/policy/model tests.
+
+Run locally
+Use Node.js 24 and npm ci, then:
+  npm run verify:buyer-ai
+  npm run preview:buyer-ai
+Open in the desktop browser:
+  http://127.0.0.1:8771/agent-home?agent=maya-brooks&uid=demo-keychain&buyer_ai_preview=1#buyer-ai
+This is a desktop loopback URL, not a phone/shared link.
+
+Review path
+1. Open Maya's synthetic paid workspace; run eligible follow-up.
+2. Alex receives simulated SMS and email. Jordan, an existing verified client of Maya, can receive service. Taylor is held because of another agent relationship. Casey gets SMS only; email permission is absent.
+3. Reply as Alex: I need a yard and four bedrooms next weekend.
+4. Inspect sourced memory and 42 Example Court's fictional match.
+5. Ask for a showing; the intent returns to Maya and automation holds for review. Acknowledge/take over.
+6. Revoke a channel or type STOP; no further simulated attempt is generated on a blocked channel. Resume does not recreate consent.
+7. Switch to Noah's inactive paid-service fixture; run produces no attempts. Switching creates a new isolated fixture session and resets that account's preview state.
+
+Verification boundary
+Focused tests cover ownership/actor isolation, represented-buyer handling, independent SMS/email permissions, ambiguous identity/suppression, fake-destination allowlists, post-generation rechecks, duplicate/concurrent runs and idempotency-key conflict, sourced facts/matches, handoff, STOP/unsubscribe, pause/revocation/takeover, prompt injection, AI SDK offline execution, disabled/default/non-loopback API, origin/CSRF guards and all three deployment guards.
+Existing buyer continuity, agent nurture, prior buyer preview, Event Pass reuse/security, LO assignment, route map and universal auth/architecture checks must remain passing. The SMS helper test loader now normalizes CRLF before stripping ESM imports; Windows checkout line endings exposed that pre-existing harness issue. Notification implementation and recipients are unchanged.
+Browser walkthrough and exact final counts are recorded in the completion handoff. Tests and fixture UI are not proof of live Supabase RLS, accounts, provider readiness or delivery.
+
+Preserved boundaries
+The review-only buyer-continuity and agent-nurture planners still forbid sending. No SQL proposal was applied. No provider calls, real recipients, real lead enrollment, campaign activation, billing change, Event Pass notification change, merge or deployment.
+Three exact-branch deployment guards remain disabled before any remote branch is published.
+
+Coordination
+Jared's Assistant runs separately in thread Build assistant inbox, 01a1b190-0dad-7329-9ca1-77e29606f00b, on test/jared-assistant in task-4/command. That task was notified of this branch/file boundary. This work does not edit its worktree, COMMAND or outreach APIs. Shared doc/config diffs must be reconciled in a later review; no automatic merge.
+
+Gateway audit carried forward, not fixed here
+Verified production READY dpl_2sPR2Zt5kjM8R2dTSaGrdkcayyJD @ ad31361d5b1a22993def74736ab769151f04f392 and live $29/month pricing. Normal pass gateway is later activation based on prior use, not second distinct property. The separate sponsored_agent_pass path has a separate consent/reuse flow. Sponsor resolves current assignment -> active agent-LO relationship -> first event since Freshen -> active Jared fallback. Owner registration email is not sponsor-specific reuse notification. Paying does not delete the permanent relationship, but the normal paid activation does not explicitly carry sponsorship into a new event. These must be resolved without replacing existing free event check-in/SMS behavior.
+
+Production blockers / next implementation
+1. Authorized isolated nonproduction app/OS target; verified schema, tenant RLS and account/workspace auth. The current fixture is not a tenant authorization migration.
+2. Authoritative check-in/profile-lead resolver and source-native crosswalk through the existing OS canonical contact resolver/relationships; do not create a second person authority or write REL8TION production from Jared's personal OS.
+3. Buyer+agent+purpose+channel consent audit, representation protection, current assisted_follow_up entitlement, shared/recycled contact review and global/channel suppression adapters.
+4. Configure and evaluate a real model behind generateWithModel with bounded context/budget and structured output; no model/provider was selected, keyed or billed by this test.
+5. Durable enrollment, source-receipt/inbound identity, campaign cadence, leases, transaction/idempotency, retries and uncertain-provider reconciliation. Preview state is memory-only and expires; it is not a production campaign store.
+6. Registered SMS and email providers, verified inbound signatures, STOP and unsubscribe/bounce/complaint handling, quiet hours/caps, current permission checks at every attempt and provider-confirmed evidence.
+7. Agent opportunity persistence and notifications through authorized channels; Cat's own push-only review alerts do not remove agents' existing Event Pass SMS notifications.
+8. Bounded authorized live pilot only after those gates. Historical lists must not automatically enroll on subscription activation.
+
+AGENTS.md updated with durable preview/model/delivery and branch guardrails.

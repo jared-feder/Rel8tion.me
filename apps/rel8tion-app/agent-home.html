@@ -338,6 +338,22 @@
       .panel { border-radius: 26px; }
     }
   </style>
+  <style>
+    .buyer-ai { margin-top:18px; scroll-margin-top:16px; }
+    .buyer-ai .ai-layout { display:grid; grid-template-columns:minmax(190px,.7fr) minmax(0,1.8fr); gap:22px; margin-top:20px; }
+    .buyer-ai h3 { font-size:18px; margin:22px 0 12px; }
+    .buyer-ai .ai-lead { display:block; width:100%; margin:10px 0; text-align:left; color:var(--ink); cursor:pointer; }
+    .buyer-ai .ai-lead span { display:block; overflow-wrap:anywhere; }
+    .buyer-ai .ai-selected { outline:2px solid var(--blue); }
+    .buyer-ai .ai-message { margin:12px 0; padding:16px; border-radius:20px; background:#fff; overflow-wrap:anywhere; }
+    .buyer-ai .ai-message.buyer { background:#e2f2ff; }
+    .buyer-ai .ai-message p { line-height:1.6; margin-bottom:0; }
+    .buyer-ai textarea,.buyer-ai select { width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:14px; font:inherit; background:white; color:var(--ink); }
+    .buyer-ai textarea { min-height:100px; margin-top:10px; }
+    .buyer-ai .mini { cursor:pointer; }
+    .buyer-ai button:disabled { opacity:.55; cursor:wait; }
+    @media(max-width:760px) { .buyer-ai .ai-layout { grid-template-columns:1fr; } .buyer-ai .badge { letter-spacing:.02em; font-size:10px; } }
+  </style>
 </head>
 <body>
   <main>
@@ -1052,7 +1068,12 @@
       renderShell({ agent, events, checkins, leads, scenarios, guidance, houseMap, qrLinks, kitDashboard, membership });
     }
 
-    init().catch((error) => {
+    const buyerAiFixtureRequested = ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
+      && params.get('buyer_ai_preview') === '1';
+    const startAgentHome = buyerAiFixtureRequested
+      ? async () => { const { initBuyerAiPreview } = await import('/apps/rel8tion-app/src/modules/buyerAi/workspace.js'); await initBuyerAiPreview({ renderShell }); }
+      : init;
+    startAgentHome().catch((error) => {
       app.className = 'panel';
       app.innerHTML = `<h2>Dashboard could not load.</h2><p class="empty">${esc(error.message || error)}</p>`;
     });

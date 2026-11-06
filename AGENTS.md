@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Paid-agent buyer AI test slice
+
+- `lib/buyer-ai/*`, `/api/buyer-ai-preview` and the explicit loopback `agent-home?buyer_ai_preview=1` entry are synthetic integration work only. The default API handler is disabled; the dedicated local server enables only fictional workspaces. Preserve the Vercel/loopback/session/CSRF guards and exact-branch deployment disablement for `feature/buyer-ai-paid-agent-slice-2026-11-06` in all three Vercel configs.
+- The conversation currently uses an AI SDK offline fixture model. Simulated attempts have no provider ID, `submitted=false` and `delivered=false`. Never describe them as model inference, production enrollment or message delivery. Real provider/model credentials must not be loaded into this preview. Preserve originating-agent scope, existing-agent protection, independent SMS/email permission, immediate suppression, human takeover and source-linked facts/handoffs. Run `npm run verify:buyer-ai` plus the existing buyer, SMS, Event Pass and route checks.
+- Do not connect the synthetic service to production tables, OS owner-wide memory, live campaigns, billing or Event Pass notifications. A real adapter requires reviewed tenant isolation, authoritative identity/consent/entitlements, durable delivery state and explicit rollout authorization. `docs/buyer-ai-paid-agent-slice.txt` records the exact boundary and open gateway defects.
+
 ## Actual-app buyer preview (local test only)
 
 - `[REVIEW ONLY]` `apps/rel8tion-app/buyer-preview.html` and `src/modules/eventShell/buyerPreview.js` reuse the existing event/check-in renderer with synthetic records. `initEventShellPreview` requires the explicit loopback preview route and fixture marker; the live `initEventShellPage` must never select it automatically. Keep its no-network/no-provider/no-persistence adapter, inert contact/PDF links, CSP `connect-src 'none'` / `form-action 'none'`, and GET-only loopback server. This is not authentication or live consent evidence. Run `node --test test/buyer-preview-app.test.cjs test/buyer-preview-policy.test.cjs test/event-sms-outcomes.test.cjs`; preserve original check-in component fingerprints and all three exact-branch deployment guards.

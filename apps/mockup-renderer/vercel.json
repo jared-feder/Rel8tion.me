@@ -1,7 +1,8 @@
 {
   "git": {
     "deploymentEnabled": {
-      "feature/rel8tion-funnel-review-2026-11-04": false
+      "feature/rel8tion-funnel-review-2026-11-04": false,
+      "feature/buyer-ai-paid-agent-slice-2026-11-06": false
     }
   },
   "$schema": "https://openapi.vercel.sh/vercel.json",

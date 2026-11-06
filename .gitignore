@@ -23,3 +23,7 @@ docs/*-assets-*/
 docs/*backup*.json
 docs/replied-agents-current-*.json
 docs/sign-detach-backup-*.json
+buyer-ai-server.log
+buyer-ai-server-errors.log
+buyer-ai-server.pid
+buyer-ai-verification.log
